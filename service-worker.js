@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inhaus-v6';
+const CACHE_NAME = 'inhaus-v7';
 const ASSETS = [
   'index.html',
   'styles.css',
@@ -7,7 +7,8 @@ const ASSETS = [
   'app.js',
   'manifest.json',
   'icons/icon-192.png',
-  'icons/icon-512.png'
+  'icons/icon-512.png',
+  'icons/logo.png'
 ];
 
 self.addEventListener('install', e => {

@@ -3,13 +3,13 @@
    All tap targets 56px minimum */
 
 :root {
-  --primary: #3D4A35;
-  --primary-dark: #2e3829;
-  --primary-light: #e8ede5;
+  --primary: #2D3B24;
+  --primary-dark: #1f2a19;
+  --primary-light: #e4ebe1;
   --accent: #8FA888;
   --accent-light: #dce5d8;
-  --success: #3D4A35;
-  --success-light: #e8ede5;
+  --success: #2D3B24;
+  --success-light: #e4ebe1;
   --warning: #d97706;
   --warning-light: #fef3c7;
   --danger: #dc2626;
@@ -63,10 +63,11 @@ body {
   margin: 0 -16px 20px; padding: 36px 20px 28px;
 }
 .app-logo {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
-  margin-bottom: 6px;
+  display: block; text-align: center; margin-bottom: 8px;
 }
-.app-logo svg { flex-shrink: 0; }
+.app-logo img {
+  max-width: 220px; height: auto;
+}
 .app-title { font-size: 2rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
 .app-subtitle { color: rgba(255,255,255,0.7); font-size: 1rem; margin-top: 2px; }
 
@@ -360,7 +361,7 @@ body {
 }
 .phase-dot.active .phase-circle {
   background: var(--primary); color: #fff;
-  box-shadow: 0 0 0 4px rgba(61, 74, 53, 0.2);
+  box-shadow: 0 0 0 4px rgba(45, 59, 36, 0.2);
 }
 .phase-dot.done .phase-circle { background: var(--accent); color: #fff; }
 .phase-name {

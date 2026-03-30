@@ -702,32 +702,20 @@
     }
   }
 
+  // ── App Header (reused on all screens) ─────────────────────
+  function buildAppHeader(subtitle) {
+    const header = el('div', { className: 'app-header' });
+    const logo = el('div', { className: 'app-logo' });
+    logo.appendChild(el('img', { src: 'icons/logo.png', alt: 'InHaus Lab' }));
+    header.appendChild(logo);
+    header.appendChild(el('p', { className: 'app-subtitle' }, subtitle || 'Field Inspector'));
+    return header;
+  }
+
   // ── HOME SCREEN ────────────────────────────────────────────
   function renderHome() {
     const c = el('div', { className: 'screen home-screen' });
-    const header = el('div', { className: 'app-header' });
-    const logo = el('div', { className: 'app-logo' });
-    // House icon SVG
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', '36');
-    svg.setAttribute('height', '36');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', '#ffffff');
-    svg.setAttribute('stroke-width', '2');
-    svg.setAttribute('stroke-linecap', 'round');
-    svg.setAttribute('stroke-linejoin', 'round');
-    const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path1.setAttribute('d', 'M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z');
-    const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path2.setAttribute('d', 'M9 21V12h6v9');
-    svg.appendChild(path1);
-    svg.appendChild(path2);
-    logo.appendChild(svg);
-    logo.appendChild(el('h1', { className: 'app-title' }, 'InHaus Lab'));
-    header.appendChild(logo);
-    header.appendChild(el('p', { className: 'app-subtitle' }, 'Field Inspector'));
-    c.appendChild(header);
+    c.appendChild(buildAppHeader());
 
     c.appendChild(el('button', {
       className: 'btn btn-primary btn-full',
@@ -818,8 +806,8 @@
     };
 
     const c = el('div', { className: 'screen' });
+    c.appendChild(buildAppHeader('Customer & Property Intake'));
     c.appendChild(renderStatusBar(lastSaveText));
-    c.appendChild(el('h1', { className: 'screen-title' }, 'Customer & Property Intake'));
 
     const card = el('div', { className: 'card' });
     const fields = [
@@ -900,6 +888,7 @@
     inspection._lastStepIdx = currentStepIdx;
 
     const c = el('div', { className: 'screen step-screen' });
+    c.appendChild(buildAppHeader(step.name));
     c.appendChild(renderStatusBar(lastSaveText));
 
     // Active timers bar
@@ -978,8 +967,8 @@
   // ── REVIEW SCREEN ──────────────────────────────────────────
   function renderReview() {
     const c = el('div', { className: 'screen review-screen' });
+    c.appendChild(buildAppHeader('Final Review'));
     c.appendChild(renderStatusBar(lastSaveText));
-    c.appendChild(el('h1', { className: 'screen-title' }, 'Final Review'));
 
     // Reminder banner
     c.appendChild(el('div', { className: 'reminder-banner' }, [
