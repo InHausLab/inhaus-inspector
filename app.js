@@ -13,6 +13,8 @@
   function textarea(key, label, opts) { return { key, type: 'textarea', label, ...opts }; }
   function num(key, label, opts) { return { key, type: 'number', label, ...opts }; }
   function date(key, label) { return { key, type: 'date', label }; }
+  function timeInput(key, label) { return { key, type: 'text', label, inputType: 'time' }; }
+  function dateTimeInput(key, label) { return { key, type: 'text', label, inputType: 'datetime-local' }; }
   function sel(key, label, choices, opts) { return { key, type: 'select', label, choices, ...opts }; }
   function yesno(key, label) { return { key, type: 'yesno', label }; }
   function yesnona(key, label) { return { key, type: 'yesnona', label }; }
@@ -45,6 +47,35 @@
     ];
   }
 
+  function flirLogFields() {
+    return [
+      heading('FLIR Thermal Scanning'),
+      check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
+      heading('FLIR Photo Log'),
+      info('Add each room scanned with its FLIR image number'),
+      text('flirRoom1', 'Room name'),
+      text('flirImg1', 'FLIR Image #'),
+      text('flirRoom2', 'Room name'),
+      text('flirImg2', 'FLIR Image #'),
+      text('flirRoom3', 'Room name'),
+      text('flirImg3', 'FLIR Image #'),
+      text('flirRoom4', 'Room name (if needed)'),
+      text('flirImg4', 'FLIR Image #'),
+      text('flirRoom5', 'Room name (if needed)'),
+      text('flirImg5', 'FLIR Image #')
+    ];
+  }
+
+  function bathroomLeakFields() {
+    return [
+      heading('Bathroom Leak Inspection'),
+      check('leakUnderSink', 'Under sink checked'),
+      check('leakToilet', 'Around toilet checked'),
+      check('leakShowerTub', 'Baseboard around shower/tub checked'),
+      check('leakGrout', 'Caulking/grout in tile checked')
+    ];
+  }
+
   function breezeFields(timerKey) {
     return [
       heading('Breeze ET Mold Test'),
@@ -60,12 +91,12 @@
       yesnona('qtrakRun', 'Q-Trak run'),
       showIf(timer('qtrakTimer', 'Q-Trak Sampling Timer (1 min)', 60), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_co2', 'CO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_voc', 'VOC / TVOC', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_pm25', 'PM2.5', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_pm10', 'PM10', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_co', 'CO', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_no2', 'NO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_ozone', 'Ozone', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_pm25', 'PM2.5', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_pm10', 'PM10', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_voc', 'TVOCs', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_chlorine', 'Chlorine', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_temp', 'Temperature', { unit: '\u00b0F' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_humidity', 'Humidity', { unit: '%' }), 'qtrakRun', 'Yes'),
@@ -163,36 +194,45 @@
     ];
   }
 
+  // ── #3: Arrival & Setup (expanded) ─────────────────────────
   function getArrivalFields() {
     return [
+      timeInput('assessmentStartTime', 'Assessment Start Time'),
       check('homeownerGreeted', 'Homeowner greeted (or entry instructions noted)'),
       text('securityCode', 'Security code (if needed)'),
       check('tarpPlaced', 'Tarp placed in entryway'),
       check('equipmentUnloaded', 'Equipment unloaded from car to tarp'),
       check('equipmentTidy', 'Equipment tidy, not blocking doorways'),
-      check('concernsReviewed', 'Customer concerns reviewed'),
-      heading('Expectations Set with Homeowner'),
-      check('testsExplained', 'Tests being performed explained'),
-      check('durationExplained', 'Duration explained'),
-      check('sedentaryAdvised', 'Homeowner advised to be relatively sedentary during testing'),
-      textarea('notes', 'Notes'),
+      divider(),
+      heading('Homeowner Engagement'),
+      check('reviewConcerns', 'Review customer concerns from intake form'),
+      check('askAdditional', 'Ask about additional concerns / problem areas'),
+      check('testsExplained', 'Explain tests being performed'),
+      check('durationExplained', 'Estimate testing duration'),
+      check('sedentaryAdvised', 'Ask homeowner to remain sedentary during testing'),
+      divider(),
+      heading('Airthings View Plus Setup'),
+      check('airthingsPaired', 'Pair to Airthings account'),
+      check('airthingsWifiConnected', 'Connect to home wifi'),
+      check('airthingsPlaced', 'Place at breathing height, away from vents/fans/windows/doors'),
+      info('Keep 3ft from vents, fans, windows, doors'),
+      divider(),
+      heading('Boulder Blue Fan'),
+      timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (need 2 hours)'),
+      timer('boulderBlueTimer', 'Boulder Blue Fan Timer (2 hours)', 7200),
+      divider(),
+      heading('Q-Trak Sensor Test'),
+      check('qtrakSensorTest', 'Hold Q-Trak to alcohol wipe \u2014 confirm elevated reading before starting'),
+      divider(),
+      text('utilityRoomLevel', 'Utility Room Location \u2014 which level is it on?'),
+      divider(),
+      textarea('arrivalNotes', 'Notes'),
       photo('Arrival Setup')
     ];
   }
 
   function getDeviceSetupFields() {
     return [
-      heading('Airthings Setup'),
-      yesnona('airthingsConnected', 'Airthings connected to wifi'),
-      showIf(text('airthingsWifi', 'Wifi network used'), 'airthingsConnected', 'Yes'),
-      showIf(text('airthingsPlacement', 'Placement location'), 'airthingsConnected', 'Yes'),
-      divider(),
-      heading('Boulder Blue Fan'),
-      yesno('boulderBluePlugged', 'Boulder Blue fan plugged in'),
-      showIf(text('boulderBluePlacement', 'Placement location'), 'boulderBluePlugged', 'Yes'),
-      showIf(timer('boulderBlueTimer', 'Boulder Blue Fan Timer (2 hours)', 7200), 'boulderBluePlugged', 'Yes'),
-      showIf(info('Note: fan must run 2 hours'), 'boulderBluePlugged', 'Yes'),
-      divider(),
       heading('PFAS Water Test'),
       radio('pfasSetup', 'PFAS water test at kitchen faucet', ['Yes', 'No', 'Not requested']),
       showIf(timer('pfasTimer', 'PFAS Drain Timer', 3600), 'pfasSetup', 'Yes'),
@@ -202,49 +242,62 @@
     ];
   }
 
-  function getOutsideFields() {
+  // ── #2: Exterior Assessment (new) ──────────────────────────
+  function getExteriorFields() {
     return [
-      heading('Breeze ET Control'),
-      yesno('breezeOutdoor', 'Breeze ET set up outdoors'),
-      showIf(info('Placement: 6\u201310 feet from main entrance, full tripod height (60\u2033)'), 'breezeOutdoor', 'Yes'),
-      showIf(timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600), 'breezeOutdoor', 'Yes'),
+      heading('Breeze ET Outdoor Control'),
+      checklist('breezeOutdoorSetup', 'Setup Checklist', [
+        { key: 'pumpSetUp', label: 'Set up pump' },
+        { key: 'placement', label: 'Place 6\u201310 ft from main entrance' },
+        { key: 'tripodHeight', label: 'Set to full tripod height (60\u2033)' }
+      ]),
+      timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600),
+      text('breezeOutdoorSporeTrapId', 'Outdoor Spore Trap ID'),
       divider(),
-      heading('Q-Trak Outdoor Control'),
-      yesno('qtrakOutdoor', 'Q-Trak outdoor control measurement taken'),
-      showIf(info('Room: Outdoor / Front \u2014 Duration: 1 minute'), 'qtrakOutdoor', 'Yes'),
-      showIf(timer('qtrakOutdoorTimer', 'Q-Trak Outdoor Timer (1 min)', 60), 'qtrakOutdoor', 'Yes'),
+      heading('Q-Trak Outdoor Measurement'),
+      check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
+      timer('qtrakOutdoorTimer', 'Q-Trak Outdoor Timer (1 min)', 60),
       divider(),
-      heading('Exterior Visual Inspection'),
-      check('insulationPlumbing', 'Insulation around plumbing lines checked'),
-      check('caulkingFlashing', 'Caulking/flashing condition checked'),
-      check('lotGrading', 'Lot grading (water flow) checked'),
-      text('sidingType', 'Type of siding'),
-      text('ventsCondition', 'Vents \u2014 condition'),
-      check('iceDamsGutters', 'Ice dams / gutters checked'),
-      text('roofCondition', 'Overall roof condition'),
-      divider(),
-      yesno('weatherScreenshot', 'Weather screenshot noted'),
-      textarea('notes', 'General exterior notes'),
-      photo('Outside Inspection')
+      heading('Visual Exterior Inspection'),
+      info('Run during mold sample time'),
+      text('moldTestLocations', 'Mold test locations identified'),
+      checklist('exteriorPhotos', 'Photo Checklist', [
+        { key: 'insulationPlumbing', label: 'Insulation around plumbing lines' },
+        { key: 'caulkingFlashing', label: 'Caulking and flashing' },
+        { key: 'lotGrading', label: 'Lot grading' },
+        { key: 'sidingType', label: 'Type of siding' },
+        { key: 'ventsCondition', label: 'Vents condition' },
+        { key: 'iceDamsGutters', label: 'Ice dams / gutters' },
+        { key: 'roofCondition', label: 'Roof condition' },
+        { key: 'weatherScreenshot', label: 'Weather app screenshot' }
+      ]),
+      textarea('exteriorNotes', 'Observations & Notes'),
+      photo('Exterior Assessment')
     ];
   }
 
+  // ── Radon setup (expanded for #4) ──────────────────────────
   function getRadonFields() {
     return [
-      text('radonLocation', 'Location in lowest livable space'),
-      heading('Placement Confirmed'),
+      heading('Radon Monitor Placement'),
+      check('radonTripod', 'Place on tripod'),
       check('radon3ft', '3 feet from exterior wall'),
-      check('radon20in', '20 inches or above floor'),
-      check('radonCentralized', 'Centralized, not in trafficked area'),
+      check('radon20in', '20+ inches above floor'),
+      check('radonCentralized', 'Central location, not high-traffic'),
       check('radonWindowsClosed', 'Windows and doors closed'),
-      yesno('radonAppStarted', 'App started'),
-      info('Test type: 48-hour test with 4-hour calibration'),
-      yesno('multipleMonitors', 'Multiple monitors needed (>2,000 sq ft or different foundations)'),
-      showIf(text('secondMonitorLocation', 'Second monitor location'), 'multipleMonitors', 'Yes'),
+      divider(),
+      heading('Radon App Setup'),
+      check('radonInitialMeasurement', 'Select "Initial measurement"'),
+      check('radon48hr', 'Select "48-hour test with 4-hour calibration"'),
+      divider(),
+      check('radonMultipleMonitors', 'Set up multiple monitors if >2,000 sq ft or different foundations'),
+      text('radonLocation', 'Radon Monitor Location'),
+      showIf(text('secondMonitorLocation', 'Second monitor location'), 'radonMultipleMonitors', true),
       photo('Radon Setup')
     ];
   }
 
+  // ── Room test (with FLIR log + bathroom leak for #4) ───────
   function getRoomTestFields() {
     return [
       text('roomName', 'Room Name', { required: true }),
@@ -252,16 +305,18 @@
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
+      ...bathroomLeakFields(),
       ...observationFields()
     ];
   }
 
+  // ── Utility Room (expanded for #8) ─────────────────────────
   function getUtilityFields() {
     return [
       text('levelLocation', 'Level location'),
       ...equipmentFields('heating', 'Heating Source'),
       ...equipmentFields('ac', 'Air Conditioning Source'),
-      ...equipmentFields('ventilation', 'Ventilation / Fresh Air System'),
+      ...equipmentFields('ventilation', 'Ventilation / Fresh Air Recirculation System'),
       divider(),
       heading('HVAC Filter'),
       text('filterSize', 'Filter size'),
@@ -286,6 +341,9 @@
       yesno('waterFiltrationPresent', 'Water filtration system present'),
       showIf(text('waterFiltType', 'Type / Model / Serial'), 'waterFiltrationPresent', 'Yes'),
       showIf(photo('Water Filtration'), 'waterFiltrationPresent', 'Yes'),
+      yesno('waterSofteningPresent', 'Water softening system present'),
+      showIf(text('waterSoftType', 'Type / Model / Serial'), 'waterSofteningPresent', 'Yes'),
+      showIf(photo('Water Softening'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
       photo('Utility Room')
     ];
@@ -300,7 +358,7 @@
       ...formaldehydeField(),
       divider(),
       yesno('hasEnsuite', 'Ensuite bathroom present'),
-      ...bathroomCheckFields().map(f => f.type === 'heading' ? showIf(f, 'hasEnsuite', 'Yes') : showIf(f, 'hasEnsuite', 'Yes')),
+      ...bathroomCheckFields().map(f => showIf(f, 'hasEnsuite', 'Yes')),
       ...observationFields()
     ];
   }
@@ -316,10 +374,12 @@
     ];
   }
 
+  // ── Living area (with FLIR log + bathroom leak for #4) ─────
   function getLivingAreaFields() {
     return [
       text('roomNames', 'Room(s) tested (e.g., Living Room, Dining Room)', { required: true }),
-      ...flirFields(),
+      ...flirLogFields(),
+      ...bathroomLeakFields(),
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
@@ -327,6 +387,7 @@
     ];
   }
 
+  // ── Kitchen appliance (expanded for #5) ────────────────────
   function getKitchenApplianceFields() {
     return [
       heading('Kitchen Water Flush'),
@@ -334,6 +395,7 @@
       showIf(timer('flushTimer', 'Kitchen Water Flush Timer (5 min)', 300), 'waterFlushed', 'Yes'),
       divider(),
       heading('Appliance Inspection'),
+      info('Check and clean each area. Take before/after photos where applicable.'),
       checklist('appliances', null, [
         { key: 'fridge', label: 'Under refrigerator \u2014 checked, cleaned', subFields: [{ key: 'fridgeFindings', label: 'Notable findings' }] },
         { key: 'dishwasher', label: 'Under dishwasher \u2014 checked, cleaned', subFields: [{ key: 'dishwasherFindings', label: 'Notable findings' }] },
@@ -341,12 +403,14 @@
         { key: 'underSink', label: 'Under sink \u2014 checked, cleaned', subFields: [{ key: 'sinkFindings', label: 'Notable findings' }] },
         { key: 'iceMaker', label: 'Under ice maker \u2014 checked, cleaned', subFields: [{ key: 'iceMakerFindings', label: 'Notable findings' }] },
         { key: 'backsplash', label: 'Grout/caulking on backsplash \u2014 checked', subFields: [{ key: 'backsplashFindings', label: 'Notable findings' }] },
-        { key: 'stoveVent', label: 'Above stove vent \u2014 checked, cleaned', subFields: [{ key: 'stoveVentFindings', label: 'Notable findings' }] }
+        { key: 'stoveVent', label: 'Above stove vent \u2014 checked, cleaned (before/after photos)', subFields: [{ key: 'stoveVentFindings', label: 'Notable findings' }] }
       ]),
       photo('Appliance Inspection'),
       divider(),
-      yesnona('moldSwabCollected', 'Mold swab collected under sink (if warranted)'),
-      showIf(text('moldSwabId', 'Swab ID'), 'moldSwabCollected', 'Yes'),
+      heading('Mold Swabs'),
+      yesno('moldVisible', 'Visible mold or high mold potential identified?'),
+      showIf(text('moldSwabLocation1', 'Swab Sample 1 Location'), 'moldVisible', 'Yes'),
+      showIf(text('moldSwabLocation2', 'Swab Sample 2 Location'), 'moldVisible', 'Yes'),
       textarea('notes', 'Notes')
     ];
   }
@@ -389,6 +453,7 @@
       ...breezeFields('kitchenBreezeTimer'),
       ...qtrakSection(),
       ...formaldehydeField(),
+      ...bathroomLeakFields(),
       ...observationFields()
     ];
   }
@@ -405,8 +470,13 @@
     ];
   }
 
+  // ── #6: Before Leaving (expanded) ──────────────────────────
   function getFinalChecksFields() {
     return [
+      heading('Boulder Blue Completion'),
+      timeInput('boulderBlueEndTime', 'Boulder Blue End Time'),
+      info('Compare to start time captured in Arrival & Setup. Must be 2+ hours.'),
+      divider(),
       checklist('finalChecks', 'Final Checks Before Leaving', [
         { key: 'breezeCollected', label: 'All Breeze ET tests collected and spore traps packed' },
         { key: 'boulderBlueDone', label: 'Boulder Blue fan run for 2 hours \u2014 filter collected and packed' },
@@ -414,10 +484,16 @@
         { key: 'waterLabeled', label: 'Water samples labeled and ready to ship' },
         { key: 'appliancesRestored', label: 'All appliances returned to original state' },
         { key: 'doorsLightsRestored', label: 'All doors/lights returned to original state' },
-        { key: 'radonLeftInPlace', label: 'Radon monitor left in place \u2014 homeowner reminded about pickup date' },
+        { key: 'radonLeftInPlace', label: 'Radon monitor left in place' },
         { key: 'formComplete', label: 'Technician form fully completed' },
         { key: 'photosUploaded', label: 'All photos uploaded/captured' }
-      ])
+      ]),
+      divider(),
+      heading('Customer Debrief'),
+      check('informComplete', 'Inform customer assessment is complete'),
+      check('adviseReport', 'Advise report in ~3 weeks'),
+      check('remindRadon', 'Remind about radon monitor in basement'),
+      dateTimeInput('radonPickupTime', 'Radon monitor pickup time')
     ];
   }
 
@@ -444,12 +520,43 @@
     ];
   }
 
+  // ── #7: Post-Assessment (new) ──────────────────────────────
+  function getPostAssessmentFields() {
+    return [
+      heading('Sample Shipping'),
+      checklist('sampleShipping', null, [
+        { key: 'chainOfCustody', label: 'Complete chain of custody forms (SafeHome, Cyclopure, Brooks Applied Labs, Priority Lab)' },
+        { key: 'waterTestsShipped', label: 'Water tests shipped to labs' },
+        { key: 'boulderBlueShipped', label: 'Boulder Blue shipped' },
+        { key: 'priorityLabShipped', label: 'Priority lab mold tests shipped' }
+      ]),
+      divider(),
+      heading('Data Management'),
+      checklist('dataManagement', null, [
+        { key: 'qtrakExported', label: 'Q-Trak data downloaded locally and exported to spreadsheet' },
+        { key: 'photosUploaded', label: 'All photos uploaded to Google Drive folder' }
+      ]),
+      divider(),
+      heading('Radon Pickup'),
+      date('radonPickupDate', 'Radon Pickup Date'),
+      info('Schedule pickup 48 hours from placement'),
+      divider(),
+      heading('Final Check'),
+      checklist('finalCheck', null, [
+        { key: 'allSectionsComplete', label: 'All form sections completed' },
+        { key: 'allPhotosUploaded', label: 'All photos uploaded' },
+        { key: 'allSamplesShipped', label: 'All samples shipped' },
+        { key: 'assessmentComplete', label: 'Assessment marked Complete' }
+      ])
+    ];
+  }
+
   // ── Step Type → Fields Mapping ─────────────────────────────
   const STEP_FIELDS = {
     'equipment': getEquipmentFields,
     'arrival': getArrivalFields,
     'device-setup': getDeviceSetupFields,
-    'outside': getOutsideFields,
+    'exterior': getExteriorFields,
     'radon': getRadonFields,
     'room-test': getRoomTestFields,
     'utility': getUtilityFields,
@@ -463,20 +570,22 @@
     'additional-room': getAdditionalRoomFields,
     'final-checks': getFinalChecksFields,
     'debrief': getDebriefFields,
-    'shipping': getShippingFields
+    'shipping': getShippingFields,
+    'post-assessment': getPostAssessmentFields
   };
 
   // ── Phases ─────────────────────────────────────────────────
   const PHASES = [
     { id: 'setup', name: 'Setup', icon: '1' },
     { id: 'arrival', name: 'Arrival', icon: '2' },
-    { id: 'outside', name: 'Outside', icon: '3' },
+    { id: 'exterior', name: 'Exterior', icon: '3' },
     { id: 'lowest', name: 'Lower', icon: '4' },
     { id: 'utility', name: 'Utility', icon: '5' },
     { id: 'upper', name: 'Upper', icon: '6' },
     { id: 'main', name: 'Kitchen', icon: '7' },
     { id: 'supplementary', name: 'Other', icon: '8' },
     { id: 'wrapup', name: 'Wrap Up', icon: '9' },
+    { id: 'post', name: 'Post', icon: '10' },
     { id: 'review', name: 'Review', icon: '\u2713' }
   ];
 
@@ -504,11 +613,11 @@
     steps.push({ id: 'equipment', type: 'equipment', phase: 'setup', name: 'Pre-Assessment Checklist' });
 
     // Arrival
-    steps.push({ id: 'arrival', type: 'arrival', phase: 'arrival', name: 'Arrival Setup' });
+    steps.push({ id: 'arrival', type: 'arrival', phase: 'arrival', name: 'Arrival & Setup' });
     steps.push({ id: 'device-setup', type: 'device-setup', phase: 'arrival', name: 'Device Setup' });
 
-    // Outside
-    steps.push({ id: 'outside', type: 'outside', phase: 'outside', name: 'Outside Inspection' });
+    // Exterior Assessment (#2)
+    steps.push({ id: 'exterior', type: 'exterior', phase: 'exterior', name: 'Exterior Assessment' });
 
     // Lowest Level
     steps.push({ id: 'radon', type: 'radon', phase: 'lowest', name: 'Radon Monitor Setup' });
@@ -523,13 +632,11 @@
     // Upper Level
     const numBed = parseInt(insp.numberOfBedrooms) || 1;
     for (let i = 0; i < numBed; i++) {
-      const defaultName = 'Bedroom ' + (i + 1);
-      steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'upper', name: defaultName, index: i });
+      steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'upper', name: 'Bedroom ' + (i + 1), index: i });
     }
     const numBath = parseInt(insp.numberOfBathrooms) || 1;
     for (let i = 0; i < numBath; i++) {
-      const defaultName = 'Bathroom ' + (i + 1);
-      steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'upper', name: defaultName, index: i });
+      steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'upper', name: 'Bathroom ' + (i + 1), index: i });
     }
 
     // Main Level / Kitchen
@@ -546,9 +653,12 @@
     });
 
     // Wrap Up
-    steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Final Checks' });
+    steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Before Leaving' });
     steps.push({ id: 'debrief', type: 'debrief', phase: 'wrapup', name: 'Customer Debrief' });
     steps.push({ id: 'shipping', type: 'shipping', phase: 'wrapup', name: 'Shipping Checklist' });
+
+    // Post-Assessment (#7)
+    steps.push({ id: 'post-assessment', type: 'post-assessment', phase: 'post', name: 'Post-Assessment' });
 
     // Review
     steps.push({ id: 'review', type: 'review', phase: 'review', name: 'Final Review' });
@@ -583,7 +693,6 @@
 
   // ── Validation ─────────────────────────────────────────────
   function validateEquipment(data) {
-    const groups = ['airEquip', 'radonEquip', 'waterEquip', 'surfaceEquip', 'otherEquip', 'safetyEquip', 'techEquip', 'shippingEquip'];
     const fieldGen = getEquipmentFields();
     const missing = [];
     for (const f of fieldGen) {
@@ -598,8 +707,6 @@
   }
 
   function validateStep(stepDef) {
-    // For now, only equipment has strict validation
-    // Other steps allow proceeding freely (inspector decides completeness)
     if (stepDef.type === 'equipment') {
       const data = getStepData(stepDef.id);
       return validateEquipment(data);
@@ -625,7 +732,6 @@
     arr.push({ name: prefix + (idx + 1) });
 
     stepList = buildStepList(inspection);
-    // Navigate to the new step
     const newStepId = section === 'lowest' ? 'lowest-room-' + idx : 'additional-' + idx;
     const newIdx = stepList.findIndex(s => s.id === newStepId);
     if (newIdx >= 0) currentStepIdx = newIdx;
@@ -635,7 +741,6 @@
 
   // ── Google Drive Upload ─────────────────────────────────────
   function showUploadBanner(type, msg) {
-    // Remove existing banner
     const old = document.getElementById('upload-banner');
     if (old) old.remove();
     const banner = el('div', { id: 'upload-banner', className: 'upload-banner upload-' + type });
@@ -646,15 +751,12 @@
 
   async function uploadToGoogleDrive(exportData) {
     if (!GOOGLE_SCRIPT_URL) return;
-
     try {
-      const resp = await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(exportData)
       });
-      // no-cors means we can't read the response, but if fetch didn't throw, the request was sent
       await DB.removeFromQueue(exportData.inspectionId);
       showUploadBanner('success', '\u2713 Saved to Google Drive');
       return true;
@@ -672,24 +774,16 @@
     for (const item of queue) {
       try {
         await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
+          method: 'POST', mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item)
         });
         await DB.removeFromQueue(item.inspectionId);
-        console.log('Retry succeeded for', item.inspectionId);
-      } catch (e) {
-        console.log('Retry still failing for', item.inspectionId);
-        break; // stop retrying if still offline
-      }
+      } catch (e) { break; }
     }
   }
 
-  // Retry queued uploads when coming back online
-  window.addEventListener('online', () => {
-    retryQueuedUploads();
-  });
+  window.addEventListener('online', () => { retryQueuedUploads(); });
 
   // ── Render ─────────────────────────────────────────────────
   function render() {
@@ -768,7 +862,6 @@
     inspection = await DB.get(id);
     if (!inspection) return;
     stepList = buildStepList(inspection);
-    // Find last visited step
     const lastVisited = inspection._lastStepIdx || 0;
     currentStepIdx = Math.min(lastVisited, stepList.length - 1);
     screen = 'step';
@@ -836,18 +929,12 @@
     });
     c.appendChild(card);
 
-    // Bottom nav
     const nav = el('div', { className: 'bottom-nav' }, [
       el('button', { className: 'btn btn-outline btn-nav', onClick: () => { screen = 'home'; render(); } }, 'Cancel'),
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
-        // Validate required fields
         const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms', 'waterSource'];
         const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
-        if (missing.length) {
-          alert('Please fill in all required fields (marked with *).');
-          return;
-        }
-        // Create inspection
+        if (missing.length) { alert('Please fill in all required fields (marked with *).'); return; }
         inspection = {
           ...data,
           startedAt: new Date().toISOString(),
@@ -872,15 +959,12 @@
   function renderStep() {
     if (currentStepIdx >= stepList.length) { screen = 'review'; render(); return; }
     const step = stepList[currentStepIdx];
-
-    // If review step, go to review screen
     if (step.type === 'review') { screen = 'review'; render(); return; }
 
     const data = getStepData(step.id);
     if (!data._enteredAt) data._enteredAt = new Date().toISOString();
     data._roomName = step.name;
 
-    // Set default room name for dynamic steps
     if ((step.type === 'room-test' || step.type === 'bedroom' || step.type === 'bathroom' || step.type === 'additional-room') && !data.roomName) {
       data.roomName = step.name;
     }
@@ -891,11 +975,9 @@
     c.appendChild(buildAppHeader(step.name));
     c.appendChild(renderStatusBar(lastSaveText));
 
-    // Active timers bar
     const timersBar = renderTimersBar(inspection);
     if (timersBar) c.appendChild(timersBar);
 
-    // Progress bar
     const currentPhase = step.phase;
     const phasesWithState = PHASES.map(p => {
       const phaseSteps = stepList.filter(s => s.phase === p.id && s.type !== 'review');
@@ -910,7 +992,6 @@
       if (idx >= 0 && idx <= currentStepIdx) { currentStepIdx = idx; render(); }
     }));
 
-    // Step content
     c.appendChild(el('h1', { className: 'screen-title' }, step.name));
 
     const fieldGen = STEP_FIELDS[step.type];
@@ -924,37 +1005,27 @@
       c.appendChild(card);
     }
 
-    // Add Room buttons for dynamic sections
     if (step.dynamic === 'lowest') {
       const lowestSteps = stepList.filter(s => s.dynamic === 'lowest');
       if (step.id === lowestSteps[lowestSteps.length - 1].id) {
-        c.appendChild(el('button', {
-          className: 'btn btn-outline btn-full', onClick: () => addDynamicRoom('lowest')
-        }, '+ Add Another Room (Lowest Level)'));
+        c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => addDynamicRoom('lowest') }, '+ Add Another Room (Lowest Level)'));
       }
     }
     if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {
-      // Show add additional room after kitchen air or in supplementary
       if (step.id === 'kitchen-air' || (step.dynamic === 'additional' && step.id === stepList.filter(s => s.dynamic === 'additional').pop()?.id)) {
-        c.appendChild(el('button', {
-          className: 'btn btn-outline btn-full', onClick: () => addDynamicRoom('additional')
-        }, '+ Add Additional Room'));
+        c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => addDynamicRoom('additional') }, '+ Add Additional Room'));
       }
     }
 
     data._visited = true;
 
-    // Bottom nav
     const nav = el('div', { className: 'bottom-nav' }, [
       currentStepIdx > 0
         ? el('button', { className: 'btn btn-outline btn-nav', onClick: () => { currentStepIdx--; render(); window.scrollTo(0, 0); } }, '\u2190 Back')
         : el('div'),
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
         const missing = validateStep(step);
-        if (missing.length) {
-          alert('Please complete these required items:\n\n' + missing.join('\n'));
-          return;
-        }
+        if (missing.length) { alert('Please complete these required items:\n\n' + missing.join('\n')); return; }
         data._completedAt = new Date().toISOString();
         currentStepIdx++;
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
@@ -970,31 +1041,22 @@
     c.appendChild(buildAppHeader('Final Review'));
     c.appendChild(renderStatusBar(lastSaveText));
 
-    // Reminder banner
     c.appendChild(el('div', { className: 'reminder-banner' }, [
       el('strong', null, 'Before you leave:'),
       el('span', null, ' Upload photos to Google Drive | Download Q-Trak data to computer | Ship all lab samples')
     ]));
 
-    // Header info
     const hCard = el('div', { className: 'card' });
     hCard.appendChild(el('h3', { className: 'section-heading' }, 'Inspection Details'));
     const infoFields = [
-      ['ID', inspection.inspectionId],
-      ['Inspector', inspection.inspectorName],
-      ['Client', inspection.clientName],
-      ['Address', inspection.propertyAddress],
-      ['Date', inspection.inspectionDate],
-      ['Levels', inspection.numberOfLevels],
-      ['Bedrooms', inspection.numberOfBedrooms],
-      ['Bathrooms', inspection.numberOfBathrooms],
+      ['ID', inspection.inspectionId], ['Inspector', inspection.inspectorName],
+      ['Client', inspection.clientName], ['Address', inspection.propertyAddress],
+      ['Date', inspection.inspectionDate], ['Levels', inspection.numberOfLevels],
+      ['Bedrooms', inspection.numberOfBedrooms], ['Bathrooms', inspection.numberOfBathrooms],
       ['Water Source', inspection.waterSource + (inspection.waterSourceDescription ? ' (' + inspection.waterSourceDescription + ')' : '')],
-      ['Wifi', inspection.wifiNetwork],
-      ['Cleaning Freq.', inspection.cleaningFrequency],
-      ['Occupancy', inspection.occupancyDuringInspection],
-      ['Weather', inspection.weatherConditions],
-      ['Started', fmtDate(inspection.startedAt)],
-      ['Status', inspection.status]
+      ['Wifi', inspection.wifiNetwork], ['Cleaning Freq.', inspection.cleaningFrequency],
+      ['Occupancy', inspection.occupancyDuringInspection], ['Weather', inspection.weatherConditions],
+      ['Started', fmtDate(inspection.startedAt)], ['Status', inspection.status]
     ];
     infoFields.forEach(([l, v]) => {
       hCard.appendChild(el('div', { className: 'info-row' }, [
@@ -1002,32 +1064,23 @@
         el('span', { className: 'info-value' }, v || '--')
       ]));
     });
-    if (inspection.clientConcerns) {
-      hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Client Concerns: '), document.createTextNode(inspection.clientConcerns)]));
-    }
-    if (inspection.knownProblemAreas) {
-      hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Known Problem Areas: '), document.createTextNode(inspection.knownProblemAreas)]));
-    }
+    if (inspection.clientConcerns) hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Client Concerns: '), document.createTextNode(inspection.clientConcerns)]));
+    if (inspection.knownProblemAreas) hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Known Problem Areas: '), document.createTextNode(inspection.knownProblemAreas)]));
     c.appendChild(hCard);
 
-    // Step summaries
     stepList.forEach((step, idx) => {
       if (step.type === 'review') return;
       const data = (inspection.stepData && inspection.stepData[step.id]) || {};
       const visited = !!data._visited;
-
       const sCard = el('div', { className: 'card' + (!visited ? ' card-incomplete' : '') });
       sCard.appendChild(el('div', { className: 'review-step-header' }, [
         el('h3', { className: 'section-heading' }, [
           document.createTextNode(step.name + ' '),
           el('span', { className: 'badge ' + (visited ? 'completed' : 'in-progress') }, visited ? 'Visited' : 'Not visited')
         ]),
-        el('button', { className: 'btn btn-small btn-outline', onClick: () => {
-          currentStepIdx = idx; screen = 'step'; render();
-        }}, 'Edit')
+        el('button', { className: 'btn btn-small btn-outline', onClick: () => { currentStepIdx = idx; screen = 'step'; render(); } }, 'Edit')
       ]));
 
-      // Show data summary
       const summary = el('div', { className: 'review-summary' });
       const fieldGen = STEP_FIELDS[step.type];
       if (fieldGen && visited) {
@@ -1043,9 +1096,8 @@
             else if (val.value != null) display = val.value + (val.unit ? ' ' + val.unit : '');
             else return;
           } else if (f.type === 'checklist' && typeof val === 'object') {
-            const checked = Object.entries(val).filter(([k, v]) => v === true).length;
-            const total = f.items ? f.items.length : 0;
-            display = checked + '/' + total + ' checked';
+            const checked = Object.entries(val).filter(([, v]) => v === true).length;
+            display = checked + '/' + (f.items ? f.items.length : 0) + ' checked';
           } else if (f.type === 'chips' && Array.isArray(val)) {
             if (!val.length) return;
             display = val.join(', ');
@@ -1059,29 +1111,22 @@
             el('span', null, display)
           ]));
         });
-
-        // Photos
         if (data._photos && data._photos.length) {
-          summary.appendChild(el('div', { className: 'review-photos-section' }, [
-            el('strong', null, data._photos.length + ' photo(s):'),
-          ]));
+          summary.appendChild(el('div', { className: 'review-photos-section' }, [el('strong', null, data._photos.length + ' photo(s):')]));
           const grid = el('div', { className: 'review-photo-grid' });
           data._photos.forEach(p => {
-            const thumb = el('div', { className: 'review-photo-item' }, [
+            grid.appendChild(el('div', { className: 'review-photo-item' }, [
               el('img', { src: p.dataUrl, className: 'review-photo-img' }),
               p.caption ? el('div', { className: 'review-photo-caption' }, p.caption) : null
-            ]);
-            grid.appendChild(thumb);
+            ]));
           });
           summary.appendChild(grid);
         }
       }
-
       sCard.appendChild(summary);
       c.appendChild(sCard);
     });
 
-    // JSON preview
     const jsonCard = el('div', { className: 'card' });
     jsonCard.appendChild(el('h3', { className: 'section-heading' }, 'JSON Export'));
     const exportData = buildExportJSON();
@@ -1090,27 +1135,19 @@
     jsonCard.appendChild(pre);
     c.appendChild(jsonCard);
 
-    // Actions
     const actCard = el('div', { className: 'card actions-card' });
-
-    // Export to Google Drive button
     if (GOOGLE_SCRIPT_URL) {
-      actCard.appendChild(el('button', { className: 'btn btn-primary btn-full', onClick: () => {
-        uploadToGoogleDrive(exportData);
-      }}, '\u2601 Export to Google Drive'));
+      actCard.appendChild(el('button', { className: 'btn btn-primary btn-full', onClick: () => { uploadToGoogleDrive(exportData); } }, '\u2601 Export to Google Drive'));
     }
-
     actCard.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => {
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = inspection.inspectionId + '.json'; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = inspection.inspectionId + '.json'; a.click();
       URL.revokeObjectURL(url);
     }}, 'Download JSON'));
-
     actCard.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => {
       const json = JSON.stringify(exportData, null, 2);
-      navigator.clipboard.writeText(json).then(() => alert('JSON copied to clipboard!')).catch(() => {
+      navigator.clipboard.writeText(json).then(() => alert('JSON copied!')).catch(() => {
         const ta = document.createElement('textarea'); ta.value = json;
         document.body.appendChild(ta); ta.select(); document.execCommand('copy');
         document.body.removeChild(ta); alert('JSON copied!');
@@ -1123,10 +1160,7 @@
         inspection.endedAt = new Date().toISOString();
         inspection.completedAt = inspection.endedAt;
         const completeData = buildExportJSON();
-        saveNow().then(() => {
-          uploadToGoogleDrive(completeData);
-          render();
-        });
+        saveNow().then(() => { uploadToGoogleDrive(completeData); render(); });
       }}, 'Mark Complete'));
     } else {
       actCard.appendChild(el('div', { className: 'completed-banner' }, [
@@ -1136,15 +1170,10 @@
     }
     c.appendChild(actCard);
 
-    // Bottom nav
     c.appendChild(el('div', { className: 'bottom-nav' }, [
       el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
-        if (inspection.status !== 'completed') {
-          currentStepIdx = stepList.length - 2; // last step before review
-          screen = 'step';
-        } else {
-          screen = 'home'; inspection = null;
-        }
+        if (inspection.status !== 'completed') { currentStepIdx = stepList.length - 2; screen = 'step'; }
+        else { screen = 'home'; inspection = null; }
         render();
       }}, inspection.status !== 'completed' ? '\u2190 Back to Steps' : '\u2190 Home'),
       el('button', { className: 'btn btn-outline btn-nav', onClick: () => { screen = 'home'; inspection = null; render(); } }, 'All Inspections')
@@ -1179,29 +1208,23 @@
       preAssessmentChecklist: cleanStepData(inspection.stepData?.equipment),
       arrivalSetup: cleanStepData(inspection.stepData?.arrival),
       deviceSetup: cleanStepData(inspection.stepData?.['device-setup']),
-      outside: cleanStepData(inspection.stepData?.outside),
+      exteriorAssessment: cleanStepData(inspection.stepData?.exterior),
       radonSetup: cleanStepData(inspection.stepData?.radon),
       rooms: [],
       utilityRoom: cleanStepData(inspection.stepData?.utility),
       wrapUp: cleanStepData(inspection.stepData?.['final-checks']),
       customerDebrief: cleanStepData(inspection.stepData?.debrief),
       shippingChecklist: cleanStepData(inspection.stepData?.shipping),
+      postAssessment: cleanStepData(inspection.stepData?.['post-assessment']),
       completedAt: inspection.completedAt || null
     };
 
-    // Build rooms array from all room-type steps
     const roomTypes = ['room-test', 'bedroom', 'bathroom', 'living-area', 'kitchen-appliance', 'water-sample', 'atp-kitchen', 'kitchen-air', 'additional-room'];
     stepList.forEach(step => {
       if (roomTypes.includes(step.type)) {
         const d = inspection.stepData?.[step.id];
         if (d) {
-          exp.rooms.push({
-            roomName: d.roomName || step.name,
-            type: step.type,
-            level: step.phase,
-            stepId: step.id,
-            ...cleanStepData(d)
-          });
+          exp.rooms.push({ roomName: d.roomName || step.name, type: step.type, level: step.phase, stepId: step.id, ...cleanStepData(d) });
         }
       }
     });
@@ -1213,18 +1236,13 @@
     if (!data) return {};
     const clean = {};
     for (const [k, v] of Object.entries(data)) {
-      if (k.startsWith('_')) continue; // skip internal keys except _photos
+      if (k.startsWith('_')) continue;
       clean[k] = v;
     }
-    // Handle photos - include with metadata
     if (data._photos && data._photos.length) {
       clean.photos = data._photos.map(p => ({
-        photoId: p.photoId,
-        roomName: p.roomName,
-        stepName: p.stepName,
-        timestamp: p.timestamp,
-        caption: p.caption,
-        imageData: p.dataUrl
+        photoId: p.photoId, roomName: p.roomName, stepName: p.stepName,
+        timestamp: p.timestamp, caption: p.caption, imageData: p.dataUrl
       }));
     }
     return clean;
@@ -1244,8 +1262,6 @@
     navigator.serviceWorker.register('service-worker.js').catch(e => console.log('SW failed:', e));
   }
 
-  // Retry any queued uploads on startup
   retryQueuedUploads();
-
   render();
 })();
