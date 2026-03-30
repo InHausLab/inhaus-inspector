@@ -191,6 +191,24 @@ body {
   50% { transform: scale(1.08); }
 }
 
+/* ── iOS Dictation Hint ─────────────────── */
+.mic-hint-btn {
+  width: 56px; height: 56px; min-width: 56px;
+  border: 2px solid var(--border); border-radius: 50%;
+  background: #fff; font-size: 1.3rem;
+  cursor: pointer; touch-action: manipulation;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.mic-hint-btn:active { background: var(--accent-light); }
+.mic-hint-btn::after {
+  content: 'Tap \1F399 on keyboard';
+  position: absolute; bottom: -28px; left: 50%;
+  transform: translateX(-50%); white-space: nowrap;
+  font-size: 0.6rem; color: var(--text-muted);
+  font-weight: 600; pointer-events: none;
+}
+
 /* ── Radio Buttons ───────────────────────── */
 .radio-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .radio-btn {

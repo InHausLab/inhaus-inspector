@@ -34,9 +34,24 @@
   // ── Voice Dictation ────────────────────────────────────────
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const hasSpeech = !!SR;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   function micBtn(onResult) {
-    if (!hasSpeech) return null;
+    if (!hasSpeech) {
+      if (isIOS) return el('button', {
+        type: 'button', className: 'mic-hint-btn', 'aria-label': 'Use keyboard dictation',
+        onClick: (e) => {
+          e.preventDefault();
+          const inp = e.target.closest('.input-row, .textarea-row');
+          if (inp) {
+            const field = inp.querySelector('input, textarea');
+            if (field) field.focus();
+          }
+        }
+      }, '\u2328\uFE0F');
+      return null;
+    }
     let rec = null, active = false;
     const btn = el('button', { type: 'button', className: 'mic-btn', 'aria-label': 'Voice input' }, '\uD83C\uDF99');
     btn.addEventListener('click', () => {
