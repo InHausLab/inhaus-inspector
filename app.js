@@ -35,21 +35,6 @@
     'Moisture concern (FLIR)', 'Other'
   ];
 
-  function qTrakReadings() {
-    return [
-      reading('co2', 'CO2', 'ppm'),
-      reading('voc', 'VOC/TVOC', '\u00b5g/m\u00b3'),
-      reading('pm25', 'PM2.5', '\u00b5g/m\u00b3'),
-      reading('pm10', 'PM10', '\u00b5g/m\u00b3'),
-      reading('co', 'CO', 'ppm'),
-      reading('no2', 'NO2', 'ppm'),
-      reading('ozone', 'Ozone', 'ppm'),
-      reading('chlorine_air', 'Chlorine', 'ppm'),
-      reading('temperature', 'Temperature', '\u00b0F'),
-      reading('humidity', 'Humidity', '%')
-    ];
-  }
-
   function flirFields() {
     return [
       heading('FLIR Thermal Scan'),
@@ -71,14 +56,29 @@
 
   function qtrakSection() {
     return [
-      heading('Q-Trak Readings'),
-      timer('qtrakTimer', 'Q-Trak Sampling Timer (1 min)', 60),
-      ...qTrakReadings()
+      heading('Q-Trak 7585'),
+      yesnona('qtrakRun', 'Q-Trak run'),
+      showIf(timer('qtrakTimer', 'Q-Trak Sampling Timer (1 min)', 60), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_co2', 'CO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_voc', 'VOC / TVOC', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_pm25', 'PM2.5', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_pm10', 'PM10', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_co', 'CO', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_no2', 'NO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_ozone', 'Ozone', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_chlorine', 'Chlorine', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_temp', 'Temperature', { unit: '\u00b0F' }), 'qtrakRun', 'Yes'),
+      showIf(num('qtrak_humidity', 'Humidity', { unit: '%' }), 'qtrakRun', 'Yes'),
+      showIf(text('qtrakNotes', 'Q-Trak notes (optional)'), 'qtrakRun', 'Yes')
     ];
   }
 
   function formaldehydeField() {
-    return [reading('formaldehyde', 'Formaldehyde (Extech)', 'ppm')];
+    return [
+      heading('Formaldehyde (Extech VFM200)'),
+      yesnona('formaldehydeRun', 'Formaldehyde test run'),
+      showIf(num('formaldehyde', 'Formaldehyde reading', { unit: 'ppm' }), 'formaldehydeRun', 'Yes')
+    ];
   }
 
   function observationFields() {
