@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InHaus Inspector — Flow Map</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 40px 20px; }
+h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #fff; }
+.subtitle { text-align: center; color: #94a3b8; margin-bottom: 40px; font-size: 14px; }
+.flow { display: flex; flex-direction: column; gap: 0; max-width: 1400px; margin: 0 auto; }
+.arrow { text-align: center; font-size: 28px; color: #475569; padding: 6px 0; }
+.phase-label {
+  background: #1e293b; color: #60a5fa; font-weight: 800; font-size: 13px;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  padding: 10px 20px; border-radius: 8px 8px 0 0;
+  margin-top: 20px;
+}
+.phase-group { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; background: #1e293b; border-radius: 0 0 8px 8px; margin-bottom: 4px; }
+
+.card {
+  background: #fff; color: #1e293b; border-radius: 12px;
+  padding: 16px 18px; width: 320px; flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  font-size: 13px; line-height: 1.5;
+}
+.card h3 { font-size: 16px; font-weight: 800; color: #2563eb; margin-bottom: 8px; border-bottom: 2px solid #dbeafe; padding-bottom: 6px; }
+.card h4 { font-size: 12px; font-weight: 700; color: #64748b; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card ul { padding-left: 16px; margin: 0; }
+.card li { margin: 2px 0; font-size: 12px; color: #334155; }
+.card .field { display: flex; align-items: baseline; gap: 6px; margin: 2px 0; font-size: 12px; }
+.card .field .label { color: #64748b; min-width: 0; }
+.card .field .type { color: #2563eb; font-weight: 600; font-size: 10px; background: #dbeafe; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+.card .tag { display: inline-block; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 10px; font-size: 10px; margin: 2px 2px; font-weight: 600; }
+.card .note { font-size: 11px; color: #94a3b8; font-style: italic; margin-top: 6px; }
+.card .timer-badge { display: inline-block; background: #0f172a; color: #4ade80; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; margin: 2px 0; }
+.card .required { color: #dc2626; font-weight: 700; }
+.card .conditional { border-left: 3px solid #f59e0b; padding-left: 8px; margin: 4px 0; }
+.card .photo-badge { display: inline-block; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+.card .section { background: #f8fafc; margin: 8px -10px; padding: 8px 10px; border-radius: 6px; }
+.card .repeat { background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin: 6px 0; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-bottom: 30px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<h1>InHaus Inspector — Complete Flow Map</h1>
+<p class="subtitle">Every screen and field in the app, shown in order. Scroll down to see the full inspection workflow.</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div> Text / Number input</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#16a34a"></div> Yes/No toggle</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Conditional (shows if...)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#0f172a"></div> Timer</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#dbeafe"></div> Photos</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f1f5f9"></div> Checklist / Chips</div>
+</div>
+
+<div class="flow">
+
+<!-- ========== HOME ========== -->
+<div class="card" style="width:100%;max-width:500px;margin:0 auto;">
+  <h3>SCREEN 1: Home Screen</h3>
+  <div class="field"><span class="type">BUTTON</span> <span class="label">New Inspection</span></div>
+  <div class="field"><span class="type">LIST</span> <span class="label">In-Progress Inspections (Resume / View / Delete)</span></div>
+  <div class="field"><span class="type">LIST</span> <span class="label">Completed Inspections (View / Delete)</span></div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== INTAKE ========== -->
+<div class="card" style="width:100%;max-width:700px;margin:0 auto;">
+  <h3>SCREEN 2: Customer & Property Intake</h3>
+  <div class="field"><span class="type">AUTO</span> <span class="label">Inspection ID (generated, read-only)</span></div>
+  <div class="field"><span class="type">TEXT</span> <span class="label">Inspector Name <span class="required">*</span></span></div>
+  <div class="field"><span class="type">DATE</span> <span class="label">Inspection Date (defaults today)</span></div>
+  <div class="field"><span class="type">TEXT</span> <span class="label">Client Name <span class="required">*</span></span></div>
+  <div class="field"><span class="type">TEXT</span> <span class="label">Property Address <span class="required">*</span></span></div>
+  <div class="field"><span class="type">SELECT</span> <span class="label">Number of Levels (1, 2, 3+) <span class="required">*</span></span></div>
+  <div class="field"><span class="type">SELECT</span> <span class="label">Number of Bedrooms (1–7) <span class="required">*</span></span></div>
+  <div class="field"><span class="type">SELECT</span> <span class="label">Number of Bathrooms (1–6) <span class="required">*</span></span></div>
+  <div class="field"><span class="type">SELECT</span> <span class="label">Water Source (Municipal / Well / Other) <span class="required">*</span></span></div>
+  <div class="conditional"><span class="type">TEXT</span> <span class="label">Water source description (if Other)</span></div>
+  <div class="field"><span class="type">TEXT</span> <span class="label">Home wifi network name</span></div>
+  <div class="field"><span class="type">TEXTAREA</span> <span class="label">Client specific concerns</span></div>
+  <div class="field"><span class="type">SELECT</span> <span class="label">Cleaning frequency (Daily / Weekly / Bi-weekly / Monthly / Rarely)</span></div>
+  <div class="field"><span class="type">RADIO</span> <span class="label">Home occupancy during inspection (Yes / No / Partial)</span></div>
+  <div class="field"><span class="type">TEXT</span> <span class="label">Weather conditions</span></div>
+  <div class="field"><span class="type">TEXTAREA</span> <span class="label">Any known problem areas</span></div>
+  <div class="field"><span class="type">TEXTAREA</span> <span class="label">Client blueprints / layout notes</span></div>
+  <div class="note">Tapping "Start Inspection" creates the inspection and enters the step workflow.</div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: SETUP ========== -->
+<div class="phase-label">Phase 1: Setup</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Step 1: Pre-Assessment Equipment Checklist</h3>
+    <h4>Air Testing Equipment (8 items)</h4>
+    <ul>
+      <li>Q-Trak 7585 — charged, data deleted, rooms configured</li>
+      <li>Extech Formaldehyde monitor (VFM200)</li>
+      <li>FLIR MR277</li>
+      <li>Airthings device + charging cube</li>
+      <li>Breeze ET pump + tripod</li>
+      <li>Breeze ST spore traps (6)</li>
+      <li>Breeze mold swabs (2)</li>
+      <li>Boulder Blue fan + filter — registered</li>
+    </ul>
+    <h4>Radon (1 item)</h4>
+    <ul><li>Airthings Corentium Pro + tripod</li></ul>
+    <h4>Water Testing (3 items)</h4>
+    <ul>
+      <li>Full panel water test kit (EnviroTest)</li>
+      <li>PFAS test kit (Cyclopure) <em>— optional</em></li>
+      <li>Microplastics test kit (Brooks) <em>— optional</em></li>
+    </ul>
+    <h4>Surface Testing (2 items)</h4>
+    <ul><li>ATP device (SystemSURE Plus)</li><li>ATP swabs (2) — refrigerated</li></ul>
+    <h4>Other Equipment (4 items)</h4>
+    <ul><li>Dewalt vacuum + attachments</li><li>Endoscope</li><li>Measuring tape</li><li>Cleaning supplies</li></ul>
+    <h4>Personal / Safety (4 items)</h4>
+    <ul><li>Shoe covers</li><li>N95 masks</li><li>Nitrile gloves</li><li>Hand sanitizer</li></ul>
+    <h4>Technology (3 items)</h4>
+    <ul><li>iPad — charged, apps downloaded</li><li>Airthings app</li><li>Airthings View Plus app</li></ul>
+    <h4>Shipping Supplies (4 items)</h4>
+    <ul><li>FedEx prepaid label (Breeze STs)</li><li>UPS label (Boulder Blue)</li><li>Safe Home water panel label</li><li>Cyclopure label <em>— optional</em></li></ul>
+    <div class="note">Must check all required items before advancing.</div>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: ARRIVAL ========== -->
+<div class="phase-label">Phase 2: Arrival & Setup</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Step 2: Arrival Setup</h3>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Homeowner greeted</span></div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Security code (if needed)</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Tarp placed in entryway</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Equipment unloaded from car</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Equipment tidy, not blocking doorways</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Customer concerns reviewed</span></div>
+    <h4>Expectations Set with Homeowner</h4>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Tests being performed explained</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Duration explained</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Homeowner advised to be sedentary</span></div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes</span></div>
+    <div class="photo-badge">Photos</div>
+  </div>
+
+  <div class="card">
+    <h3>Step 3: Device Setup</h3>
+    <h4>Airthings</h4>
+    <div class="field"><span class="type">Y/N/NA</span> <span class="label">Connected to wifi</span></div>
+    <div class="conditional">Wifi network used, Placement location</div>
+    <h4>Boulder Blue Fan</h4>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Fan plugged in</span></div>
+    <div class="conditional">
+      <span class="type">TEXT</span> Placement location<br>
+      <span class="timer-badge">2-HOUR TIMER</span><br>
+      <em>Fan must run 2 hours</em>
+    </div>
+    <h4>PFAS Water Test</h4>
+    <div class="field"><span class="type">RADIO</span> <span class="label">Set up at kitchen faucet (Yes / No / Not requested)</span></div>
+    <div class="conditional">
+      <span class="timer-badge">1-HOUR TIMER</span><br>
+      <em>Needs ~1 hour to drain</em>
+    </div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes</span></div>
+    <div class="photo-badge">Photos</div>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: OUTSIDE ========== -->
+<div class="phase-label">Phase 3: Outside</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Step 4: Outside Inspection</h3>
+    <h4>Breeze ET Control</h4>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Breeze ET set up outdoors</span></div>
+    <div class="conditional">
+      Placement: 6–10 ft from entrance, 60" tripod<br>
+      <span class="timer-badge">10-MIN TIMER</span>
+    </div>
+    <h4>Q-Trak Outdoor Control</h4>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Outdoor measurement taken</span></div>
+    <div class="conditional"><span class="timer-badge">1-MIN TIMER</span></div>
+    <h4>Exterior Visual Inspection</h4>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Insulation around plumbing</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Caulking/flashing condition</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Lot grading (water flow)</span></div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Type of siding</span></div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Vents — condition</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Ice dams / gutters</span></div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Overall roof condition</span></div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Weather screenshot noted</span></div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">General exterior notes</span></div>
+    <div class="photo-badge">Photos</div>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: LOWEST LEVEL ========== -->
+<div class="phase-label">Phase 4: Lowest Livable Level</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Step 5: Radon Monitor Setup</h3>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Location in lowest livable space</span></div>
+    <h4>Placement Confirmed</h4>
+    <div class="field"><span class="type">CHECK</span> <span class="label">3 feet from exterior wall</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">20 inches or above floor</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Centralized, not trafficked</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Windows and doors closed</span></div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">App started</span></div>
+    <div class="note">48-hour test with 4-hour calibration</div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Multiple monitors needed</span></div>
+    <div class="conditional">Second monitor location (text)</div>
+    <div class="photo-badge">Photos</div>
+  </div>
+
+  <div class="card">
+    <h3>Step 6: Lowest Level — Room Testing</h3>
+    <div class="repeat">REPEATS — 1 room default, + Add Another Room</div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Room Name</span></div>
+    <div class="section">
+      <h4>FLIR Thermal Scan</h4>
+      <div class="field"><span class="type">Y/N</span> <span class="label">Scan completed</span></div>
+      <div class="conditional">Concerns found (Y/N), Photo # (text), Moisture % (flag >20%)</div>
+    </div>
+    <div class="section">
+      <h4>Breeze ET Mold Test</h4>
+      <div class="field"><span class="type">Y/N</span> <span class="label">Test performed</span></div>
+      <div class="conditional"><span class="timer-badge">10-MIN TIMER</span> Spore Trap ID (text)</div>
+    </div>
+    <div class="section">
+      <h4>Q-Trak Readings</h4>
+      <span class="timer-badge">1-MIN TIMER</span>
+      <div class="field"><span class="type">READING</span> <span class="label">CO2 (ppm) — Measured / Not Tested / N/A</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">VOC/TVOC (µg/m³)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">PM2.5 (µg/m³)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">PM10 (µg/m³)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">CO (ppm)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">NO2 (ppm)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">Ozone (ppm)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">Chlorine (ppm)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">Temperature (°F)</span></div>
+      <div class="field"><span class="type">READING</span> <span class="label">Humidity (%)</span></div>
+    </div>
+    <div class="field"><span class="type">READING</span> <span class="label">Formaldehyde (ppm)</span></div>
+    <h4>Observations</h4>
+    <div><span class="tag">Visible mold</span><span class="tag">Poor ventilation</span><span class="tag">Water staining</span><span class="tag">Condensation</span><span class="tag">Musty odor</span><span class="tag">Active leak</span><span class="tag">Plumbing issue</span><span class="tag">HVAC concern</span><span class="tag">Moisture concern</span><span class="tag">Other</span></div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes</span></div>
+    <div class="photo-badge">Photos with captions</div>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: UTILITY ========== -->
+<div class="phase-label">Phase 5: Utility Room</div>
+<div class="phase-group">
+  <div class="card" style="width:380px">
+    <h3>Step 7: Utility Room</h3>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Level location</span></div>
+    <div class="section">
+      <h4>Heating Source</h4>
+      <div class="field"><span class="type">TEXT</span> <span class="label">Type, Model #, Serial #</span></div>
+      <div class="photo-badge">Photo</div>
+    </div>
+    <div class="section">
+      <h4>Air Conditioning Source</h4>
+      <div class="field"><span class="type">TEXT</span> <span class="label">Type, Model #, Serial #</span></div>
+      <div class="photo-badge">Photo</div>
+    </div>
+    <div class="section">
+      <h4>Ventilation / Fresh Air System</h4>
+      <div class="field"><span class="type">TEXT</span> <span class="label">Type, Model #, Serial #</span></div>
+      <div class="photo-badge">Photo</div>
+    </div>
+    <div class="section">
+      <h4>HVAC Filter</h4>
+      <div class="field"><span class="type">TEXT</span> <span class="label">Size, MERV/HEPA rating</span></div>
+      <div class="field"><span class="type">RADIO</span> <span class="label">Condition (Good / Fair / Poor)</span></div>
+      <div class="photo-badge">Photo</div>
+    </div>
+    <div class="section">
+      <h4>HVAC Inspection</h4>
+      <div class="field"><span class="type">CHECK</span> <span class="label">Service panel removed</span></div>
+      <div class="field"><span class="type">CHECK</span> <span class="label">Filters checked</span></div>
+      <div class="field"><span class="type">Y/N</span> <span class="label">Condensation noted</span></div>
+      <div class="field"><span class="type">Y/N</span> <span class="label">Leaks noted</span></div>
+      <div class="field"><span class="type">TEXT</span> <span class="label">Notable details</span></div>
+      <div class="photo-badge">Photo</div>
+    </div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Radon mitigation system present</span></div>
+    <div class="conditional">Type/Model/Serial + Photo</div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Air filtration system present</span></div>
+    <div class="conditional">Type/Model/Serial + Photo</div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Water filtration system present</span></div>
+    <div class="conditional">Type/Model/Serial + Photo</div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">General notes</span></div>
+    <div class="photo-badge">Photos</div>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: UPPER LEVEL ========== -->
+<div class="phase-label">Phase 6: Upper Level</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Steps 8+: Bedrooms</h3>
+    <div class="repeat">REPEATS — one per bedroom (from intake count)</div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Room Name</span></div>
+    <div class="section">
+      <h4>FLIR + Breeze ET + Q-Trak + Formaldehyde</h4>
+      <div class="note">Same fields as Lowest Level Room Testing</div>
+    </div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Ensuite bathroom present</span></div>
+    <div class="conditional">
+      <h4>Bathroom Inspection (if ensuite)</h4>
+      <div class="field"><span class="type">CHECK</span> <span class="label">Under sink checked</span></div>
+      <div class="field"><span class="type">CHECK</span> <span class="label">Around toilet checked</span></div>
+      <div class="field"><span class="type">CHECK</span> <span class="label">Baseboard around shower/tub</span></div>
+      <div class="field"><span class="type">CHECK</span> <span class="label">Caulking/grout in tile</span></div>
+      <div class="field"><span class="type">Y/N</span> <span class="label">Leak found</span></div>
+    </div>
+    <h4>Observations (chips) + Notes + Photos</h4>
+  </div>
+
+  <div class="card">
+    <h3>Steps: Bathrooms (non-ensuite)</h3>
+    <div class="repeat">REPEATS — one per bathroom (from intake count)</div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Room Name</span></div>
+    <div class="section">
+      <h4>Breeze ET + Q-Trak + Formaldehyde</h4>
+      <div class="note">Same readings (no FLIR for bathrooms)</div>
+    </div>
+    <h4>Bathroom Inspection</h4>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Under sink checked</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Around toilet checked</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Baseboard around shower/tub</span></div>
+    <div class="field"><span class="type">CHECK</span> <span class="label">Caulking/grout in tile</span></div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Leak found</span></div>
+    <h4>Observations (chips) + Notes + Photos</h4>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: KITCHEN / MAIN ========== -->
+<div class="phase-label">Phase 7: Kitchen & Main Living Level</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Main Living Area Air Testing</h3>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Room(s) tested (e.g. Living Room, Dining Room)</span></div>
+    <div class="section">
+      <h4>FLIR + Breeze ET + Q-Trak + Formaldehyde</h4>
+      <div class="note">Same fields as room testing</div>
+    </div>
+    <h4>Observations + Notes + Photos</h4>
+  </div>
+
+  <div class="card" style="width:360px">
+    <h3>Kitchen Appliance Inspection</h3>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Water flushed 5 min before sampling</span></div>
+    <div class="conditional"><span class="timer-badge">5-MIN TIMER</span></div>
+    <h4>Appliance Checklist (7 items)</h4>
+    <ul>
+      <li>Under refrigerator — checked, cleaned → findings</li>
+      <li>Under dishwasher — checked, cleaned → findings</li>
+      <li>Dishwasher filter — checked, cleaned → findings</li>
+      <li>Under sink — checked, cleaned → findings</li>
+      <li>Under ice maker — checked, cleaned → findings</li>
+      <li>Grout/caulking backsplash — checked → findings</li>
+      <li>Above stove vent — checked, cleaned → findings</li>
+    </ul>
+    <div class="photo-badge">Photos</div>
+    <div class="field"><span class="type">Y/N/NA</span> <span class="label">Mold swab collected under sink</span></div>
+    <div class="conditional">Swab ID (text)</div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Water Sample Collection</h3>
+    <h4>Water Panel</h4>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Water panel collected</span></div>
+    <div class="conditional">Sample ID, Faucet location, Photo</div>
+    <h4>Microplastics</h4>
+    <div class="field"><span class="type">RADIO</span> <span class="label">Collected / Not requested</span></div>
+    <div class="conditional">Sample ID (text)</div>
+    <h4>PFAS</h4>
+    <div class="field"><span class="type">RADIO</span> <span class="label">Collected / Not requested / Already set up</span></div>
+    <div class="conditional">Sample ID (text)</div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes</span></div>
+  </div>
+
+  <div class="card">
+    <h3>ATP Surface Testing — Kitchen</h3>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Surface tested</span></div>
+    <div class="field"><span class="type">NUMBER</span> <span class="label">Pre-test RLU reading</span></div>
+    <div class="field"><span class="type">RADIO</span> <span class="label">Pre-test status (Pass / Fail)</span></div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Surface cleaned with soap and water</span></div>
+    <div class="field"><span class="type">NUMBER</span> <span class="label">Post-test RLU reading</span></div>
+    <div class="field"><span class="type">RADIO</span> <span class="label">Post-test status (Pass / Fail)</span></div>
+    <div class="photo-badge">Photos</div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Kitchen Air Testing</h3>
+    <div class="section">
+      <h4>FLIR + Breeze ET + Q-Trak + Formaldehyde</h4>
+      <div class="note">Same fields as room testing</div>
+    </div>
+    <h4>Observations + Notes + Photos</h4>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: SUPPLEMENTARY ========== -->
+<div class="phase-label">Phase 8: Supplementary Areas (optional)</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Additional Rooms</h3>
+    <div class="repeat">OPTIONAL — Add as needed via "+ Add Additional Room" button</div>
+    <div class="field"><span class="type">TEXT</span> <span class="label">Room Name</span></div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Reason for inclusion</span></div>
+    <div class="section">
+      <h4>FLIR + Breeze ET + Q-Trak + Formaldehyde</h4>
+      <div class="note">Same fields as room testing</div>
+    </div>
+    <h4>Observations + Notes + Photos</h4>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== PHASE: WRAP UP ========== -->
+<div class="phase-label">Phase 9: Wrap Up</div>
+<div class="phase-group">
+  <div class="card">
+    <h3>Final Checks Before Leaving</h3>
+    <h4>Checklist (9 items)</h4>
+    <ul>
+      <li>All Breeze ET tests collected and spore traps packed</li>
+      <li>Boulder Blue fan run 2 hours — filter collected and packed</li>
+      <li>PFAS test collected from sink</li>
+      <li>Water samples labeled and ready to ship</li>
+      <li>All appliances returned to original state</li>
+      <li>All doors/lights returned to original state</li>
+      <li>Radon monitor left in place — homeowner reminded</li>
+      <li>Technician form fully completed</li>
+      <li>All photos uploaded/captured</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Customer Debrief</h3>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Debrief completed</span></div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Homeowner reminded about radon pickup</span></div>
+    <div class="field"><span class="type">Y/N</span> <span class="label">Expected report date communicated</span></div>
+    <div class="field"><span class="type">TEXTAREA</span> <span class="label">Notes from debrief</span></div>
+  </div>
+
+  <div class="card" style="width:420px">
+    <h3>Shipping Checklist</h3>
+    <h4>Post-Assessment Shipping (7 items)</h4>
+    <ul>
+      <li>Breeze ST spore traps → FedEx overnight <em>+ tracking #</em></li>
+      <li>Boulder Blue filter → UPS to Jonah Ventures, Boulder CO <em>+ tracking #</em></li>
+      <li>Water panel → prepaid label sent <em>+ tracking #</em></li>
+      <li>PFAS (Cyclopure) → prepaid label sent <em>+ tracking #</em></li>
+      <li>Microplastics (Brooks) → packaged and shipped <em>+ tracking #</em></li>
+      <li>Q-Trak data downloaded and exported</li>
+      <li>Photos uploaded to Google Drive</li>
+    </ul>
+  </div>
+</div>
+
+<div class="arrow">&#8595;</div>
+
+<!-- ========== REVIEW ========== -->
+<div class="phase-label">Final</div>
+<div class="phase-group">
+  <div class="card" style="width:100%;max-width:700px">
+    <h3>Final Review & Export</h3>
+    <div style="background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;">
+      REMINDER: Upload photos to Google Drive | Download Q-Trak data | Ship all lab samples
+    </div>
+    <h4>Inspection Details Summary</h4>
+    <div class="note">ID, Inspector, Client, Address, Date, Levels, Bedrooms, Bathrooms, Water Source, Wifi, Cleaning Freq, Occupancy, Weather, Start Time, Status, Client Concerns, Known Problem Areas</div>
+    <h4>Step-by-Step Summary Cards</h4>
+    <div class="note">Every step shown with: Visited/Not visited badge, Edit button, all data values, all photos with captions</div>
+    <h4>JSON Export Preview</h4>
+    <div class="note">Full inspection data formatted as JSON</div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="type" style="font-size:12px;padding:6px 14px;">DOWNLOAD JSON</span>
+      <span class="type" style="font-size:12px;padding:6px 14px;">COPY JSON</span>
+      <span style="display:inline-block;background:#2563eb;color:#fff;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:700;">MARK COMPLETE</span>
+    </div>
+    <div class="note">Sets end timestamp. Inspection moves to "Completed" list on home screen.</div>
+  </div>
+</div>
+
+</div>
+
+<div style="text-align:center;margin-top:60px;color:#475569;font-size:13px;">
+  <p>Total steps in a typical inspection (3 bedrooms, 2 bathrooms):</p>
+  <p style="font-size:22px;font-weight:800;color:#fff;">~23 steps</p>
+  <p style="margin-top:20px;">Equipment checklist → Arrival → Device setup → Outside → Radon → Lowest level rooms → Utility → 3 Bedrooms → 2 Bathrooms → Living area → Kitchen appliance → Water samples → ATP → Kitchen air → Final checks → Debrief → Shipping → Review</p>
+</div>
+
+</body>
+</html>
