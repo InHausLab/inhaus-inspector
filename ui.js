@@ -570,7 +570,7 @@
   }
 
   // ── Progress Bar ───────────────────────────────────────────
-  function renderProgressBar(phases, currentPhaseId, stepName, onPhaseClick) {
+  function renderProgressBar(phases, currentPhaseId, stepName, onPhaseClick, stepNumber, totalSteps) {
     const bar = el('div', { className: 'progress-bar' });
     phases.forEach(p => {
       const dot = el('div', {
@@ -582,7 +582,12 @@
       ]);
       bar.appendChild(dot);
     });
-    const nameBar = el('div', { className: 'step-name-bar' }, stepName || '');
+    const nameBarChildren = [];
+    if (stepNumber != null && totalSteps != null) {
+      nameBarChildren.push(el('div', { className: 'step-counter' }, 'Step ' + stepNumber + ' of ' + totalSteps));
+    }
+    nameBarChildren.push(el('span', null, stepName || ''));
+    const nameBar = el('div', { className: 'step-name-bar' }, nameBarChildren);
     const wrapper = el('div', { className: 'progress-wrapper' }, [bar, nameBar]);
     return wrapper;
   }

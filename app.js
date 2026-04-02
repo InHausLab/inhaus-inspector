@@ -990,7 +990,7 @@
     c.appendChild(renderProgressBar(phasesWithState, currentPhase, step.name, phaseId => {
       const idx = stepList.findIndex(s => s.phase === phaseId);
       if (idx >= 0 && idx <= currentStepIdx) { currentStepIdx = idx; render(); }
-    }));
+    }, currentStepIdx + 1, stepList.length));
 
     c.appendChild(el('h1', { className: 'screen-title' }, step.name));
 
