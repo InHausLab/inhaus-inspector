@@ -357,36 +357,75 @@
   function renderChecklist(key, label, items, data, onChange, opts) {
     opts = opts || {};
     const g = el('div', { className: 'field-group checklist-group' });
-    if (label) g.appendChild(el('label', { className: 'field-label' }, label));
     if (!data) data = {};
-    items.forEach(item => {
-      const ik = typeof item === 'string' ? item : item.key;
-      const il = typeof item === 'string' ? item : item.label;
-      const optional = item.optional;
-      const box = el('div', { className: 'check-box' + (data[ik] ? ' checked' : '') }, data[ik] ? '\u2713' : '');
-      const row = el('div', {
-        className: 'check-item' + (optional ? ' optional-item' : ''),
-        onClick: () => {
-          data[ik] = !data[ik];
-          box.className = 'check-box' + (data[ik] ? ' checked' : '');
-          box.textContent = data[ik] ? '\u2713' : '';
-          onChange(data);
+
+    function build() {
+      g.innerHTML = '';
+      if (label) {
+        const headerRow = el('div', { className: 'checklist-header' });
+        headerRow.appendChild(el('label', { className: 'field-label' }, label));
+        const allChecked = items.every(item => {
+          const ik = typeof item === 'string' ? item : item.key;
+          return !!data[ik];
+        });
+        const toggleBtn = el('button', {
+          type: 'button',
+          className: 'btn-check-all' + (allChecked ? ' all-checked' : ''),
+          onClick: (e) => {
+            e.stopPropagation();
+            const newState = !allChecked;
+            items.forEach(item => {
+              const ik = typeof item === 'string' ? item : item.key;
+              data[ik] = newState;
+            });
+            onChange(data);
+            build();
+          }
+        }, allChecked ? 'Uncheck all' : 'All packed \u2713');
+        headerRow.appendChild(toggleBtn);
+        g.appendChild(headerRow);
+      }
+
+      items.forEach(item => {
+        const ik = typeof item === 'string' ? item : item.key;
+        const il = typeof item === 'string' ? item : item.label;
+        const optional = item.optional;
+        const box = el('div', { className: 'check-box' + (data[ik] ? ' checked' : '') }, data[ik] ? '\u2713' : '');
+        const row = el('div', {
+          className: 'check-item' + (optional ? ' optional-item' : ''),
+          onClick: () => {
+            data[ik] = !data[ik];
+            box.className = 'check-box' + (data[ik] ? ' checked' : '');
+            box.textContent = data[ik] ? '\u2713' : '';
+            onChange(data);
+            // Update toggle button text
+            const btn = g.querySelector('.btn-check-all');
+            if (btn) {
+              const nowAllChecked = items.every(it => {
+                const k = typeof it === 'string' ? it : it.key;
+                return !!data[k];
+              });
+              btn.textContent = nowAllChecked ? 'Uncheck all' : 'All packed \u2713';
+              btn.classList.toggle('all-checked', nowAllChecked);
+            }
+          }
+        });
+        row.appendChild(box);
+        row.appendChild(el('div', { className: 'check-label' }, il + (optional ? ' (if applicable)' : '')));
+        g.appendChild(row);
+
+        // Sub-fields for checklist items
+        if (item.subFields && data[ik]) {
+          item.subFields.forEach(sf => {
+            const subVal = data[sf.key] || '';
+            const sub = renderText(sf.key, sf.label, subVal, v => { data[sf.key] = v; onChange(data); }, sf);
+            sub.classList.add('sub-field');
+            g.appendChild(sub);
+          });
         }
       });
-      row.appendChild(box);
-      row.appendChild(el('div', { className: 'check-label' }, il + (optional ? ' (if applicable)' : '')));
-      g.appendChild(row);
-
-      // Sub-fields for checklist items
-      if (item.subFields && data[ik]) {
-        item.subFields.forEach(sf => {
-          const subVal = data[sf.key] || '';
-          const sub = renderText(sf.key, sf.label, subVal, v => { data[sf.key] = v; onChange(data); }, sf);
-          sub.classList.add('sub-field');
-          g.appendChild(sub);
-        });
-      }
-    });
+    }
+    build();
     return g;
   }
 
@@ -572,10 +611,15 @@
   // ── Progress Bar ───────────────────────────────────────────
   function renderProgressBar(phases, currentPhaseId, stepName, onPhaseClick, stepNumber, totalSteps) {
     const bar = el('div', { className: 'progress-bar' });
+    let pastCurrent = false;
     phases.forEach(p => {
+      const isCurrent = p.id === currentPhaseId;
+      if (isCurrent) pastCurrent = true;
+      const isFuture = !isCurrent && pastCurrent && !p.done;
+      const canTap = p.done || isCurrent;
       const dot = el('div', {
-        className: 'phase-dot' + (p.id === currentPhaseId ? ' active' : '') + (p.done ? ' done' : ''),
-        onClick: () => onPhaseClick(p.id)
+        className: 'phase-dot' + (isCurrent ? ' active' : '') + (p.done ? ' done' : '') + (isFuture ? ' future' : ''),
+        onClick: canTap ? () => onPhaseClick(p.id) : undefined
       }, [
         el('div', { className: 'phase-circle' }, p.done ? '\u2713' : p.icon || ''),
         el('div', { className: 'phase-name' }, p.name)
@@ -600,12 +644,37 @@
     ]);
   }
 
+  // ── Toast ──────────────────────────────────────────────────
+  function showToast(msg, durationMs) {
+    const existing = document.getElementById('ui-toast');
+    if (existing) existing.remove();
+    const toast = el('div', { id: 'ui-toast', className: 'toast' }, msg);
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.classList.add('toast-visible'); }, 10);
+    setTimeout(() => {
+      toast.classList.remove('toast-visible');
+      setTimeout(() => toast.remove(), 300);
+    }, durationMs || 2500);
+  }
+
+  // ── Validation Flash ──────────────────────────────────────
+  function flashUncheckedItems(container) {
+    const items = container.querySelectorAll('.check-item:not(.optional-item)');
+    items.forEach(row => {
+      const box = row.querySelector('.check-box');
+      if (box && !box.classList.contains('checked')) {
+        row.classList.add('validation-flash');
+        setTimeout(() => row.classList.remove('validation-flash'), 1500);
+      }
+    });
+  }
+
   // ── Export ─────────────────────────────────────────────────
   window.UI = {
     el, frag, renderField, renderProgressBar, renderStatusBar, renderTimersBar,
     renderText, renderTextarea, renderNumber, renderSelect, renderYesNo, renderRadio,
     renderCheck, renderChecklist, renderChips, renderReading, renderPhoto, renderTimer,
     renderHeading, renderInfo, renderDivider, compressImage, playAlert, fmtDate, fmtDuration,
-    micBtn
+    micBtn, showToast, flashUncheckedItems
   };
 })();

@@ -6,7 +6,7 @@
   // Set this to your Google Apps Script web app URL
   const GOOGLE_SCRIPT_URL = '';
 
-  const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, fmtDate } = UI;
+  const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems } = UI;
 
   // ── Field Definition Helpers ───────────────────────────────
   function text(key, label, opts) { return { key, type: 'text', label, ...opts }; }
@@ -1025,7 +1025,7 @@
         : el('div'),
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
         const missing = validateStep(step);
-        if (missing.length) { alert('Please complete these required items:\n\n' + missing.join('\n')); return; }
+        if (missing.length) { showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); flashUncheckedItems(c); return; }
         data._completedAt = new Date().toISOString();
         currentStepIdx++;
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
@@ -1041,10 +1041,36 @@
     c.appendChild(buildAppHeader('Final Review'));
     c.appendChild(renderStatusBar(lastSaveText));
 
-    c.appendChild(el('div', { className: 'reminder-banner' }, [
-      el('strong', null, 'Before you leave:'),
-      el('span', null, ' Upload photos to Google Drive | Download Q-Trak data to computer | Ship all lab samples')
-    ]));
+    // ── 6a: Departure Checklist ──
+    if (!inspection._departureChecklist) inspection._departureChecklist = {};
+    const depData = inspection._departureChecklist;
+    const depItems = [
+      { key: 'uploadPhotos', label: 'Upload photos to Google Drive' },
+      { key: 'downloadQtrak', label: 'Download Q-Trak data to computer' },
+      { key: 'shipSamples', label: 'Ship all lab samples' }
+    ];
+    const depCard = el('div', { className: 'card' });
+    depCard.appendChild(el('h3', { className: 'section-heading' }, 'Before You Leave'));
+    const allInspBtn = el('button', {
+      className: 'btn btn-outline btn-full',
+      onClick: () => { screen = 'home'; inspection = null; render(); }
+    }, 'All Inspections');
+
+    function updateDepState() {
+      const allDone = depItems.every(i => !!depData[i.key]);
+      allInspBtn.disabled = !allDone;
+      allInspBtn.style.opacity = allDone ? '1' : '0.4';
+      allInspBtn.style.pointerEvents = allDone ? 'auto' : 'none';
+      scheduleSave();
+    }
+
+    depItems.forEach(item => {
+      depCard.appendChild(renderCheck(item.key, item.label, !!depData[item.key], v => {
+        depData[item.key] = v;
+        updateDepState();
+      }));
+    });
+    c.appendChild(depCard);
 
     const hCard = el('div', { className: 'card' });
     hCard.appendChild(el('h3', { className: 'section-heading' }, 'Inspection Details'));
@@ -1160,8 +1186,11 @@
         inspection.endedAt = new Date().toISOString();
         inspection.completedAt = inspection.endedAt;
         const completeData = buildExportJSON();
-        saveNow().then(() => { uploadToGoogleDrive(completeData); render(); });
-      }}, 'Mark Complete'));
+        saveNow().then(() => {
+          uploadToGoogleDrive(completeData);
+          screen = 'home'; inspection = null; render();
+        });
+      }}, '\u2713 Mark as Complete'));
     } else {
       actCard.appendChild(el('div', { className: 'completed-banner' }, [
         el('strong', null, '\u2713 Inspection Complete'),
@@ -1170,13 +1199,16 @@
     }
     c.appendChild(actCard);
 
+    // Initial departure checklist state
+    updateDepState();
+
     c.appendChild(el('div', { className: 'bottom-nav' }, [
       el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
         if (inspection.status !== 'completed') { currentStepIdx = stepList.length - 2; screen = 'step'; }
         else { screen = 'home'; inspection = null; }
         render();
       }}, inspection.status !== 'completed' ? '\u2190 Back to Steps' : '\u2190 Home'),
-      el('button', { className: 'btn btn-outline btn-nav', onClick: () => { screen = 'home'; inspection = null; render(); } }, 'All Inspections')
+      allInspBtn
     ]));
 
     root.appendChild(c);

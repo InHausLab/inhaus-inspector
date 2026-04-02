@@ -266,6 +266,20 @@ body {
 .optional-item .check-label { font-style: italic; }
 
 .checklist-group { margin-bottom: 12px; }
+.checklist-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin-bottom: 4px;
+}
+.checklist-header .field-label { margin-bottom: 0; }
+.btn-check-all {
+  background: var(--accent-light); color: var(--primary);
+  border: none; border-radius: 20px;
+  padding: 6px 14px; font-size: 0.7rem; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+  white-space: nowrap; transition: all 0.12s;
+}
+.btn-check-all:active { opacity: 0.8; transform: scale(0.97); }
+.btn-check-all.all-checked { background: var(--border); color: var(--text-muted); }
 
 /* ── Chips ───────────────────────────────── */
 .chips-row { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -387,6 +401,9 @@ body {
   color: var(--text-muted); font-weight: 600; line-height: 1.2;
 }
 .phase-dot.active .phase-name { color: var(--primary); font-weight: 800; }
+.phase-dot.done { cursor: pointer; }
+.phase-dot.done:active .phase-circle { transform: scale(0.9); }
+.phase-dot.future { opacity: 0.45; cursor: default; }
 .step-name-bar {
   text-align: center; font-size: 0.85rem; font-weight: 700;
   color: var(--text); padding: 6px 12px 10px;
@@ -513,6 +530,24 @@ body {
     display: flex; align-items: flex-start; gap: 16px;
   }
   .reading-group > .field-label { min-width: 200px; padding-top: 12px; margin-bottom: 0; }
+}
+
+/* ── Toast ───────────────────────────────── */
+.toast {
+  position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: rgba(44, 44, 44, 0.95); color: #fff;
+  padding: 12px 24px; border-radius: 28px;
+  font-size: 0.9rem; font-weight: 700;
+  z-index: 300; opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none; white-space: nowrap;
+}
+.toast-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Validation Flash ───────────────────── */
+.validation-flash .check-box:not(.checked) {
+  border-color: var(--danger); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 @media (max-width: 420px) {
