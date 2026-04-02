@@ -583,8 +583,8 @@
     { id: 'utility', name: 'Utility', icon: '5' },
     { id: 'upper', name: 'Upper', icon: '6' },
     { id: 'main', name: 'Kitchen', icon: '7' },
-    { id: 'supplementary', name: 'Other', icon: '8' },
-    { id: 'wrapup', name: 'Wrap Up', icon: '9' },
+    { id: 'supplementary', name: 'Water Samples', icon: '8' },
+    { id: 'wrapup', name: 'Customer Debrief', icon: '9' },
     { id: 'post', name: 'Post', icon: '10' },
     { id: 'review', name: 'Review', icon: '\u2713' }
   ];
