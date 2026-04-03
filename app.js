@@ -210,6 +210,7 @@
       check('testsExplained', 'Explain tests being performed'),
       check('durationExplained', 'Estimate testing duration'),
       check('sedentaryAdvised', 'Ask homeowner to remain sedentary during testing'),
+      sel('windowsOpen', 'Windows open during assessment', ['No', 'Yes', 'Some']),
       divider(),
       heading('Airthings View Plus Setup'),
       check('airthingsPaired', 'Pair to Airthings account'),
@@ -406,6 +407,9 @@
         { key: 'stoveVent', label: 'Above stove vent \u2014 checked, cleaned (before/after photos)', subFields: [{ key: 'stoveVentFindings', label: 'Notable findings' }] }
       ]),
       photo('Appliance Inspection'),
+      divider(),
+      heading('Overall Assessment'),
+      sel('appliancesCondition', 'Overall Appliances Condition', ['Excellent - New or Recently Replaced (0-3 years)', 'Good (3-10 years)', 'Fair (10-20 years)', 'Poor (20+ years or needs replacement)']),
       divider(),
       heading('Mold Swabs'),
       yesno('moldVisible', 'Visible mold or high mold potential identified?'),
@@ -889,6 +893,15 @@
       numberOfBathrooms: '',
       waterSource: '',
       waterSourceDescription: '',
+      residenceType: '',
+      yearBuilt: '',
+      squareFootage: '',
+      basement: '',
+      carpetedRooms: '',
+      pets: '',
+      smokingVaping: '',
+      stoveType: '',
+      fireplace: '',
       wifiNetwork: '',
       clientConcerns: '',
       cleaningFrequency: '',
@@ -914,6 +927,17 @@
       sel('numberOfBathrooms', 'Number of Bathrooms *', ['1', '2', '3', '4', '5', '6']),
       sel('waterSource', 'Water Source *', ['Municipal', 'Well', 'Other']),
       showIf(text('waterSourceDescription', 'Water source description'), 'waterSource', 'Other'),
+      divider(),
+      heading('Property Details'),
+      sel('residenceType', 'Residence Type', ['Single-Family Home', 'Townhome', 'Condo', 'Duplex', 'Apartment', 'Other']),
+      num('yearBuilt', 'Year Home Was Built'),
+      text('squareFootage', 'Approximate Square Footage'),
+      sel('basement', 'Basement', ['Yes - Finished', 'Yes - Unfinished', 'No', 'Partial']),
+      sel('carpetedRooms', 'Number of Carpeted Rooms', ['0', '1', '2', '3', '4', '5', '6+']),
+      sel('stoveType', 'Stove/Range Type', ['Gas', 'Electric', 'Induction', 'Other']),
+      sel('fireplace', 'Fireplace', ['No', 'Yes - Wood Burning', 'Yes - Gas', 'Yes - Electric']),
+      sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
+      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only']),
       text('wifiNetwork', 'Home wifi network name'),
       textarea('clientConcerns', 'Client specific concerns'),
       sel('cleaningFrequency', 'Cleaning frequency', ['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Rarely']),
@@ -1228,6 +1252,15 @@
       numberOfBathrooms: inspection.numberOfBathrooms,
       waterSource: inspection.waterSource,
       waterSourceDescription: inspection.waterSourceDescription || '',
+      residenceType: inspection.residenceType || '',
+      yearBuilt: inspection.yearBuilt || '',
+      squareFootage: inspection.squareFootage || '',
+      basement: inspection.basement || '',
+      carpetedRooms: inspection.carpetedRooms || '',
+      pets: inspection.pets || '',
+      smokingVaping: inspection.smokingVaping || '',
+      stoveType: inspection.stoveType || '',
+      fireplace: inspection.fireplace || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
       cleaningFrequency: inspection.cleaningFrequency || '',
@@ -1261,6 +1294,19 @@
       }
     });
 
+    const arrivalData = inspection.stepData?.arrival || {};
+    exp.windowsOpen = arrivalData.windowsOpen || '';
+    const kitchenData = inspection.stepData?.['kitchen-appliance'] || {};
+    exp.appliancesCondition = kitchenData.appliancesCondition || '';
+    let dampnessCount = 0;
+    let mustyCount = 0;
+    exp.rooms.forEach(room => {
+      const obs = room.observations || [];
+      if (obs.includes('Visible mold') || obs.includes('Water staining') || obs.includes('Condensation') || obs.includes('Active leak')) dampnessCount++;
+      if (obs.includes('Musty odor')) mustyCount++;
+    });
+    exp.roomsWithDampness = dampnessCount;
+    exp.roomsWithMustySmell = mustyCount;
     return exp;
   }
 
