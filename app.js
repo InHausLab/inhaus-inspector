@@ -4,7 +4,7 @@
 
   // ── Google Drive Export Config ─────────────────────────────
   // Set this to your Google Apps Script web app URL
-  const GOOGLE_SCRIPT_URL = '';
+  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZoRaJtJs9Nvb3H1aLToccUazpqtij3pWNHl0tX3okFw9E47BewY7arvRJlp2XXsGYOw/exec';
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems } = UI;
 
