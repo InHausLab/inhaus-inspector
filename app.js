@@ -116,7 +116,10 @@
     return [
       chips('observations', 'Observations', OBS_TAGS),
       textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments...' }),
-      photo('Room Inspection')
+      divider(),
+      heading('Photos'),
+      photo('Before'),
+      photo('After')
     ];
   }
 
