@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inhaus-v17';
+const CACHE_NAME = 'inhaus-v18';
 const ASSETS = [
   'index.html',
   'styles.css',
@@ -20,5 +20,12 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  // Network-first: always try network, fall back to cache for offline
+  e.respondWith(
+    fetch(e.request).then(response => {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      return response;
+    }).catch(() => caches.match(e.request))
+  );
 });
