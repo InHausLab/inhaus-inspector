@@ -123,6 +123,17 @@
     ];
   }
 
+  function followUpFields() {
+    return [
+      divider(),
+      heading('Follow-Up'),
+      yesno('followUpNeeded', 'Follow-up recommended?'),
+      showIf(sel('followUpTimeframe', 'Re-check in', ['3 months', '6 months', '12 months']), 'followUpNeeded', 'Yes'),
+      showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return...' }), 'followUpNeeded', 'Yes'),
+      showIf(photo('Follow-Up'), 'followUpNeeded', 'Yes')
+    ];
+  }
+
   function bathroomCheckFields() {
     return [
       heading('Bathroom Inspection'),
@@ -310,6 +321,7 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...bathroomLeakFields(),
+      ...followUpFields(),
       ...observationFields()
     ];
   }
@@ -363,6 +375,7 @@
       divider(),
       yesno('hasEnsuite', 'Ensuite bathroom present'),
       ...bathroomCheckFields().map(f => showIf(f, 'hasEnsuite', 'Yes')),
+      ...followUpFields(),
       ...observationFields()
     ];
   }
@@ -374,6 +387,7 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...bathroomCheckFields(),
+      ...followUpFields(),
       ...observationFields()
     ];
   }
@@ -387,6 +401,7 @@
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
+      ...followUpFields(),
       ...observationFields()
     ];
   }
@@ -461,6 +476,7 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...bathroomLeakFields(),
+      ...followUpFields(),
       ...observationFields()
     ];
   }
@@ -473,6 +489,7 @@
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
+      ...followUpFields(),
       ...observationFields()
     ];
   }
