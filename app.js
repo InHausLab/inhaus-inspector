@@ -68,7 +68,7 @@
 
   function bathroomLeakFields() {
     return [
-      heading('Bathroom Leak Inspection'),
+      heading('Moisture Check'),
       check('leakUnderSink', 'Under sink checked'),
       check('leakToilet', 'Around toilet checked'),
       check('leakShowerTub', 'Baseboard around shower/tub checked'),
