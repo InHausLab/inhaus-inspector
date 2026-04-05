@@ -1063,7 +1063,15 @@
 
     data._visited = true;
 
-    const nav = el('div', { className: 'bottom-nav' }, [
+    const isDevMode = new URLSearchParams(window.location.search).get('dev') === 'true';
+    if (isDevMode && !document.getElementById('dev-banner')) {
+      const banner = document.createElement('div');
+      banner.id = 'dev-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff9900;color:#000;text-align:center;font-size:12px;font-weight:bold;padding:3px;z-index:9999;';
+      banner.textContent = '⚠️ DEV MODE — Skip buttons active';
+      document.body.prepend(banner);
+    }
+    const navButtons = [
       currentStepIdx > 0
         ? el('button', { className: 'btn btn-outline btn-nav', onClick: () => { currentStepIdx--; render(); window.scrollTo(0, 0); } }, '\u2190 Back')
         : el('div'),
@@ -1074,7 +1082,16 @@
         currentStepIdx++;
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
       }}, currentStepIdx < stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
-    ]);
+    ];
+    if (isDevMode) {
+      navButtons.push(el('button', { className: 'btn btn-nav', style: 'background:#ff9900;color:#000;font-size:12px;padding:6px 10px;', onClick: () => {
+        data._completedAt = new Date().toISOString();
+        data._visited = true;
+        currentStepIdx++;
+        saveNow().then(() => { render(); window.scrollTo(0, 0); });
+      }}, 'Skip \u23e9'));
+    }
+    const nav = el('div', { className: 'bottom-nav' }, navButtons);
     c.appendChild(nav);
     root.appendChild(c);
   }
