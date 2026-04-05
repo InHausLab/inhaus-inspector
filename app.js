@@ -821,11 +821,30 @@
   }
 
   // ── App Header (reused on all screens) ─────────────────────
+  let _devTapCount = 0, _devTapTimer = null;
+  function isDevMode() { return localStorage.getItem('inhausDevMode') === 'true'; }
+  function toggleDevMode() {
+    const next = !isDevMode();
+    localStorage.setItem('inhausDevMode', next ? 'true' : 'false');
+    const msg = next ? '\u26a0\ufe0f Dev Mode ON \u2014 Skip buttons active' : 'Dev Mode OFF';
+    showToast(msg);
+    render();
+  }
+
   function buildAppHeader(subtitle) {
     const header = el('div', { className: 'app-header' });
-    const logo = el('div', { className: 'app-logo' });
+    const logo = el('div', { className: 'app-logo', style: 'cursor:pointer;', onClick: () => {
+      _devTapCount++;
+      if (_devTapTimer) clearTimeout(_devTapTimer);
+      _devTapTimer = setTimeout(() => { _devTapCount = 0; }, 2000);
+      if (_devTapCount >= 5) { _devTapCount = 0; toggleDevMode(); }
+    }});
     logo.appendChild(el('img', { src: 'icons/logo.png', alt: 'InHaus Lab' }));
     header.appendChild(logo);
+    if (isDevMode()) {
+      const banner = el('div', { style: 'background:#ff9900;color:#000;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:4px;' }, '\u26a0\ufe0f DEV');
+      header.appendChild(banner);
+    }
     header.appendChild(el('p', { className: 'app-subtitle' }, subtitle || 'Field Inspector'));
     return header;
   }
@@ -1063,14 +1082,6 @@
 
     data._visited = true;
 
-    const isDevMode = new URLSearchParams(window.location.search).get('dev') === 'true';
-    if (isDevMode && !document.getElementById('dev-banner')) {
-      const banner = document.createElement('div');
-      banner.id = 'dev-banner';
-      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff9900;color:#000;text-align:center;font-size:12px;font-weight:bold;padding:3px;z-index:9999;';
-      banner.textContent = '⚠️ DEV MODE — Skip buttons active';
-      document.body.prepend(banner);
-    }
     const navButtons = [
       currentStepIdx > 0
         ? el('button', { className: 'btn btn-outline btn-nav', onClick: () => { currentStepIdx--; render(); window.scrollTo(0, 0); } }, '\u2190 Back')
@@ -1083,7 +1094,7 @@
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
       }}, currentStepIdx < stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
     ];
-    if (isDevMode) {
+    if (isDevMode()) {
       navButtons.push(el('button', { className: 'btn btn-nav', style: 'background:#ff9900;color:#000;font-size:12px;padding:6px 10px;', onClick: () => {
         data._completedAt = new Date().toISOString();
         data._visited = true;
