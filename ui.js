@@ -582,6 +582,11 @@
       case 'heading': return renderHeading(f.label);
       case 'info': return renderInfo(f.label);
       case 'divider': return renderDivider();
+      case 'link': {
+        const div = el('div', { className: 'field-row', style: 'padding:8px 0' });
+        div.innerHTML = `<a href="${f.url}" target="_blank" rel="noopener" style="color:#1a73e8;text-decoration:underline;font-size:1rem;">${f.label}</a>`;
+        return div;
+      }
       case 'text': return renderText(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);
       case 'textarea': return renderTextarea(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);
       case 'number': return renderNumber(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);

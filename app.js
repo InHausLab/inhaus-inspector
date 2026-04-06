@@ -28,6 +28,7 @@
   function heading(label) { return { type: 'heading', label }; }
   function info(label) { return { type: 'info', label }; }
   function divider() { return { type: 'divider' }; }
+  function link(label, url) { return { type: 'link', label, url }; }
   function showIf(field, key, value) { return { ...field, showIf: { key, value } }; }
 
   // ── Reusable Field Groups ──────────────────────────────────
@@ -174,6 +175,7 @@
         { key: 'radonPrepared', label: 'Radon test prepared' },
         { key: 'qtrakSetup', label: 'Q-Trak device set up (previous data deleted, room templates configured)' }
       ]),
+      link('\uD83D\uDCCB Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
       checklist('airEquip', 'Air Testing Equipment', [
         { key: 'qtrak', label: 'Q-Trak 7585 \u2014 charged, previous data deleted, rooms configured' },
 
