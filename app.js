@@ -89,7 +89,7 @@
     return [
       heading('Q-Trak 7585'),
       yesnona('qtrakRun', 'Q-Trak run'),
-      showIf(timer('qtrakTimer', 'Q-Trak Sampling Timer (1 min)', 60), 'qtrakRun', 'Yes'),
+
       showIf(num('qtrak_co2', 'CO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_co', 'CO', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
       showIf(num('qtrak_no2', 'NO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
@@ -105,11 +105,7 @@
   }
 
   function formaldehydeField() {
-    return [
-      heading('Formaldehyde (Extech VFM200)'),
-      yesnona('formaldehydeRun', 'Formaldehyde test run'),
-      showIf(num('formaldehyde', 'Formaldehyde reading', { unit: 'ppm' }), 'formaldehydeRun', 'Yes')
-    ];
+    return [];
   }
 
   function observationFields() {
@@ -162,7 +158,7 @@
     return [
       checklist('airEquip', 'Air Testing Equipment', [
         { key: 'qtrak', label: 'Q-Trak 7585 \u2014 charged, previous data deleted, rooms configured' },
-        { key: 'extech', label: 'Extech Formaldehyde monitor (VFM200)' },
+
         { key: 'flir', label: 'FLIR MR277' },
         { key: 'airthings', label: 'Airthings device + charging cube' },
         { key: 'breezeET', label: 'Breeze ET pump + tripod' },
@@ -174,7 +170,7 @@
         { key: 'corentium', label: 'Airthings Corentium Pro radon monitor + tripod' }
       ]),
       checklist('waterEquip', 'Water Testing', [
-        { key: 'waterKit', label: 'Full panel water test kit (EnviroTest)' },
+        { key: 'waterKit', label: 'Full panel water test kit (SafeHome)' },
         { key: 'pfasKit', label: 'PFAS test kit (Cyclopure)', optional: true },
         { key: 'microKit', label: 'Microplastics test kit (Brooks Applied Labs)', optional: true }
       ]),
@@ -213,7 +209,7 @@
     return [
       timeInput('assessmentStartTime', 'Assessment Start Time'),
       check('homeownerGreeted', 'Homeowner greeted (or entry instructions noted)'),
-      text('securityCode', 'Security code (if needed)'),
+
       check('tarpPlaced', 'Tarp placed in entryway'),
       check('equipmentUnloaded', 'Equipment unloaded from car to tarp'),
       check('equipmentTidy', 'Equipment tidy, not blocking doorways'),
@@ -943,7 +939,7 @@
       fireplace: '',
       wifiNetwork: '',
       clientConcerns: '',
-      cleaningFrequency: '',
+
       occupancyDuringInspection: '',
       weatherConditions: '',
       knownProblemAreas: '',
@@ -962,8 +958,8 @@
       text('clientName', 'Client Name *'),
       text('propertyAddress', 'Property Address *'),
       sel('numberOfLevels', 'Number of Levels *', ['1', '2', '3+']),
-      sel('numberOfBedrooms', 'Number of Bedrooms *', ['1', '2', '3', '4', '5', '6', '7']),
-      sel('numberOfBathrooms', 'Number of Bathrooms *', ['1', '2', '3', '4', '5', '6']),
+      sel('numberOfBedrooms', 'Number of Bedrooms *', ['1', '2', '3', '4', '5', '6', '7+']),
+      sel('numberOfBathrooms', 'Number of Bathrooms *', ['1', '2', '3', '4', '5', '6+']),
       sel('waterSource', 'Water Source *', ['Municipal', 'Well', 'Other']),
       showIf(text('waterSourceDescription', 'Water source description'), 'waterSource', 'Other'),
       divider(),
@@ -979,8 +975,8 @@
       sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only']),
       text('wifiNetwork', 'Home wifi network name'),
       textarea('clientConcerns', 'Client specific concerns'),
-      sel('cleaningFrequency', 'Cleaning frequency', ['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Rarely']),
-      radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Yes', 'No', 'Partial']),
+
+      radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Occupied - Active', 'Occupied - Passive', 'Unoccupied']),
       text('weatherConditions', 'Weather conditions'),
       textarea('knownProblemAreas', 'Any known problem areas'),
       textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
@@ -1071,12 +1067,12 @@
     if (step.dynamic === 'lowest') {
       const lowestSteps = stepList.filter(s => s.dynamic === 'lowest');
       if (step.id === lowestSteps[lowestSteps.length - 1].id) {
-        c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => addDynamicRoom('lowest') }, '+ Add Another Room (Lowest Level)'));
+        c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => { addDynamicRoom('lowest'); window.scrollTo(0, 0); } }, '+ Add Another Room (Lowest Level)'));
       }
     }
     if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {
       if (step.id === 'kitchen-air' || (step.dynamic === 'additional' && step.id === stepList.filter(s => s.dynamic === 'additional').pop()?.id)) {
-        c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => addDynamicRoom('additional') }, '+ Add Additional Room'));
+        c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => { addDynamicRoom('additional'); window.scrollTo(0, 0); } }, '+ Add Additional Room'));
       }
     }
 
@@ -1152,7 +1148,7 @@
       ['Date', inspection.inspectionDate], ['Levels', inspection.numberOfLevels],
       ['Bedrooms', inspection.numberOfBedrooms], ['Bathrooms', inspection.numberOfBathrooms],
       ['Water Source', inspection.waterSource + (inspection.waterSourceDescription ? ' (' + inspection.waterSourceDescription + ')' : '')],
-      ['Wifi', inspection.wifiNetwork], ['Cleaning Freq.', inspection.cleaningFrequency],
+      ['Wifi', inspection.wifiNetwork],
       ['Occupancy', inspection.occupancyDuringInspection], ['Weather', inspection.weatherConditions],
       ['Started', fmtDate(inspection.startedAt)], ['Status', inspection.status]
     ];
@@ -1311,7 +1307,7 @@
       fireplace: inspection.fireplace || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
-      cleaningFrequency: inspection.cleaningFrequency || '',
+
       occupancyDuringInspection: inspection.occupancyDuringInspection || '',
       weatherConditions: inspection.weatherConditions || '',
       knownProblemAreas: inspection.knownProblemAreas || '',
