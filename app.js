@@ -107,20 +107,7 @@
     return [
       heading('Q-Trak 7585'),
       yesno('qtrakDownloaded', 'Q-Trak data downloaded from device?'),
-      text('qtrakExportFilename', 'Q-Trak export filename or notes', { placeholder: 'e.g. QTRAK_2026-04-06_123MainSt.xlsx' }),
-      yesnona('qtrakRun', 'Q-Trak run'),
-
-      showIf(num('qtrak_co2', 'CO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_co', 'CO', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_no2', 'NO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_ozone', 'Ozone', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_pm25', 'PM2.5', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_pm10', 'PM10', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_voc', 'TVOCs', { unit: '\u00b5g/m\u00b3' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_chlorine', 'Chlorine', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_temp', 'Temperature', { unit: '\u00b0F' }), 'qtrakRun', 'Yes'),
-      showIf(num('qtrak_humidity', 'Humidity', { unit: '%' }), 'qtrakRun', 'Yes'),
-      showIf(text('qtrakNotes', 'Q-Trak notes (optional)'), 'qtrakRun', 'Yes')
+      text('qtrakExportFilename', 'Q-Trak export filename or notes', { placeholder: 'e.g. QTRAK_2026-04-06_123MainSt.xlsx' })
     ];
   }
 
@@ -176,6 +163,17 @@
 
   function getEquipmentFields() {
     return [
+      checklist('preAssessment', 'Pre-Assessment', [
+        { key: 'reviewConcerns', label: 'Review customer concerns from customer intake form' },
+        { key: 'reviewTechForm', label: 'Review and complete pre-assessment section of the technician form' },
+        { key: 'reviewHome', label: 'Review home for general details (layout, etc.)' },
+        { key: 'devicesCharged', label: 'All devices charged' },
+        { key: 'corentiumRegistered', label: 'Airthings Corentium Pro registered to house (radon monitor)' },
+        { key: 'boulderBlueRegistered', label: 'Boulder Blue sample registered' },
+        { key: 'waterTestsActivated', label: 'Water tests activated' },
+        { key: 'radonPrepared', label: 'Radon test prepared' },
+        { key: 'qtrakSetup', label: 'Q-Trak device set up (previous data deleted, room templates configured)' }
+      ]),
       checklist('airEquip', 'Air Testing Equipment', [
         { key: 'qtrak', label: 'Q-Trak 7585 \u2014 charged, previous data deleted, rooms configured' },
 
@@ -294,6 +292,16 @@
       check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
       timer('qtrakOutdoorTimer', 'Q-Trak Outdoor Timer (1 min)', 60),
       divider(),
+      heading('What to Look For'),
+      checklist('exteriorGuidance', null, [
+        { key: 'visualInspection', label: 'Conduct visual inspection of exterior — look for signs that might indicate further investigation inside' },
+        { key: 'leaksStains', label: 'Visible leaks or water stains on exterior walls' },
+        { key: 'poolingWater', label: 'Pooling water or poor drainage near foundation' },
+        { key: 'foundationCracks', label: 'Cracks in foundation or walls' },
+        { key: 'roofDamage', label: 'Damaged or missing roof elements' },
+        { key: 'gapsSeals', label: 'Gaps around windows, doors, or utility penetrations' }
+      ]),
+      divider(),
       heading('Visual Exterior Inspection'),
       info('Run during mold sample time'),
       text('moldTestLocations', 'Mold test locations identified'),
@@ -336,6 +344,11 @@
   // ── Room test (with FLIR log + bathroom leak for #4) ───────
   function getRoomTestFields() {
     return [
+      heading('Room Setup'),
+      checklist('roomSetup', null, [
+        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
+        { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
+      ]),
       text('roomName', 'Room Name', { required: true }),
       ...flirFields(),
       ...breezeFields(),
@@ -351,14 +364,24 @@
   function getUtilityFields() {
     return [
       text('levelLocation', 'Level location'),
-      ...equipmentFields('heating', 'Heating Source'),
-      ...equipmentFields('ac', 'Air Conditioning Source'),
-      ...equipmentFields('ventilation', 'Ventilation / Fresh Air Recirculation System'),
+      divider(),
+      heading('HVAC System'),
+      yesno('forcedHVAC', 'Forced HVAC System present?'),
+      sel('heatingType', 'Heating Source Type', ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)']),
+      sel('acType', 'Air Conditioning Source Type', ['Central AC', 'Ductless Mini-Split System', 'Window AC Unit(s)', 'Portable AC Unit(s)', 'Heat Pump (Cooling Mode)', 'No Air Conditioning', 'Other (specify)']),
+      checklist('ventilationType', 'Ventilation Type', [
+        { key: 'bathExhaust', label: 'Bathroom Exhaust Fan(s)' },
+        { key: 'hrv', label: 'HRV (Heat Recovery Ventilator)' },
+        { key: 'erv', label: 'ERV (Energy Recovery Ventilator)' },
+        { key: 'ventNone', label: 'None' },
+        { key: 'ventNotSure', label: 'Not sure' }
+      ]),
       divider(),
       heading('HVAC Filter'),
       text('filterSize', 'Filter size'),
       text('filterRating', 'MERV / HEPA rating'),
       radio('filterCondition', 'Filter condition', ['Good', 'Fair', 'Poor']),
+      check('filterCleaned', 'Filters checked and cleaned if needed'),
       photo('HVAC Filter'),
       divider(),
       heading('HVAC Inspection'),
@@ -372,7 +395,7 @@
       yesno('radonMitigationPresent', 'Radon mitigation system present'),
       showIf(text('radonMitType', 'Type / Model / Serial'), 'radonMitigationPresent', 'Yes'),
       showIf(photo('Radon Mitigation'), 'radonMitigationPresent', 'Yes'),
-      yesno('airFiltrationPresent', 'Air filtration system present'),
+      yesno('airFiltrationPresent', 'Air filtration and/or HVAC air cleansing system present'),
       showIf(text('airFiltType', 'Type / Model / Serial'), 'airFiltrationPresent', 'Yes'),
       showIf(photo('Air Filtration'), 'airFiltrationPresent', 'Yes'),
       yesno('waterFiltrationPresent', 'Water filtration system present'),
@@ -382,12 +405,23 @@
       showIf(text('waterSoftType', 'Type / Model / Serial'), 'waterSofteningPresent', 'Yes'),
       showIf(photo('Water Softening'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
-      photo('Utility Room')
+      photo('Utility Room'),
+      divider(),
+      heading('Property Details (Observed)'),
+      sel('carpetedRooms', 'Number of Carpeted Rooms', ['0', '1', '2', '3', '4', '5', '6+']),
+      sel('fireplace', 'Fireplace', ['No', 'Yes - Wood Burning', 'Yes - Gas', 'Yes - Electric']),
+      sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
+      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only'])
     ];
   }
 
   function getBedroomFields() {
     return [
+      heading('Room Setup'),
+      checklist('roomSetup', null, [
+        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
+        { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
+      ]),
       text('roomName', 'Room Name', { required: true }),
       ...flirFields(),
       ...breezeFields(),
@@ -416,6 +450,11 @@
   // ── Living area (with FLIR log + bathroom leak for #4) ─────
   function getLivingAreaFields() {
     return [
+      heading('Room Setup'),
+      checklist('roomSetup', null, [
+        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
+        { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
+      ]),
       text('roomNames', 'Room(s) tested (e.g., Living Room, Dining Room)', { required: true }),
       ...flirLogFields(),
       ...bathroomLeakFields(),
@@ -430,6 +469,11 @@
   // ── Kitchen appliance (expanded for #5) ────────────────────
   function getKitchenApplianceFields() {
     return [
+      heading('Stove / Range'),
+      sel('stoveType', 'Stove/Range Type', ['Gas', 'Electric (Radiant)', 'Induction', 'Dual-Fuel', 'Other (specify)']),
+      sel('exhaustHoodType', 'Type of cooking exhaust hood or vent', ['Under cabinet range hood', 'Over the range microwave with vent', 'Wall mount range hood', 'Ceiling mount range hood', 'Downdraft range hood', 'None', 'Other (specify)']),
+      sel('exhaustVented', 'Is cooking exhaust vented to outdoors?', ['Ducted (to outside)', 'Ductless (recirculating)', 'Unknown']),
+      divider(),
       heading('Kitchen Water Flush'),
       yesno('waterFlushed', 'Water flushed 5 minutes before sampling'),
       showIf(timer('flushTimer', 'Kitchen Water Flush Timer (5 min)', 300), 'waterFlushed', 'Yes'),
@@ -965,11 +1009,6 @@
       yearBuilt: '',
       squareFootage: '',
       basement: '',
-      carpetedRooms: '',
-      pets: '',
-      smokingVaping: '',
-      stoveType: '',
-      fireplace: '',
       wifiNetwork: '',
       clientConcerns: '',
 
@@ -1001,18 +1040,14 @@
       num('yearBuilt', 'Year Home Was Built'),
       text('squareFootage', 'Approximate Square Footage'),
       sel('basement', 'Basement', ['Yes - Finished', 'Yes - Unfinished', 'No', 'Partial']),
-      sel('carpetedRooms', 'Number of Carpeted Rooms', ['0', '1', '2', '3', '4', '5', '6+']),
-      sel('stoveType', 'Stove/Range Type', ['Gas', 'Electric', 'Induction', 'Other']),
-      sel('fireplace', 'Fireplace', ['No', 'Yes - Wood Burning', 'Yes - Gas', 'Yes - Electric']),
-      sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
-      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only']),
       text('wifiNetwork', 'Home wifi network name'),
+      text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
       textarea('clientConcerns', 'Client specific concerns'),
-
-      radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Occupied - Active', 'Occupied - Passive', 'Unoccupied']),
-      text('weatherConditions', 'Weather conditions'),
       textarea('knownProblemAreas', 'Any known problem areas'),
-      textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
+      textarea('blueprintNotes', 'Client blueprints / layout notes (optional)'),
+      divider(),
+      radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Occupied - Active', 'Occupied - Passive', 'Unoccupied']),
+      text('weatherConditions', 'Weather conditions')
     ];
 
     fields.forEach(f => {
@@ -1333,11 +1368,6 @@
       yearBuilt: inspection.yearBuilt || '',
       squareFootage: inspection.squareFootage || '',
       basement: inspection.basement || '',
-      carpetedRooms: inspection.carpetedRooms || '',
-      pets: inspection.pets || '',
-      smokingVaping: inspection.smokingVaping || '',
-      stoveType: inspection.stoveType || '',
-      fireplace: inspection.fireplace || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
 
