@@ -40,8 +40,15 @@
   function flirFields() {
     return [
       heading('FLIR Thermal Scan'),
+      checklist('flirGuidance', null, [
+        { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
+        { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
+        { key: 'flirPhotoAll', label: 'Photograph ALL areas of concern' },
+        { key: 'flirPhotoNoConcern', label: 'If no concerns: photograph area where mold test conducted' }
+      ]),
       yesno('flirDone', 'FLIR scan completed'),
       showIf(yesno('flirConcerns', 'Areas of concern found'), 'flirDone', 'Yes'),
+      showIf(text('flirImageLabel', 'FLIR Image Label', { placeholder: 'e.g. Bedroom 1 — Image #0023' }), 'flirDone', 'Yes'),
       showIf(text('flirPhotoNum', 'FLIR photo number noted'), 'flirDone', 'Yes'),
       showIf(num('flirMoisture', 'Moisture reading', { unit: '%', note: 'Flag if >20%' }), 'flirDone', 'Yes')
     ];
@@ -49,18 +56,29 @@
 
   function flirLogFields() {
     return [
-      heading('FLIR Thermal Scanning'),
+      heading('FLIR Thermal Scan'),
+      checklist('flirGuidance', null, [
+        { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
+        { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
+        { key: 'flirPhotoAll', label: 'Photograph ALL areas of concern' },
+        { key: 'flirPhotoNoConcern', label: 'If no concerns: photograph area where mold test conducted' }
+      ]),
       check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
       heading('FLIR Photo Log'),
       info('Add each room scanned with its FLIR image number'),
+      text('flirImageLabel1', 'FLIR Image Label', { placeholder: 'e.g. Living Room — Image #0023' }),
       text('flirRoom1', 'Room name'),
       text('flirImg1', 'FLIR Image #'),
+      text('flirImageLabel2', 'FLIR Image Label', { placeholder: 'e.g. Dining Room — Image #0024' }),
       text('flirRoom2', 'Room name'),
       text('flirImg2', 'FLIR Image #'),
+      text('flirImageLabel3', 'FLIR Image Label', { placeholder: 'e.g. Hallway — Image #0025' }),
       text('flirRoom3', 'Room name'),
       text('flirImg3', 'FLIR Image #'),
+      text('flirImageLabel4', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0026' }),
       text('flirRoom4', 'Room name (if needed)'),
       text('flirImg4', 'FLIR Image #'),
+      text('flirImageLabel5', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0027' }),
       text('flirRoom5', 'Room name (if needed)'),
       text('flirImg5', 'FLIR Image #')
     ];
@@ -88,6 +106,8 @@
   function qtrakSection() {
     return [
       heading('Q-Trak 7585'),
+      yesno('qtrakDownloaded', 'Q-Trak data downloaded from device?'),
+      text('qtrakExportFilename', 'Q-Trak export filename or notes', { placeholder: 'e.g. QTRAK_2026-04-06_123MainSt.xlsx' }),
       yesnona('qtrakRun', 'Q-Trak run'),
 
       showIf(num('qtrak_co2', 'CO2', { unit: 'ppm' }), 'qtrakRun', 'Yes'),
@@ -160,7 +180,7 @@
         { key: 'qtrak', label: 'Q-Trak 7585 \u2014 charged, previous data deleted, rooms configured' },
 
         { key: 'flir', label: 'FLIR MR277' },
-        { key: 'airthings', label: 'Airthings device + charging cube' },
+        { key: 'airthings', label: 'Airthings Corentium Pro (radon monitor app) device + charging cube' },
         { key: 'breezeET', label: 'Breeze ET pump + tripod' },
         { key: 'breezeST', label: 'Breeze ST spore traps (6)' },
         { key: 'breezeSwabs', label: 'Breeze mold swabs (2)' },
@@ -229,6 +249,11 @@
       info('Keep 3ft from vents, fans, windows, doors'),
       divider(),
       heading('Boulder Blue Fan'),
+      checklist('boulderBlueSetup', 'Boulder Blue Setup', [
+        { key: 'filterInserted', label: 'Filter inserted into fan' },
+        { key: 'fanPluggedIn', label: 'Fan plugged in at main living space with access to airflow' },
+        { key: 'allergenPlacement', label: 'If client has specific allergen concerns: placed in desired location' }
+      ]),
       timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (need 2 hours)'),
       timer('boulderBlueTimer', 'Boulder Blue Fan Timer (2 hours)', 7200),
       divider(),
@@ -435,6 +460,13 @@
 
   function getWaterSampleFields() {
     return [
+      heading('Sample Labeling'),
+      checklist('sampleLabeling', null, [
+        { key: 'bottlesLabeled', label: 'Bottles labeled with client last name and property address' },
+        { key: 'preMadeLabels', label: 'Pre-made labels applied (if available)' },
+        { key: 'chainOfCustody', label: 'Chain of custody forms completed for each sample' }
+      ]),
+      divider(),
       heading('Water Panel'),
       yesno('waterPanelCollected', 'Water panel collected'),
       showIf(text('waterSampleId', 'Sample ID / label'), 'waterPanelCollected', 'Yes'),
@@ -446,7 +478,8 @@
       showIf(text('microplasticsSampleId', 'Sample ID'), 'microplasticsStatus', 'Collected'),
       divider(),
       heading('PFAS Test'),
-      radio('pfasStatus', 'PFAS test', ['Collected', 'Not requested', 'Already set up']),
+      info('Reminder: Collect PFAS sample from kitchen faucet (should have been draining since Device Setup)'),
+      radio('pfasStatus', 'PFAS test', ['Collected', 'Not requested']),
       showIf(text('pfasSampleId', 'Sample ID'), 'pfasStatus', 'Collected'),
       textarea('notes', 'Notes')
     ];
@@ -456,7 +489,7 @@
     return [
       text('atpSurface', 'Surface tested', { required: true }),
       num('atpPreRLU', 'Pre-test RLU reading', { unit: 'RLU' }),
-      radio('atpPreStatus', 'Pre-test status', ['Pass', 'Fail']),
+      radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
       yesno('atpCleaned', 'Surface cleaned with soap and water'),
       num('atpPostRLU', 'Post-test RLU reading', { unit: 'RLU' }),
       radio('atpPostStatus', 'Post-test status', ['Pass', 'Fail']),
@@ -599,7 +632,7 @@
     { id: 'setup', name: 'Setup', icon: '1' },
     { id: 'arrival', name: 'Arrival', icon: '2' },
     { id: 'exterior', name: 'Exterior', icon: '3' },
-    { id: 'lowest', name: 'Lower', icon: '4' },
+    { id: 'lowest', name: 'Lowest Livable Level (e.g. Basement)', icon: '4' },
     { id: 'utility', name: 'Utility', icon: '5' },
     { id: 'upper', name: 'Upper', icon: '6' },
     { id: 'main', name: 'Kitchen', icon: '7' },
@@ -673,8 +706,8 @@
     });
 
     // Wrap Up
-    steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Before Leaving' });
     steps.push({ id: 'debrief', type: 'debrief', phase: 'wrapup', name: 'Customer Debrief' });
+    steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Before Leaving' });
     steps.push({ id: 'shipping', type: 'shipping', phase: 'wrapup', name: 'Shipping Checklist' });
 
     // Post-Assessment (#7)
