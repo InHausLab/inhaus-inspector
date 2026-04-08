@@ -1471,6 +1471,11 @@
       yearBuilt: (inspection.stepData?.['property-details']?.yearBuilt) || '',
       squareFootage: (inspection.stepData?.['property-details']?.squareFootage) || '',
       basement: (inspection.stepData?.['property-details']?.basement) || '',
+      carpetedRooms: (inspection.stepData?.['property-details']?.carpetedRooms) || '',
+      fireplace: (inspection.stepData?.['property-details']?.fireplace) || '',
+      pets: (inspection.stepData?.['property-details']?.pets) || '',
+      smokingVaping: (inspection.stepData?.['property-details']?.smokingVaping) || '',
+      stoveType: (inspection.stepData?.['kitchen-appliance']?.stoveType) || (inspection.stepData?.['property-details']?.stoveType) || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
 
@@ -1493,6 +1498,10 @@
       postAssessment: cleanStepData(inspection.stepData?.['post-assessment']),
       completedAt: inspection.completedAt || null
     };
+
+    const ventType = inspection.stepData?.utility?.ventilationType || {};
+    const ventLabels = { hrv: 'HRV', erv: 'ERV', bathExhaust: 'Bathroom Exhaust Fan(s)', none: 'None', notSure: 'Not Sure' };
+    exp.ventilationReadable = Object.entries(ventType).filter(([, v]) => v === true).map(([k]) => ventLabels[k] || k).join(', ');
 
     const roomTypes = ['room-test', 'bedroom', 'bathroom', 'living-area', 'kitchen-appliance', 'water-sample', 'atp-kitchen', 'kitchen-air', 'additional-room'];
     stepList.forEach(step => {
