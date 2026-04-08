@@ -6,7 +6,7 @@
   // Set this to your Google Apps Script web app URL
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZoRaJtJs9Nvb3H1aLToccUazpqtij3pWNHl0tX3okFw9E47BewY7arvRJlp2XXsGYOw/exec';
 
-  const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems } = UI;
+  const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
   // ── Field Definition Helpers ───────────────────────────────
   function text(key, label, opts) { return { key, type: 'text', label, ...opts }; }
@@ -281,6 +281,12 @@
   // ── #2: Exterior Assessment (new) ──────────────────────────
   function getExteriorFields() {
     return [
+      checklist('equipNeededExterior', 'Equipment Needed', [
+        { key: 'breezeOutdoor', label: 'Breeze ET pump + tripod' },
+        { key: 'qtrakOut', label: 'Q-Trak 7585' },
+        { key: 'flirExt', label: 'FLIR MR277' }
+      ]),
+      divider(),
       heading('Breeze ET Outdoor Control'),
       checklist('breezeOutdoorSetup', 'Setup Checklist', [
         { key: 'pumpSetUp', label: 'Set up pump' },
@@ -325,6 +331,13 @@
   // ── Radon setup (expanded for #4) ──────────────────────────
   function getRadonFields() {
     return [
+      checklist('equipNeededLowest', 'Equipment Needed', [
+        { key: 'radonMonitor', label: 'Airthings Corentium Pro (radon monitor)' },
+        { key: 'breezeLowest', label: 'Breeze ET pump + tripod' },
+        { key: 'qtrakLowest', label: 'Q-Trak 7585' },
+        { key: 'flirLowest', label: 'FLIR MR277' }
+      ]),
+      divider(),
       heading('Radon Monitor Placement'),
       check('radonTripod', 'Place on tripod'),
       check('radon3ft', '3 feet from exterior wall'),
@@ -352,11 +365,12 @@
         { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
       ]),
       text('roomName', 'Room Name', { required: true }),
+      radio('roomType', 'Room Type', ['Bedroom', 'Bathroom', 'Office', 'Storage', 'Other']),
       ...flirFields(),
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
-      ...bathroomLeakFields(),
+      ...bathroomLeakFields().map(f => showIf(f, 'roomType', 'Bathroom')),
       ...followUpFields(),
       ...observationFields()
     ];
@@ -365,6 +379,11 @@
   // ── Utility Room (expanded for #8) ─────────────────────────
   function getUtilityFields() {
     return [
+      checklist('equipNeededUtility', 'Equipment Needed', [
+        { key: 'flirUtil', label: 'FLIR MR277' },
+        { key: 'qtrakUtil', label: 'Q-Trak 7585' }
+      ]),
+      divider(),
       text('levelLocation', 'Level location'),
       divider(),
       heading('HVAC System'),
@@ -413,6 +432,12 @@
 
   function getBedroomFields() {
     return [
+      checklist('equipNeededBedroom', 'Equipment Needed', [
+        { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps' },
+        { key: 'flirRooms', label: 'FLIR MR277' },
+        { key: 'qtrakRooms', label: 'Q-Trak 7585' }
+      ]),
+      divider(),
       heading('Room Setup'),
       checklist('roomSetup', null, [
         { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
@@ -446,6 +471,12 @@
   // ── Living area (with FLIR log + bathroom leak for #4) ─────
   function getLivingAreaFields() {
     return [
+      checklist('equipNeededMain', 'Equipment Needed', [
+        { key: 'breezeMain', label: 'Breeze ET pump + tripod + spore traps' },
+        { key: 'flirMain', label: 'FLIR MR277' },
+        { key: 'qtrakMain', label: 'Q-Trak 7585' }
+      ]),
+      divider(),
       heading('Room Setup'),
       checklist('roomSetup', null, [
         { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
@@ -465,6 +496,13 @@
   // ── Kitchen appliance (expanded for #5) ────────────────────
   function getKitchenApplianceFields() {
     return [
+      checklist('equipNeededKitchen', 'Equipment Needed', [
+        { key: 'breezeKitchen', label: 'Breeze ET pump + tripod + spore traps' },
+        { key: 'flirKitchen', label: 'FLIR MR277' },
+        { key: 'qtrakKitchen', label: 'Q-Trak 7585' },
+        { key: 'atpKitchen', label: 'ATP device + swabs' }
+      ]),
+      divider(),
       heading('Stove / Range'),
       sel('stoveType', 'Stove/Range Type', ['Gas', 'Electric (Radiant)', 'Induction', 'Dual-Fuel', 'Other (specify)']),
       sel('exhaustHoodType', 'Type of cooking exhaust hood or vent', ['Under cabinet range hood', 'Over the range microwave with vent', 'Wall mount range hood', 'Ceiling mount range hood', 'Downdraft range hood', 'None', 'Other (specify)']),
@@ -528,12 +566,17 @@
   function getAtpKitchenFields() {
     return [
       text('atpSurface', 'Surface tested', { required: true }),
+      info('\u26a0\ufe0f Both a Before photo and After photo are required for each ATP test.'),
       num('atpPreRLU', 'Pre-test RLU reading', { unit: 'RLU' }),
       radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
+      heading('Before Photo'),
+      { type: 'photo', stepName: 'ATP Before', photoKey: '_atpBeforePhotos' },
+      divider(),
       yesno('atpCleaned', 'Surface cleaned with soap and water'),
       num('atpPostRLU', 'Post-test RLU reading', { unit: 'RLU' }),
       radio('atpPostStatus', 'Post-test status', ['Pass', 'Fail']),
-      photo('ATP Testing'),
+      heading('After Photo'),
+      { type: 'photo', stepName: 'ATP After', photoKey: '_atpAfterPhotos' },
       textarea('notes', 'Notes')
     ];
   }
@@ -826,6 +869,15 @@
       const data = getStepData(stepDef.id);
       return validateEquipment(data);
     }
+    if (stepDef.type === 'atp-kitchen') {
+      const data = getStepData(stepDef.id);
+      const missing = [];
+      const beforePhotos = data._atpBeforePhotos || [];
+      const afterPhotos = data._atpAfterPhotos || [];
+      if (!beforePhotos.length) missing.push('ATP Before photo required');
+      if (!afterPhotos.length) missing.push('ATP After photo required');
+      return missing;
+    }
     return [];
   }
 
@@ -1060,10 +1112,12 @@
       text('weatherConditions', 'Weather conditions')
     ];
 
+    const onIntakeChange = () => { updateShowIf(card, data); };
     fields.forEach(f => {
-      const rendered = renderField(f, data, () => {}, {}, () => {});
+      const rendered = renderField(f, data, onIntakeChange, {}, () => {});
       if (rendered) card.appendChild(rendered);
     });
+    updateShowIf(card, data);
     c.appendChild(card);
 
     const nav = el('div', { className: 'bottom-nav' }, [
@@ -1107,6 +1161,9 @@
     }
 
     inspection._lastStepIdx = currentStepIdx;
+    if (inspection._furthestStepIdx === undefined || currentStepIdx > inspection._furthestStepIdx) {
+      inspection._furthestStepIdx = currentStepIdx;
+    }
 
     const c = el('div', { className: 'screen step-screen' });
     c.appendChild(buildAppHeader(step.name));
@@ -1129,16 +1186,39 @@
       if (idx >= 0 && idx <= currentStepIdx) { currentStepIdx = idx; render(); }
     }, currentStepIdx + 1, stepList.length));
 
+    const phaseSteps = stepList.filter(s => s.phase === currentPhase && s.type !== 'review');
+    if (phaseSteps.length > 1) {
+      const subNav = el('div', { className: 'sub-nav' });
+      phaseSteps.forEach((s, i) => {
+        const sIdx = stepList.indexOf(s);
+        const isCurr = sIdx === currentStepIdx;
+        const isDone = inspection.stepData && inspection.stepData[s.id] && inspection.stepData[s.id]._visited;
+        const btn = el('button', {
+          type: 'button',
+          className: 'sub-nav-btn' + (isCurr ? ' active' : '') + (isDone ? ' done' : ''),
+          onClick: () => { currentStepIdx = sIdx; render(); window.scrollTo(0, 0); }
+        }, s.name);
+        subNav.appendChild(btn);
+      });
+      c.appendChild(subNav);
+    }
+
     c.appendChild(el('h1', { className: 'screen-title' }, step.name));
 
     const fieldGen = STEP_FIELDS[step.type];
     if (fieldGen) {
       const fields = fieldGen();
       const card = el('div', { className: 'card' });
+      const onFieldChange = () => {
+        data._updatedAt = new Date().toISOString();
+        scheduleSave();
+        updateShowIf(card, data);
+      };
       fields.forEach(f => {
-        const rendered = renderField(f, data, () => { data._updatedAt = new Date().toISOString(); scheduleSave(); }, inspection, () => { scheduleSave(); });
+        const rendered = renderField(f, data, onFieldChange, inspection, () => { scheduleSave(); });
         if (rendered) card.appendChild(rendered);
       });
+      updateShowIf(card, data);
       c.appendChild(card);
     }
 
@@ -1177,6 +1257,13 @@
       }}, 'Skip \u23e9'));
     }
     const nav = el('div', { className: 'bottom-nav' }, navButtons);
+    if ((inspection._furthestStepIdx || 0) > currentStepIdx) {
+      const resumeBtn = el('button', {
+        className: 'btn-resume-location',
+        onClick: () => { currentStepIdx = inspection._furthestStepIdx; render(); window.scrollTo(0, 0); }
+      }, '\u25b6 Resume');
+      c.appendChild(resumeBtn);
+    }
     c.appendChild(nav);
     root.appendChild(c);
   }
@@ -1328,6 +1415,12 @@
 
     if (inspection.status !== 'completed') {
       actCard.appendChild(el('button', { className: 'btn btn-primary btn-full', onClick: () => {
+        const unvisited = stepList.filter(s => s.type !== 'review' && !(inspection.stepData && inspection.stepData[s.id] && inspection.stepData[s.id]._visited));
+        if (unvisited.length) {
+          const names = unvisited.map(s => s.name).join('\n\u2022 ');
+          alert('The following sections have not been visited:\n\u2022 ' + names + '\n\nPlease complete all sections before marking as complete.');
+          return;
+        }
         inspection.status = 'completed';
         inspection.endedAt = new Date().toISOString();
         inspection.completedAt = inspection.endedAt;
@@ -1434,11 +1527,20 @@
       if (k.startsWith('_')) continue;
       clean[k] = v;
     }
-    if (data._photos && data._photos.length) {
-      clean.photos = data._photos.map(p => ({
+    function exportPhotos(arr) {
+      return arr.map(p => ({
         photoId: p.photoId, roomName: p.roomName, stepName: p.stepName,
         timestamp: p.timestamp, caption: p.caption, imageData: p.dataUrl
       }));
+    }
+    if (data._photos && data._photos.length) {
+      clean.photos = exportPhotos(data._photos);
+    }
+    if (data._atpBeforePhotos && data._atpBeforePhotos.length) {
+      clean.atpBeforePhotos = exportPhotos(data._atpBeforePhotos);
+    }
+    if (data._atpAfterPhotos && data._atpAfterPhotos.length) {
+      clean.atpAfterPhotos = exportPhotos(data._atpAfterPhotos);
     }
     return clean;
   }

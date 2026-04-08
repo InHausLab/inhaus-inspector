@@ -171,6 +171,41 @@ body {
   border: none; border-top: 2px solid var(--border);
   margin: 20px 0;
 }
+.showif-hidden { display: none; }
+
+/* ── Resume Location Button ──────────────── */
+.btn-resume-location {
+  position: fixed; bottom: 90px; right: 16px;
+  background: var(--primary); color: #fff;
+  border: none; border-radius: 28px;
+  padding: 12px 20px; font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  z-index: 95;
+}
+.btn-resume-location:active { opacity: 0.85; transform: scale(0.97); }
+
+/* ── Sub-Nav ─────────────────────────────── */
+.sub-nav {
+  display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 10px;
+  flex-wrap: nowrap; -webkit-overflow-scrolling: touch;
+}
+.sub-nav-btn {
+  white-space: nowrap; padding: 8px 14px;
+  border: 2px solid var(--border); border-radius: 20px;
+  background: #fff; font-size: 0.75rem; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+  color: var(--text-muted); flex-shrink: 0;
+}
+.sub-nav-btn.active {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.sub-nav-btn.done {
+  background: var(--accent-light); color: var(--primary); border-color: var(--accent);
+}
+.sub-nav-btn.active.done {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
 
 /* ── Mic Button ──────────────────────────── */
 .mic-btn {

@@ -589,8 +589,17 @@
     if (f.showIf) {
       const dv = data[f.showIf.key];
       const target = f.showIf.value;
-      if (Array.isArray(target)) { if (!target.includes(dv)) return null; }
-      else if (dv !== target) return null;
+      const visible = Array.isArray(target) ? target.includes(dv) : dv === target;
+      const fCopy = Object.assign({}, f);
+      delete fCopy.showIf;
+      const inner = renderField(fCopy, data, onChange, inspection, onSave);
+      if (!inner) return null;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'showif-wrapper' + (visible ? '' : ' showif-hidden');
+      wrapper.setAttribute('data-showif-key', f.showIf.key);
+      wrapper.setAttribute('data-showif-value', JSON.stringify(f.showIf.value));
+      wrapper.appendChild(inner);
+      return wrapper;
     }
 
     const changed = () => onChange();
@@ -621,9 +630,11 @@
       case 'reading':
         if (!data[f.key]) data[f.key] = { value: null, status: '', unit: f.unit || '', timestamp: null };
         return renderReading(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);
-      case 'photo':
-        if (!data._photos) data._photos = [];
-        return renderPhoto(data._photos, () => { changed(); }, data.roomName || data._roomName || '', f.stepName || '');
+      case 'photo': {
+        const pk = f.photoKey || '_photos';
+        if (!data[pk]) data[pk] = [];
+        return renderPhoto(data[pk], () => { changed(); }, data.roomName || data._roomName || '', f.stepName || '');
+      }
       case 'timer':
         return renderTimer(f.timerId || (f.key + '-' + (data._stepId || '')), f.label, f.duration, inspection, onSave);
       default: return null;
@@ -691,12 +702,25 @@
     });
   }
 
+  // ── ShowIf Real-time Update ───────────────────────────────
+  function updateShowIf(container, data) {
+    container.querySelectorAll('.showif-wrapper').forEach(function(w) {
+      const key = w.getAttribute('data-showif-key');
+      const rawValue = w.getAttribute('data-showif-value');
+      var target;
+      try { target = JSON.parse(rawValue); } catch(e) { target = rawValue; }
+      const dv = data[key];
+      const visible = Array.isArray(target) ? target.includes(dv) : dv === target;
+      w.classList.toggle('showif-hidden', !visible);
+    });
+  }
+
   // ── Export ─────────────────────────────────────────────────
   window.UI = {
     el, frag, renderField, renderProgressBar, renderStatusBar, renderTimersBar,
     renderText, renderTextarea, renderNumber, renderSelect, renderYesNo, renderRadio,
     renderCheck, renderChecklist, renderChips, renderReading, renderPhoto, renderTimer,
     renderHeading, renderInfo, renderDivider, compressImage, playAlert, fmtDate, fmtDuration,
-    micBtn, showToast, flashUncheckedItems
+    micBtn, showToast, flashUncheckedItems, updateShowIf
   };
 })();
