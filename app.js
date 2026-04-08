@@ -240,7 +240,6 @@
       check('testsExplained', 'Explain tests being performed'),
       check('durationExplained', 'Estimate testing duration'),
       check('sedentaryAdvised', 'Ask homeowner to remain sedentary during testing'),
-      sel('windowsOpen', 'Windows open during assessment', ['No', 'Yes', 'Some']),
       divider(),
       heading('Airthings View Plus Setup'),
       check('airthingsPaired', 'Pair to Airthings account'),
@@ -259,6 +258,7 @@
       divider(),
       heading('Q-Trak Sensor Test'),
       check('qtrakSensorTest', 'Hold Q-Trak to alcohol wipe \u2014 confirm elevated reading before starting'),
+      info('During sensor test, you should see Formaldehyde and VOC readings spike.'),
       divider(),
       text('utilityRoomLevel', 'Utility Room Location \u2014 which level is it on?'),
       divider(),
@@ -359,6 +359,7 @@
   // ── Room test (with FLIR log + bathroom leak for #4) ───────
   function getRoomTestFields() {
     return [
+      info('Complete this section for each room in the lower/basement level. Add additional rooms using the button at the bottom of the page.'),
       heading('Room Setup'),
       checklist('roomSetup', null, [
         { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
@@ -432,6 +433,7 @@
 
   function getBedroomFields() {
     return [
+      info('Complete this section for each bedroom. If the room has an ensuite bathroom, document it in the section below.'),
       checklist('equipNeededBedroom', 'Equipment Needed', [
         { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps' },
         { key: 'flirRooms', label: 'FLIR MR277' },
@@ -484,7 +486,6 @@
       ]),
       text('roomNames', 'Room(s) tested (e.g., Living Room, Dining Room)', { required: true }),
       ...flirLogFields(),
-      ...bathroomLeakFields(),
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
@@ -538,6 +539,7 @@
 
   function getWaterSampleFields() {
     return [
+      info('Label bottles with customer last name and address. Ensure chain of custody forms are filled out.'),
       heading('Sample Labeling'),
       checklist('sampleLabeling', null, [
         { key: 'bottlesLabeled', label: 'Bottles labeled with client last name and property address' },
@@ -574,7 +576,7 @@
       divider(),
       yesno('atpCleaned', 'Surface cleaned with soap and water'),
       num('atpPostRLU', 'Post-test RLU reading', { unit: 'RLU' }),
-      radio('atpPostStatus', 'Post-test status', ['Pass', 'Fail']),
+      radio('atpPostStatus', 'Post-test status (Pass if below 100 RLU, Fail if 100 or more)', ['Pass', 'Fail']),
       heading('After Photo'),
       { type: 'photo', stepName: 'ATP After', photoKey: '_atpAfterPhotos' },
       textarea('notes', 'Notes')
@@ -587,7 +589,6 @@
       ...breezeFields('kitchenBreezeTimer'),
       ...qtrakSection(),
       ...formaldehydeField(),
-      ...bathroomLeakFields(),
       ...followUpFields(),
       ...observationFields()
     ];
@@ -619,7 +620,12 @@
       sel('carpetedRooms', 'Number of Carpeted Rooms', ['0', '1', '2', '3', '4', '5', '6+']),
       chips('fireplace', 'Fireplace(s)', ['Wood Burning', 'Gas', 'Electric']),
       sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
-      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only'])
+      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only']),
+      divider(),
+      heading('Assessment Conditions'),
+      sel('windowsOpen', 'Windows open during assessment', ['No', 'Yes', 'Some']),
+      radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Occupied - Active', 'Occupied - Passive', 'Unoccupied']),
+      text('weatherConditions', 'Weather conditions')
     ];
   }
 
@@ -641,17 +647,17 @@
         { key: 'formComplete', label: 'Technician form fully completed' },
         { key: 'photosUploaded', label: 'All photos uploaded/captured' }
       ]),
-      divider(),
-      heading('Customer Debrief'),
-      check('informComplete', 'Inform customer assessment is complete'),
-      check('adviseReport', 'Advise report in ~3 weeks'),
-      check('remindRadon', 'Remind about radon monitor in basement'),
-      dateTimeInput('radonPickupTime', 'Radon monitor pickup time')
     ];
   }
 
   function getDebriefFields() {
     return [
+      info('Perform the customer debrief before completing the final departure checks.'),
+      check('informComplete', 'Inform customer assessment is complete'),
+      check('adviseReport', 'Advise report in approximately 3 weeks'),
+      check('remindRadon', 'Remind about radon monitor in basement'),
+      dateTimeInput('radonPickupTime', 'Radon monitor pickup time (schedule 48 hrs from placement)'),
+      divider(),
       yesno('debriefCompleted', 'Debrief completed'),
       yesno('radonPickupReminder', 'Homeowner reminded about radon pickup'),
       yesno('reportDateCommunicated', 'Expected report date communicated'),
@@ -659,29 +665,17 @@
     ];
   }
 
-  function getShippingFields() {
+  // ── #7: Post-Assessment (new) ──────────────────────────────
+  function getPostAssessmentFields() {
     return [
-      checklist('shipping', 'Post-Assessment Shipping', [
+      heading('Sample Shipping'),
+      checklist('shipping', 'Shipping Checklist', [
         { key: 'breezeST', label: 'Breeze ST spore traps \u2014 packed for FedEx overnight', subFields: [{ key: 'breezeTracking', label: 'Tracking number' }] },
         { key: 'boulderBlueShip', label: 'Boulder Blue filter \u2014 packed for UPS to Jonah Ventures, 5485 Conestoga Ct #210, Boulder CO 80301', subFields: [{ key: 'boulderBlueTracking', label: 'Tracking number' }] },
         { key: 'waterPanelShip', label: 'Water panel \u2014 prepaid label + package sent', subFields: [{ key: 'waterTracking', label: 'Tracking number' }] },
         { key: 'pfasShip', label: 'PFAS (Cyclopure) \u2014 prepaid label + package sent', subFields: [{ key: 'pfasTracking', label: 'Tracking number' }] },
         { key: 'microplasticsShip', label: 'Microplastics (Brooks Applied Labs) \u2014 packaged and shipped', subFields: [{ key: 'microTracking', label: 'Tracking number' }] },
-        { key: 'qtrakDownloaded', label: 'Q-Trak data downloaded and exported to spreadsheet' },
-        { key: 'photosGDrive', label: 'Photos uploaded to Google Drive folder' }
-      ])
-    ];
-  }
-
-  // ── #7: Post-Assessment (new) ──────────────────────────────
-  function getPostAssessmentFields() {
-    return [
-      heading('Sample Shipping'),
-      checklist('sampleShipping', null, [
-        { key: 'chainOfCustody', label: 'Complete chain of custody forms (SafeHome, Cyclopure, Brooks Applied Labs, Priority Lab)' },
-        { key: 'waterTestsShipped', label: 'Water tests shipped to labs' },
-        { key: 'boulderBlueShipped', label: 'Boulder Blue shipped' },
-        { key: 'priorityLabShipped', label: 'Priority lab mold tests shipped' }
+        { key: 'chainOfCustody', label: 'Chain of custody forms completed (SafeHome, Cyclopure, Brooks Applied Labs, Priority Lab)' }
       ]),
       divider(),
       heading('Data Management'),
@@ -723,7 +717,6 @@
     'additional-room': getAdditionalRoomFields,
     'final-checks': getFinalChecksFields,
     'debrief': getDebriefFields,
-    'shipping': getShippingFields,
     'property-details': getPropertyDetailsFields,
     'post-assessment': getPostAssessmentFields
   };
@@ -737,7 +730,7 @@
     { id: 'utility', name: 'Utility', icon: '5' },
     { id: 'rooms', name: 'Bedrooms & Bathrooms', icon: '6' },
     { id: 'main', name: 'Kitchen', icon: '7' },
-    { id: 'supplementary', name: 'Water Samples', icon: '8' },
+    { id: 'supplementary', name: 'Additional Rooms', icon: '8' },
     { id: 'wrapup', name: 'Customer Debrief', icon: '9' },
     { id: 'propdetails', name: 'Property Details', icon: '10' },
     { id: 'post', name: 'Post', icon: '11' },
@@ -807,10 +800,9 @@
       steps.push({ id: 'additional-' + i, type: 'additional-room', phase: 'supplementary', name: r.name, dynamic: 'additional', index: i });
     });
 
-    // Wrap Up
+    // Wrap Up — Debrief first, then final departure checks
     steps.push({ id: 'debrief', type: 'debrief', phase: 'wrapup', name: 'Customer Debrief' });
     steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Before Leaving' });
-    steps.push({ id: 'shipping', type: 'shipping', phase: 'wrapup', name: 'Shipping Checklist' });
 
     // Property Details (near end)
     steps.push({ id: 'property-details', type: 'property-details', phase: 'propdetails', name: 'Property Details' });
@@ -869,14 +861,19 @@
       const data = getStepData(stepDef.id);
       return validateEquipment(data);
     }
+    return [];
+  }
+
+  // Returns non-blocking warnings (shown as toast but navigation still allowed)
+  function warnStep(stepDef) {
     if (stepDef.type === 'atp-kitchen') {
       const data = getStepData(stepDef.id);
-      const missing = [];
+      const warnings = [];
       const beforePhotos = data._atpBeforePhotos || [];
       const afterPhotos = data._atpAfterPhotos || [];
-      if (!beforePhotos.length) missing.push('ATP Before photo required');
-      if (!afterPhotos.length) missing.push('ATP After photo required');
-      return missing;
+      if (!beforePhotos.length) warnings.push('ATP Before photo missing');
+      if (!afterPhotos.length) warnings.push('ATP After photo missing');
+      return warnings;
     }
     return [];
   }
@@ -903,7 +900,7 @@
     const newIdx = stepList.findIndex(s => s.id === newStepId);
     if (newIdx >= 0) currentStepIdx = newIdx;
 
-    saveNow().then(() => render());
+    saveNow().then(() => { render(); window.scrollTo(0, 0); });
   }
 
   // ── Google Drive Upload ─────────────────────────────────────
@@ -1064,7 +1061,23 @@
 
   // ── INTAKE SCREEN ──────────────────────────────────────────
   function renderIntake() {
-    const data = {
+    const isEdit = !!inspection;
+    const data = isEdit ? {
+      inspectionId: inspection.inspectionId,
+      inspectorName: inspection.inspectorName || '',
+      inspectionDate: inspection.inspectionDate || new Date().toISOString().slice(0, 10),
+      clientName: inspection.clientName || '',
+      propertyAddress: inspection.propertyAddress || '',
+      numberOfLevels: inspection.numberOfLevels || '',
+      numberOfBedrooms: inspection.numberOfBedrooms || '',
+      numberOfBathrooms: inspection.numberOfBathrooms || '',
+      waterSource: inspection.waterSource || '',
+      waterSourceDescription: inspection.waterSourceDescription || '',
+      wifiNetwork: inspection.wifiNetwork || '',
+      wifiPassword: inspection.wifiPassword || '',
+      clientConcerns: inspection.clientConcerns || '',
+      blueprintNotes: inspection.blueprintNotes || ''
+    } : {
       inspectionId: genId(),
       inspectorName: '',
       inspectionDate: new Date().toISOString().slice(0, 10),
@@ -1076,16 +1089,13 @@
       waterSource: '',
       waterSourceDescription: '',
       wifiNetwork: '',
+      wifiPassword: '',
       clientConcerns: '',
-
-      occupancyDuringInspection: '',
-      weatherConditions: '',
-      knownProblemAreas: '',
       blueprintNotes: ''
     };
 
     const c = el('div', { className: 'screen' });
-    c.appendChild(buildAppHeader('Customer & Property Intake'));
+    c.appendChild(buildAppHeader(isEdit ? 'Edit Intake Details' : 'Customer & Property Intake'));
     c.appendChild(renderStatusBar(lastSaveText));
 
     const card = el('div', { className: 'card' });
@@ -1104,12 +1114,8 @@
       divider(),
       text('wifiNetwork', 'Home wifi network name'),
       text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
-      textarea('clientConcerns', 'Client specific concerns'),
-      textarea('knownProblemAreas', 'Any known problem areas'),
-      textarea('blueprintNotes', 'Client blueprints / layout notes (optional)'),
-      divider(),
-      radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Occupied - Active', 'Occupied - Passive', 'Unoccupied']),
-      text('weatherConditions', 'Weather conditions')
+      textarea('clientConcerns', 'Client concerns / known problem areas'),
+      textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
     ];
 
     const onIntakeChange = () => { updateShowIf(card, data); };
@@ -1121,26 +1127,35 @@
     c.appendChild(card);
 
     const nav = el('div', { className: 'bottom-nav' }, [
-      el('button', { className: 'btn btn-outline btn-nav', onClick: () => { screen = 'home'; render(); } }, 'Cancel'),
+      el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
+        if (isEdit) { screen = 'step'; render(); } else { screen = 'home'; render(); }
+      } }, isEdit ? '\u2190 Back to Steps' : 'Cancel'),
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
         const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms', 'waterSource'];
         const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
         if (missing.length) { alert('Please fill in all required fields (marked with *).'); return; }
-        inspection = {
-          ...data,
-          startedAt: new Date().toISOString(),
-          endedAt: null,
-          status: 'in-progress',
-          stepData: {},
-          timers: {},
-          dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
-          _lastStepIdx: 0
-        };
-        stepList = buildStepList(inspection);
-        currentStepIdx = 0;
-        screen = 'step';
-        saveNow().then(() => render());
-      }}, 'Start Inspection \u2192')
+        if (isEdit) {
+          Object.assign(inspection, data);
+          stepList = buildStepList(inspection);
+          screen = 'step';
+          saveNow().then(() => render());
+        } else {
+          inspection = {
+            ...data,
+            startedAt: new Date().toISOString(),
+            endedAt: null,
+            status: 'in-progress',
+            stepData: {},
+            timers: {},
+            dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
+            _lastStepIdx: 0
+          };
+          stepList = buildStepList(inspection);
+          currentStepIdx = 0;
+          screen = 'step';
+          saveNow().then(() => render());
+        }
+      }}, isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192')
     ]);
     c.appendChild(nav);
     root.appendChild(c);
@@ -1187,7 +1202,8 @@
     }, currentStepIdx + 1, stepList.length));
 
     const phaseSteps = stepList.filter(s => s.phase === currentPhase && s.type !== 'review');
-    if (phaseSteps.length > 1) {
+    const alwaysShowSubNav = ['lowest', 'rooms', 'supplementary', 'wrapup'].includes(currentPhase);
+    if (phaseSteps.length > 1 || alwaysShowSubNav) {
       const subNav = el('div', { className: 'sub-nav' });
       phaseSteps.forEach((s, i) => {
         const sIdx = stepList.indexOf(s);
@@ -1202,6 +1218,15 @@
       });
       c.appendChild(subNav);
     }
+
+    // Back to page 1 (edit intake) button
+    const backToIntakeBtn = el('button', {
+      type: 'button',
+      className: 'btn btn-outline btn-small',
+      style: 'position:fixed;top:8px;right:10px;z-index:200;font-size:11px;padding:4px 10px;',
+      onClick: () => { screen = 'intake'; render(); }
+    }, '\u270E Intake');
+    c.appendChild(backToIntakeBtn);
 
     c.appendChild(el('h1', { className: 'screen-title' }, step.name));
 
@@ -1243,6 +1268,8 @@
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
         const missing = validateStep(step);
         if (missing.length) { showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); flashUncheckedItems(c); return; }
+        const warnings = warnStep(step);
+        if (warnings.length) { showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
         data._completedAt = new Date().toISOString();
         currentStepIdx++;
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
@@ -1261,7 +1288,7 @@
       const resumeBtn = el('button', {
         className: 'btn-resume-location',
         onClick: () => { currentStepIdx = inspection._furthestStepIdx; render(); window.scrollTo(0, 0); }
-      }, '\u25b6 Resume');
+      }, '\u25b6 Jump to Current');
       c.appendChild(resumeBtn);
     }
     c.appendChild(nav);
@@ -1416,9 +1443,17 @@
     if (inspection.status !== 'completed') {
       actCard.appendChild(el('button', { className: 'btn btn-primary btn-full', onClick: () => {
         const unvisited = stepList.filter(s => s.type !== 'review' && !(inspection.stepData && inspection.stepData[s.id] && inspection.stepData[s.id]._visited));
-        if (unvisited.length) {
-          const names = unvisited.map(s => s.name).join('\n\u2022 ');
-          alert('The following sections have not been visited:\n\u2022 ' + names + '\n\nPlease complete all sections before marking as complete.');
+        const atpData = (inspection.stepData && inspection.stepData['atp-kitchen']) || {};
+        const atpIssues = [];
+        if (!(atpData._atpBeforePhotos && atpData._atpBeforePhotos.length)) atpIssues.push('ATP Before photo missing');
+        if (!(atpData._atpAfterPhotos && atpData._atpAfterPhotos.length)) atpIssues.push('ATP After photo missing');
+        const allIssues = [
+          ...unvisited.map(s => 'Section not visited: ' + s.name),
+          ...atpIssues
+        ];
+        if (allIssues.length) {
+          const names = allIssues.join('\n\u2022 ');
+          alert('The following items are incomplete:\n\u2022 ' + names + '\n\nPlease address these before marking as complete.');
           return;
         }
         inspection.status = 'completed';
@@ -1494,7 +1529,6 @@
       utilityRoom: cleanStepData(inspection.stepData?.utility),
       wrapUp: cleanStepData(inspection.stepData?.['final-checks']),
       customerDebrief: cleanStepData(inspection.stepData?.debrief),
-      shippingChecklist: cleanStepData(inspection.stepData?.shipping),
       postAssessment: cleanStepData(inspection.stepData?.['post-assessment']),
       completedAt: inspection.completedAt || null
     };
