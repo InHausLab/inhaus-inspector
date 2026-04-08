@@ -99,17 +99,24 @@
   }
 
   // ── Audio Alert ────────────────────────────────────────────
-  function playAlert() {
+  function playAlert(prominent) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       function beep(freq, start, dur) {
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.connect(g); g.connect(ctx.destination);
-        o.frequency.value = freq; g.gain.value = 0.25;
+        o.frequency.value = freq; g.gain.value = prominent ? 0.5 : 0.25;
         o.start(ctx.currentTime + start);
         o.stop(ctx.currentTime + start + dur);
       }
-      beep(880, 0, 0.15); beep(880, 0.25, 0.15); beep(1100, 0.5, 0.3);
+      if (prominent) {
+        // Prominent repeating alarm for 10-minute timers
+        beep(880, 0, 0.2); beep(880, 0.3, 0.2); beep(1100, 0.6, 0.25);
+        beep(880, 1.1, 0.2); beep(880, 1.4, 0.2); beep(1100, 1.7, 0.25);
+        beep(880, 2.2, 0.2); beep(880, 2.5, 0.2); beep(1100, 2.8, 0.4);
+      } else {
+        beep(880, 0, 0.15); beep(880, 0.25, 0.15); beep(1100, 0.5, 0.3);
+      }
     } catch (e) { /* no audio */ }
   }
 
@@ -145,7 +152,7 @@
           if (rem <= 0) {
             display.textContent = '00:00 — COMPLETE';
             display.classList.add('timer-done');
-            if (!t.alerted) { playAlert(); t.alerted = true; onSave(); }
+            if (!t.alerted) { playAlert(durationSec === 600); t.alerted = true; onSave(); }
             return false;
           }
           const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
@@ -542,9 +549,8 @@
       section.appendChild(grid);
     }
 
-    const fileInp = el('input', { type: 'file', accept: 'image/*', capture: 'environment', multiple: 'true', className: 'hidden' });
-    fileInp.addEventListener('change', async e => {
-      for (const file of Array.from(e.target.files)) {
+    async function handleFiles(files) {
+      for (const file of Array.from(files)) {
         try {
           const dataUrl = await compressImage(file);
           photos.push({
@@ -556,9 +562,20 @@
       }
       onUpdate();
       section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName));
-    });
+    }
+
+    const fileInp = el('input', { type: 'file', accept: 'image/*', capture: 'environment', multiple: 'true', className: 'hidden' });
+    fileInp.addEventListener('change', async e => { await handleFiles(e.target.files); });
+
+    const libInp = el('input', { type: 'file', accept: 'image/*', multiple: 'true', className: 'hidden' });
+    libInp.addEventListener('change', async e => { await handleFiles(e.target.files); });
+
     section.appendChild(fileInp);
-    section.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => fileInp.click() }, '\uD83D\uDCF7 Add Photos'));
+    section.appendChild(libInp);
+    const photoBtnRow = el('div', { className: 'photo-btn-row' });
+    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => fileInp.click() }, '\uD83D\uDCF7 Add Photos'));
+    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => libInp.click() }, '\uD83D\uDCC1 From Library'));
+    section.appendChild(photoBtnRow);
     return section;
   }
 

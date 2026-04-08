@@ -360,6 +360,8 @@ body {
   font-size: 1.2rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
+.photo-btn-row { display: flex; gap: 8px; }
+.photo-btn-row .photo-add-btn { flex: 1; font-size: 1rem; }
 .photo-add-btn { width: 100%; font-size: 1.1rem; }
 .photo-card .input-row { padding: 0; }
 .photo-card .mic-btn {

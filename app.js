@@ -288,7 +288,7 @@
         { key: 'tripodHeight', label: 'Set to full tripod height (60\u2033)' }
       ]),
       timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600),
-      text('breezeOutdoorSporeTrapId', 'Outdoor Spore Trap ID'),
+      photo('Outdoor Spore Trap'),
       divider(),
       heading('Q-Trak Outdoor Measurement'),
       check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
@@ -407,13 +407,7 @@
       showIf(text('waterSoftType', 'Type / Model / Serial'), 'waterSofteningPresent', 'Yes'),
       showIf(photo('Water Softening'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
-      photo('Utility Room'),
-      divider(),
-      heading('Property Details (Observed)'),
-      sel('carpetedRooms', 'Number of Carpeted Rooms', ['0', '1', '2', '3', '4', '5', '6+']),
-      sel('fireplace', 'Fireplace', ['No', 'Yes - Wood Burning', 'Yes - Gas', 'Yes - Electric']),
-      sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
-      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only'])
+      photo('Utility Room')
     ];
   }
 
@@ -558,7 +552,7 @@
 
   function getAdditionalRoomFields() {
     return [
-      text('roomName', 'Room Name', { required: true }),
+      text('roomName', 'Room Name'),
       textarea('reasonForInclusion', 'Reason for inclusion'),
       ...flirFields(),
       ...breezeFields(),
@@ -566,6 +560,23 @@
       ...formaldehydeField(),
       ...followUpFields(),
       ...observationFields()
+    ];
+  }
+
+  // ── Property Details (moved near end) ─────────────────────
+  function getPropertyDetailsFields() {
+    return [
+      heading('Property Details'),
+      sel('residenceType', 'Residence Type', ['Single-Family Home', 'Townhome', 'Condo', 'Duplex', 'Apartment', 'Other']),
+      num('yearBuilt', 'Year Home Was Built'),
+      text('squareFootage', 'Approximate Square Footage'),
+      sel('basement', 'Basement', ['Yes - Finished', 'Yes - Unfinished', 'No', 'Partial']),
+      divider(),
+      heading('Property Details (Observed)'),
+      sel('carpetedRooms', 'Number of Carpeted Rooms', ['0', '1', '2', '3', '4', '5', '6+']),
+      chips('fireplace', 'Fireplace(s)', ['Wood Burning', 'Gas', 'Electric']),
+      sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
+      sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only'])
     ];
   }
 
@@ -670,6 +681,7 @@
     'final-checks': getFinalChecksFields,
     'debrief': getDebriefFields,
     'shipping': getShippingFields,
+    'property-details': getPropertyDetailsFields,
     'post-assessment': getPostAssessmentFields
   };
 
@@ -680,11 +692,12 @@
     { id: 'exterior', name: 'Exterior', icon: '3' },
     { id: 'lowest', name: 'Lowest Livable Level (e.g. Basement)', icon: '4' },
     { id: 'utility', name: 'Utility', icon: '5' },
-    { id: 'upper', name: 'Upper', icon: '6' },
+    { id: 'rooms', name: 'Bedrooms & Bathrooms', icon: '6' },
     { id: 'main', name: 'Kitchen', icon: '7' },
     { id: 'supplementary', name: 'Water Samples', icon: '8' },
     { id: 'wrapup', name: 'Customer Debrief', icon: '9' },
-    { id: 'post', name: 'Post', icon: '10' },
+    { id: 'propdetails', name: 'Property Details', icon: '10' },
+    { id: 'post', name: 'Post', icon: '11' },
     { id: 'review', name: 'Review', icon: '\u2713' }
   ];
 
@@ -731,11 +744,11 @@
     // Upper Level
     const numBed = parseInt(insp.numberOfBedrooms) || 1;
     for (let i = 0; i < numBed; i++) {
-      steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'upper', name: 'Bedroom ' + (i + 1), index: i });
+      steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'rooms', name: 'Bedroom ' + (i + 1), index: i });
     }
     const numBath = parseInt(insp.numberOfBathrooms) || 1;
     for (let i = 0; i < numBath; i++) {
-      steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'upper', name: 'Bathroom ' + (i + 1), index: i });
+      steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'rooms', name: 'Bathroom ' + (i + 1), index: i });
     }
 
     // Main Level / Kitchen
@@ -755,6 +768,9 @@
     steps.push({ id: 'debrief', type: 'debrief', phase: 'wrapup', name: 'Customer Debrief' });
     steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Before Leaving' });
     steps.push({ id: 'shipping', type: 'shipping', phase: 'wrapup', name: 'Shipping Checklist' });
+
+    // Property Details (near end)
+    steps.push({ id: 'property-details', type: 'property-details', phase: 'propdetails', name: 'Property Details' });
 
     // Post-Assessment (#7)
     steps.push({ id: 'post-assessment', type: 'post-assessment', phase: 'post', name: 'Post-Assessment' });
@@ -1007,10 +1023,6 @@
       numberOfBathrooms: '',
       waterSource: '',
       waterSourceDescription: '',
-      residenceType: '',
-      yearBuilt: '',
-      squareFootage: '',
-      basement: '',
       wifiNetwork: '',
       clientConcerns: '',
 
@@ -1031,17 +1043,13 @@
       date('inspectionDate', 'Inspection Date'),
       text('clientName', 'Client Name *'),
       text('propertyAddress', 'Property Address *'),
+      photo('Title Page'),
       sel('numberOfLevels', 'Number of Levels *', ['1', '2', '3+']),
       sel('numberOfBedrooms', 'Number of Bedrooms *', ['1', '2', '3', '4', '5', '6', '7+']),
       sel('numberOfBathrooms', 'Number of Bathrooms *', ['1', '2', '3', '4', '5', '6+']),
       sel('waterSource', 'Water Source *', ['Municipal', 'Well', 'Other']),
       showIf(text('waterSourceDescription', 'Water source description'), 'waterSource', 'Other'),
       divider(),
-      heading('Property Details'),
-      sel('residenceType', 'Residence Type', ['Single-Family Home', 'Townhome', 'Condo', 'Duplex', 'Apartment', 'Other']),
-      num('yearBuilt', 'Year Home Was Built'),
-      text('squareFootage', 'Approximate Square Footage'),
-      sel('basement', 'Basement', ['Yes - Finished', 'Yes - Unfinished', 'No', 'Partial']),
       text('wifiNetwork', 'Home wifi network name'),
       text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
       textarea('clientConcerns', 'Client specific concerns'),
@@ -1366,10 +1374,10 @@
       numberOfBathrooms: inspection.numberOfBathrooms,
       waterSource: inspection.waterSource,
       waterSourceDescription: inspection.waterSourceDescription || '',
-      residenceType: inspection.residenceType || '',
-      yearBuilt: inspection.yearBuilt || '',
-      squareFootage: inspection.squareFootage || '',
-      basement: inspection.basement || '',
+      residenceType: (inspection.stepData?.['property-details']?.residenceType) || '',
+      yearBuilt: (inspection.stepData?.['property-details']?.yearBuilt) || '',
+      squareFootage: (inspection.stepData?.['property-details']?.squareFootage) || '',
+      basement: (inspection.stepData?.['property-details']?.basement) || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
 
