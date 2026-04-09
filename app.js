@@ -99,8 +99,7 @@
     return [
       heading('Breeze ET Mold Test'),
       yesno('breezeDone', 'Breeze ET test performed'),
-      showIf(timer(timerKey || 'breezeTimer', 'Breeze ET Timer (10 min)', 600), 'breezeDone', 'Yes'),
-      showIf(text('sporeTrapId', 'Spore Trap ID'), 'breezeDone', 'Yes')
+      showIf(timer(timerKey || 'breezeTimer', 'Breeze ET Timer (10 min)', 600), 'breezeDone', 'Yes')
     ];
   }
 
@@ -432,7 +431,7 @@
 
   function getBedroomFields() {
     return [
-      info('Complete this section for each bedroom. If the room has an ensuite bathroom, document it in the section below.'),
+      info('Complete this section for each bedroom.'),
       checklist('equipNeededBedroom', 'Equipment Needed', [
         { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps' },
         { key: 'flirRooms', label: 'FLIR MR277' },
@@ -943,6 +942,173 @@
 
   window.addEventListener('online', () => { retryQueuedUploads(); });
 
+  // ── Room Navigation Drawer ─────────────────────────────────
+  function buildRoomDrawer() {
+    const DRAWER_GROUPS = [
+      { label: 'SETUP', phases: ['setup', 'arrival', 'exterior'] },
+      { label: 'LOWER LEVEL', phases: ['lowest', 'utility'] },
+      { label: 'UPPER LEVEL', phases: ['rooms'] },
+      { label: 'MAIN LEVEL', phases: ['main'] },
+      { label: 'ADDITIONAL ROOMS', phases: ['supplementary'] },
+      { label: 'WRAP-UP', phases: ['wrapup', 'propdetails', 'post'] }
+    ];
+
+    const overlay = el('div', { id: 'room-drawer-overlay', className: 'room-drawer-overlay' });
+    const drawer = el('div', { className: 'room-drawer' });
+
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    drawer.addEventListener('click', e => e.stopPropagation());
+
+    drawer.appendChild(el('div', { className: 'room-drawer-handle' }));
+    drawer.appendChild(el('div', { className: 'room-drawer-title' }, '\uD83D\uDCCD Navigate'));
+
+    const scrollArea = el('div', { className: 'room-drawer-scroll' });
+
+    DRAWER_GROUPS.forEach(group => {
+      const groupSteps = stepList.filter(s => group.phases.includes(s.phase) && s.type !== 'review');
+      if (!groupSteps.length) return;
+
+      scrollArea.appendChild(el('div', { className: 'room-drawer-group-label' }, group.label));
+
+      groupSteps.forEach(s => {
+        const sData = (inspection.stepData && inspection.stepData[s.id]) || {};
+        const completed = !!sData._completedAt;
+        const visited = !!sData._visited;
+        const sIdx = stepList.indexOf(s);
+        const isCurrent = sIdx === currentStepIdx;
+
+        const statusText = completed ? '\u2713' : (visited ? '\u25cf' : '');
+        const cls = 'room-drawer-item' +
+          (isCurrent ? ' room-item-current' : '') +
+          (completed ? ' room-item-done' : '') +
+          (visited && !completed ? ' room-item-partial' : '');
+
+        scrollArea.appendChild(el('div', {
+          className: cls,
+          onClick: () => {
+            currentStepIdx = sIdx;
+            overlay.remove();
+            render();
+            window.scrollTo(0, 0);
+          }
+        }, [
+          el('span', { className: 'room-item-name' }, s.name),
+          statusText ? el('span', { className: 'room-item-status' + (completed ? ' status-done' : ' status-partial') }, statusText) : null
+        ]));
+      });
+    });
+
+    scrollArea.appendChild(el('button', {
+      type: 'button',
+      className: 'btn btn-outline btn-full room-drawer-add-btn',
+      onClick: () => { overlay.remove(); addDynamicRoom('additional'); }
+    }, '+ Add Room'));
+
+    drawer.appendChild(scrollArea);
+    overlay.appendChild(drawer);
+    return overlay;
+  }
+
+  // ── Search ─────────────────────────────────────────────────
+  function openSearch() {
+    const existing = document.getElementById('search-overlay');
+    if (existing) { existing.remove(); return; }
+
+    const searchIndex = [];
+    stepList.forEach(s => {
+      if (s.type === 'review') return;
+      const sIdx = stepList.indexOf(s);
+      searchIndex.push({ label: s.name, stepIdx: sIdx, context: '' });
+      const fieldGen = STEP_FIELDS[s.type];
+      if (fieldGen) {
+        fieldGen().forEach(f => {
+          if (!f.label || !f.key) return;
+          if (['heading', 'info', 'divider', 'photo', 'timer', 'link'].includes(f.type)) return;
+          searchIndex.push({ label: f.label, stepIdx: sIdx, context: s.name, key: f.key });
+        });
+      }
+    });
+
+    const overlay = el('div', { id: 'search-overlay', className: 'search-overlay' });
+    const panel = el('div', { className: 'search-panel' });
+
+    const inputRow = el('div', { className: 'search-input-row' });
+    const inp = el('input', {
+      type: 'search', className: 'search-input',
+      placeholder: 'Search sections, fields, rooms\u2026',
+      autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off'
+    });
+    const closeBtn = el('button', {
+      type: 'button', className: 'search-close-btn',
+      onClick: () => overlay.remove()
+    }, '\u00d7');
+    inputRow.appendChild(el('span', { className: 'search-icon-prefix' }, '\uD83D\uDD0D'));
+    inputRow.appendChild(inp);
+    inputRow.appendChild(closeBtn);
+    panel.appendChild(inputRow);
+
+    const resultsList = el('div', { className: 'search-results-list' });
+    panel.appendChild(resultsList);
+    overlay.appendChild(panel);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    inp.focus();
+
+    let allMatches = [], matchCursor = 0;
+
+    function renderResults(q) {
+      resultsList.innerHTML = '';
+      allMatches = [];
+      matchCursor = 0;
+      if (!q.trim()) return;
+      const low = q.toLowerCase();
+      const seen = new Set();
+      searchIndex.forEach(item => {
+        const dedupKey = item.key ? 'f-' + item.stepIdx + '-' + item.key : 's-' + item.stepIdx;
+        if (seen.has(dedupKey)) return;
+        if (item.label.toLowerCase().includes(low) || (item.context && item.context.toLowerCase().includes(low))) {
+          seen.add(dedupKey);
+          allMatches.push(item);
+        }
+      });
+
+      if (!allMatches.length) {
+        resultsList.appendChild(el('div', { className: 'search-no-results' }, 'No results found'));
+        return;
+      }
+
+      allMatches.slice(0, 25).forEach(item => {
+        resultsList.appendChild(el('div', {
+          className: 'search-result-item',
+          onClick: () => {
+            currentStepIdx = item.stepIdx;
+            overlay.remove();
+            render();
+            window.scrollTo(0, 0);
+          }
+        }, [
+          el('div', { className: 'search-result-label' }, item.label),
+          item.context ? el('div', { className: 'search-result-context' }, 'In: ' + item.context) : null
+        ]));
+      });
+
+      if (allMatches.length > 1) {
+        resultsList.appendChild(el('button', {
+          type: 'button', className: 'btn btn-primary btn-full search-next-btn',
+          onClick: () => {
+            matchCursor = (matchCursor + 1) % allMatches.length;
+            currentStepIdx = allMatches[matchCursor].stepIdx;
+            overlay.remove();
+            render();
+            window.scrollTo(0, 0);
+          }
+        }, 'Next \u203a (' + allMatches.length + ' matches)'));
+      }
+    }
+
+    inp.addEventListener('input', () => renderResults(inp.value));
+  }
+
   // ── Render ─────────────────────────────────────────────────
   function render() {
     root.innerHTML = '';
@@ -1228,6 +1394,26 @@
       onClick: () => { screen = 'intake'; render(); }
     }, '\u270E Intake');
     c.appendChild(backToIntakeBtn);
+
+    // Search button
+    const searchBtn = el('button', {
+      type: 'button',
+      style: 'position:fixed;top:8px;right:88px;z-index:200;background:#fff;border:2px solid var(--border);border-radius:8px;font-size:13px;padding:4px 10px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;',
+      onClick: () => openSearch()
+    }, '\uD83D\uDD0D');
+    c.appendChild(searchBtn);
+
+    // Room navigation FAB
+    const roomNavFab = el('button', {
+      type: 'button',
+      className: 'room-nav-fab',
+      onClick: () => {
+        const existing = document.getElementById('room-drawer-overlay');
+        if (existing) { existing.remove(); return; }
+        document.body.appendChild(buildRoomDrawer());
+      }
+    }, '\uD83D\uDCCD');
+    c.appendChild(roomNavFab);
 
     c.appendChild(el('h1', { className: 'screen-title' }, step.name));
 
