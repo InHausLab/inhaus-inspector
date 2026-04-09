@@ -170,7 +170,6 @@
         { key: 'reviewHome', label: 'Review home for general details (layout, etc.)' },
         { key: 'devicesCharged', label: 'All devices charged' },
         { key: 'corentiumRegistered', label: 'Airthings Corentium Pro registered to house (radon monitor)' },
-        { key: 'boulderBlueRegistered', label: 'Boulder Blue sample registered' },
         { key: 'waterTestsActivated', label: 'Water tests activated' },
         { key: 'radonPrepared', label: 'Radon test prepared' },
         { key: 'qtrakSetup', label: 'Q-Trak device set up (previous data deleted, room templates configured)' }
@@ -184,7 +183,7 @@
         { key: 'breezeET', label: 'Breeze ET pump + tripod' },
         { key: 'breezeST', label: 'Breeze ST spore traps (6)' },
         { key: 'breezeSwabs', label: 'Breeze mold swabs (2)' },
-        { key: 'boulderBlue', label: 'Boulder Blue fan + filter \u2014 registered' }
+        { key: 'boulderBlue', label: 'Boulder Blue fan + filter' }
       ]),
       checklist('radonEquip', 'Radon', [
         { key: 'corentium', label: 'Airthings Corentium Pro radon monitor + tripod' }
@@ -294,7 +293,6 @@
         { key: 'tripodHeight', label: 'Set to full tripod height (60\u2033)' }
       ]),
       timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600),
-      photo('Outdoor Spore Trap'),
       divider(),
       heading('Q-Trak Outdoor Measurement'),
       check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
@@ -312,6 +310,7 @@
       divider(),
       heading('Visual Exterior Inspection'),
       info('Run during mold sample time'),
+      chips('sidingTypes', 'Siding Type(s)', ['Wood', 'Brick', 'Stucco', 'Vinyl', 'Fiber Cement', 'Stone', 'Metal', 'Other (specify)']),
       text('moldTestLocations', 'Mold test locations identified'),
       checklist('exteriorPhotos', 'Photo Checklist', [
         { key: 'insulationPlumbing', label: 'Insulation around plumbing lines' },
@@ -451,8 +450,6 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       divider(),
-      yesno('hasEnsuite', 'Ensuite bathroom present'),
-      ...bathroomCheckFields().map(f => showIf(f, 'hasEnsuite', 'Yes')),
       ...followUpFields(),
       ...observationFields()
     ];
@@ -645,7 +642,8 @@
         { key: 'doorsLightsRestored', label: 'All doors/lights returned to original state' },
         { key: 'radonLeftInPlace', label: 'Radon monitor left in place' },
         { key: 'formComplete', label: 'Technician form fully completed' },
-        { key: 'photosUploaded', label: 'All photos uploaded/captured' }
+        { key: 'photosUploaded', label: 'All photos uploaded/captured' },
+        { key: 'boulderBlueRegistered', label: 'Boulder Blue filter sample registered (Jonah Ventures portal)' }
       ]),
     ];
   }
@@ -656,7 +654,8 @@
       check('informComplete', 'Inform customer assessment is complete'),
       check('adviseReport', 'Advise report in approximately 3 weeks'),
       check('remindRadon', 'Remind about radon monitor in basement'),
-      dateTimeInput('radonPickupTime', 'Radon monitor pickup time (schedule 48 hrs from placement)'),
+      info('Radon pickup auto-set to 54 hrs after inspection start \u2014 override below if needed'),
+      dateTimeInput('radonPickupTime', 'Radon Pickup Date/Time'),
       divider(),
       yesno('debriefCompleted', 'Debrief completed'),
       yesno('radonPickupReminder', 'Homeowner reminded about radon pickup'),
@@ -680,13 +679,8 @@
       divider(),
       heading('Data Management'),
       checklist('dataManagement', null, [
-        { key: 'qtrakExported', label: 'Q-Trak data downloaded locally and exported to spreadsheet' },
-        { key: 'photosUploaded', label: 'All photos uploaded to Google Drive folder' }
+        { key: 'qtrakExported', label: 'Q-Trak data downloaded locally and exported to spreadsheet' }
       ]),
-      divider(),
-      heading('Radon Pickup'),
-      date('radonPickupDate', 'Radon Pickup Date'),
-      info('Schedule pickup 48 hours from placement'),
       divider(),
       heading('Final Check'),
       checklist('finalCheck', null, [
@@ -1171,6 +1165,13 @@
     if (!data._enteredAt) data._enteredAt = new Date().toISOString();
     data._roomName = step.name;
 
+    if (step.type === 'debrief' && !data.radonPickupTime && inspection.startedAt) {
+      const pickupMs = new Date(inspection.startedAt).getTime() + 54 * 60 * 60 * 1000;
+      const d = new Date(pickupMs);
+      const pad = n => String(n).padStart(2, '0');
+      data.radonPickupTime = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
     if ((step.type === 'room-test' || step.type === 'bedroom' || step.type === 'bathroom' || step.type === 'additional-room') && !data.roomName) {
       data.roomName = step.name;
     }
@@ -1284,13 +1285,6 @@
       }}, 'Skip \u23e9'));
     }
     const nav = el('div', { className: 'bottom-nav' }, navButtons);
-    if ((inspection._furthestStepIdx || 0) > currentStepIdx) {
-      const resumeBtn = el('button', {
-        className: 'btn-resume-location',
-        onClick: () => { currentStepIdx = inspection._furthestStepIdx; render(); window.scrollTo(0, 0); }
-      }, '\u25b6 Jump to Current');
-      c.appendChild(resumeBtn);
-    }
     c.appendChild(nav);
     root.appendChild(c);
   }
@@ -1305,7 +1299,6 @@
     if (!inspection._departureChecklist) inspection._departureChecklist = {};
     const depData = inspection._departureChecklist;
     const depItems = [
-      { key: 'uploadPhotos', label: 'Upload photos to Google Drive' },
       { key: 'downloadQtrak', label: 'Download Q-Trak data to computer' },
       { key: 'shipSamples', label: 'Ship all lab samples' }
     ];
