@@ -906,14 +906,77 @@
     if (type === 'success') setTimeout(() => { if (banner.parentNode) banner.remove(); }, 5000);
   }
 
-  async function uploadToGoogleDrive(exportData) {
-    if (!GOOGLE_SCRIPT_URL) return;
-    try {
+  function extractAllPhotosFromExport(exportData) {
+    const photos = [];
+    const sectionKeys = ['preAssessmentChecklist', 'arrivalSetup', 'deviceSetup', 'exteriorAssessment',
+                         'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
+    sectionKeys.forEach(key => {
+      const s = exportData[key];
+      if (s && s.photos) photos.push(...s.photos);
+    });
+    (exportData.rooms || []).forEach(room => {
+      if (room.photos) photos.push(...room.photos.map(p => ({ ...p, roomName: p.roomName || room.roomName })));
+      if (room.atpBeforePhotos) photos.push(...room.atpBeforePhotos.map(p => ({ ...p, roomName: p.roomName || room.roomName })));
+      if (room.atpAfterPhotos) photos.push(...room.atpAfterPhotos.map(p => ({ ...p, roomName: p.roomName || room.roomName })));
+    });
+    return photos;
+  }
+
+  function stripPhotosFromExport(exportData) {
+    const stripped = JSON.parse(JSON.stringify(exportData));
+    const sectionKeys = ['preAssessmentChecklist', 'arrivalSetup', 'deviceSetup', 'exteriorAssessment',
+                         'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
+    sectionKeys.forEach(key => { if (stripped[key]) delete stripped[key].photos; });
+    (stripped.rooms || []).forEach(room => {
+      delete room.photos;
+      delete room.atpBeforePhotos;
+      delete room.atpAfterPhotos;
+    });
+    return stripped;
+  }
+
+  async function sendToGoogleScript(exportData) {
+    const FIVE_MB = 5 * 1024 * 1024;
+    const payloadBytes = new Blob([JSON.stringify(exportData)]).size;
+
+    let mainPayload = exportData;
+    let photoPayload = null;
+
+    if (payloadBytes > FIVE_MB) {
+      mainPayload = stripPhotosFromExport(exportData);
+      const allPhotos = extractAllPhotosFromExport(exportData);
+      if (allPhotos.length > 0) {
+        photoPayload = {
+          photoUploadOnly: true,
+          inspectionId: exportData.inspectionId,
+          clientName: exportData.clientName,
+          propertyAddress: exportData.propertyAddress,
+          photos: allPhotos
+        };
+      }
+    }
+
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mainPayload)
+    });
+
+    if (photoPayload) {
+      showUploadBanner('pending', 'Uploading photos\u2026');
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(exportData)
+        body: JSON.stringify(photoPayload)
       });
+    }
+  }
+
+  async function submitInspection(exportData) {
+    if (!GOOGLE_SCRIPT_URL) return true;
+    showUploadBanner('pending', 'Uploading to Google Drive\u2026');
+    try {
+      await sendToGoogleScript(exportData);
       await DB.removeFromQueue(exportData.inspectionId);
       showUploadBanner('success', '\u2713 Saved to Google Drive');
       return true;
@@ -930,11 +993,7 @@
     const queue = await DB.getQueue();
     for (const item of queue) {
       try {
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST', mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item)
-        });
+        await sendToGoogleScript(item);
         await DB.removeFromQueue(item.inspectionId);
       } catch (e) { break; }
     }
@@ -1601,9 +1660,6 @@
     c.appendChild(jsonCard);
 
     const actCard = el('div', { className: 'card actions-card' });
-    if (GOOGLE_SCRIPT_URL) {
-      actCard.appendChild(el('button', { className: 'btn btn-primary btn-full', onClick: () => { uploadToGoogleDrive(exportData); } }, '\u2601 Export to Google Drive'));
-    }
     actCard.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => {
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1640,10 +1696,10 @@
         inspection.completedAt = inspection.endedAt;
         const completeData = buildExportJSON();
         saveNow().then(() => {
-          uploadToGoogleDrive(completeData);
+          submitInspection(completeData);
           screen = 'home'; inspection = null; render();
         });
-      }}, '\u2713 Mark as Complete'));
+      }}, '\u2713 Submit Inspection'));
     } else {
       actCard.appendChild(el('div', { className: 'completed-banner' }, [
         el('strong', null, '\u2713 Inspection Complete'),
