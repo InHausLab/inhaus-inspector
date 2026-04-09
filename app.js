@@ -908,16 +908,26 @@
 
   function extractAllPhotosFromExport(exportData) {
     const photos = [];
+    function pickPhoto(p, fallbackRoomName) {
+      return {
+        photoId: p.photoId || '',
+        imageData: p.imageData || '',
+        caption: p.caption || '',
+        roomName: p.roomName || fallbackRoomName || '',
+        stepName: p.stepName || '',
+        timestamp: p.timestamp || ''
+      };
+    }
     const sectionKeys = ['preAssessmentChecklist', 'arrivalSetup', 'deviceSetup', 'exteriorAssessment',
                          'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
     sectionKeys.forEach(key => {
       const s = exportData[key];
-      if (s && s.photos) photos.push(...s.photos);
+      if (s && s.photos) photos.push(...s.photos.map(p => pickPhoto(p)));
     });
     (exportData.rooms || []).forEach(room => {
-      if (room.photos) photos.push(...room.photos.map(p => ({ ...p, roomName: p.roomName || room.roomName })));
-      if (room.atpBeforePhotos) photos.push(...room.atpBeforePhotos.map(p => ({ ...p, roomName: p.roomName || room.roomName })));
-      if (room.atpAfterPhotos) photos.push(...room.atpAfterPhotos.map(p => ({ ...p, roomName: p.roomName || room.roomName })));
+      if (room.photos) photos.push(...room.photos.map(p => pickPhoto(p, room.roomName)));
+      if (room.atpBeforePhotos) photos.push(...room.atpBeforePhotos.map(p => pickPhoto(p, room.roomName)));
+      if (room.atpAfterPhotos) photos.push(...room.atpAfterPhotos.map(p => pickPhoto(p, room.roomName)));
     });
     return photos;
   }
@@ -936,25 +946,9 @@
   }
 
   async function sendToGoogleScript(exportData) {
-    const FIVE_MB = 5 * 1024 * 1024;
-    const payloadBytes = new Blob([JSON.stringify(exportData)]).size;
-
-    let mainPayload = exportData;
-    let photoPayload = null;
-
-    if (payloadBytes > FIVE_MB) {
-      mainPayload = stripPhotosFromExport(exportData);
-      const allPhotos = extractAllPhotosFromExport(exportData);
-      if (allPhotos.length > 0) {
-        photoPayload = {
-          photoUploadOnly: true,
-          inspectionId: exportData.inspectionId,
-          clientName: exportData.clientName,
-          propertyAddress: exportData.propertyAddress,
-          photos: allPhotos
-        };
-      }
-    }
+    // Always strip photos from main payload — send data first, then photos separately
+    const mainPayload = stripPhotosFromExport(exportData);
+    const allPhotos = extractAllPhotosFromExport(exportData);
 
     await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST', mode: 'no-cors',
@@ -962,7 +956,14 @@
       body: JSON.stringify(mainPayload)
     });
 
-    if (photoPayload) {
+    if (allPhotos.length > 0) {
+      const photoPayload = {
+        photoUploadOnly: true,
+        inspectionId: exportData.inspectionId,
+        clientName: exportData.clientName,
+        propertyAddress: exportData.propertyAddress,
+        photos: allPhotos
+      };
       showUploadBanner('pending', 'Uploading photos\u2026');
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST', mode: 'no-cors',
@@ -1651,29 +1652,9 @@
       c.appendChild(sCard);
     });
 
-    const jsonCard = el('div', { className: 'card' });
-    jsonCard.appendChild(el('h3', { className: 'section-heading' }, 'JSON Export'));
     const exportData = buildExportJSON();
-    const pre = el('pre', { className: 'json-preview' });
-    pre.textContent = JSON.stringify(exportData, null, 2);
-    jsonCard.appendChild(pre);
-    c.appendChild(jsonCard);
 
     const actCard = el('div', { className: 'card actions-card' });
-    actCard.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => {
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = inspection.inspectionId + '.json'; a.click();
-      URL.revokeObjectURL(url);
-    }}, 'Download JSON'));
-    actCard.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => {
-      const json = JSON.stringify(exportData, null, 2);
-      navigator.clipboard.writeText(json).then(() => alert('JSON copied!')).catch(() => {
-        const ta = document.createElement('textarea'); ta.value = json;
-        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-        document.body.removeChild(ta); alert('JSON copied!');
-      });
-    }}, 'Copy JSON'));
 
     if (inspection.status !== 'completed') {
       const submitBtn = el('button', { className: 'btn btn-primary btn-full', onClick: () => {
