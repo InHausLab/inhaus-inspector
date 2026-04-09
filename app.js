@@ -1676,7 +1676,7 @@
     }}, 'Copy JSON'));
 
     if (inspection.status !== 'completed') {
-      actCard.appendChild(el('button', { className: 'btn btn-primary btn-full', onClick: () => {
+      const submitBtn = el('button', { className: 'btn btn-primary btn-full', onClick: () => {
         const unvisited = stepList.filter(s => s.type !== 'review' && !(inspection.stepData && inspection.stepData[s.id] && inspection.stepData[s.id]._visited));
         const atpData = (inspection.stepData && inspection.stepData['atp-kitchen']) || {};
         const atpIssues = [];
@@ -1691,15 +1691,20 @@
           alert('The following items are incomplete:\n\u2022 ' + names + '\n\nPlease address these before marking as complete.');
           return;
         }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting... \u23f3';
         inspection.status = 'completed';
         inspection.endedAt = new Date().toISOString();
         inspection.completedAt = inspection.endedAt;
         const completeData = buildExportJSON();
         saveNow().then(() => {
-          submitInspection(completeData);
+          submitInspection(completeData).then(ok => {
+            if (!ok) { submitBtn.disabled = false; submitBtn.textContent = '\u2713 Submit Inspection'; }
+          });
           screen = 'home'; inspection = null; render();
         });
-      }}, '\u2713 Submit Inspection'));
+      }}, '\u2713 Submit Inspection');
+      actCard.appendChild(submitBtn);
     } else {
       actCard.appendChild(el('div', { className: 'completed-banner' }, [
         el('strong', null, '\u2713 Inspection Complete'),
