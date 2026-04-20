@@ -251,6 +251,8 @@
         { key: 'fanPluggedIn', label: 'Fan plugged in at main living space with access to airflow' },
         { key: 'allergenPlacement', label: 'If client has specific allergen concerns: placed in desired location' }
       ]),
+      text('boulderBlueSampleId', 'Boulder Blue Sample ID', { placeholder: 'e.g. B2BJC43G' }),
+      text('boulderBlueTestLocation', 'Boulder Blue Test Location', { placeholder: 'e.g. Living Room' }),
       timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (need 2 hours)'),
       timer('boulderBlueTimer', 'Boulder Blue Fan Timer (2 hours)', 7200),
       divider(),
@@ -269,6 +271,7 @@
     return [
       heading('PFAS Water Test'),
       radio('pfasSetup', 'PFAS water test at kitchen faucet', ['Yes', 'No', 'Not requested']),
+      showIf(text('pfasKitBarcode', 'PFAS Test Kit # / Barcode', { placeholder: 'e.g. WTK_PFAS_27099' }), 'pfasSetup', 'Yes'),
       showIf(timer('pfasTimer', 'PFAS Drain Timer', 3600), 'pfasSetup', 'Yes'),
       showIf(info('Note: needs ~1 hour to drain'), 'pfasSetup', 'Yes'),
       textarea('notes', 'Notes'),
@@ -630,6 +633,7 @@
     return [
       heading('Boulder Blue Completion'),
       timeInput('boulderBlueEndTime', 'Boulder Blue End Time'),
+      text('boulderBlueTestDuration', 'Boulder Blue Test Duration', { placeholder: 'e.g. 2 hours 15 minutes' }),
       info('Compare to start time captured in Arrival & Setup. Must be 2+ hours.'),
       divider(),
       checklist('finalChecks', 'Final Checks Before Leaving', [
