@@ -1271,7 +1271,9 @@
         canResume ? el('button', { className: 'btn btn-primary', onClick: () => resumeInsp(insp.inspectionId) }, 'Resume') : null,
         el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
         el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
-          if (confirm('Delete this inspection permanently?')) DB.remove(insp.inspectionId).then(() => render());
+          if (confirm('⚠️ Delete this inspection permanently?\n\nAll photos and data will be removed from this device.\n\nOnly delete after confirming your photos have been uploaded to Google Drive.\n\nThis cannot be undone.')) {
+            DB.remove(insp.inspectionId).then(() => render());
+          }
         }}, 'Delete')
       ])
     ]);
