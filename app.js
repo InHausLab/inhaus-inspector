@@ -665,6 +665,8 @@
 
   function getDebriefFields() {
     return [
+      timeInput('assessmentEndTime', 'Assessment End Time'),
+      divider(),
       info('Perform the customer debrief before completing the final departure checks.'),
       check('informComplete', 'Inform customer assessment is complete'),
       check('adviseReport', 'Advise report in approximately 3 weeks'),
