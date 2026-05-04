@@ -1708,9 +1708,29 @@
       }}, '\u2713 Submit Inspection');
       actCard.appendChild(submitBtn);
     } else {
+      const reuploadBtn = el('button', { className: 'btn btn-outline btn-full', onClick: async () => {
+        reuploadBtn.disabled = true;
+        reuploadBtn.textContent = 'Uploading\u2026 \u23f3';
+        try {
+          const reuploadData = buildExportJSON();
+          const ok = await submitInspection(reuploadData);
+          if (ok) {
+            reuploadBtn.textContent = '\u2713 Upload Complete';
+          } else {
+            reuploadBtn.disabled = false;
+            reuploadBtn.textContent = '\u21ba Re-upload to Drive';
+            alert('Upload failed. Please check your connection and try again.');
+          }
+        } catch(e) {
+          reuploadBtn.disabled = false;
+          reuploadBtn.textContent = '\u21ba Re-upload to Drive';
+          alert('Upload failed: ' + e.message);
+        }
+      }}, '\u21ba Re-upload to Drive');
       actCard.appendChild(el('div', { className: 'completed-banner' }, [
         el('strong', null, '\u2713 Inspection Complete'),
-        el('p', null, 'Completed: ' + fmtDate(inspection.endedAt))
+        el('p', null, 'Completed: ' + fmtDate(inspection.endedAt)),
+        reuploadBtn
       ]));
     }
     c.appendChild(actCard);
