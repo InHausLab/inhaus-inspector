@@ -963,6 +963,35 @@
     return stripped;
   }
 
+  // ── Real-time single-photo upload ─────────────────────────
+  async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
+    if (!GOOGLE_SCRIPT_URL || !inspectionId) return;
+    try {
+      const payload = {
+        photoUploadOnly: true,
+        inspectionId: inspectionId,
+        clientName: clientName || '',
+        propertyAddress: propertyAddress || '',
+        photos: [{
+          photoId: photo.photoId || '',
+          roomName: photo.roomName || '',
+          stepName: photo.stepName || '',
+          imageData: photo.dataUrl || '',
+          caption: photo.caption || ''
+        }]
+      };
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      photo._uploaded = true;
+    } catch(e) {
+      console.warn('Real-time photo upload failed, will retry on export:', e);
+    }
+  }
+  window.uploadPhotoImmediate = uploadPhotoImmediate;
+
   async function sendToGoogleScript(exportData) {
     // Always strip photos from main payload — send data first, then photos separately
     const mainPayload = stripPhotosFromExport(exportData);

@@ -553,15 +553,26 @@
       for (const file of Array.from(files)) {
         try {
           const dataUrl = await compressImage(file);
-          photos.push({
+          const newPhoto = {
             photoId: 'p-' + Math.random().toString(36).substr(2, 9),
             roomName: roomName || '', stepName: stepName || '',
-            timestamp: new Date().toISOString(), caption: '', dataUrl
-          });
+            timestamp: new Date().toISOString(), caption: '', dataUrl,
+            _uploaded: false
+          };
+          photos.push(newPhoto);
+          onUpdate();
+          section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName));
+          // ⚡ Upload immediately to Drive — don’t wait for export
+          if (window.uploadPhotoImmediate && window.inspection && window.inspection.inspectionId) {
+            window.uploadPhotoImmediate(
+              newPhoto,
+              window.inspection.inspectionId,
+              window.inspection.clientName || '',
+              window.inspection.propertyAddress || ''
+            );
+          }
         } catch (err) { console.error('Photo error:', err); }
       }
-      onUpdate();
-      section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName));
     }
 
     const fileInp = el('input', { type: 'file', accept: 'image/*', capture: 'environment', multiple: 'true', className: 'hidden' });
