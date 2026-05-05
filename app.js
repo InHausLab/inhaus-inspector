@@ -1742,14 +1742,25 @@
         reuploadBtn.textContent = 'Uploading\u2026 \u23f3';
         try {
           const reuploadData = buildExportJSON();
-          const ok = await submitInspection(reuploadData);
-          if (ok) {
-            reuploadBtn.textContent = '\u2713 Upload Complete';
-          } else {
-            reuploadBtn.disabled = false;
-            reuploadBtn.textContent = '\u21ba Re-upload to Drive';
-            alert('Upload failed. Please check your connection and try again.');
+          // Send main data first (no photos)
+          const mainPayload = stripPhotosFromExport(reuploadData);
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST', mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mainPayload)
+          });
+          // Send photos one at a time to avoid payload size limits
+          const allPhotos = extractAllPhotosFromExport(reuploadData);
+          for (let i = 0; i < allPhotos.length; i++) {
+            reuploadBtn.textContent = 'Uploading photo ' + (i + 1) + ' of ' + allPhotos.length + '\u2026';
+            await uploadPhotoImmediate(
+              { photoId: allPhotos[i].photoId, roomName: allPhotos[i].roomName, stepName: allPhotos[i].stepName, dataUrl: allPhotos[i].imageData, caption: allPhotos[i].caption || '' },
+              reuploadData.inspectionId,
+              reuploadData.clientName || '',
+              reuploadData.propertyAddress || ''
+            );
           }
+          reuploadBtn.textContent = '\u2713 Upload Complete (' + allPhotos.length + ' photos)';
         } catch(e) {
           reuploadBtn.disabled = false;
           reuploadBtn.textContent = '\u21ba Re-upload to Drive';
