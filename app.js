@@ -23,7 +23,7 @@
   function checklist(key, label, items, opts) { return { key, type: 'checklist', label, items, ...opts }; }
   function chips(key, label, options) { return { key, type: 'chips', label, options }; }
   function reading(key, label, unit) { return { key, type: 'reading', label, unit }; }
-  function photo(stepName) { return { type: 'photo', stepName }; }
+  function photo(stepName, photoKey) { return { type: 'photo', stepName, photoKey }; }
   function timer(key, label, duration, opts) { return { key, type: 'timer', label, duration, ...opts }; }
   function heading(label) { return { type: 'heading', label }; }
   function info(label) { return { type: 'info', label }; }
@@ -121,8 +121,8 @@
       textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments...' }),
       divider(),
       heading('Photos'),
-      photo('Before'),
-      photo('After')
+      photo('Before', '_beforePhotos'),
+      photo('After', '_afterPhotos')
     ];
   }
 
@@ -133,7 +133,7 @@
       yesno('followUpNeeded', 'Follow-up recommended?'),
       showIf(sel('followUpTimeframe', 'Re-check in', ['3 months', '6 months', '12 months']), 'followUpNeeded', 'Yes'),
       showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return...' }), 'followUpNeeded', 'Yes'),
-      showIf(photo('Follow-Up'), 'followUpNeeded', 'Yes')
+      showIf(photo('Follow-Up', '_followUpPhotos'), 'followUpNeeded', 'Yes')
     ];
   }
 
@@ -406,7 +406,7 @@
       text('filterRating', 'MERV / HEPA rating'),
       radio('filterCondition', 'Filter condition', ['Good', 'Fair', 'Poor']),
       check('filterCleaned', 'Filters checked and cleaned if needed'),
-      photo('HVAC Filter'),
+      photo('HVAC Filter', '_hvacFilterPhotos'),
       divider(),
       heading('HVAC Inspection'),
       check('servicePanelRemoved', 'Service panel removed'),
@@ -414,29 +414,29 @@
       yesno('hvacCondensation', 'Condensation noted'),
       yesno('hvacLeaks', 'Leaks noted'),
       text('hvacDetails', 'Notable details'),
-      photo('HVAC Inspection'),
+      photo('HVAC Inspection', '_hvacInspPhotos'),
       divider(),
       yesno('radonMitigationPresent', 'Radon mitigation system present'),
       showIf(radio('radonMitActive', 'Radon system type', ['Active', 'Passive']), 'radonMitigationPresent', 'Yes'),
       showIf(text('radonMitType', 'Type / Model / Serial'), 'radonMitigationPresent', 'Yes'),
-      showIf(photo('Radon Mitigation'), 'radonMitigationPresent', 'Yes'),
+      showIf(photo('Radon Mitigation', '_radonMitPhotos'), 'radonMitigationPresent', 'Yes'),
       yesno('uvSystemPresent', 'UV or water disinfection system present'),
       showIf(text('uvSystemType', 'Type / Model / Serial'), 'uvSystemPresent', 'Yes'),
-      showIf(photo('UV System'), 'uvSystemPresent', 'Yes'),
+      showIf(photo('UV System', '_uvSystemPhotos'), 'uvSystemPresent', 'Yes'),
       yesno('otherAirPurifierPresent', 'Other air purifiers or enhanced filtration (e.g. portable units)?'),
       showIf(text('otherAirPurifierType', 'Type / Model / Serial'), 'otherAirPurifierPresent', 'Yes'),
-      showIf(photo('Other Air Purifier'), 'otherAirPurifierPresent', 'Yes'),
+      showIf(photo('Other Air Purifier', '_otherAirPhotos'), 'otherAirPurifierPresent', 'Yes'),
       yesno('airFiltrationPresent', 'Air filtration and/or HVAC air cleansing system present'),
       showIf(text('airFiltType', 'Type / Model / Serial'), 'airFiltrationPresent', 'Yes'),
-      showIf(photo('Air Filtration'), 'airFiltrationPresent', 'Yes'),
+      showIf(photo('Air Filtration', '_airFiltPhotos'), 'airFiltrationPresent', 'Yes'),
       yesno('waterFiltrationPresent', 'Water filtration system present'),
       showIf(text('waterFiltType', 'Type / Model / Serial'), 'waterFiltrationPresent', 'Yes'),
-      showIf(photo('Water Filtration'), 'waterFiltrationPresent', 'Yes'),
+      showIf(photo('Water Filtration', '_waterFiltPhotos'), 'waterFiltrationPresent', 'Yes'),
       yesno('waterSofteningPresent', 'Water softening system present'),
       showIf(text('waterSoftType', 'Type / Model / Serial'), 'waterSofteningPresent', 'Yes'),
-      showIf(photo('Water Softening'), 'waterSofteningPresent', 'Yes'),
+      showIf(photo('Water Softening', '_waterSoftPhotos'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
-      photo('Utility Room')
+      photo('Utility Room', '_utilityRoomPhotos')
     ];
   }
 
@@ -937,30 +937,35 @@
         timestamp: p.timestamp || ''
       };
     }
+    function extractFromSection(s, fallbackRoomName) {
+      if (!s) return;
+      for (const v of Object.values(s)) {
+        if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
+          photos.push(...v.map(p => pickPhoto(p, fallbackRoomName)));
+        }
+      }
+    }
     const sectionKeys = ['preAssessmentChecklist', 'arrivalSetup', 'deviceSetup', 'exteriorAssessment',
                          'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
-    sectionKeys.forEach(key => {
-      const s = exportData[key];
-      if (s && s.photos) photos.push(...s.photos.map(p => pickPhoto(p)));
-    });
-    (exportData.rooms || []).forEach(room => {
-      if (room.photos) photos.push(...room.photos.map(p => pickPhoto(p, room.roomName)));
-      if (room.atpBeforePhotos) photos.push(...room.atpBeforePhotos.map(p => pickPhoto(p, room.roomName)));
-      if (room.atpAfterPhotos) photos.push(...room.atpAfterPhotos.map(p => pickPhoto(p, room.roomName)));
-    });
+    sectionKeys.forEach(key => extractFromSection(exportData[key]));
+    (exportData.rooms || []).forEach(room => extractFromSection(room, room.roomName));
     return photos;
   }
 
   function stripPhotosFromExport(exportData) {
     const stripped = JSON.parse(JSON.stringify(exportData));
+    function stripFromSection(s) {
+      if (!s) return;
+      for (const k of Object.keys(s)) {
+        if (Array.isArray(s[k]) && s[k].length && s[k][0] && typeof s[k][0].photoId === 'string') {
+          delete s[k];
+        }
+      }
+    }
     const sectionKeys = ['preAssessmentChecklist', 'arrivalSetup', 'deviceSetup', 'exteriorAssessment',
                          'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
-    sectionKeys.forEach(key => { if (stripped[key]) delete stripped[key].photos; });
-    (stripped.rooms || []).forEach(room => {
-      delete room.photos;
-      delete room.atpBeforePhotos;
-      delete room.atpAfterPhotos;
-    });
+    sectionKeys.forEach(key => stripFromSection(stripped[key]));
+    (stripped.rooms || []).forEach(room => stripFromSection(room));
     return stripped;
   }
 
@@ -1347,7 +1352,8 @@
       wifiNetwork: inspection.wifiNetwork || '',
       wifiPassword: inspection.wifiPassword || '',
       clientConcerns: inspection.clientConcerns || '',
-      blueprintNotes: inspection.blueprintNotes || ''
+      blueprintNotes: inspection.blueprintNotes || '',
+      inspectorEmail: inspection.inspectorEmail || ''
     } : {
       inspectionId: genId(),
       inspectorName: '',
@@ -1688,17 +1694,25 @@
             el('span', null, display)
           ]));
         });
-        if (data._photos && data._photos.length) {
-          summary.appendChild(el('div', { className: 'review-photos-section' }, [el('strong', null, data._photos.length + ' photo(s):')]));
+        // Show all photo arrays (handles _photos, _beforePhotos, _afterPhotos, ATP photos, etc.)
+        const photoArrayKeys = Object.keys(data).filter(k =>
+          k.startsWith('_') && Array.isArray(data[k]) && data[k].length &&
+          data[k][0] && typeof data[k][0].photoId === 'string'
+        );
+        photoArrayKeys.forEach(pk => {
+          const arr = data[pk];
+          const labelRaw = pk.slice(1).replace(/Photos$/, '').replace(/([A-Z])/g, ' $1').trim();
+          const label = (labelRaw || 'All') + ' Photos';
+          summary.appendChild(el('div', { className: 'review-photos-section' }, [el('strong', null, arr.length + ' ' + label + ':')]));
           const grid = el('div', { className: 'review-photo-grid' });
-          data._photos.forEach(p => {
+          arr.forEach(p => {
             grid.appendChild(el('div', { className: 'review-photo-item' }, [
               el('img', { src: p.dataUrl, className: 'review-photo-img' }),
               p.caption ? el('div', { className: 'review-photo-caption' }, p.caption) : null
             ]));
           });
           summary.appendChild(grid);
-        }
+        });
       }
       sCard.appendChild(summary);
       c.appendChild(sCard);
@@ -1870,24 +1884,23 @@
   function cleanStepData(data) {
     if (!data) return {};
     const clean = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (k.startsWith('_')) continue;
-      clean[k] = v;
-    }
     function exportPhotos(arr) {
       return arr.map(p => ({
         photoId: p.photoId, roomName: p.roomName, stepName: p.stepName,
         timestamp: p.timestamp, caption: p.caption, imageData: p.dataUrl
       }));
     }
-    if (data._photos && data._photos.length) {
-      clean.photos = exportPhotos(data._photos);
+    for (const [k, v] of Object.entries(data)) {
+      if (k.startsWith('_')) continue;
+      clean[k] = v;
     }
-    if (data._atpBeforePhotos && data._atpBeforePhotos.length) {
-      clean.atpBeforePhotos = exportPhotos(data._atpBeforePhotos);
-    }
-    if (data._atpAfterPhotos && data._atpAfterPhotos.length) {
-      clean.atpAfterPhotos = exportPhotos(data._atpAfterPhotos);
+    // Export all photo arrays (any _-prefixed key holding photo objects)
+    for (const [k, v] of Object.entries(data)) {
+      if (!k.startsWith('_')) continue;
+      if (!Array.isArray(v) || !v.length) continue;
+      if (v[0] && typeof v[0].photoId === 'string') {
+        clean[k.slice(1)] = exportPhotos(v); // strip leading _ for export key
+      }
     }
     return clean;
   }

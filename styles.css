@@ -663,6 +663,13 @@ body {
   background: var(--primary-light);
   font-weight: 800; color: var(--primary);
 }
+.room-item-done {
+  background: #f0f9f0;
+  color: var(--primary);
+}
+.room-item-partial {
+  opacity: 0.82;
+}
 .room-item-name { flex: 1; }
 .room-item-status {
   font-size: 0.9rem; font-weight: 800;
