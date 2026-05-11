@@ -1906,4 +1906,12 @@
 
   retryQueuedUploads();
   render();
+
+  // ── Periodic auto-save every 30s (safety net) ───────────────
+  setInterval(() => {
+    if (inspection && screen === 'step') {
+      saveNow();
+    }
+  }, 30000);
+
 })();
