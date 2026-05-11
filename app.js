@@ -673,6 +673,7 @@
       check('remindRadon', 'Remind about radon monitor in basement'),
       info('Radon pickup auto-set to 54 hrs after inspection start \u2014 override below if needed'),
       dateTimeInput('radonPickupTime', 'Radon Pickup Date/Time'),
+      dateTimeInput('radonPickupTime2', 'Radon Pickup 2 Date/Time (if second monitor)'),
       divider(),
       yesno('debriefCompleted', 'Debrief completed'),
       yesno('radonPickupReminder', 'Homeowner reminded about radon pickup'),
@@ -1054,7 +1055,7 @@
     const DRAWER_GROUPS = [
       { label: 'SETUP', phases: ['setup', 'arrival', 'exterior'] },
       { label: 'LOWER LEVEL', phases: ['lowest', 'utility'] },
-      { label: 'UPPER LEVEL', phases: ['rooms'] },
+      { label: 'BEDROOMS & BATHROOMS', phases: ['rooms'] },
       { label: 'MAIN LEVEL', phases: ['main'] },
       { label: 'ADDITIONAL ROOMS', phases: ['supplementary'] },
       { label: 'WRAP-UP', phases: ['wrapup', 'propdetails', 'post'] }

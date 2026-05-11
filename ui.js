@@ -152,7 +152,7 @@
           if (rem <= 0) {
             display.textContent = '00:00 — COMPLETE';
             display.classList.add('timer-done');
-            if (!t.alerted) { playAlert(durationSec === 600); t.alerted = true; onSave(); }
+            if (!t.alerted) { playAlert(durationSec === 600); if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]); t.alerted = true; onSave(); }
             return false;
           }
           const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
