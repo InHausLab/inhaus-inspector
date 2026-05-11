@@ -1219,7 +1219,8 @@
 
   // ── Render ─────────────────────────────────────────────────
   function render() {
-    root.innerHTML = '';
+    window.inspection = inspection; // expose for real-time photo upload in ui.js
+    root.innerHTML = ''
     switch (screen) {
       case 'home': renderHome(); break;
       case 'intake': renderIntake(); break;
@@ -1631,7 +1632,7 @@
       ['Bedrooms', inspection.numberOfBedrooms], ['Bathrooms', inspection.numberOfBathrooms],
       ['Water Source', inspection.waterSource + (inspection.waterSourceDescription ? ' (' + inspection.waterSourceDescription + ')' : '')],
       ['Wifi', inspection.wifiNetwork],
-      ['Occupancy', inspection.occupancyDuringInspection], ['Weather', inspection.weatherConditions],
+      ['Occupancy', inspection.stepData?.['property-details']?.occupancyDuringInspection], ['Weather', inspection.stepData?.['property-details']?.weatherConditions],
       ['Started', fmtDate(inspection.startedAt)], ['Status', inspection.status]
     ];
     infoFields.forEach(([l, v]) => {
@@ -1817,8 +1818,8 @@
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
 
-      occupancyDuringInspection: inspection.occupancyDuringInspection || '',
-      weatherConditions: inspection.weatherConditions || '',
+      occupancyDuringInspection: (inspection.stepData?.['property-details']?.occupancyDuringInspection) || '',
+      weatherConditions: (inspection.stepData?.['property-details']?.weatherConditions) || '',
       knownProblemAreas: inspection.knownProblemAreas || '',
       startedAt: inspection.startedAt,
       endedAt: inspection.endedAt,
@@ -1850,8 +1851,8 @@
       }
     });
 
-    const arrivalData = inspection.stepData?.arrival || {};
-    exp.windowsOpen = arrivalData.windowsOpen || '';
+    const propDetailsData = inspection.stepData?.['property-details'] || {};
+    exp.windowsOpen = propDetailsData.windowsOpen || '';
     const kitchenData = inspection.stepData?.['kitchen-appliance'] || {};
     exp.appliancesCondition = kitchenData.appliancesCondition || '';
     let dampnessCount = 0;
