@@ -322,6 +322,8 @@
   <button class="tab-btn active" onclick="switchTab('tab1', this)">First Look — Path to $10M</button>
   <button class="tab-btn" onclick="switchTab('tab2', this)">Unit Economics per Truck</button>
   <button class="tab-btn" onclick="switchTab('tab3', this)">Break-Even Waterfall</button>
+  <button class="tab-btn" onclick="switchTab('tab4', this)">Recurring Revenue</button>
+  <button class="tab-btn" onclick="switchTab('tab5', this)">SAFE &amp; Cap Table</button>
 </div>
 
 <!-- TAB 1: PATH TO $10M -->
@@ -555,9 +557,128 @@
   </div>
 </div>
 
+<!-- TAB 4: RECURRING REVENUE -->
+<div id="tab4" class="tab-content">
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <h3>Base Assumptions</h3>
+        <div class="input-row"><label>New customers per month (at maturity)</label>
+          <div class="input-with-prefix"><span class="prefix">#</span><input type="number" id="rr-new" value="60" oninput="updateRR()"></div></div>
+        <div class="input-row"><label>Average original inspection price</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="rr-orig" value="2200" oninput="updateRR()"></div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Re-Test (One-Time Return)</h3>
+        <div class="slider-row">
+          <div class="slider-label"><span>% of customers who re-test</span><span id="rr-v-rpct">35%</span></div>
+          <input type="range" id="rr-s-rpct" min="0" max="100" step="5" value="35" oninput="updateRR()">
+          <div class="slider-range"><span>0%</span><span>100%</span></div>
+        </div>
+        <div class="input-row"><label>Re-test price (no CAC, lower price)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="rr-rprice" value="1200" oninput="updateRR()"></div></div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Months until re-test (avg)</span><span id="rr-v-rmo">12</span></div>
+          <input type="range" id="rr-s-rmo" min="3" max="24" step="1" value="12" oninput="updateRR()">
+          <div class="slider-range"><span>3 mo</span><span>24 mo</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Annual Subscription</h3>
+        <div class="slider-row">
+          <div class="slider-label"><span>% who subscribe annually</span><span id="rr-v-spct">20%</span></div>
+          <input type="range" id="rr-s-spct" min="0" max="80" step="5" value="20" oninput="updateRR()">
+          <div class="slider-range"><span>0%</span><span>80%</span></div>
+        </div>
+        <div class="input-row"><label>Annual subscription price ($/yr)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="rr-sprice" value="400" oninput="updateRR()"></div></div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Subscription renewal rate (yr 2+)</span><span id="rr-v-renew">70%</span></div>
+          <input type="range" id="rr-s-renew" min="20" max="95" step="5" value="70" oninput="updateRR()">
+          <div class="slider-range"><span>20%</span><span>95%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="kpi-grid" id="rr-kpis" style="grid-template-columns:repeat(3,1fr)"></div>
+      <div class="chart-panel">
+        <h3>Revenue by Type — Month 1–36 (at maturity ramp)</h3>
+        <div class="chart-wrap" style="height:260px"><canvas id="rrChart"></canvas></div>
+      </div>
+      <div class="bottom-grid">
+        <div class="panel">
+          <h3>LTV per Customer</h3>
+          <table class="pl-table" id="rr-ltv"></table>
+        </div>
+        <div class="panel">
+          <h3>Recurring Revenue at Year 3</h3>
+          <table class="pl-table" id="rr-yr3"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 5: SAFE & CAP TABLE -->
+<div id="tab5" class="tab-content">
+  <div style="max-width:900px;margin:0 auto">
+    <div class="bottom-grid" style="margin-bottom:20px">
+      <div class="panel">
+        <h3>Round 1 (Completed)</h3>
+        <div class="input-row"><label>Amount raised ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="r1-amt" value="500000" oninput="updateSAFE()"></div></div>
+        <div class="input-row"><label>Valuation cap ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="r1-cap" value="5000000" oninput="updateSAFE()"></div></div>
+        <div class="input-row"><label>Discount rate (%)</label>
+          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="r1-disc" value="0" oninput="updateSAFE()"></div></div>
+      </div>
+      <div class="panel">
+        <h3>Round 2 (Planned)</h3>
+        <div class="input-row"><label>Amount raised ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="r2-amt" value="750000" oninput="updateSAFE()"></div></div>
+        <div class="input-row"><label>Valuation cap ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="r2-cap" value="10000000" oninput="updateSAFE()"></div></div>
+        <div class="input-row"><label>Discount rate (%)</label>
+          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="r2-disc" value="0" oninput="updateSAFE()"></div></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <h3>Series A Assumptions (future round)</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div class="input-row"><label>Series A raise ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="sa-amt" value="4000000" oninput="updateSAFE()"></div></div>
+        <div class="input-row"><label>Series A pre-money valuation ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="sa-pre" value="20000000" oninput="updateSAFE()"></div></div>
+        <div class="input-row"><label>Option pool (% of post-money)</label>
+          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="sa-pool" value="10" oninput="updateSAFE()"></div></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <h3>Exit Scenarios</h3>
+      <div class="kpi-grid" id="safe-exits" style="grid-template-columns:repeat(4,1fr)"></div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="panel">
+        <h3>Cap Table at Series A</h3>
+        <table class="pl-table" id="safe-captable"></table>
+      </div>
+      <div class="panel">
+        <h3>Investor Returns at Exit</h3>
+        <div class="chart-wrap"><canvas id="safeChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── CHART INSTANCES ──────────────────────────────────────────
-let trajChart, ueChartInst, beChartInst;
+let trajChart, ueChartInst, beChartInst, rrChartInst, safeChartInst;
 
 // ─── TAB SWITCHING ────────────────────────────────────────────
 function switchTab(id, btn) {
@@ -568,6 +689,8 @@ function switchTab(id, btn) {
   if (id === 'tab1') updateAll();
   if (id === 'tab2') updateUE();
   if (id === 'tab3') updateBE();
+  if (id === 'tab4') updateRR();
+  if (id === 'tab5') updateSAFE();
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -953,6 +1076,208 @@ function updateBE() {
       scales:{
         y:{ ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{color:'#f0f0f0'} },
         x:{ title:{ display:true, text:'Number of tests completed', font:{size:10} }, ticks:{ font:{size:9}, maxTicksLimit:10 }, grid:{display:false} }
+      }
+    }
+  });
+}
+
+// ─── RECURRING REVENUE ─────────────────────────────────
+function updateRR() {
+  const newPerMo  = parseFloat(document.getElementById('rr-new').value) || 0;
+  const origPrice = parseFloat(document.getElementById('rr-orig').value) || 0;
+  const rPct      = parseFloat(document.getElementById('rr-s-rpct').value) / 100;
+  const rPrice    = parseFloat(document.getElementById('rr-rprice').value) || 0;
+  const rMonths   = parseFloat(document.getElementById('rr-s-rmo').value);
+  const sPct      = parseFloat(document.getElementById('rr-s-spct').value) / 100;
+  const sPrice    = parseFloat(document.getElementById('rr-sprice').value) || 0;
+  const renewRate = parseFloat(document.getElementById('rr-s-renew').value) / 100;
+
+  document.getElementById('rr-v-rpct').textContent = Math.round(rPct*100) + '%';
+  document.getElementById('rr-v-rmo').textContent  = rMonths;
+  document.getElementById('rr-v-spct').textContent = Math.round(sPct*100) + '%';
+  document.getElementById('rr-v-renew').textContent = Math.round(renewRate*100) + '%';
+
+  // Build 36-month model
+  const months = 36;
+  const newRev = [], reTestRev = [], subRev = [];
+  let cumCustomers = 0;
+  let subBase = 0; // active subscribers
+  const reTestQueue = {}; // month -> # customers due for retest
+
+  for (let m = 1; m <= months; m++) {
+    // New customers this month
+    const nc = newPerMo;
+    cumCustomers += nc;
+    newRev.push(nc * origPrice);
+
+    // Queue re-tests
+    const qMonth = m + rMonths;
+    if (qMonth <= months) {
+      reTestQueue[qMonth] = (reTestQueue[qMonth] || 0) + nc * rPct;
+    }
+
+    // Re-test revenue this month
+    const rt = reTestQueue[m] || 0;
+    reTestRev.push(rt * rPrice);
+
+    // Subscriptions: new subscribers from this month's new customers
+    const newSubs = nc * sPct;
+    // Existing subscribers renew (simplified: monthly renewal = annual / 12 * renewRate^(yr-1))
+    subBase = subBase * renewRate + newSubs; // decay existing + add new
+    subRev.push((subBase * sPrice) / 12);
+  }
+
+  const totalNewRev   = newRev.reduce((a,b)=>a+b,0);
+  const totalRTRev    = reTestRev.reduce((a,b)=>a+b,0);
+  const totalSubRev   = subRev.reduce((a,b)=>a+b,0);
+  const totalRev      = totalNewRev + totalRTRev + totalSubRev;
+  const recurPct      = totalRev > 0 ? (totalRTRev + totalSubRev) / totalRev : 0;
+
+  // LTV
+  const ltvBase      = origPrice;
+  const ltvReTest    = rPct * rPrice;
+  const ltvSubYr1    = sPct * sPrice;
+  const ltvSubYr2    = ltvSubYr1 * renewRate;
+  const ltvSubYr3    = ltvSubYr2 * renewRate;
+  const ltv3yr       = ltvBase + ltvReTest + ltvSubYr1 + ltvSubYr2 + ltvSubYr3;
+
+  // Year 3 monthly recurring
+  const mo36Sub = subRev[35];
+  const mo36RT  = reTestRev[35];
+
+  document.getElementById('rr-kpis').innerHTML = [
+    { label:'3-Year Revenue\n(New + Recurring)', value: fmt$(totalRev), sub:'All revenue streams' },
+    { label:'Recurring Revenue\n% at Month 36', value: (recurPct*100).toFixed(1)+'%', sub: recurPct>0.3?'✓ Meaningful recurring base':'' },
+    { label:'LTV per Customer\n(3 years)', value: fmt$(ltv3yr), sub:`vs $${origPrice.toLocaleString()} one-time` },
+  ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.label.replace('\n','<br>')}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // Chart
+  if (rrChartInst) rrChartInst.destroy();
+  const ctx4 = document.getElementById('rrChart').getContext('2d');
+  rrChartInst = new Chart(ctx4, {
+    type:'bar',
+    data:{
+      labels: Array.from({length:months},(_,i)=>`M${i+1}`),
+      datasets:[
+        { label:'New inspections', data:newRev, backgroundColor:'#2C3F16', stack:'s' },
+        { label:'Re-tests', data:reTestRev, backgroundColor:'#BDD7F0', stack:'s' },
+        { label:'Subscriptions', data:subRev, backgroundColor:'#f39c12', stack:'s' },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+      scales:{
+        y:{ stacked:true, ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{color:'#f0f0f0'} },
+        x:{ stacked:true, ticks:{ font:{size:9}, maxTicksLimit:12 }, grid:{display:false} }
+      }
+    }
+  });
+
+  document.getElementById('rr-ltv').innerHTML = `
+    <tr><td>Original inspection</td><td class="pos">${fmtFull$(ltvBase)}</td></tr>
+    <tr><td>Re-test (${Math.round(rPct*100)}% convert)</td><td>${fmtFull$(ltvReTest)}</td></tr>
+    <tr><td>Subscription Yr 1 (${Math.round(sPct*100)}% convert)</td><td>${fmtFull$(ltvSubYr1)}</td></tr>
+    <tr><td>Subscription Yr 2 (${Math.round(renewRate*100)}% renew)</td><td>${fmtFull$(ltvSubYr2)}</td></tr>
+    <tr><td>Subscription Yr 3</td><td>${fmtFull$(ltvSubYr3)}</td></tr>
+    <tr class="pl-divider pl-total"><td>3-Year LTV</td><td class="pos">${fmtFull$(ltv3yr)}</td></tr>
+    <tr><td>LTV multiplier vs one-time</td><td class="pos">${(ltv3yr/ltvBase).toFixed(2)}x</td></tr>
+  `;
+
+  document.getElementById('rr-yr3').innerHTML = `
+    <tr><td>New inspection revenue/mo (M36)</td><td class="pos">${fmtFull$(newRev[35])}</td></tr>
+    <tr><td>Re-test revenue/mo (M36)</td><td>${fmtFull$(mo36RT)}</td></tr>
+    <tr><td>Subscription revenue/mo (M36)</td><td>${fmtFull$(mo36Sub)}</td></tr>
+    <tr class="pl-divider"><td>Total monthly revenue (M36)</td><td class="pos">${fmtFull$(newRev[35]+mo36RT+mo36Sub)}</td></tr>
+    <tr><td>Annual run-rate (M36)</td><td class="pos">${fmtFull$((newRev[35]+mo36RT+mo36Sub)*12)}</td></tr>
+    <tr><td>Recurring % of revenue</td><td>${((mo36RT+mo36Sub)/(newRev[35]+mo36RT+mo36Sub)*100).toFixed(1)}%</td></tr>
+    <tr><td>Active subscribers (est.)</td><td>${Math.round(subBase).toLocaleString()}</td></tr>
+  `;
+}
+
+// ─── SAFE & CAP TABLE ─────────────────────────────────
+function updateSAFE() {
+  const r1amt  = parseFloat(document.getElementById('r1-amt').value) || 0;
+  const r1cap  = parseFloat(document.getElementById('r1-cap').value) || 1;
+  const r1disc = parseFloat(document.getElementById('r1-disc').value) / 100;
+  const r2amt  = parseFloat(document.getElementById('r2-amt').value) || 0;
+  const r2cap  = parseFloat(document.getElementById('r2-cap').value) || 1;
+  const r2disc = parseFloat(document.getElementById('r2-disc').value) / 100;
+  const saAmt  = parseFloat(document.getElementById('sa-amt').value) || 0;
+  const saPre  = parseFloat(document.getElementById('sa-pre').value) || 1;
+  const saPool = parseFloat(document.getElementById('sa-pool').value) / 100;
+
+  // Series A post-money
+  const saPost = saPre + saAmt;
+
+  // SAFE conversions: each SAFE converts at min(cap, pre-money * (1-discount))
+  const r1convPrice = Math.min(r1cap, saPre * (1 - r1disc));
+  const r2convPrice = Math.min(r2cap, saPre * (1 - r2disc));
+
+  // Ownership % from each SAFE (relative to Series A pre-money)
+  const r1pct = r1amt / r1convPrice * (r1convPrice / saPost);
+  const r2pct = r2amt / r2convPrice * (r2convPrice / saPost);
+  const saPct = saAmt / saPost;
+  const poolPct = saPool;
+  const founderPct = Math.max(0, 1 - r1pct - r2pct - saPct - poolPct);
+
+  // Cap table rows
+  const capRows = [
+    { who: 'Founder / Matt', pct: founderPct, invested: 0, cls:'pos' },
+    { who: 'SAFE Round 1 ($5M cap)', pct: r1pct, invested: r1amt, cls:'' },
+    { who: 'SAFE Round 2 ($10M cap)', pct: r2pct, invested: r2amt, cls:'' },
+    { who: 'Series A investors', pct: saPct, invested: saAmt, cls:'' },
+    { who: 'Option pool', pct: poolPct, invested: 0, cls:'' },
+  ];
+
+  document.getElementById('safe-captable').innerHTML = `
+    <tr><td><strong>Shareholder</strong></td><td style="text-align:right"><strong>Ownership</strong></td><td style="text-align:right"><strong>Invested</strong></td></tr>
+    <tr><td colspan="3"><hr class="divider" style="margin:4px 0"></td></tr>
+  ` + capRows.map(r=>`
+    <tr><td>${r.who}</td><td class="${r.cls}" style="text-align:right">${(r.pct*100).toFixed(1)}%</td><td style="text-align:right;color:var(--text-muted)">${r.invested>0?fmtFull$(r.invested):'—'}</td></tr>
+  `).join('') + `
+    <tr class="pl-divider"><td><strong>Total</strong></td><td style="text-align:right"><strong>100%</strong></td><td style="text-align:right">${fmtFull$(r1amt+r2amt+saAmt)}</td></tr>
+    <tr><td colspan="3" style="padding-top:8px;font-size:11px;color:var(--text-muted)">Post-money valuation at Series A: ${fmtFull$(saPost)}</td></tr>
+  `;
+
+  // Exit scenarios
+  const exits = [10000000, 20000000, 40000000, 80000000];
+  document.getElementById('safe-exits').innerHTML = exits.map(exit => {
+    const founderReturn = exit * founderPct;
+    const r1return = exit * r1pct;
+    const r2return = exit * r2pct;
+    const moic1 = r1amt > 0 ? (r1return / r1amt).toFixed(1) : '—';
+    const moic2 = r2amt > 0 ? (r2return / r2amt).toFixed(1) : '—';
+    return `<div class="kpi-card">
+      <div class="kpi-label">Exit at ${fmt$(exit)}</div>
+      <div class="kpi-value" style="font-size:20px">${fmt$(founderReturn)}</div>
+      <div class="kpi-sub">Founder: ${(founderPct*100).toFixed(1)}%</div>
+      <div class="kpi-sub" style="margin-top:4px">R1: ${fmt$(r1return)} (${moic1}x MOIC)</div>
+      <div class="kpi-sub">R2: ${fmt$(r2return)} (${moic2}x MOIC)</div>
+    </div>`;
+  }).join('');
+
+  // Chart: stacked bar showing ownership split at each exit
+  if (safeChartInst) safeChartInst.destroy();
+  const ctx5 = document.getElementById('safeChart').getContext('2d');
+  safeChartInst = new Chart(ctx5, {
+    type:'bar',
+    data:{
+      labels: exits.map(e => fmt$(e) + ' exit'),
+      datasets:[
+        { label:'Founder', data: exits.map(e=>e*founderPct), backgroundColor:'#2C3F16', stack:'s' },
+        { label:'SAFE R1', data: exits.map(e=>e*r1pct), backgroundColor:'#BDD7F0', stack:'s' },
+        { label:'SAFE R2', data: exits.map(e=>e*r2pct), backgroundColor:'#7ab5d8', stack:'s' },
+        { label:'Series A', data: exits.map(e=>e*saPct), backgroundColor:'#dde1d6', stack:'s' },
+        { label:'Options', data: exits.map(e=>e*poolPct), backgroundColor:'#f0f0f0', stack:'s' },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+      scales:{
+        y:{ stacked:true, ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{color:'#f0f0f0'} },
+        x:{ stacked:true, ticks:{ font:{size:11} }, grid:{display:false} }
       }
     }
   });
