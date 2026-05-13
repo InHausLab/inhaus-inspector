@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InHaus Lab / Business Economics</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --forest: #2C3F16;
+    --forest-light: #3d5520;
+    --sky: #BDD7F0;
+    --fog: #ECEFE9;
+    --fog-dark: #dde1d6;
+    --cream: #F7F5F0;
+    --text: #1a1a1a;
+    --text-muted: #666;
+    --red: #c0392b;
+    --green: #27ae60;
+    --card-bg: #ffffff;
+    --border: #dde1d6;
+  }
+
+  body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .app-header {
+    background: var(--cream);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .app-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--forest);
+    letter-spacing: -0.3px;
+  }
+  .app-header h1 span { font-weight: 600; }
+  .app-header .subtitle {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .app-header .meta { text-align: right; font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+
+  /* Tabs */
+  .tabs {
+    background: var(--cream);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    gap: 0;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 12px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab-btn:hover { color: var(--forest); }
+  .tab-btn.active { color: var(--forest); border-bottom-color: var(--forest); }
+
+  /* Layout */
+  .tab-content { display: none; padding: 24px 32px; }
+  .tab-content.active { display: block; }
+
+  .layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; }
+
+  /* Panels */
+  .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+  .panel h3 {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  /* Sliders */
+  .slider-row { margin-bottom: 18px; }
+  .slider-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .slider-label span:first-child { color: var(--text); font-weight: 400; }
+  .slider-label span:last-child { font-weight: 600; color: var(--forest); }
+  .slider-range { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--fog-dark);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--forest);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* Number inputs */
+  .input-row { margin-bottom: 14px; }
+  .input-row label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--text); }
+  .input-with-prefix { display: flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .input-with-prefix .prefix {
+    background: var(--fog);
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-right: 1px solid var(--border);
+  }
+  .input-with-prefix input {
+    border: none;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    width: 100%;
+    background: var(--card-bg);
+    outline: none;
+  }
+  .info-chip {
+    background: var(--fog);
+    border: 1px solid var(--fog-dark);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--forest);
+    margin-top: 8px;
+    display: inline-block;
+  }
+
+  /* KPI cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .kpi-card .kpi-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .kpi-card .kpi-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--forest);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .kpi-card .kpi-value.bad { color: var(--red); }
+  .kpi-card .kpi-sub { font-size: 11px; color: var(--text-muted); }
+  .kpi-card .kpi-check { color: var(--green); font-size: 11px; }
+
+  /* Chart */
+  .chart-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-panel h3 {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .chart-wrap { height: 240px; }
+
+  /* Two-col bottom */
+  .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* P&L table */
+  .pl-table { width: 100%; }
+  .pl-table tr td { font-size: 13px; padding: 5px 0; }
+  .pl-table tr td:last-child { text-align: right; font-weight: 500; }
+  .pl-table .pl-divider td { border-top: 1px solid var(--border); padding-top: 8px; font-weight: 600; }
+  .pl-table .pl-total td { font-weight: 700; font-size: 14px; }
+  .pl-table .neg { color: var(--red); }
+  .pl-table .pos { color: var(--forest); }
+
+  /* Unit Economics tab */
+  .ue-layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
+  .staff-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .staff-row input { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: 'Inter'; width: 100px; outline: none; }
+  .staff-row label { font-size: 13px; color: var(--text-muted); }
+  .add-staff-btn {
+    background: var(--fog);
+    border: 1px dashed var(--fog-dark);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--forest);
+    font-family: 'Inter';
+    margin-top: 4px;
+  }
+  .add-staff-btn:hover { background: var(--fog-dark); }
+  .rm-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--fog);
+    font-size: 14px;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-row .label { color: var(--text-muted); }
+  .metric-row .value { font-weight: 600; }
+  .metric-row.highlight { background: var(--fog); margin: 0 -20px; padding: 10px 20px; border-radius: 4px; }
+  .metric-row.highlight .value { color: var(--forest); font-size: 16px; }
+
+  /* Break-even */
+  .be-layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; }
+  .waterfall-bar-wrap { margin-top: 16px; }
+  .wf-step { margin-bottom: 10px; }
+  .wf-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .wf-bar-outer { background: var(--fog); border-radius: 3px; height: 28px; position: relative; overflow: hidden; }
+  .wf-bar-inner { height: 100%; border-radius: 3px; transition: width 0.4s; display: flex; align-items: center; padding: 0 8px; font-size: 11px; font-weight: 600; color: white; }
+  .wf-bar-inner.cost { background: var(--red); }
+  .wf-bar-inner.revenue { background: var(--forest); }
+  .wf-bar-inner.breakeven { background: #f39c12; }
+
+  .be-summary {
+    background: var(--fog);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .be-summary .be-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    font-weight: 600;
+    color: var(--forest);
+    line-height: 1;
+  }
+  .be-summary .be-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .be-chart-wrap { height: 300px; margin-top: 20px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .layout, .ue-layout, .be-layout { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .app-header, .tabs, .tab-content { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div>
+    <h1><span>InHaus Lab</span> / Business Economics</h1>
+    <div class="subtitle">Path to $10M &nbsp;·&nbsp; Capital Model &nbsp;·&nbsp; Unit Economics</div>
+  </div>
+  <div class="meta">v1.1<br>Built for Matt</div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('tab1', this)">First Look — Path to $10M</button>
+  <button class="tab-btn" onclick="switchTab('tab2', this)">Unit Economics per Truck</button>
+  <button class="tab-btn" onclick="switchTab('tab3', this)">Break-Even Waterfall</button>
+</div>
+
+<!-- TAB 1: PATH TO $10M -->
+<div id="tab1" class="tab-content active">
+  <div class="layout">
+    <!-- Left controls -->
+    <div>
+      <div class="panel">
+        <h3>Operating Assumptions</h3>
+        <div class="slider-row">
+          <div class="slider-label"><span>Tests per truck per day</span><span id="v-tpd">1.50</span></div>
+          <input type="range" id="s-tpd" min="0.5" max="4" step="0.25" value="1.5" oninput="updateAll()">
+          <div class="slider-range"><span>0.50</span><span>4.00</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Revenue per test</span><span id="v-rpt">$1,500</span></div>
+          <input type="range" id="s-rpt" min="1000" max="3000" step="50" value="1500" oninput="updateAll()">
+          <div class="slider-range"><span>$1,000</span><span>$3,000</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Working days per month</span><span id="v-wdm">22</span></div>
+          <input type="range" id="s-wdm" min="15" max="26" step="1" value="22" oninput="updateAll()">
+          <div class="slider-range"><span>15</span><span>26</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Ramp-up per market (months)</span><span id="v-ramp">6</span></div>
+          <input type="range" id="s-ramp" min="1" max="12" step="1" value="6" oninput="updateAll()">
+          <div class="slider-range"><span>1</span><span>12</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Network Buildout</h3>
+        <div class="slider-row">
+          <div class="slider-label"><span>Number of markets</span><span id="v-nmkt">4</span></div>
+          <input type="range" id="s-nmkt" min="1" max="10" step="1" value="4" oninput="updateAll()">
+          <div class="slider-range"><span>1</span><span>10</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Trucks per market at maturity</span><span id="v-tpm">4</span></div>
+          <input type="range" id="s-tpm" min="1" max="10" step="1" value="4" oninput="updateAll()">
+          <div class="slider-range"><span>1</span><span>10</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Months between market launches</span><span id="v-mbl">3</span></div>
+          <input type="range" id="s-mbl" min="1" max="12" step="1" value="3" oninput="updateAll()">
+          <div class="slider-range"><span>1</span><span>12</span></div>
+        </div>
+        <div id="network-chip" class="info-chip"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Overhead &amp; CAPEX</h3>
+        <div class="input-row">
+          <label>Market GM salary (fully loaded, $/yr)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="i-gm" value="120000" oninput="updateAll()"></div>
+        </div>
+        <div class="input-row">
+          <label>Corporate G&amp;A ($/yr)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="i-ga" value="1200000" oninput="updateAll()"></div>
+        </div>
+        <div class="input-row">
+          <label>Marketing (% of revenue)</label>
+          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="i-mkt" value="5" step="0.5" oninput="updateAll()"></div>
+        </div>
+        <div class="input-row">
+          <label>Truck-level COGS % of revenue</label>
+          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="i-cogs" value="23" step="1" oninput="updateAll()"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right output -->
+    <div>
+      <div class="kpi-grid" id="kpi-grid">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="chart-panel">
+        <h3>Trajectory — Monthly Revenue, EBITDA, &amp; Cumulative Cash</h3>
+        <div class="chart-wrap"><canvas id="trajectoryChart"></canvas></div>
+      </div>
+
+      <div class="bottom-grid">
+        <div class="panel">
+          <h3>Annual P&amp;L at Mature Run-Rate</h3>
+          <table class="pl-table" id="pl-table"></table>
+        </div>
+        <div class="panel">
+          <h3>What It Takes to Hit $10M</h3>
+          <table class="pl-table" id="hit-table"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: UNIT ECONOMICS -->
+<div id="tab2" class="tab-content">
+  <div class="ue-layout">
+    <div>
+      <div class="panel">
+        <h3>Truck Configuration</h3>
+        <div class="slider-row">
+          <div class="slider-label"><span>Tests per truck per day</span><span id="ue-v-tpd">1.5</span></div>
+          <input type="range" id="ue-s-tpd" min="0.5" max="4" step="0.25" value="1.5" oninput="updateUE()">
+          <div class="slider-range"><span>0.50</span><span>4.00</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Revenue per test</span><span id="ue-v-rpt">$2,200</span></div>
+          <input type="range" id="ue-s-rpt" min="1000" max="3000" step="50" value="2200" oninput="updateUE()">
+          <div class="slider-range"><span>$1,000</span><span>$3,000</span></div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Working days per month</span><span id="ue-v-wdm">22</span></div>
+          <input type="range" id="ue-s-wdm" min="15" max="26" step="1" value="22" oninput="updateUE()">
+          <div class="slider-range"><span>15</span><span>26</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Staff (per truck)</h3>
+        <div id="staff-list">
+          <div class="staff-row" data-idx="0">
+            <input type="number" placeholder="$/hr" value="75" oninput="updateUE()" class="staff-rate">
+            <input type="number" placeholder="hrs/test" value="4" oninput="updateUE()" class="staff-hrs" style="width:80px">
+            <label>Inspector</label>
+            <button class="rm-btn" onclick="removeStaff(this)" style="display:none">×</button>
+          </div>
+        </div>
+        <button class="add-staff-btn" onclick="addStaff()">+ Add staff member</button>
+      </div>
+
+      <div class="panel">
+        <h3>Fixed Costs per Truck / Month</h3>
+        <div class="input-row">
+          <label>Truck lease ($/mo)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="ue-lease" value="1200" oninput="updateUE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Equipment amortization ($/mo)<br><small style="color:var(--text-muted)">$40K ÷ 60 months = $667</small></label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="ue-equip" value="667" oninput="updateUE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Miles driven per working day</label>
+          <div class="input-with-prefix"><span class="prefix">mi</span><input type="number" id="ue-miles" value="50" oninput="updateUE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Fuel cost per mile</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="ue-fuelpm" value="0.20" step="0.01" oninput="updateUE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Lab / consumables per test</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="ue-labs" value="430" oninput="updateUE()"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel" id="ue-results">
+        <h3>Unit Economics — Per Truck</h3>
+        <!-- populated by JS -->
+      </div>
+      <div class="chart-panel">
+        <h3>Monthly Revenue vs. Costs Breakdown</h3>
+        <div class="chart-wrap"><canvas id="ueChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 3: BREAK-EVEN WATERFALL -->
+<div id="tab3" class="tab-content">
+  <div class="be-layout">
+    <div>
+      <div class="panel">
+        <h3>Upfront Investment per Truck</h3>
+        <div class="input-row">
+          <label>Truck purchase price ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="be-truck" value="100000" oninput="updateBE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Testing equipment ($)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="be-equip" value="40000" oninput="updateBE()"></div>
+        </div>
+        <hr class="divider">
+        <h3>Per-Test Economics</h3>
+        <div class="slider-row">
+          <div class="slider-label"><span>Revenue per test</span><span id="be-v-rpt">$2,200</span></div>
+          <input type="range" id="be-s-rpt" min="1000" max="3000" step="50" value="2200" oninput="updateBE()">
+          <div class="slider-range"><span>$1,000</span><span>$3,000</span></div>
+        </div>
+        <div class="input-row">
+          <label>Labor per test (only paid when testing)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="be-labor" value="300" oninput="updateBE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Lab / consumables per test</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="be-labs" value="430" oninput="updateBE()"></div>
+        </div>
+        <div class="input-row">
+          <label>Fuel per test (est.)</label>
+          <div class="input-with-prefix"><span class="prefix">$</span><input type="number" id="be-fuel" value="10" oninput="updateBE()"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="be-summary">
+          <div class="be-num" id="be-tests">0</div>
+          <div class="be-label">tests to break even</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:8px" id="be-months"></div>
+        </div>
+
+        <div style="margin-top: 24px">
+          <h3>Break-Even Waterfall</h3>
+          <div class="waterfall-bar-wrap" id="be-waterfall"></div>
+        </div>
+
+        <hr class="divider">
+        <h3>Contribution Margin per Test</h3>
+        <table class="pl-table" id="be-cm-table" style="margin-top: 8px"></table>
+      </div>
+
+      <div class="chart-panel" style="margin-top:0">
+        <h3>Cumulative Cash Position (first 100 tests)</h3>
+        <div class="be-chart-wrap"><canvas id="beChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CHART INSTANCES ──────────────────────────────────────────
+let trajChart, ueChartInst, beChartInst;
+
+// ─── TAB SWITCHING ────────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'tab1') updateAll();
+  if (id === 'tab2') updateUE();
+  if (id === 'tab3') updateBE();
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────
+function fmt$(n, decimals=0) {
+  if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+  return '$' + n.toFixed(decimals);
+}
+function fmtFull$(n) {
+  return '$' + Math.round(n).toLocaleString();
+}
+function neg$(n) { return n < 0 ? '(' + fmt$(Math.abs(n)) + ')' : fmt$(n); }
+
+// ─── TAB 1: PATH TO $10M ─────────────────────────────────────
+function updateAll() {
+  const tpd  = parseFloat(document.getElementById('s-tpd').value);
+  const rpt  = parseFloat(document.getElementById('s-rpt').value);
+  const wdm  = parseFloat(document.getElementById('s-wdm').value);
+  const ramp = parseFloat(document.getElementById('s-ramp').value);
+  const nmkt = parseInt(document.getElementById('s-nmkt').value);
+  const tpm  = parseInt(document.getElementById('s-tpm').value);
+  const mbl  = parseInt(document.getElementById('s-mbl').value);
+  const gmSal = parseFloat(document.getElementById('i-gm').value) || 0;
+  const gaAnn = parseFloat(document.getElementById('i-ga').value) || 0;
+  const mktPct = parseFloat(document.getElementById('i-mkt').value) / 100 || 0;
+  const cogsPct = parseFloat(document.getElementById('i-cogs').value) / 100 || 0;
+
+  // Update display values
+  document.getElementById('v-tpd').textContent = tpd.toFixed(2);
+  document.getElementById('v-rpt').textContent = '$' + rpt.toLocaleString();
+  document.getElementById('v-wdm').textContent = wdm;
+  document.getElementById('v-ramp').textContent = ramp;
+  document.getElementById('v-nmkt').textContent = nmkt;
+  document.getElementById('v-tpm').textContent = tpm;
+  document.getElementById('v-mbl').textContent = mbl;
+
+  const totalTrucks = nmkt * tpm;
+  document.getElementById('network-chip').textContent = `Network at maturity: ${totalTrucks} trucks across ${nmkt} markets`;
+
+  // Per-truck monthly revenue
+  const testsPerMonth = tpd * wdm;
+  const revenuePerTruckMo = testsPerMonth * rpt;
+  const revenuePerTruckAnn = revenuePerTruckMo * 12;
+
+  // Mature annual
+  const matureRevAnn = revenuePerTruckAnn * totalTrucks;
+  const cogsTotal = matureRevAnn * cogsPct;
+  const truckOpIncome = matureRevAnn - cogsTotal; // simplified
+  const gmTotal = gmSal * nmkt;
+  const mktTotal = matureRevAnn * mktPct;
+  const opIncome = matureRevAnn - cogsTotal - gmTotal - mktTotal - gaAnn;
+  const equipAmort = (40000 / 60) * totalTrucks * 12;
+  const ebitda = opIncome + equipAmort;
+  const ebitdaMargin = matureRevAnn > 0 ? ebitda / matureRevAnn : 0;
+
+  // Capital required (simplified: truck + equip per truck, offset by cash flow)
+  const capexPerTruck = 140000;
+  const truckCapex = totalTrucks * capexPerTruck;
+  // Peak burn approximation
+  const monthlyBurn = (gaAnn + gmTotal) / 12;
+  const peakBurn = monthlyBurn * ramp + capexPerTruck * Math.min(tpm, 3);
+
+  // Months to $10M run-rate
+  let months10M = '60+';
+  const months = Array.from({length:60},(_,i)=>i+1);
+  const monthRevArr = [], monthEbitdaArr = [], cumCashArr = [];
+  let cumCash = 0;
+  let monthOp = -1;
+  let month10M = 999;
+
+  for (let m = 1; m <= 60; m++) {
+    // How many trucks are active this month
+    let activeTrucks = 0;
+    for (let mkt = 0; mkt < nmkt; mkt++) {
+      const launchMonth = mkt * mbl + 1;
+      if (m >= launchMonth) {
+        const elapsed = m - launchMonth;
+        const rampFrac = Math.min(elapsed / ramp, 1);
+        activeTrucks += tpm * rampFrac;
+      }
+    }
+    const mRev = activeTrucks * revenuePerTruckMo;
+    const mCogs = mRev * cogsPct;
+    const mGM = gmSal / 12 * Math.min(Math.floor((m-1) / mbl) + 1, nmkt);
+    const mMkt = mRev * mktPct;
+    const mGA = gaAnn / 12;
+    const mOpIncome = mRev - mCogs - mGM - mMkt - mGA;
+    const annRunRate = mRev * 12;
+
+    if (annRunRate >= 10000000 && month10M === 999) month10M = m;
+    if (mOpIncome > 0 && monthOp === -1) monthOp = m;
+
+    // Capex: buy trucks as markets launch
+    let mCapex = 0;
+    for (let mkt = 0; mkt < nmkt; mkt++) {
+      if (m === mkt * mbl + 1) mCapex += tpm * capexPerTruck;
+    }
+    cumCash += mOpIncome - mCapex;
+    monthRevArr.push(mRev);
+    monthEbitdaArr.push(mOpIncome + (equipAmort/(12)));
+    cumCashArr.push(cumCash);
+  }
+  if (month10M < 999) months10M = month10M;
+
+  // KPIs
+  const kpiData = [
+    { label: 'Network Revenue\n(Annual, Mature)', value: fmt$(matureRevAnn), sub: `${(matureRevAnn/10000000*100).toFixed(0)}% of $10M target`, cls: matureRevAnn >= 10000000 ? '' : '' },
+    { label: 'EBITDA (Annual)', value: fmt$(ebitda), sub: `Op income: ${fmt$(opIncome)}`, cls: ebitda < 0 ? 'bad' : '' },
+    { label: 'EBITDA Margin', value: (ebitdaMargin*100).toFixed(1)+'%', sub: ebitdaMargin >= 0.15 ? '✓ At/above 15% target' : '✗ Below 15% target', cls: ebitdaMargin >= 0.15 ? '' : 'bad' },
+    { label: 'Capital Required', value: fmt$(peakBurn), sub: `Peak burn ~month ${ramp}`, cls: 'bad' },
+    { label: 'Total Trucks', value: totalTrucks, sub: `${Math.ceil(10000000/revenuePerTruckAnn)} trucks needed for $10M` },
+    { label: 'Revenue per Truck\n(Annual)', value: fmt$(revenuePerTruckAnn), sub: `${Math.round(testsPerMonth)} tests/mo` },
+    { label: 'Months to $10M\nRun-Rate', value: months10M === 999 ? '60+' : months10M, sub: months10M === 999 ? 'Not reached in 60mo' : `Month ${months10M}` },
+    { label: 'Months to Op\nProfitability', value: monthOp === -1 ? 'N/A' : monthOp, sub: monthOp === -1 ? 'Not reached' : `Cash-flow positive: M${monthOp}` },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpiData.map(k => `
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label.replace('\n','<br>')}</div>
+      <div class="kpi-value ${k.cls||''}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+
+  // Trajectory chart
+  const labels = months.map(m => `M${m}`);
+  if (trajChart) trajChart.destroy();
+  const ctx = document.getElementById('trajectoryChart').getContext('2d');
+  trajChart = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'Monthly revenue', data: monthRevArr, backgroundColor:'#2C3F16', yAxisID:'y1' },
+        { type:'line', label:'Monthly EBITDA', data: monthEbitdaArr, borderColor:'#1a1a1a', borderWidth:2, pointRadius:0, yAxisID:'y1', tension:0.3 },
+        { type:'line', label:'Cumulative cash', data: cumCashArr, borderColor:'#c0392b', borderWidth:1.5, borderDash:[4,3], pointRadius:0, yAxisID:'y2', tension:0.3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+      scales:{
+        y1:{ position:'left', ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{color:'#f0f0f0'} },
+        y2:{ position:'right', ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{display:false} },
+        x:{ ticks:{ font:{size:9}, maxTicksLimit:15 }, grid:{display:false} }
+      }
+    }
+  });
+
+  // P&L table
+  const plRows = [
+    ['Revenue', fmtFull$(matureRevAnn), 'pos'],
+    ['Truck operating income (all trucks)', fmtFull$(truckOpIncome), 'pos'],
+    ['Market overhead (GMs)', '(' + fmtFull$(gmTotal) + ')', 'neg'],
+    ['Marketing', '(' + fmtFull$(mktTotal) + ')', 'neg'],
+    ['Corporate G&A', '(' + fmtFull$(gaAnn) + ')', 'neg'],
+  ];
+  document.getElementById('pl-table').innerHTML = plRows.map(r=>`
+    <tr><td>${r[0]}</td><td class="${r[2]}">${r[1]}</td></tr>
+  `).join('') + `
+    <tr class="pl-divider"><td>Operating income</td><td class="${opIncome<0?'neg':'pos'}">${fmtFull$(opIncome)}</td></tr>
+    <tr><td>+ Equipment amortization (D&A addback)</td><td class="pos">${fmtFull$(equipAmort)}</td></tr>
+    <tr class="pl-total"><td>EBITDA</td><td class="${ebitda<0?'neg':'pos'}">${fmtFull$(ebitda)}</td></tr>
+  `;
+
+  // Hit $10M table
+  const trucksFor10M = Math.ceil(10000000 / revenuePerTruckAnn);
+  const mktsFor10M = Math.ceil(trucksFor10M / tpm);
+  const capexFor10M = trucksFor10M * capexPerTruck;
+  document.getElementById('hit-table').innerHTML = `
+    <tr><td>Revenue per truck (annual)</td><td>${fmtFull$(revenuePerTruckAnn)}</td></tr>
+    <tr><td>Trucks required</td><td>${trucksFor10M}</td></tr>
+    <tr><td>Markets required (at current density)</td><td>${mktsFor10M}</td></tr>
+    <tr><td>Capex per truck (truck + equip)</td><td>${fmtFull$(capexPerTruck)}</td></tr>
+    <tr class="pl-divider"><td>Total capex (all trucks)</td><td>${fmtFull$(capexFor10M)}</td></tr>
+    <tr><td>Peak operating burn (cumulative)</td><td>${fmtFull$(Math.min(0, Math.min(...cumCashArr)))}</td></tr>
+    <tr class="pl-total"><td>Total capital required</td><td class="bad">${fmtFull$(Math.abs(Math.min(0, Math.min(...cumCashArr))) + capexFor10M)}</td></tr>
+  `;
+}
+
+// ─── TAB 2: UNIT ECONOMICS ────────────────────────────────────
+function addStaff() {
+  const list = document.getElementById('staff-list');
+  const idx = list.children.length;
+  const row = document.createElement('div');
+  row.className = 'staff-row';
+  row.dataset.idx = idx;
+  row.innerHTML = `
+    <input type="number" placeholder="$/hr" value="65" oninput="updateUE()" class="staff-rate">
+    <input type="number" placeholder="hrs/test" value="2" oninput="updateUE()" class="staff-hrs" style="width:80px">
+    <label>Staff ${idx+1}</label>
+    <button class="rm-btn" onclick="removeStaff(this)">×</button>
+  `;
+  list.appendChild(row);
+  updateRmBtns();
+  updateUE();
+}
+
+function removeStaff(btn) {
+  btn.closest('.staff-row').remove();
+  updateRmBtns();
+  updateUE();
+}
+
+function updateRmBtns() {
+  const rows = document.querySelectorAll('#staff-list .staff-row');
+  rows.forEach((r,i) => {
+    r.querySelector('.rm-btn').style.display = rows.length > 1 ? 'block' : 'none';
+  });
+}
+
+function updateUE() {
+  const tpd  = parseFloat(document.getElementById('ue-s-tpd').value);
+  const rpt  = parseFloat(document.getElementById('ue-s-rpt').value);
+  const wdm  = parseFloat(document.getElementById('ue-s-wdm').value);
+  const lease = parseFloat(document.getElementById('ue-lease').value) || 0;
+  const equip = parseFloat(document.getElementById('ue-equip').value) || 0;
+  const miles = parseFloat(document.getElementById('ue-miles').value) || 0;
+  const fuelpm = parseFloat(document.getElementById('ue-fuelpm').value) || 0;
+  const labsPerTest = parseFloat(document.getElementById('ue-labs').value) || 0;
+
+  document.getElementById('ue-v-tpd').textContent = tpd.toFixed(2);
+  document.getElementById('ue-v-rpt').textContent = '$' + rpt.toLocaleString();
+  document.getElementById('ue-v-wdm').textContent = wdm;
+
+  const testsPerMonth = tpd * wdm;
+  const grossRevMo = testsPerMonth * rpt;
+  const grossRevWk = grossRevMo / (wdm/5);
+
+  // Labor costs
+  let laborPerTest = 0;
+  document.querySelectorAll('#staff-list .staff-row').forEach(row => {
+    const rate = parseFloat(row.querySelector('.staff-rate').value) || 0;
+    const hrs  = parseFloat(row.querySelector('.staff-hrs').value) || 0;
+    laborPerTest += rate * hrs;
+  });
+  const laborMo = laborPerTest * testsPerMonth;
+
+  // Fuel
+  const fuelMo = miles * fuelpm * wdm;
+  const labsMo = labsPerTest * testsPerMonth;
+
+  // Fixed
+  const fixedMo = lease + equip;
+
+  // Totals
+  const totalCostMo = laborMo + fuelMo + labsMo + fixedMo;
+  const netOpMo = grossRevMo - totalCostMo;
+  const netOpWk = netOpMo / (wdm/5);
+  const grossMarginPct = grossRevMo > 0 ? (netOpMo / grossRevMo) * 100 : 0;
+
+  const rows = [
+    { label:'Tests per month', value: testsPerMonth.toFixed(1) },
+    { label:'Gross revenue / month', value: fmtFull$(grossRevMo), cls:'pos' },
+    { label:'Gross revenue / week', value: fmtFull$(grossRevWk) },
+    null,
+    { label:'Labor (all staff)', value: '(' + fmtFull$(laborMo) + ')', cls:'neg' },
+    { label:'Lab & consumables', value: '(' + fmtFull$(labsMo) + ')', cls:'neg' },
+    { label:'Fuel', value: '(' + fmtFull$(fuelMo) + ')', cls:'neg' },
+    { label:'Truck lease', value: '(' + fmtFull$(lease) + ')', cls:'neg' },
+    { label:'Equipment amortization', value: '(' + fmtFull$(equip) + ')', cls:'neg' },
+    null,
+    { label:'Net operating income / month', value: fmtFull$(netOpMo), cls: netOpMo>=0?'pos':'neg', highlight:true },
+    { label:'Net operating income / week', value: fmtFull$(netOpWk), cls: netOpWk>=0?'pos':'neg' },
+    { label:'Net operating margin', value: grossMarginPct.toFixed(1) + '%', cls: grossMarginPct>=15?'pos':'neg' },
+    { label:'Contribution margin per test', value: fmtFull$(rpt - laborPerTest - labsPerTest - (fuelMo/testsPerMonth)), cls:'pos' },
+  ];
+
+  document.getElementById('ue-results').innerHTML = `<h3>Unit Economics — Per Truck</h3>` +
+    rows.map(r => r === null ? '<hr class="divider">' :
+      `<div class="metric-row ${r.highlight?'highlight':''}">
+        <span class="label">${r.label}</span>
+        <span class="value ${r.cls||''}">${r.value}</span>
+      </div>`
+    ).join('');
+
+  // Chart
+  if (ueChartInst) ueChartInst.destroy();
+  const ctx2 = document.getElementById('ueChart').getContext('2d');
+  ueChartInst = new Chart(ctx2, {
+    type:'bar',
+    data:{
+      labels:['Monthly Revenue','Labor','Labs','Fuel','Fixed','Net Income'],
+      datasets:[{
+        data:[grossRevMo, laborMo, labsMo, fuelMo, fixedMo, Math.max(0, netOpMo)],
+        backgroundColor:['#2C3F16','#c0392b','#e74c3c','#e67e22','#bdc3c7','#27ae60'],
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        y:{ ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{color:'#f0f0f0'} },
+        x:{ ticks:{ font:{size:10} }, grid:{display:false} }
+      }
+    }
+  });
+}
+
+// ─── TAB 3: BREAK-EVEN ───────────────────────────────────────
+function updateBE() {
+  const truckCost = parseFloat(document.getElementById('be-truck').value) || 0;
+  const equipCost = parseFloat(document.getElementById('be-equip').value) || 0;
+  const rpt  = parseFloat(document.getElementById('be-s-rpt').value);
+  const labor = parseFloat(document.getElementById('be-labor').value) || 0;
+  const labs  = parseFloat(document.getElementById('be-labs').value) || 0;
+  const fuel  = parseFloat(document.getElementById('be-fuel').value) || 0;
+
+  document.getElementById('be-v-rpt').textContent = '$' + rpt.toLocaleString();
+
+  const totalFixed = truckCost + equipCost;
+  const varCostPerTest = labor + labs + fuel;
+  const contribPerTest = rpt - varCostPerTest;
+  const beTests = contribPerTest > 0 ? Math.ceil(totalFixed / contribPerTest) : Infinity;
+  const beMonths = (beTests / (1.5 * 22)).toFixed(1); // assuming 1.5 tests/day, 22 days
+
+  document.getElementById('be-tests').textContent = beTests === Infinity ? '∞' : beTests.toLocaleString();
+  document.getElementById('be-months').textContent = beTests === Infinity ? 'Contribution margin is negative' :
+    `≈ ${beMonths} months at 1.5 tests/day`;
+
+  // Waterfall bars
+  const maxW = totalFixed;
+  const wfItems = [
+    { label: 'Truck cost', amount: truckCost, type: 'cost' },
+    { label: 'Equipment cost', amount: equipCost, type: 'cost' },
+    { label: `Revenue (${Math.ceil(beTests/2)} tests)`, amount: contribPerTest * Math.ceil(beTests/2), type: 'revenue' },
+    { label: `Revenue (${beTests} tests — BREAK-EVEN)`, amount: totalFixed, type: 'breakeven' },
+  ];
+
+  document.getElementById('be-waterfall').innerHTML = wfItems.map(w => {
+    const pct = Math.min((w.amount / (totalFixed * 1.1)) * 100, 100);
+    return `<div class="wf-step">
+      <div class="wf-label"><span>${w.label}</span><span>${fmtFull$(w.amount)}</span></div>
+      <div class="wf-bar-outer"><div class="wf-bar-inner ${w.type}" style="width:${pct}%">${pct > 20 ? fmtFull$(w.amount) : ''}</div></div>
+    </div>`;
+  }).join('');
+
+  // CM table
+  document.getElementById('be-cm-table').innerHTML = `
+    <tr><td>Revenue per test</td><td class="pos">${fmtFull$(rpt)}</td></tr>
+    <tr><td>Labor per test</td><td class="neg">(${fmtFull$(labor)})</td></tr>
+    <tr><td>Lab & consumables per test</td><td class="neg">(${fmtFull$(labs)})</td></tr>
+    <tr><td>Fuel per test</td><td class="neg">(${fmtFull$(fuel)})</td></tr>
+    <tr class="pl-divider"><td>Contribution margin per test</td><td class="${contribPerTest>=0?'pos':'neg'}">${fmtFull$(contribPerTest)}</td></tr>
+    <tr><td>Contribution margin %</td><td class="${contribPerTest>=0?'pos':'neg'}">${rpt>0?(contribPerTest/rpt*100).toFixed(1)+'%':'—'}</td></tr>
+    <tr class="pl-divider"><td>Total upfront investment</td><td class="neg">(${fmtFull$(totalFixed)})</td></tr>
+    <tr class="pl-total"><td>Break-even tests</td><td>${beTests === Infinity ? '∞' : beTests.toLocaleString()}</td></tr>
+  `;
+
+  // Cash position chart
+  const pts = Math.min(beTests * 2, 200);
+  const cashData = Array.from({length: pts+1}, (_,i) => -totalFixed + (contribPerTest * i));
+  const testLabels = Array.from({length: pts+1}, (_,i) => i);
+
+  if (beChartInst) beChartInst.destroy();
+  const ctx3 = document.getElementById('beChart').getContext('2d');
+  beChartInst = new Chart(ctx3, {
+    type:'line',
+    data:{
+      labels: testLabels,
+      datasets:[{
+        label:'Cumulative cash',
+        data: cashData,
+        borderColor:'#2C3F16',
+        backgroundColor: function(ctx) {
+          const chart = ctx.chart;
+          const {ctx: c, chartArea} = chart;
+          if (!chartArea) return '#2C3F16';
+          const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(44,63,22,0.15)');
+          gradient.addColorStop(1, 'rgba(44,63,22,0)');
+          return gradient;
+        },
+        fill: true,
+        borderWidth:2, pointRadius:0, tension:0.1
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        annotation: {}
+      },
+      scales:{
+        y:{ ticks:{ callback:v=>fmt$(v), font:{size:10} }, grid:{color:'#f0f0f0'} },
+        x:{ title:{ display:true, text:'Number of tests completed', font:{size:10} }, ticks:{ font:{size:9}, maxTicksLimit:10 }, grid:{display:false} }
+      }
+    }
+  });
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+updateAll();
+updateUE();
+updateBE();
+</script>
+</body>
+</html>
