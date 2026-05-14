@@ -42,6 +42,8 @@
   function flirFields() {
     return [
       collapsible('FLIR Thermal Scan', [
+      link('📲 Open Meterlink app', 'meterlink://'),
+      link('🌡 Get FLIR photos via Meterlink', 'https://www.flir.com/products/meterlink/'),
       checklist('flirGuidance', null, [
         { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
         { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
@@ -100,6 +102,8 @@
   function breezeFields(timerKey) {
     return [
       heading('Breeze ET Mold Test'),
+      link('📋 Open Priority Lab app', 'https://app.prioritylaboratory.com'),
+      link('🔬 Priority Lab order portal', 'https://prioritylaboratory.com/inhaus'),
       yesno('breezeDone', 'Breeze ET test performed'),
       showIf(timer(timerKey || 'breezeTimer', 'Breeze ET Timer (10 min)', 600), 'breezeDone', 'Yes')
     ];
@@ -297,6 +301,7 @@
         { key: 'tripodHeight', label: 'Set to full tripod height (60\u2033)' }
       ]),
       timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600),
+      photo('Outdoor Spore Trap Setup', '_outdoorSporePhotos'),
       divider(),
       heading('Q-Trak Outdoor Measurement'),
       check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
@@ -1535,6 +1540,30 @@
       }
     }, '\uD83D\uDCCD');
     c.appendChild(roomNavFab);
+
+    // Spare photos FAB
+    const spareFab = el('button', {
+      type: 'button',
+      style: 'position:fixed;bottom:160px;right:16px;width:48px;height:48px;background:#f59e0b;color:#fff;border:none;border-radius:50%;font-size:1.3rem;cursor:pointer;z-index:95;box-shadow:0 4px 14px rgba(0,0,0,0.25);touch-action:manipulation;display:flex;align-items:center;justify-content:center;',
+      'aria-label': 'Add spare photo',
+      onClick: () => {
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+        inp.onchange = async e => {
+          if (!e.target.files[0]) return;
+          try {
+            const dataUrl = await UI.compressImage ? UI.compressImage(e.target.files[0]) : new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
+            if (!inspection.sparePhotos) inspection.sparePhotos = [];
+            const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name) };
+            inspection.sparePhotos.push(sp);
+            saveNow();
+            showToast('📸 Spare photo saved — sort it later in Review');
+          } catch(err) { console.error(err); }
+        };
+        document.body.appendChild(inp); inp.click(); setTimeout(() => inp.remove(), 2000);
+      }
+    }, '📸');
+    c.appendChild(spareFab);
 
     c.appendChild(el('h1', { className: 'screen-title' }, step.name));
 

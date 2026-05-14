@@ -523,10 +523,12 @@
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
 
         const capRow = el('div', { className: 'input-row' });
-        const capInp = el('input', {
-          className: 'field-input photo-caption-input', type: 'text',
-          value: p.caption || '', placeholder: 'Add caption...'
+        const capInp = el('textarea', {
+          className: 'field-input photo-caption-input', rows: '2',
+          placeholder: 'Add caption...'
         });
+        capInp.value = p.caption || '';
+        capInp.style.cssText = 'resize:none;min-height:54px;font-size:0.9rem;line-height:1.4;padding:8px;';
         capInp.addEventListener('input', () => { p.caption = capInp.value; onUpdate(); });
         capRow.appendChild(capInp);
         const m = micBtn(txt => { capInp.value = (capInp.value ? capInp.value + ' ' : '') + txt; p.caption = capInp.value; onUpdate(); });
@@ -575,7 +577,7 @@
       }
     }
 
-    const fileInp = el('input', { type: 'file', accept: 'image/*', capture: 'environment', multiple: 'true', className: 'hidden' });
+    const fileInp = el('input', { type: 'file', accept: 'image/*', capture: 'environment', className: 'hidden' });
     fileInp.addEventListener('change', async e => { await handleFiles(e.target.files); });
 
     const libInp = el('input', { type: 'file', accept: 'image/*', multiple: 'true', className: 'hidden' });
