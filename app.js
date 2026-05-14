@@ -373,8 +373,8 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...bathroomLeakFields().map(f => showIf(f, 'roomType', 'Bathroom')),
-      ...followUpFields(),
-      ...observationFields()
+      ...observationFields(),
+      ...followUpFields()
     ];
   }
 
@@ -460,8 +460,8 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       divider(),
-      ...followUpFields(),
-      ...observationFields()
+      ...observationFields(),
+      ...followUpFields()
     ];
   }
 
@@ -472,8 +472,8 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...bathroomCheckFields(),
-      ...followUpFields(),
-      ...observationFields()
+      ...observationFields(),
+      ...followUpFields()
     ];
   }
 
@@ -1456,9 +1456,7 @@
       data.radonPickupTime = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 
-    if ((step.type === 'room-test' || step.type === 'bedroom' || step.type === 'bathroom' || step.type === 'additional-room') && !data.roomName) {
-      data.roomName = step.name;
-    }
+    // Room name left blank intentionally — Dave types the actual room name
 
     inspection._lastStepIdx = currentStepIdx;
     if (inspection._furthestStepIdx === undefined || currentStepIdx > inspection._furthestStepIdx) {

@@ -44,10 +44,10 @@ body {
 }
 .save-status { font-style: italic; font-weight: 600; }
 .online-badge {
-  padding: 3px 12px; border-radius: 12px; font-weight: 700; font-size: 0.7rem;
+  padding: 2px 8px; border-radius: 8px; font-weight: 600; font-size: 0.65rem;
 }
-.online-badge.online { background: var(--accent-light); color: var(--primary); }
-.online-badge.offline { background: var(--warning-light); color: #92400e; }
+.online-badge.online { background: transparent; color: rgba(255,255,255,0.5); }
+.online-badge.offline { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); font-size: 0.65rem; }
 
 /* ── Screens ─────────────────────────────── */
 .screen {
@@ -60,7 +60,7 @@ body {
 .app-header {
   text-align: center; padding: 0;
   background: var(--primary); border-radius: 0 0 20px 20px;
-  margin: 0 -16px 20px; padding: 36px 20px 28px;
+  margin: 0 -16px 16px; padding: 20px 20px 16px;
 }
 .app-logo {
   display: block; text-align: center; margin-bottom: 8px;
