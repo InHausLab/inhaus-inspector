@@ -1992,6 +1992,32 @@
       allInspBtn
     ]));
 
+
+    // Spare Photos section in Review
+    if (inspection.sparePhotos && inspection.sparePhotos.length) {
+      const spHead = document.createElement('div');
+      spHead.style = 'background:#fff8e1;border-left:4px solid #f59e0b;padding:12px 16px;margin:16px 0 8px;border-radius:4px;';
+      spHead.innerHTML = '<span style="font-weight:800;color:#92400e;">📸 Spare Photos (' + inspection.sparePhotos.length + ')</span><span style="font-size:11px;color:#64748b;margin-left:8px;">Add captions to assign them</span>';
+      c.appendChild(spHead);
+      inspection.sparePhotos.forEach((sp, i) => {
+        const spCard = document.createElement('div');
+        spCard.className = 'photo-card';
+        spCard.style = 'margin-bottom:10px;';
+        const spImg = document.createElement('img');
+        spImg.src = sp.dataUrl; spImg.className = 'photo-img'; spImg.alt = 'Spare ' + (i+1);
+        const spMeta = document.createElement('div');
+        spMeta.style = 'padding:4px 10px;font-size:11px;color:#64748b;';
+        spMeta.textContent = 'Captured during: ' + (sp.roomName || sp.stepName || 'inspection') + ' • ' + new Date(sp.timestamp).toLocaleTimeString();
+        const spCap = document.createElement('input');
+        spCap.type = 'text'; spCap.placeholder = 'Caption or room assignment...';
+        spCap.value = sp.caption || '';
+        spCap.style = 'width:100%;border:none;border-top:1px solid #e5e7eb;padding:10px;font-size:13px;font-family:inherit;';
+        spCap.oninput = () => { sp.caption = spCap.value; scheduleSave(); };
+        spCard.appendChild(spImg); spCard.appendChild(spMeta); spCard.appendChild(spCap);
+        c.appendChild(spCard);
+      });
+    }
+
     root.appendChild(c);
     window.scrollTo(0, 0);
   }
