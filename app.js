@@ -761,7 +761,7 @@
   let inspection = null;
   let stepList = [];
   let currentStepIdx = 0;
-  let screen = 'home'; // home | intake | step | review
+  let screen = 'home'; // home | intake | precheck | step | review
   let saveTimeout = null;
   let lastSaveText = '';
 
@@ -886,15 +886,7 @@
 
   // Returns non-blocking warnings (shown as toast but navigation still allowed)
   function warnStep(stepDef) {
-    if (stepDef.type === 'atp-kitchen') {
-      const data = getStepData(stepDef.id);
-      const warnings = [];
-      const beforePhotos = data._atpBeforePhotos || [];
-      const afterPhotos = data._atpAfterPhotos || [];
-      if (!beforePhotos.length) warnings.push('ATP Before photo missing');
-      if (!afterPhotos.length) warnings.push('ATP After photo missing');
-      return warnings;
-    }
+    // ATP completion warning removed per Matt's request
     return [];
   }
 
@@ -1239,6 +1231,7 @@
     switch (screen) {
       case 'home': renderHome(); break;
       case 'intake': renderIntake(); break;
+      case 'precheck': renderPrecheck(); break;
       case 'step': renderStep(); break;
       case 'review': renderReview(); break;
     }
@@ -1450,6 +1443,64 @@
   }
 
   // ── STEP SCREEN ────────────────────────────────────────────
+  function renderPrecheck() {
+    const c = document.createElement('div');
+    c.className = 'screen step-screen';
+    c.appendChild(buildAppHeader('Pre-Inspection Checklist'));
+
+    const title = document.createElement('h1');
+    title.className = 'screen-title';
+    title.textContent = 'Equipment Check';
+    c.appendChild(title);
+
+    const info = document.createElement('div');
+    info.className = 'field-info';
+    info.style = 'margin-bottom:16px;';
+    info.textContent = 'Confirm everything is packed and ready before entering the home.';
+    c.appendChild(info);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const data = getStepData('equipment');
+    const fieldGen = STEP_FIELDS['equipment'];
+    if (fieldGen) {
+      const fields = fieldGen();
+      const onFieldChange = () => { data._updatedAt = new Date().toISOString(); scheduleSave(); UI.updateShowIf(card, data); };
+      fields.forEach(f => {
+        const rendered = UI.renderField(f, data, onFieldChange, inspection, () => scheduleSave());
+        if (rendered) card.appendChild(rendered);
+      });
+      UI.updateShowIf(card, data);
+    }
+    c.appendChild(card);
+
+    const nav = document.createElement('div');
+    nav.className = 'bottom-nav';
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn-outline btn-nav';
+    backBtn.textContent = '← Back';
+    backBtn.onclick = () => { screen = 'home'; render(); };
+
+    const startBtn = document.createElement('button');
+    startBtn.className = 'btn btn-primary btn-nav';
+    startBtn.textContent = 'Begin Inspection →';
+    startBtn.style = 'background:#2C3F16;';
+    startBtn.onclick = () => {
+      data._visited = true;
+      data._completedAt = new Date().toISOString();
+      currentStepIdx = 1; // skip equipment step — already done here
+      screen = 'step';
+      saveNow().then(() => { render(); window.scrollTo(0, 0); });
+    };
+
+    nav.appendChild(backBtn);
+    nav.appendChild(startBtn);
+    c.appendChild(nav);
+    root.innerHTML = '';
+    root.appendChild(c);
+  }
+
   function renderStep() {
     if (currentStepIdx >= stepList.length) { screen = 'review'; render(); return; }
     const step = stepList[currentStepIdx];
@@ -1459,6 +1510,32 @@
     if (!data._enteredAt) data._enteredAt = new Date().toISOString();
     data._roomName = step.name;
 
+    if (step.type === 'debrief') {
+      setTimeout(() => {
+        if (data.radonPickupTime && !document.getElementById('radon-cal-btn')) {
+          const calBtn = document.createElement('button');
+          calBtn.id = 'radon-cal-btn';
+          calBtn.type = 'button';
+          calBtn.className = 'btn btn-outline btn-full';
+          calBtn.style = 'margin:8px 0;background:#e8f5e9;border-color:#2C3F16;color:#2C3F16;font-weight:700;';
+          calBtn.textContent = '\uD83D\uDCC5 Add Radon Pickup to Calendar';
+          calBtn.onclick = () => {
+            const dt = new Date(data.radonPickupTime);
+            const pad = n => String(n).padStart(2,'0');
+            const fmt = d => d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00';
+            const dtEnd = new Date(dt.getTime() + 30*60000);
+            const addr = (inspection.propertyAddress || 'Inspection address').replace(/,/g, '\\,');
+            const ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:'+fmt(dt)+'\r\nDTEND:'+fmt(dtEnd)+'\r\nSUMMARY:Radon Pickup - '+addr+'\r\nDESCRIPTION:Pick up Airthings Corentium radon monitor\r\nLOCATION:'+addr+'\r\nEND:VEVENT\r\nEND:VCALENDAR';
+            const blob = new Blob([ics], {type:'text/calendar'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href=url; a.download='radon-pickup.ics'; a.click();
+            URL.revokeObjectURL(url);
+          };
+          const card = document.querySelector('.step-screen .card');
+          if (card) card.appendChild(calBtn);
+        }
+      }, 400);
+    }
     if (step.type === 'debrief' && !data.radonPickupTime && inspection.startedAt) {
       const pickupMs = new Date(inspection.startedAt).getTime() + 54 * 60 * 60 * 1000;
       const d = new Date(pickupMs);
@@ -1524,7 +1601,7 @@
     // Search button
     const searchBtn = el('button', {
       type: 'button',
-      style: 'position:fixed;top:54px;right:88px;z-index:200;background:#fff;border:2px solid var(--border);border-radius:8px;font-size:13px;padding:4px 10px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;',
+      style: 'position:fixed;top:54px;right:82px;z-index:200;background:#2C3F16;color:#fff;border:none;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.2);',
       onClick: () => openSearch()
     }, '\uD83D\uDD0D');
     c.appendChild(searchBtn);

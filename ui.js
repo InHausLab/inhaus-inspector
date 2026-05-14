@@ -593,7 +593,24 @@
   }
 
   // ── Heading / Info ─────────────────────────────────────────
-  function renderHeading(label) { return el('h3', { className: 'section-heading' }, label); }
+  function renderHeading(label) {
+    const h = document.createElement('h3');
+    h.className = 'section-heading collapsible-heading';
+    h.innerHTML = label + ' <span class="collapse-arrow">&#9660;</span>';
+    h.style = 'cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:center;';
+    h.onclick = () => {
+      const isOpen = !h.classList.contains('collapsed');
+      h.classList.toggle('collapsed', isOpen);
+      let sib = h.nextElementSibling;
+      while (sib && !sib.classList.contains('section-heading') && !sib.classList.contains('collapsible-heading')) {
+        sib.style.display = isOpen ? 'none' : '';
+        sib = sib.nextElementSibling;
+      }
+      const arrow = h.querySelector('.collapse-arrow');
+      if (arrow) arrow.style.transform = isOpen ? 'rotate(-90deg)' : '';
+    };
+    return h;
+  }
   function renderInfo(text) { return el('div', { className: 'field-info' }, text); }
   function renderDivider() { return el('hr', { className: 'divider' }); }
 

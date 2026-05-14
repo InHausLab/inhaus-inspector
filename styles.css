@@ -55,7 +55,7 @@ body {
   padding: 0 16px 140px;
 }
 .screen-title {
-  font-size: 1.5rem; font-weight: 800; padding: 12px 0 8px;
+  font-size: 1.2rem; font-weight: 800; padding: 8px 0 6px;
 }
 .app-header {
   text-align: center; padding: 0;
@@ -813,3 +813,7 @@ body {
   /* Mic button compact */
   .mic-btn { width: 44px; height: 44px; min-width: 44px; font-size: 1.1rem; }
 }
+
+/* ── Collapsible Headings ────────────── */
+.collapsible-heading .collapse-arrow { font-size: 0.7rem; transition: transform 0.2s; color: var(--text-muted); }
+.collapsible-heading.collapsed .collapse-arrow { transform: rotate(-90deg); }
