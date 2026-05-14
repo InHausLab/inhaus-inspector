@@ -190,9 +190,7 @@
         { key: 'breezeSwabs', label: 'Breeze mold swabs (2)' },
         { key: 'boulderBlue', label: 'Boulder Blue fan + filter' }
       ]),
-      checklist('radonEquip', 'Radon', [
-        { key: 'corentium', label: 'Airthings Corentium Pro radon monitor + tripod' }
-      ]),
+
       checklist('waterEquip', 'Water Testing', [
         { key: 'waterKit', label: 'Full panel water test kit (SafeHome)' },
         { key: 'pfasKit', label: 'PFAS test kit (Cyclopure)', optional: true },
@@ -339,23 +337,12 @@
   // ── Radon setup (expanded for #4) ──────────────────────────
   function getRadonFields() {
     return [
-      checklist('equipNeededLowest', 'Equipment Needed', [
-        { key: 'radonMonitor', label: 'Airthings Corentium Pro (radon monitor)' },
-        { key: 'breezeLowest', label: 'Breeze ET pump + tripod' },
-        { key: 'qtrakLowest', label: 'Q-Trak 7585' },
-        { key: 'flirLowest', label: 'FLIR MR277' }
-      ]),
-      divider(),
       heading('Radon Monitor Placement'),
-      check('radonTripod', 'Place on tripod'),
-      check('radon3ft', '3 feet from exterior wall'),
-      check('radon20in', '20+ inches above floor'),
-      check('radonCentralized', 'Central location, not high-traffic'),
+      check('radonTripod', 'On tripod — 3 ft from exterior wall, 20"+ above floor, central/low-traffic'),
       check('radonWindowsClosed', 'Windows and doors closed'),
       divider(),
       heading('Radon App Setup'),
-      check('radonInitialMeasurement', 'Select "Initial measurement"'),
-      check('radon48hr', 'Select "48-hour test with 4-hour calibration"'),
+      check('radonInitialMeasurement', 'Select "Initial measurement" + "48-hour test with 4-hour calibration"'),
       divider(),
       check('radonMultipleMonitors', 'Set up multiple monitors if >2,000 sq ft or different foundations'),
       text('radonLocation', 'Radon Monitor Location'),
