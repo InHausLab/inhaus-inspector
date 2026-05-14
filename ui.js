@@ -616,6 +616,43 @@
     const changed = () => onChange();
 
     switch (f.type) {
+      case 'weather-link': {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style = 'background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:0.95rem;cursor:pointer;font-family:inherit;font-weight:600;width:100%;margin:4px 0;touch-action:manipulation;';
+        btn.textContent = '🌤 Open weather for current location';
+        btn.onclick = () => {
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+              const lat = pos.coords.latitude.toFixed(4);
+              const lon = pos.coords.longitude.toFixed(4);
+              window.open('https://forecast.weather.gov/MapClick.php?lat=' + lat + '&lon=' + lon, '_blank');
+            }, () => {
+              window.open('https://weather.com/weather/today', '_blank');
+            });
+          } else {
+            window.open('https://weather.com/weather/today', '_blank');
+          }
+        };
+        return btn;
+      }
+      case 'collapsible-section': {
+        const details = document.createElement('details');
+        details.style = 'margin: 8px 0;';
+        if (f.defaultOpen !== false) details.setAttribute('open', '');
+        const summary = document.createElement('summary');
+        summary.style = 'font-weight:700;font-size:1rem;color:var(--primary);cursor:pointer;padding:10px 0;list-style:none;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--accent-light);';
+        summary.innerHTML = f.title + ' <span style="font-size:0.8rem;color:var(--text-muted)">▾</span>';
+        details.appendChild(summary);
+        const inner = document.createElement('div');
+        inner.style = 'padding-top:8px;';
+        (f.fields || []).forEach(sf => {
+          const rendered = renderField(sf, data, onChange, inspection, onSave);
+          if (rendered) inner.appendChild(rendered);
+        });
+        details.appendChild(inner);
+        return details;
+      }
       case 'heading': return renderHeading(f.label);
       case 'info': return renderInfo(f.label);
       case 'divider': return renderDivider();

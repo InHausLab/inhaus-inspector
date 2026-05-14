@@ -26,6 +26,7 @@
   function photo(stepName, photoKey) { return { type: 'photo', stepName, photoKey }; }
   function timer(key, label, duration, opts) { return { key, type: 'timer', label, duration, ...opts }; }
   function heading(label) { return { type: 'heading', label }; }
+  function collapsible(title, fields, opts) { return { type: 'collapsible-section', title, fields, defaultOpen: opts && opts.defaultOpen !== false }; }
   function info(label) { return { type: 'info', label }; }
   function divider() { return { type: 'divider' }; }
   function link(label, url) { return { type: 'link', label, url }; }
@@ -40,7 +41,7 @@
 
   function flirFields() {
     return [
-      heading('FLIR Thermal Scan'),
+      collapsible('FLIR Thermal Scan', [
       checklist('flirGuidance', null, [
         { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
         { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
@@ -52,6 +53,7 @@
       showIf(text('flirImageLabel', 'FLIR Image Label', { placeholder: 'e.g. Bedroom 1 — Image #0023' }), 'flirDone', 'Yes'),
       showIf(text('flirPhotoNum', 'FLIR photo number noted'), 'flirDone', 'Yes'),
       showIf(num('flirMoisture', 'Moisture reading', { unit: '%', note: 'Flag if >20%' }), 'flirDone', 'Yes')
+    ], { defaultOpen: false })
     ];
   }
 
@@ -636,7 +638,8 @@
       radio('occupancyDuringInspection', 'Home occupancy during inspection', ['Occupied - Active', 'Occupied - Passive', 'Unoccupied']),
       showIf(textarea('occupancyActivities', 'Describe occupant activities (e.g. cooking, cleaning, watching TV)', { placeholder: 'e.g. Owner was cooking in kitchen during assessment' }), 'occupancyDuringInspection', 'Occupied - Active'),
       showIf(textarea('occupancyActivities', 'Describe occupant activities', { placeholder: 'e.g. Owner present but resting in bedroom' }), 'occupancyDuringInspection', 'Occupied - Passive'),
-      text('weatherConditions', 'Weather conditions')
+      text('weatherConditions', 'Weather conditions'),
+      { type: 'weather-link' }
     ];
   }
 
@@ -1508,7 +1511,7 @@
     const backToIntakeBtn = el('button', {
       type: 'button',
       className: 'btn btn-outline btn-small',
-      style: 'position:fixed;top:8px;right:10px;z-index:200;font-size:11px;padding:4px 10px;',
+      style: 'position:fixed;top:54px;right:10px;z-index:200;font-size:11px;padding:4px 10px;',
       onClick: () => { screen = 'intake'; render(); }
     }, '\u270E Intake');
     c.appendChild(backToIntakeBtn);
@@ -1516,7 +1519,7 @@
     // Search button
     const searchBtn = el('button', {
       type: 'button',
-      style: 'position:fixed;top:8px;right:88px;z-index:200;background:#fff;border:2px solid var(--border);border-radius:8px;font-size:13px;padding:4px 10px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;',
+      style: 'position:fixed;top:54px;right:88px;z-index:200;background:#fff;border:2px solid var(--border);border-radius:8px;font-size:13px;padding:4px 10px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;',
       onClick: () => openSearch()
     }, '\uD83D\uDD0D');
     c.appendChild(searchBtn);
