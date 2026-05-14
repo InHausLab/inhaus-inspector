@@ -596,8 +596,8 @@
       ...breezeFields('kitchenBreezeTimer'),
       ...qtrakSection(),
       ...formaldehydeField(),
-      ...followUpFields(),
-      ...observationFields()
+      ...observationFields(),
+      ...followUpFields()
     ];
   }
 
@@ -609,8 +609,8 @@
       ...breezeFields(),
       ...qtrakSection(),
       ...formaldehydeField(),
-      ...followUpFields(),
-      ...observationFields()
+      ...observationFields(),
+      ...followUpFields()
     ];
   }
 
@@ -898,14 +898,16 @@
   }
 
   // ── Add Dynamic Room ───────────────────────────────────────
-  function addDynamicRoom(section) {
+  function addDynamicRoom(section, namePrefix) {
     if (!inspection.dynamicRooms) inspection.dynamicRooms = {};
     if (!inspection.dynamicRooms[section]) inspection.dynamicRooms[section] = [];
 
     const arr = inspection.dynamicRooms[section];
     const idx = arr.length;
-    const prefix = section === 'lowest' ? 'Lowest Level \u2014 Room ' : 'Additional Room ';
-    arr.push({ name: prefix + (idx + 1) });
+    const defaultPrefix = section === 'lowest' ? 'Lowest Level — Room ' : 'Additional Room ';
+    const prefix = namePrefix || defaultPrefix;
+    const count = namePrefix ? arr.filter(r => r.name && r.name.startsWith(namePrefix)).length + 1 : idx + 1;
+    arr.push({ name: prefix + ' ' + count });
 
     stepList = buildStepList(inspection);
     const newStepId = section === 'lowest' ? 'lowest-room-' + idx : 'additional-' + idx;
@@ -1554,6 +1556,18 @@
       const lowestSteps = stepList.filter(s => s.dynamic === 'lowest');
       if (step.id === lowestSteps[lowestSteps.length - 1].id) {
         c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => { addDynamicRoom('lowest'); window.scrollTo(0, 0); } }, '+ Add Another Room (Lowest Level)'));
+      }
+    }
+    if (step.type === 'bedroom') {
+      const bedroomSteps = stepList.filter(s => s.type === 'bedroom');
+      if (step.id === bedroomSteps[bedroomSteps.length - 1].id) {
+        c.appendChild(el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { addDynamicRoom('additional', 'Bedroom'); window.scrollTo(0, 0); } }, '+ Add Another Bedroom'));
+      }
+    }
+    if (step.type === 'bathroom') {
+      const bathroomSteps = stepList.filter(s => s.type === 'bathroom');
+      if (step.id === bathroomSteps[bathroomSteps.length - 1].id) {
+        c.appendChild(el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { addDynamicRoom('additional', 'Bathroom'); window.scrollTo(0, 0); } }, '+ Add Another Bathroom'));
       }
     }
     if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {
