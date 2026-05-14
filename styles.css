@@ -817,3 +817,29 @@ body {
 /* ── Collapsible Headings ────────────── */
 .collapsible-heading .collapse-arrow { font-size: 0.7rem; transition: transform 0.2s; color: var(--text-muted); }
 .collapsible-heading.collapsed .collapse-arrow { transform: rotate(-90deg); }
+
+/* ── Color Tile Sub-Nav ──────────────── */
+.sub-nav {
+  display: flex; gap: 6px; padding: 8px 0 12px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; flex-wrap: nowrap;
+}
+.sub-nav::-webkit-scrollbar { display: none; }
+.sub-nav-btn {
+  flex: 0 0 auto; min-width: 72px; max-width: 100px;
+  padding: 8px 10px; border-radius: 10px; border: 2px solid transparent;
+  font-size: 0.72rem; font-weight: 700; cursor: pointer;
+  text-align: center; line-height: 1.3;
+  background: #f1f5f9; color: #475569;
+  touch-action: manipulation; transition: all 0.15s;
+  white-space: normal; word-break: break-word;
+}
+.sub-nav-btn.active {
+  background: var(--primary); color: #fff;
+  border-color: var(--primary); transform: scale(1.05);
+}
+.sub-nav-btn.done {
+  background: #dcfce7; color: #166534; border-color: #86efac;
+}
+.sub-nav-btn.done::after { content: ' ✓'; }
+.sub-nav-btn:not(.active):not(.done) { border-color: #e2e8f0; }

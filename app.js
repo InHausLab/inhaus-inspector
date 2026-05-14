@@ -408,6 +408,7 @@
       ]),
       divider(),
       heading('HVAC Filter'),
+      { type: 'scan-filter-tag' },
       text('filterSize', 'Filter size'),
       text('filterMakeModel', 'Filter make / model / brand'),
       text('filterRating', 'MERV / HEPA rating'),
@@ -748,7 +749,8 @@
     { id: 'exterior', name: 'Exterior', icon: '3' },
     { id: 'lowest', name: 'Lowest Livable Level (e.g. Basement)', icon: '4' },
     { id: 'utility', name: 'Utility', icon: '5' },
-    { id: 'rooms', name: 'Bedrooms & Bathrooms', icon: '6' },
+    { id: 'upper', name: 'Upper Level', icon: '6' },
+    { id: 'rooms', name: 'Bedrooms & Bathrooms', icon: '6.5' },
     { id: 'main', name: 'Kitchen', icon: '7' },
     { id: 'supplementary', name: 'Additional Rooms', icon: '8' },
     { id: 'wrapup', name: 'Customer Debrief', icon: '9' },
@@ -800,11 +802,11 @@
     // Upper Level
     const numBed = parseInt(insp.numberOfBedrooms) || 1;
     for (let i = 0; i < numBed; i++) {
-      steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'rooms', name: 'Bedroom ' + (i + 1), index: i });
+      steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'upper', name: 'Bedroom ' + (i + 1), index: i });
     }
     const numBath = parseInt(insp.numberOfBathrooms) || 1;
     for (let i = 0; i < numBath; i++) {
-      steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'rooms', name: 'Bathroom ' + (i + 1), index: i });
+      steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'upper', name: 'Bathroom ' + (i + 1), index: i });
     }
 
     // Main Level / Kitchen
@@ -1062,6 +1064,7 @@
     const DRAWER_GROUPS = [
       { label: 'SETUP', phases: ['setup', 'arrival', 'exterior'] },
       { label: 'LOWER LEVEL', phases: ['lowest', 'utility'] },
+      { label: 'UPPER LEVEL', phases: ['upper'] },
       { label: 'BEDROOMS & BATHROOMS', phases: ['rooms'] },
       { label: 'MAIN LEVEL', phases: ['main'] },
       { label: 'ADDITIONAL ROOMS', phases: ['supplementary'] },
@@ -1395,6 +1398,7 @@
       divider(),
       text('wifiNetwork', 'Home wifi network name'),
       text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
+      { type: 'wifi-copy' },
       textarea('clientConcerns', 'Client concerns / known problem areas'),
       textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
     ];
@@ -1433,7 +1437,7 @@
           };
           stepList = buildStepList(inspection);
           currentStepIdx = 0;
-          screen = 'step';
+          screen = 'precheck';
           saveNow().then(() => render());
         }
       }}, isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192')
@@ -1501,6 +1505,45 @@
     root.appendChild(c);
   }
 
+  function renderPrecheck() {
+    const c2 = document.createElement('div');
+    c2.className = 'screen step-screen';
+    c2.appendChild(buildAppHeader('Pre-Inspection Checklist'));
+    const title = document.createElement('h1');
+    title.className = 'screen-title';
+    title.textContent = 'Equipment Check';
+    c2.appendChild(title);
+    const info2 = document.createElement('div');
+    info2.className = 'field-info';
+    info2.style = 'margin-bottom:16px;';
+    info2.textContent = 'Confirm everything is packed and ready before entering the home.';
+    c2.appendChild(info2);
+    const card2 = document.createElement('div');
+    card2.className = 'card';
+    const eqData = getStepData('equipment');
+    const eqGen = STEP_FIELDS['equipment'];
+    if (eqGen) {
+      const eqFields = eqGen();
+      const onEqChange = () => { eqData._updatedAt = new Date().toISOString(); scheduleSave(); UI.updateShowIf(card2, eqData); };
+      eqFields.forEach(f => { const r = UI.renderField(f, eqData, onEqChange, inspection, ()=>scheduleSave()); if (r) card2.appendChild(r); });
+      UI.updateShowIf(card2, eqData);
+    }
+    c2.appendChild(card2);
+    const nav2 = document.createElement('div');
+    nav2.className = 'bottom-nav';
+    const bk = document.createElement('button');
+    bk.className = 'btn btn-outline btn-nav'; bk.textContent = '← Back';
+    bk.onclick = () => { screen = 'home'; render(); };
+    const go = document.createElement('button');
+    go.className = 'btn btn-primary btn-nav';
+    go.textContent = 'Begin Inspection →';
+    go.style = 'background:#2C3F16;';
+    go.onclick = () => { eqData._visited = true; eqData._completedAt = new Date().toISOString(); currentStepIdx = 1; screen = 'step'; saveNow().then(()=>{ render(); window.scrollTo(0,0); }); };
+    nav2.appendChild(bk); nav2.appendChild(go);
+    c2.appendChild(nav2);
+    root.innerHTML = ''; root.appendChild(c2);
+  }
+
   function renderStep() {
     if (currentStepIdx >= stepList.length) { screen = 'review'; render(); return; }
     const step = stepList[currentStepIdx];
@@ -1527,6 +1570,32 @@
             const addr = (inspection.propertyAddress || 'Inspection address').replace(/,/g, '\\,');
             const ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:'+fmt(dt)+'\r\nDTEND:'+fmt(dtEnd)+'\r\nSUMMARY:Radon Pickup - '+addr+'\r\nDESCRIPTION:Pick up Airthings Corentium radon monitor\r\nLOCATION:'+addr+'\r\nEND:VEVENT\r\nEND:VCALENDAR';
             const blob = new Blob([ics], {type:'text/calendar'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href=url; a.download='radon-pickup.ics'; a.click();
+            URL.revokeObjectURL(url);
+          };
+          const card = document.querySelector('.step-screen .card');
+          if (card) card.appendChild(calBtn);
+        }
+      }, 400);
+    }
+    if (step.type === 'debrief') {
+      setTimeout(() => {
+        if (data.radonPickupTime && !document.getElementById('radon-cal-btn')) {
+          const calBtn = document.createElement('button');
+          calBtn.id = 'radon-cal-btn'; calBtn.type = 'button';
+          calBtn.className = 'btn btn-outline btn-full';
+          calBtn.style = 'margin:8px 0;background:#e8f5e9;border-color:#2C3F16;color:#2C3F16;font-weight:700;';
+          calBtn.textContent = '📅 Add Radon Pickup to Calendar';
+          calBtn.onclick = () => {
+            const dt = new Date(data.radonPickupTime);
+            const pad = n => String(n).padStart(2,'0');
+            const fmt = d => d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00';
+            const dtEnd = new Date(dt.getTime()+30*60000);
+            const addr = (inspection.propertyAddress||'Inspection address').replace(/,/g,'\,');
+            const ics = ['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','DTSTART:'+fmt(dt),'DTEND:'+fmt(dtEnd),'SUMMARY:Radon Pickup - '+addr,'DESCRIPTION:Pick up Airthings Corentium radon monitor','LOCATION:'+addr,'END:VEVENT','END:VCALENDAR'].join('
+');
+            const blob = new Blob([ics],{type:'text/calendar'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href=url; a.download='radon-pickup.ics'; a.click();
             URL.revokeObjectURL(url);
@@ -1572,7 +1641,7 @@
     }, currentStepIdx + 1, stepList.length));
 
     const phaseSteps = stepList.filter(s => s.phase === currentPhase && s.type !== 'review');
-    const alwaysShowSubNav = ['lowest', 'rooms', 'supplementary', 'wrapup'].includes(currentPhase);
+    const alwaysShowSubNav = ['lowest', 'upper', 'rooms', 'supplementary', 'wrapup'].includes(currentPhase);
     if (phaseSteps.length > 1 || alwaysShowSubNav) {
       const subNav = el('div', { className: 'sub-nav' });
       phaseSteps.forEach((s, i) => {

@@ -655,6 +655,59 @@
         };
         return btn;
       }
+      case 'wifi-copy': {
+        const panel = document.createElement('div');
+        panel.style = 'background:#f0f7ff;border-radius:8px;padding:10px 12px;margin:4px 0 8px;';
+        const wh2 = document.createElement('div');
+        wh2.style = 'font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;';
+        wh2.textContent = 'QUICK COPY';
+        panel.appendChild(wh2);
+        const mkCopy = (lbl, val) => {
+          if (!val) return;
+          const row = document.createElement('div');
+          row.style = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
+          const sp = document.createElement('span');
+          sp.style = 'font-size:13px;color:#1a1a1a;';
+          sp.textContent = lbl + ': ' + val;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.style = 'font-size:11px;padding:3px 10px;border:1px solid #bcd;border-radius:6px;background:#fff;cursor:pointer;';
+          b.textContent = 'Copy';
+          b.onclick = () => { navigator.clipboard.writeText(val).then(()=>{b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500);}); };
+          row.appendChild(sp); row.appendChild(b); panel.appendChild(row);
+        };
+        mkCopy('Network', data.wifiNetwork || (inspection && inspection.wifiNetwork));
+        mkCopy('Password', data.wifiPassword || (inspection && inspection.wifiPassword));
+        return panel;
+      }
+      case 'scan-filter-tag': {
+        const wrap = document.createElement('div');
+        wrap.style = 'margin:4px 0 8px;';
+        const finp = document.createElement('input');
+        finp.type = 'file'; finp.accept = 'image/*'; finp.capture = 'environment'; finp.style = 'display:none;';
+        let prev = null;
+        finp.onchange = e => {
+          const file = e.target.files[0]; if (!file) return;
+          const fr = new FileReader();
+          fr.onload = ev => {
+            if (!prev) { prev = document.createElement('img'); prev.style='width:100%;border-radius:8px;margin-bottom:8px;border:2px solid #f59e0b;'; wrap.insertBefore(prev,fbtn); }
+            prev.src = ev.target.result;
+            fhint.textContent = 'Photo captured — enter values from the tag in fields above';
+            fhint.style.color = '#166534';
+          };
+          fr.readAsDataURL(file);
+        };
+        const fbtn = document.createElement('button');
+        fbtn.type = 'button';
+        fbtn.style = 'width:100%;padding:10px;background:#fff8e1;border:2px dashed #f59e0b;border-radius:8px;cursor:pointer;font-weight:700;color:#92400e;font-size:0.9rem;font-family:inherit;';
+        fbtn.textContent = '📷 Photo Filter Data Tag — Enter Values Above';
+        fbtn.onclick = () => finp.click();
+        const fhint = document.createElement('div');
+        fhint.style = 'font-size:11px;color:#64748b;margin-top:4px;';
+        fhint.textContent = 'Take photo of filter tag, then enter size and MERV rating in the fields above';
+        wrap.appendChild(finp); wrap.appendChild(fbtn); wrap.appendChild(fhint);
+        return wrap;
+      }
       case 'collapsible-section': {
         const details = document.createElement('details');
         details.style = 'margin: 8px 0;';
