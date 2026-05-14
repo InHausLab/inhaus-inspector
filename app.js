@@ -1592,9 +1592,8 @@
             const pad = n => String(n).padStart(2,'0');
             const fmt = d => d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00';
             const dtEnd = new Date(dt.getTime()+30*60000);
-            const addr = (inspection.propertyAddress||'Inspection address').replace(/,/g,'\,');
-            const ics = ['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','DTSTART:'+fmt(dt),'DTEND:'+fmt(dtEnd),'SUMMARY:Radon Pickup - '+addr,'DESCRIPTION:Pick up Airthings Corentium radon monitor','LOCATION:'+addr,'END:VEVENT','END:VCALENDAR'].join('
-');
+            const addr = (inspection.propertyAddress||'Inspection address').replace(/,/g,'\\,');
+            const ics = ['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','DTSTART:'+fmt(dt),'DTEND:'+fmt(dtEnd),'SUMMARY:Radon Pickup - '+addr,'DESCRIPTION:Pick up Airthings Corentium radon monitor','LOCATION:'+addr,'END:VEVENT','END:VCALENDAR'].join('\\r\\n');
             const blob = new Blob([ics],{type:'text/calendar'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href=url; a.download='radon-pickup.ics'; a.click();
