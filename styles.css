@@ -951,3 +951,84 @@ body {
   font-weight: 700;
   color: #92400e;
 }
+
+/* ── AI Room Summary ───────────────────────────── */
+.ai-room-summary-wrap {
+  margin: 16px 0 8px;
+  padding-top: 12px;
+  border-top: 2px solid var(--accent-light);
+}
+.ai-room-summary-btn {
+  width: 100%;
+  margin-bottom: 10px;
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 14px 20px;
+  cursor: pointer;
+  touch-action: manipulation;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  transition: background 0.12s, opacity 0.12s;
+}
+.ai-room-summary-btn:active { background: var(--accent-light); }
+.ai-room-summary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ai-room-summary-textarea {
+  width: 100%;
+  min-height: 80px;
+  margin-top: 4px;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  -webkit-appearance: none;
+}
+.ai-room-summary-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(143, 168, 136, 0.25);
+}
+.ai-room-summary-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  font-style: italic;
+}
+.ai-room-summary-regen {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Room Summaries section in Review */
+.room-summary-label {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 14px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--accent-light);
+}
+.room-summary-label:first-of-type { margin-top: 4px; }
+.room-summary-text {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 4px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}

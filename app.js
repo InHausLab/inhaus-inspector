@@ -377,7 +377,8 @@
       ...formaldehydeField(),
       ...bathroomLeakFields().map(f => showIf(f, 'roomType', 'Bathroom')),
       ...observationFields(),
-      ...followUpFields()
+      ...followUpFields(),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -446,7 +447,8 @@
       showIf(text('waterSoftType', 'Type / Model / Serial'), 'waterSofteningPresent', 'Yes'),
       showIf(photo('Water Softening', '_waterSoftPhotos'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
-      photo('Utility Room', '_utilityRoomPhotos')
+      photo('Utility Room', '_utilityRoomPhotos'),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -471,7 +473,8 @@
       ...formaldehydeField(),
       divider(),
       ...observationFields(),
-      ...followUpFields()
+      ...followUpFields(),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -483,7 +486,8 @@
       ...formaldehydeField(),
       ...bathroomCheckFields(),
       ...observationFields(),
-      ...followUpFields()
+      ...followUpFields(),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -507,7 +511,8 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...followUpFields(),
-      ...observationFields()
+      ...observationFields(),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -607,7 +612,8 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...observationFields(),
-      ...followUpFields()
+      ...followUpFields(),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -620,7 +626,8 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...observationFields(),
-      ...followUpFields()
+      ...followUpFields(),
+      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
     ];
   }
 
@@ -2029,6 +2036,26 @@
     if (inspection.knownProblemAreas) hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Known Problem Areas: '), document.createTextNode(inspection.knownProblemAreas)]));
     c.appendChild(hCard);
 
+    // ── Room Summaries ──
+    const summariesCard = el('div', { className: 'card' });
+    summariesCard.appendChild(el('h3', { className: 'section-heading' }, 'Room Summaries'));
+    const summarySteps = stepList.filter(s => {
+      const d = inspection.stepData && inspection.stepData[s.id];
+      return d && d.aiSummary;
+    });
+    if (summarySteps.length === 0) {
+      summariesCard.appendChild(el('p', { style: 'color:var(--text-muted);font-size:0.9rem;padding:8px 0;' }, 'No room summaries generated yet'));
+    } else {
+      summarySteps.forEach(s => {
+        const d = inspection.stepData[s.id];
+        const roomLabel = el('div', { className: 'room-summary-label' }, d.roomName || s.name);
+        const summaryText = el('p', { className: 'room-summary-text' }, d.aiSummary);
+        summariesCard.appendChild(roomLabel);
+        summariesCard.appendChild(summaryText);
+      });
+    }
+    c.appendChild(summariesCard);
+
     stepList.forEach((step, idx) => {
       if (step.type === 'review') return;
       const data = (inspection.stepData && inspection.stepData[step.id]) || {};
@@ -2282,6 +2309,21 @@
     });
     exp.roomsWithDampness = dampnessCount;
     exp.roomsWithMustySmell = mustyCount;
+
+    // Room summaries
+    const roomSummaries = {};
+    stepList.forEach(step => {
+      const d = inspection.stepData && inspection.stepData[step.id];
+      if (d && d.aiSummary) {
+        roomSummaries[step.id] = {
+          roomName: d.roomName || step.name,
+          summary: d.aiSummary,
+          generatedAt: d.aiSummaryGeneratedAt || null
+        };
+      }
+    });
+    exp.roomSummaries = roomSummaries;
+
     return exp;
   }
 
