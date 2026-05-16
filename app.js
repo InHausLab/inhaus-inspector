@@ -6,6 +6,11 @@
   // Set this to your Google Apps Script web app URL
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZoRaJtJs9Nvb3H1aLToccUazpqtij3pWNHl0tX3okFw9E47BewY7arvRJlp2XXsGYOw/exec';
 
+  // ── AI Vision Config ──────────────────────────────────────
+  // Set this to your Anthropic API key for AI HVAC scanning
+  // Leave blank to disable AI scanning (fields can still be filled manually)
+  const ANTHROPIC_KEY = '';
+
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
   // ── Field Definition Helpers ───────────────────────────────
@@ -395,11 +400,17 @@
       ]),
       divider(),
       heading('HVAC Filter'),
-      { type: 'scan-filter-tag' },
+      { type: 'ai-hvac-scanner', anthropicKey: ANTHROPIC_KEY },
+      text('hvacManufacturer', 'Manufacturer'),
+      text('hvacModel', 'Model number'),
+      text('hvacSerial', 'Serial number'),
       text('filterSize', 'Filter size'),
+      num('mervRating', 'MERV rating'),
       text('filterMakeModel', 'Filter make / model / brand'),
-      text('filterRating', 'MERV / HEPA rating'),
-      radio('filterCondition', 'Filter condition', ['Good', 'Fair', 'Poor']),
+      sel('filterCondition', 'Filter condition', ['Clean', 'Dirty', 'Very Dirty', 'Damaged']),
+      sel('filterEstimatedAge', 'Estimated filter age', ['New', 'Less than 6 months', '6-12 months', 'Over 1 year']),
+      yesno('filterRecallFlag', 'Recall notice visible?'),
+      textarea('filterNotes', 'Filter notes'),
       check('filterCleaned', 'Filters checked and cleaned if needed'),
       photo('HVAC Filter', '_hvacFilterPhotos'),
       divider(),

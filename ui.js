@@ -221,7 +221,8 @@
     const row = el('div', { className: 'input-row' });
     const inp = el('input', {
       className: 'field-input', type: opts.inputType || 'text',
-      value: value || '', placeholder: opts.placeholder || ''
+      value: value || '', placeholder: opts.placeholder || '',
+      'data-field-key': key
     });
     if (opts.disabled) inp.disabled = true;
     inp.addEventListener('input', () => onChange(inp.value));
@@ -241,7 +242,8 @@
     const row = el('div', { className: 'input-row textarea-row' });
     const ta = el('textarea', {
       className: 'field-textarea', rows: opts.rows || '3',
-      placeholder: opts.placeholder || ''
+      placeholder: opts.placeholder || '',
+      'data-field-key': key
     });
     ta.value = value || '';
     ta.addEventListener('input', () => onChange(ta.value));
@@ -260,7 +262,8 @@
     const row = el('div', { className: 'input-row' });
     const inp = el('input', {
       className: 'field-input', type: 'number', step: 'any', inputmode: 'decimal',
-      value: value != null ? value : '', placeholder: opts.placeholder || 'Enter value'
+      value: value != null ? value : '', placeholder: opts.placeholder || 'Enter value',
+      'data-field-key': key
     });
     inp.addEventListener('input', () => onChange(inp.value === '' ? null : parseFloat(inp.value)));
     row.appendChild(inp);
@@ -283,7 +286,7 @@
   function renderSelect(key, label, value, onChange, choices) {
     const g = el('div', { className: 'field-group' });
     g.appendChild(el('label', { className: 'field-label' }, label));
-    const sel = el('select', { className: 'field-select' });
+    const sel = el('select', { className: 'field-select', 'data-field-key': key });
     sel.appendChild(el('option', { value: '' }, '-- Select --'));
     choices.forEach(c => {
       const opt = el('option', { value: typeof c === 'string' ? c : c.value }, typeof c === 'string' ? c : c.label);
@@ -297,7 +300,7 @@
 
   // ── Field: Yes/No/NA Radio ─────────────────────────────────
   function renderYesNo(key, label, value, onChange, type) {
-    const g = el('div', { className: 'field-group' });
+    const g = el('div', { className: 'field-group', 'data-yesno-key': key });
     g.appendChild(el('label', { className: 'field-label' }, label));
     const row = el('div', { className: 'radio-row' });
     let choices = [{ v: 'Yes', cls: 'radio-yes' }, { v: 'No', cls: 'radio-no' }];
@@ -307,6 +310,7 @@
       const btn = el('button', {
         type: 'button',
         className: 'radio-btn ' + c.cls + (value === c.v ? ' active' : ''),
+        'data-yesno-val': c.v,
         onClick: () => {
           btns.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
@@ -680,32 +684,198 @@
         mkCopy('Password', data.wifiPassword || (inspection && inspection.wifiPassword));
         return panel;
       }
-      case 'scan-filter-tag': {
+      case 'ai-hvac-scanner': {
+        const apiKey = f.anthropicKey || '';
         const wrap = document.createElement('div');
-        wrap.style = 'margin:4px 0 8px;';
-        const finp = document.createElement('input');
-        finp.type = 'file'; finp.accept = 'image/*'; finp.capture = 'environment'; finp.style = 'display:none;';
-        let prev = null;
-        finp.onchange = e => {
+        wrap.className = 'ai-hvac-scanner';
+
+        // ── Anthropic API call ──────────────────────────────────
+        async function callAnthropic(imageDataUrl, promptText) {
+          if (!apiKey) throw new Error('NO_KEY');
+          const base64 = imageDataUrl.split(',')[1];
+          const mimeType = (imageDataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model: 'claude-opus-4-5',
+              max_tokens: 200,
+              messages: [{ role: 'user', content: [
+                { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+                { type: 'text', text: promptText }
+              ]}]
+            })
+          });
+          if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
+          const result = await resp.json();
+          const text = result.content && result.content[0] && result.content[0].text;
+          if (!text) throw new Error('EMPTY_RESPONSE');
+          return JSON.parse(text);
+        }
+
+        // ── Field updater ───────────────────────────────────────
+        function setFieldValue(key, value, card) {
+          if (value === null || value === undefined) return;
+          data[key] = value;
+          if (!card) return;
+          const inp = card.querySelector('[data-field-key="' + key + '"]');
+          if (inp) {
+            if (inp.tagName === 'SELECT') {
+              const opts = Array.from(inp.options);
+              const strVal = String(value).toLowerCase();
+              const match = opts.find(o => o.value.toLowerCase() === strVal) ||
+                            opts.find(o => o.value.toLowerCase().includes(strVal) || strVal.includes(o.value.toLowerCase()));
+              if (match) { inp.value = match.value; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+            } else {
+              inp.value = String(value);
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+          const yesnoGroup = card.querySelector('[data-yesno-key="' + key + '"]');
+          if (yesnoGroup) {
+            const strVal = String(value).toLowerCase();
+            const target = (strVal === 'true' || strVal === 'yes') ? 'Yes' : 'No';
+            const btn = yesnoGroup.querySelector('[data-yesno-val="' + target + '"]');
+            if (btn) btn.click();
+          }
+        }
+
+        // ── Recall warning banner ───────────────────────────────
+        const recallBanner = document.createElement('div');
+        recallBanner.className = 'ai-recall-banner';
+        recallBanner.style.display = 'none';
+        recallBanner.textContent = '⚠️ Possible recall notice visible — verify with manufacturer';
+
+        // ── DATA TAG scanner ────────────────────────────────────
+        const tagSection = document.createElement('div');
+        tagSection.className = 'ai-scan-section';
+
+        const tagInp = document.createElement('input');
+        tagInp.type = 'file'; tagInp.accept = 'image/*'; tagInp.capture = 'environment'; tagInp.style = 'display:none;';
+
+        const tagBtn = document.createElement('button');
+        tagBtn.type = 'button';
+        tagBtn.className = 'ai-scan-btn ai-scan-tag-btn';
+        tagBtn.innerHTML = '📷 Scan HVAC Data Tag';
+
+        const tagStatus = document.createElement('div');
+        tagStatus.className = 'ai-scan-status';
+
+        let tagPreview = null;
+
+        tagInp.onchange = async e => {
           const file = e.target.files[0]; if (!file) return;
-          const fr = new FileReader();
-          fr.onload = ev => {
-            if (!prev) { prev = document.createElement('img'); prev.style='width:100%;border-radius:8px;margin-bottom:8px;border:2px solid #f59e0b;'; wrap.insertBefore(prev,fbtn); }
-            prev.src = ev.target.result;
-            fhint.textContent = 'Photo captured — enter values from the tag in fields above';
-            fhint.style.color = '#166534';
-          };
-          fr.readAsDataURL(file);
+          tagInp.value = '';
+          try {
+            const dataUrl = await compressImage(file);
+            data.hvacTagPhoto = { dataUrl, timestamp: new Date().toISOString() };
+            onChange();
+            if (!tagPreview) {
+              tagPreview = document.createElement('img');
+              tagPreview.className = 'ai-scan-preview';
+              tagSection.insertBefore(tagPreview, tagBtn);
+            }
+            tagPreview.src = dataUrl;
+            tagBtn.disabled = true;
+            tagStatus.textContent = '⏳ Analyzing data tag…';
+            tagStatus.className = 'ai-scan-status ai-scan-loading';
+            const prompt = 'Analyze this HVAC equipment data tag. Extract and return JSON with: filterSize (e.g. "16x25x1"), mervRating (number or null), manufacturer (string or null), modelNumber (string or null), serialNumber (string or null). If any field is not visible or readable, use null. Return ONLY the JSON object, no other text.';
+            const result = await callAnthropic(dataUrl, prompt);
+            const card = wrap.closest('.card');
+            if (result.filterSize) setFieldValue('filterSize', result.filterSize, card);
+            if (result.mervRating != null) setFieldValue('mervRating', result.mervRating, card);
+            if (result.manufacturer) setFieldValue('hvacManufacturer', result.manufacturer, card);
+            if (result.modelNumber) setFieldValue('hvacModel', result.modelNumber, card);
+            if (result.serialNumber) setFieldValue('hvacSerial', result.serialNumber, card);
+            onChange();
+            tagStatus.textContent = '✓ Data tag scanned';
+            tagStatus.className = 'ai-scan-status ai-scan-success';
+          } catch (err) {
+            const isNoKey = err.message === 'NO_KEY';
+            tagStatus.textContent = isNoKey
+              ? 'AI scanning unavailable — please enter manually'
+              : 'Could not read tag — please enter manually';
+            tagStatus.className = 'ai-scan-status ai-scan-error';
+          } finally {
+            tagBtn.disabled = false;
+          }
         };
-        const fbtn = document.createElement('button');
-        fbtn.type = 'button';
-        fbtn.style = 'width:100%;padding:10px;background:#fff8e1;border:2px dashed #f59e0b;border-radius:8px;cursor:pointer;font-weight:700;color:#92400e;font-size:0.9rem;font-family:inherit;';
-        fbtn.textContent = '📷 Photo Filter Data Tag — Enter Values Above';
-        fbtn.onclick = () => finp.click();
-        const fhint = document.createElement('div');
-        fhint.style = 'font-size:11px;color:#64748b;margin-top:4px;';
-        fhint.textContent = 'Take photo of filter tag, then enter size and MERV rating in the fields above';
-        wrap.appendChild(finp); wrap.appendChild(fbtn); wrap.appendChild(fhint);
+        tagBtn.onclick = () => tagInp.click();
+        tagSection.appendChild(tagInp);
+        tagSection.appendChild(tagBtn);
+        tagSection.appendChild(tagStatus);
+
+        // ── FILTER scanner ──────────────────────────────────────
+        const filterSection = document.createElement('div');
+        filterSection.className = 'ai-scan-section';
+
+        const filterInp = document.createElement('input');
+        filterInp.type = 'file'; filterInp.accept = 'image/*'; filterInp.capture = 'environment'; filterInp.style = 'display:none;';
+
+        const filterBtn = document.createElement('button');
+        filterBtn.type = 'button';
+        filterBtn.className = 'ai-scan-btn ai-scan-filter-btn';
+        filterBtn.innerHTML = '📷 Scan Filter';
+
+        const filterStatus = document.createElement('div');
+        filterStatus.className = 'ai-scan-status';
+
+        let filterPreview = null;
+
+        filterInp.onchange = async e => {
+          const file = e.target.files[0]; if (!file) return;
+          filterInp.value = '';
+          try {
+            const dataUrl = await compressImage(file);
+            data.hvacFilterPhoto = { dataUrl, timestamp: new Date().toISOString() };
+            onChange();
+            if (!filterPreview) {
+              filterPreview = document.createElement('img');
+              filterPreview.className = 'ai-scan-preview';
+              filterSection.insertBefore(filterPreview, filterBtn);
+            }
+            filterPreview.src = dataUrl;
+            filterBtn.disabled = true;
+            filterStatus.textContent = '⏳ Analyzing filter…';
+            filterStatus.className = 'ai-scan-status ai-scan-loading';
+            const prompt = 'Analyze this HVAC filter photo. Extract and return JSON with: filterSize (e.g. "16x25x1" or null), mervRating (number or null), filterCondition (one of: "Clean", "Dirty", "Very Dirty", "Damaged"), estimatedAge (one of: "New", "Less than 6 months", "6-12 months", "Over 1 year"), visibleRecallNotice (true or false), notes (any relevant text visible on filter, or null). Return ONLY the JSON object, no other text.';
+            const result = await callAnthropic(dataUrl, prompt);
+            const card = wrap.closest('.card');
+            if (result.filterSize) setFieldValue('filterSize', result.filterSize, card);
+            if (result.mervRating != null) setFieldValue('mervRating', result.mervRating, card);
+            if (result.filterCondition) setFieldValue('filterCondition', result.filterCondition, card);
+            if (result.estimatedAge) setFieldValue('filterEstimatedAge', result.estimatedAge, card);
+            if (result.notes) setFieldValue('filterNotes', result.notes, card);
+            if (result.visibleRecallNotice) {
+              setFieldValue('filterRecallFlag', 'Yes', card);
+              recallBanner.style.display = 'block';
+            }
+            onChange();
+            filterStatus.textContent = '✓ Filter scanned';
+            filterStatus.className = 'ai-scan-status ai-scan-success';
+          } catch (err) {
+            const isNoKey = err.message === 'NO_KEY';
+            filterStatus.textContent = isNoKey
+              ? 'AI scanning unavailable — please enter manually'
+              : 'Could not read filter — please enter manually';
+            filterStatus.className = 'ai-scan-status ai-scan-error';
+          } finally {
+            filterBtn.disabled = false;
+          }
+        };
+        filterBtn.onclick = () => filterInp.click();
+        filterSection.appendChild(filterInp);
+        filterSection.appendChild(filterBtn);
+        filterSection.appendChild(filterStatus);
+
+        wrap.appendChild(tagSection);
+        wrap.appendChild(filterSection);
+        wrap.appendChild(recallBanner);
         return wrap;
       }
       case 'collapsible-section': {
