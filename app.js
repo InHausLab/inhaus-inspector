@@ -9,6 +9,7 @@
   // ── AI Vision Config ──────────────────────────────────────
   // Set this to your Anthropic API key for AI HVAC scanning
   // Leave blank to disable AI scanning (fields can still be filled manually)
+  // Contact Matt to set this API key — needed for AI HVAC scanner and room summaries
   const ANTHROPIC_KEY = '';
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
@@ -1691,45 +1692,6 @@
     root.appendChild(c);
   }
 
-  function renderPrecheck() {
-    const c2 = document.createElement('div');
-    c2.className = 'screen step-screen';
-    c2.appendChild(buildAppHeader('Pre-Inspection Checklist'));
-    const title = document.createElement('h1');
-    title.className = 'screen-title';
-    title.textContent = 'Equipment Check';
-    c2.appendChild(title);
-    const info2 = document.createElement('div');
-    info2.className = 'field-info';
-    info2.style = 'margin-bottom:16px;';
-    info2.textContent = 'Confirm everything is packed and ready before entering the home.';
-    c2.appendChild(info2);
-    const card2 = document.createElement('div');
-    card2.className = 'card';
-    const eqData = getStepData('equipment');
-    const eqGen = STEP_FIELDS['equipment'];
-    if (eqGen) {
-      const eqFields = eqGen();
-      const onEqChange = () => { eqData._updatedAt = new Date().toISOString(); scheduleSave(); UI.updateShowIf(card2, eqData); };
-      eqFields.forEach(f => { const r = UI.renderField(f, eqData, onEqChange, inspection, ()=>scheduleSave()); if (r) card2.appendChild(r); });
-      UI.updateShowIf(card2, eqData);
-    }
-    c2.appendChild(card2);
-    const nav2 = document.createElement('div');
-    nav2.className = 'bottom-nav';
-    const bk = document.createElement('button');
-    bk.className = 'btn btn-outline btn-nav'; bk.textContent = '← Back';
-    bk.onclick = () => { screen = 'home'; render(); };
-    const go = document.createElement('button');
-    go.className = 'btn btn-primary btn-nav';
-    go.textContent = 'Begin Inspection →';
-    go.style = 'background:#2C3F16;';
-    go.onclick = () => { eqData._visited = true; eqData._completedAt = new Date().toISOString(); currentStepIdx = 1; screen = 'step'; saveNow().then(()=>{ render(); window.scrollTo(0,0); }); };
-    nav2.appendChild(bk); nav2.appendChild(go);
-    c2.appendChild(nav2);
-    root.innerHTML = ''; root.appendChild(c2);
-  }
-
   function renderStep() {
     if (currentStepIdx >= stepList.length) { screen = 'review'; render(); return; }
     const step = stepList[currentStepIdx];
@@ -1756,31 +1718,6 @@
             const addr = (inspection.propertyAddress || 'Inspection address').replace(/,/g, '\\,');
             const ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:'+fmt(dt)+'\r\nDTEND:'+fmt(dtEnd)+'\r\nSUMMARY:Radon Pickup - '+addr+'\r\nDESCRIPTION:Pick up Airthings Corentium radon monitor\r\nLOCATION:'+addr+'\r\nEND:VEVENT\r\nEND:VCALENDAR';
             const blob = new Blob([ics], {type:'text/calendar'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href=url; a.download='radon-pickup.ics'; a.click();
-            URL.revokeObjectURL(url);
-          };
-          const card = document.querySelector('.step-screen .card');
-          if (card) card.appendChild(calBtn);
-        }
-      }, 400);
-    }
-    if (step.type === 'debrief') {
-      setTimeout(() => {
-        if (data.radonPickupTime && !document.getElementById('radon-cal-btn')) {
-          const calBtn = document.createElement('button');
-          calBtn.id = 'radon-cal-btn'; calBtn.type = 'button';
-          calBtn.className = 'btn btn-outline btn-full';
-          calBtn.style = 'margin:8px 0;background:#e8f5e9;border-color:#2C3F16;color:#2C3F16;font-weight:700;';
-          calBtn.textContent = '📅 Add Radon Pickup to Calendar';
-          calBtn.onclick = () => {
-            const dt = new Date(data.radonPickupTime);
-            const pad = n => String(n).padStart(2,'0');
-            const fmt = d => d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'T'+pad(d.getHours())+pad(d.getMinutes())+'00';
-            const dtEnd = new Date(dt.getTime()+30*60000);
-            const addr = (inspection.propertyAddress||'Inspection address').replace(/,/g,'\\,');
-            const ics = ['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','DTSTART:'+fmt(dt),'DTEND:'+fmt(dtEnd),'SUMMARY:Radon Pickup - '+addr,'DESCRIPTION:Pick up Airthings Corentium radon monitor','LOCATION:'+addr,'END:VEVENT','END:VCALENDAR'].join('\\r\\n');
-            const blob = new Blob([ics],{type:'text/calendar'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href=url; a.download='radon-pickup.ics'; a.click();
             URL.revokeObjectURL(url);
