@@ -66,31 +66,32 @@
 
   function flirLogFields() {
     return [
-      heading('FLIR Thermal Scan'),
-      checklist('flirGuidance', null, [
-        { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
-        { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
-        { key: 'flirPhotoAll', label: 'Photograph ALL areas of concern' },
-        { key: 'flirPhotoNoConcern', label: 'If no concerns: photograph area where mold test conducted' }
-      ]),
-      check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
-      heading('FLIR Photo Log'),
-      info('Add each room scanned with its FLIR image number'),
-      text('flirImageLabel1', 'FLIR Image Label', { placeholder: 'e.g. Living Room — Image #0023' }),
-      text('flirRoom1', 'Room name'),
-      text('flirImg1', 'FLIR Image #'),
-      text('flirImageLabel2', 'FLIR Image Label', { placeholder: 'e.g. Dining Room — Image #0024' }),
-      text('flirRoom2', 'Room name'),
-      text('flirImg2', 'FLIR Image #'),
-      text('flirImageLabel3', 'FLIR Image Label', { placeholder: 'e.g. Hallway — Image #0025' }),
-      text('flirRoom3', 'Room name'),
-      text('flirImg3', 'FLIR Image #'),
-      text('flirImageLabel4', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0026' }),
-      text('flirRoom4', 'Room name (if needed)'),
-      text('flirImg4', 'FLIR Image #'),
-      text('flirImageLabel5', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0027' }),
-      text('flirRoom5', 'Room name (if needed)'),
-      text('flirImg5', 'FLIR Image #')
+      collapsible('FLIR Thermal Scan & Photo Log', [
+        checklist('flirGuidance', null, [
+          { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
+          { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
+          { key: 'flirPhotoAll', label: 'Photograph ALL areas of concern' },
+          { key: 'flirPhotoNoConcern', label: 'If no concerns: photograph area where mold test conducted' }
+        ]),
+        check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
+        heading('FLIR Photo Log'),
+        info('Add each room scanned with its FLIR image number'),
+        text('flirImageLabel1', 'FLIR Image Label', { placeholder: 'e.g. Living Room — Image #0023' }),
+        text('flirRoom1', 'Room name'),
+        text('flirImg1', 'FLIR Image #'),
+        text('flirImageLabel2', 'FLIR Image Label', { placeholder: 'e.g. Dining Room — Image #0024' }),
+        text('flirRoom2', 'Room name'),
+        text('flirImg2', 'FLIR Image #'),
+        text('flirImageLabel3', 'FLIR Image Label', { placeholder: 'e.g. Hallway — Image #0025' }),
+        text('flirRoom3', 'Room name'),
+        text('flirImg3', 'FLIR Image #'),
+        text('flirImageLabel4', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0026' }),
+        text('flirRoom4', 'Room name (if needed)'),
+        text('flirImg4', 'FLIR Image #'),
+        text('flirImageLabel5', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0027' }),
+        text('flirRoom5', 'Room name (if needed)'),
+        text('flirImg5', 'FLIR Image #')
+      ], { defaultOpen: false })
     ];
   }
 
@@ -310,30 +311,33 @@
       check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
       timer('qtrakOutdoorTimer', 'Q-Trak Outdoor Timer (1 min)', 60),
       divider(),
-      heading('What to Look For'),
-      checklist('exteriorGuidance', null, [
-        { key: 'visualInspection', label: 'Conduct visual inspection of exterior — look for signs that might indicate further investigation inside' },
-        { key: 'leaksStains', label: 'Visible leaks or water stains on exterior walls' },
-        { key: 'poolingWater', label: 'Pooling water or poor drainage near foundation' },
-        { key: 'foundationCracks', label: 'Cracks in foundation or walls' },
-        { key: 'roofDamage', label: 'Damaged or missing roof elements' },
-        { key: 'gapsSeals', label: 'Gaps around windows, doors, or utility penetrations' }
-      ]),
+      collapsible('🔍 What to Look For', [
+        checklist('exteriorGuidance', null, [
+          { key: 'visualInspection', label: 'Conduct visual inspection of exterior — look for signs that might indicate further investigation inside' },
+          { key: 'leaksStains', label: 'Visible leaks or water stains on exterior walls' },
+          { key: 'poolingWater', label: 'Pooling water or poor drainage near foundation' },
+          { key: 'foundationCracks', label: 'Cracks in foundation or walls' },
+          { key: 'roofDamage', label: 'Damaged or missing roof elements' },
+          { key: 'gapsSeals', label: 'Gaps around windows, doors, or utility penetrations' }
+        ])
+      ], { defaultOpen: false }),
       divider(),
       heading('Visual Exterior Inspection'),
       info('Run during mold sample time'),
       chips('sidingTypes', 'Siding Type(s)', ['Wood', 'Brick', 'Stucco', 'Vinyl', 'Fiber Cement', 'Stone', 'Metal', 'Other (specify)']),
       text('moldTestLocations', 'Mold test locations identified'),
-      checklist('exteriorPhotos', 'Photo Checklist', [
-        { key: 'insulationPlumbing', label: 'Insulation around plumbing lines' },
-        { key: 'caulkingFlashing', label: 'Caulking and flashing' },
-        { key: 'lotGrading', label: 'Lot grading' },
-        { key: 'sidingType', label: 'Type of siding' },
-        { key: 'ventsCondition', label: 'Vents condition' },
-        { key: 'iceDamsGutters', label: 'Ice dams / gutters' },
-        { key: 'roofCondition', label: 'Roof condition' },
-        { key: 'weatherScreenshot', label: 'Weather app screenshot' }
-      ]),
+      collapsible('📋 Photo Checklist', [
+        checklist('exteriorPhotos', null, [
+          { key: 'insulationPlumbing', label: 'Insulation around plumbing lines' },
+          { key: 'caulkingFlashing', label: 'Caulking and flashing' },
+          { key: 'lotGrading', label: 'Lot grading' },
+          { key: 'sidingType', label: 'Type of siding' },
+          { key: 'ventsCondition', label: 'Vents condition' },
+          { key: 'iceDamsGutters', label: 'Ice dams / gutters' },
+          { key: 'roofCondition', label: 'Roof condition' },
+          { key: 'weatherScreenshot', label: 'Weather app screenshot' }
+        ])
+      ], { defaultOpen: false }),
       textarea('exteriorNotes', 'Observations & Notes'),
       photo('Exterior Assessment')
     ];
@@ -1836,7 +1840,7 @@
     const backToIntakeBtn = el('button', {
       type: 'button',
       className: 'btn btn-outline btn-small',
-      style: 'position:fixed;top:54px;right:10px;z-index:200;font-size:11px;padding:4px 10px;',
+      style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:10px;z-index:200;font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;justify-content:center;',
       onClick: () => { screen = 'intake'; render(); }
     }, '\u270E Intake');
     c.appendChild(backToIntakeBtn);
@@ -1844,7 +1848,7 @@
     // Search button
     const searchBtn = el('button', {
       type: 'button',
-      style: 'position:fixed;top:54px;right:82px;z-index:200;background:#2C3F16;color:#fff;border:none;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.2);',
+      style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:82px;z-index:200;background:#2C3F16;color:#fff;border:none;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;',
       onClick: () => openSearch()
     }, '\uD83D\uDD0D');
     c.appendChild(searchBtn);

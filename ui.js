@@ -535,8 +535,6 @@
         capInp.style.cssText = 'resize:none;min-height:54px;font-size:0.9rem;line-height:1.4;padding:8px;';
         capInp.addEventListener('input', () => { p.caption = capInp.value; onUpdate(); });
         capRow.appendChild(capInp);
-        const m = micBtn(txt => { capInp.value = (capInp.value ? capInp.value + ' ' : '') + txt; p.caption = capInp.value; onUpdate(); });
-        if (m) capRow.appendChild(m);
         card.appendChild(capRow);
 
         card.appendChild(el('button', {

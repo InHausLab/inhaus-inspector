@@ -67,7 +67,8 @@ body {
 .app-header {
   text-align: center; padding: 0;
   background: var(--primary); border-radius: 0 0 20px 20px;
-  margin: 0 -16px 12px; padding: 15px 20px 12px;
+  margin: 0 -16px 12px;
+  padding: max(15px, env(safe-area-inset-top)) 20px 12px;
 }
 .app-logo {
   display: block; text-align: center; margin-bottom: 6px;
