@@ -750,7 +750,8 @@
   let inspection = null;
   let stepList = [];
   let currentStepIdx = 0;
-  let screen = 'home'; // home | intake | precheck | step | review
+  let screen = 'home'; // home | truck-check | intake | precheck | step | review
+  let _truckCheck = {};
   let saveTimeout = null;
   let lastSaveText = '';
 
@@ -1220,6 +1221,7 @@
     root.innerHTML = ''
     switch (screen) {
       case 'home': renderHome(); break;
+      case 'truck-check': renderTruckCheck(); break;
       case 'intake': renderIntake(); break;
       case 'precheck': renderPrecheck(); break;
       case 'step': renderStep(); break;
@@ -1263,7 +1265,7 @@
 
     c.appendChild(el('button', {
       className: 'btn btn-primary btn-full',
-      onClick: () => { screen = 'intake'; render(); }
+      onClick: () => { screen = 'truck-check'; render(); }
     }, 'New Inspection'));
 
     const list = el('div', { className: 'inspection-list' });
@@ -1326,6 +1328,150 @@
     stepList = buildStepList(inspection);
     screen = 'review';
     render();
+  }
+
+  // ── TRUCK CHECK SCREEN ────────────────────────────────────
+  function renderTruckCheck() {
+    const SECTIONS = [
+      {
+        title: 'Air Testing',
+        items: [
+          { key: 'tc_qtrak',        label: 'Q-Trak 7585 — charged, previous data deleted, rooms configured', required: true },
+          { key: 'tc_flir',         label: 'FLIR MR277', required: true },
+          { key: 'tc_corentium',    label: 'Airthings Corentium Pro + charging cube', required: true },
+          { key: 'tc_breezePump',   label: 'Breeze ET pump + tripod', required: true },
+          { key: 'tc_breezeTraps',  label: 'Breeze ST spore traps (6)', required: true },
+          { key: 'tc_breezeSwabs',  label: 'Breeze mold swabs (2)', required: true },
+          { key: 'tc_boulderFan',   label: 'Boulder Blue fan + filter', required: true }
+        ]
+      },
+      {
+        title: 'Water Testing',
+        items: [
+          { key: 'tc_waterPanel',   label: 'Full panel water test kit (SafeHome)', required: true },
+          { key: 'tc_pfas',         label: 'PFAS test kit (Cyclopure)', required: false },
+          { key: 'tc_microplastic', label: 'Microplastics test kit (Brooks Applied Labs)', required: false }
+        ]
+      },
+      {
+        title: 'Surface Testing',
+        items: [
+          { key: 'tc_atpDevice',    label: 'ATP device (SystemSURE Plus)', required: true },
+          { key: 'tc_atpSwabs',     label: 'ATP swabs (2) — refrigerated, bring ice pack', required: true }
+        ]
+      },
+      {
+        title: 'Other Equipment',
+        items: [
+          { key: 'tc_dewalt',       label: 'Dewalt vacuum + attachments + bendy light', required: true },
+          { key: 'tc_endoscope',    label: 'Endoscope', required: true },
+          { key: 'tc_tape',         label: 'Measuring tape', required: true },
+          { key: 'tc_cleaning',     label: 'Cleaning supplies', required: true }
+        ]
+      },
+      {
+        title: 'Personal / Safety',
+        items: [
+          { key: 'tc_shoeCovers',   label: 'Shoe covers', required: true },
+          { key: 'tc_n95',          label: 'N95 masks', required: true },
+          { key: 'tc_gloves',       label: 'Nitrile gloves', required: true },
+          { key: 'tc_sanitizer',    label: 'Hand sanitizer', required: true }
+        ]
+      },
+      {
+        title: 'Technology',
+        items: [
+          { key: 'tc_ipad',         label: 'iPad — fully charged, all apps downloaded', required: true },
+          { key: 'tc_airthingsApp', label: 'Airthings app installed', required: true },
+          { key: 'tc_airthingsVP',  label: 'Airthings View Plus app installed', required: true }
+        ]
+      },
+      {
+        title: 'Shipping Supplies',
+        items: [
+          { key: 'tc_fedexLabel',   label: 'FedEx prepaid label (Breeze STs)', required: true },
+          { key: 'tc_upsLabel',     label: 'UPS label (Boulder Blue)', required: true },
+          { key: 'tc_waterLabel',   label: 'Safe Home water panel — prepaid label + package', required: true },
+          { key: 'tc_cyclopureLabel', label: 'Cyclopure — prepaid label + package', required: false }
+        ]
+      }
+    ];
+
+    const allRequired = SECTIONS.flatMap(s => s.items.filter(i => i.required));
+
+    function countChecked() {
+      return SECTIONS.flatMap(s => s.items).filter(i => !!_truckCheck[i.key]).length;
+    }
+    function totalItems() {
+      return SECTIONS.flatMap(s => s.items).length;
+    }
+    function allRequiredChecked() {
+      return allRequired.every(i => !!_truckCheck[i.key]);
+    }
+
+    const c = el('div', { className: 'screen' });
+    c.appendChild(buildAppHeader());
+
+    // Reset / back link
+    const resetBar = el('div', { className: 'truck-check-reset-bar' });
+    const resetLink = el('button', {
+      className: 'btn-link',
+      onClick: () => { screen = 'home'; render(); }
+    }, '← Back to Home');
+    resetBar.appendChild(resetLink);
+    c.appendChild(resetBar);
+
+    const card = el('div', { className: 'card' });
+
+    // Header
+    card.appendChild(el('h2', { className: 'screen-title' }, '🚛 Loading Truck Checklist'));
+    card.appendChild(el('p', { className: 'truck-check-subtitle' }, 'Check off every item before leaving'));
+
+    // Progress counter
+    const progressEl = el('div', { className: 'truck-check-progress' }, countChecked() + ' of ' + totalItems() + ' items checked');
+    card.appendChild(progressEl);
+
+    // Sections
+    SECTIONS.forEach(section => {
+      card.appendChild(el('div', { className: 'section-heading' }, section.title));
+      section.items.forEach(item => {
+        const box = el('div', {
+          className: 'check-box' + (_truckCheck[item.key] ? ' checked' : '')
+        }, _truckCheck[item.key] ? '\u2713' : '');
+        const labelText = item.label + (!item.required ? ' (optional)' : '');
+        const row = el('div', {
+          className: 'check-item' + (!item.required ? ' optional-item' : ''),
+          onClick: () => {
+            _truckCheck[item.key] = !_truckCheck[item.key];
+            box.className = 'check-box' + (_truckCheck[item.key] ? ' checked' : '');
+            box.textContent = _truckCheck[item.key] ? '\u2713' : '';
+            const checked = countChecked();
+            progressEl.textContent = checked + ' of ' + totalItems() + ' items checked';
+            continueBtn.className = 'btn btn-full ' + (allRequiredChecked() ? 'btn-primary' : 'btn-disabled');
+            continueBtn.disabled = !allRequiredChecked();
+          }
+        });
+        row.appendChild(box);
+        row.appendChild(el('div', { className: 'check-label' }, labelText));
+        card.appendChild(row);
+      });
+    });
+
+    // Continue button
+    const ready = allRequiredChecked();
+    const continueBtn = el('button', {
+      className: 'btn btn-full ' + (ready ? 'btn-primary' : 'btn-disabled'),
+      disabled: !ready,
+      onClick: () => {
+        if (!allRequiredChecked()) return;
+        screen = 'intake';
+        render();
+      }
+    }, 'Continue \u2192');
+
+    card.appendChild(el('div', { style: 'margin-top: 1.5rem;' }, [continueBtn]));
+    c.appendChild(card);
+    root.appendChild(c);
   }
 
   // ── INTAKE SCREEN ──────────────────────────────────────────
@@ -1400,8 +1546,8 @@
 
     const nav = el('div', { className: 'bottom-nav' }, [
       el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
-        if (isEdit) { screen = 'step'; render(); } else { screen = 'home'; render(); }
-      } }, isEdit ? '\u2190 Back to Steps' : 'Cancel'),
+        if (isEdit) { screen = 'step'; render(); } else { screen = 'truck-check'; render(); }
+      } }, isEdit ? '\u2190 Back to Steps' : '\u2190 Back'),
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
         const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms', 'waterSource'];
         const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
@@ -1420,7 +1566,8 @@
             stepData: {},
             timers: {},
             dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
-            _lastStepIdx: 0
+            _lastStepIdx: 0,
+            truckCheck: Object.assign({}, _truckCheck)
           };
           stepList = buildStepList(inspection);
           currentStepIdx = 0;
