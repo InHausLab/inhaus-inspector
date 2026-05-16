@@ -513,6 +513,418 @@
     return g;
   }
 
+  // ── Photo Annotation Editor ────────────────────────────────
+  function openAnnotationEditor(photo, onSave) {
+    var COLORS = { red: '#FF3B30', yellow: '#FFCC00', white: '#FFFFFF', black: '#000000' };
+    var srcUrl = photo.originalDataUrl || photo.dataUrl;
+    var annotations = (photo.annotations && photo.annotations.length)
+      ? JSON.parse(JSON.stringify(photo.annotations))
+      : [];
+    var activeTool = 'circle';
+    var activeColor = 'red';
+    var selectedId = null;
+    var dragState = null;
+    var svgW = 1, svgH = 1;
+
+    // ── Build DOM ──────────────────────────────────────────────
+    var overlay = document.createElement('div');
+    overlay.className = 'annot-overlay';
+    overlay.id = 'annotation-overlay';
+
+    var header = document.createElement('div');
+    header.className = 'annot-header';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'annot-btn annot-cancel';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function() { document.removeEventListener('keydown', keyHandler); overlay.remove(); };
+    var titleEl = document.createElement('span');
+    titleEl.className = 'annot-title';
+    titleEl.textContent = 'Annotate Photo';
+    var doneBtn = document.createElement('button');
+    doneBtn.type = 'button';
+    doneBtn.className = 'annot-btn annot-done';
+    doneBtn.textContent = 'Done';
+    doneBtn.onclick = function() { saveAnnotation(); };
+    header.appendChild(cancelBtn);
+    header.appendChild(titleEl);
+    header.appendChild(doneBtn);
+
+    var toolbar = document.createElement('div');
+    toolbar.className = 'annot-toolbar';
+    var toolsRow = document.createElement('div');
+    toolsRow.className = 'annot-tools';
+    var circleBtn = document.createElement('button');
+    circleBtn.type = 'button';
+    circleBtn.className = 'annot-tool active';
+    circleBtn.textContent = '\u25cb  Circle';
+    circleBtn.onclick = function() { activeTool = 'circle'; circleBtn.classList.add('active'); arrowBtn.classList.remove('active'); };
+    var arrowBtn = document.createElement('button');
+    arrowBtn.type = 'button';
+    arrowBtn.className = 'annot-tool';
+    arrowBtn.textContent = '\u2192  Arrow';
+    arrowBtn.onclick = function() { activeTool = 'arrow'; arrowBtn.classList.add('active'); circleBtn.classList.remove('active'); };
+    toolsRow.appendChild(circleBtn);
+    toolsRow.appendChild(arrowBtn);
+    var colorRow = document.createElement('div');
+    colorRow.className = 'annot-colors';
+    ['red','yellow','white','black'].forEach(function(name) {
+      var dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'annot-color' + (name === 'red' ? ' selected' : '');
+      dot.style.background = COLORS[name];
+      if (name === 'white') dot.style.border = '2px solid #999';
+      dot.title = name;
+      dot.onclick = function() {
+        activeColor = name;
+        colorRow.querySelectorAll('.annot-color').forEach(function(d) { d.classList.remove('selected'); });
+        dot.classList.add('selected');
+      };
+      colorRow.appendChild(dot);
+    });
+    toolbar.appendChild(toolsRow);
+    toolbar.appendChild(colorRow);
+
+    var canvasArea = document.createElement('div');
+    canvasArea.className = 'annot-canvas-area';
+    var photoImg = document.createElement('img');
+    photoImg.className = 'annot-photo';
+    photoImg.src = srcUrl;
+    photoImg.draggable = false;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svg.style.cssText = 'position:absolute;cursor:crosshair;touch-action:none;';
+    canvasArea.appendChild(photoImg);
+    canvasArea.appendChild(svg);
+
+    var bottomBar = document.createElement('div');
+    bottomBar.className = 'annot-bottom';
+    var undoBtn = document.createElement('button');
+    undoBtn.type = 'button';
+    undoBtn.className = 'annot-action-btn';
+    undoBtn.textContent = '\u21a9 Undo';
+    undoBtn.onclick = function() {
+      if (annotations.length) { annotations.pop(); selectedId = null; renderAnnot(); }
+    };
+    var instrEl = document.createElement('span');
+    instrEl.className = 'annot-instructions';
+    instrEl.textContent = 'Tap to place \u2022 Drag handles to resize';
+    var clearAllBtn = document.createElement('button');
+    clearAllBtn.type = 'button';
+    clearAllBtn.className = 'annot-action-btn';
+    clearAllBtn.textContent = '\u2715 Clear All';
+    clearAllBtn.onclick = function() {
+      if (!annotations.length) return;
+      if (confirm('Remove all annotations?')) { annotations = []; selectedId = null; renderAnnot(); }
+    };
+    bottomBar.appendChild(undoBtn);
+    bottomBar.appendChild(instrEl);
+    bottomBar.appendChild(clearAllBtn);
+
+    overlay.appendChild(header);
+    overlay.appendChild(toolbar);
+    overlay.appendChild(canvasArea);
+    overlay.appendChild(bottomBar);
+    document.body.appendChild(overlay);
+
+    // ── SVG Layout ─────────────────────────────────────────────
+    function layoutSvg() {
+      if (!svgW || !svgH) return;
+      var r = canvasArea.getBoundingClientRect();
+      var aW = r.width, aH = r.height;
+      if (!aW || !aH) return;
+      var imgAR = svgW / svgH, areaAR = aW / aH;
+      var dW, dH;
+      if (imgAR > areaAR) { dW = aW; dH = aW / imgAR; }
+      else { dH = aH; dW = aH * imgAR; }
+      var oX = (aW - dW) / 2, oY = (aH - dH) / 2;
+      svg.style.width = dW + 'px';
+      svg.style.height = dH + 'px';
+      svg.style.left = oX + 'px';
+      svg.style.top = oY + 'px';
+    }
+
+    function init() {
+      svgW = photoImg.naturalWidth || 1200;
+      svgH = photoImg.naturalHeight || 900;
+      svg.setAttribute('viewBox', '0 0 ' + svgW + ' ' + svgH);
+      requestAnimationFrame(function() { layoutSvg(); renderAnnot(); });
+    }
+
+    photoImg.onload = init;
+    if (photoImg.complete && photoImg.naturalWidth) init();
+
+    // ── Coordinate Conversion ─────────────────────────────────
+    function svgPt(clientX, clientY) {
+      var r = svg.getBoundingClientRect();
+      if (!r.width || !r.height) return { x: 0, y: 0 };
+      return { x: (clientX - r.left) / r.width * svgW, y: (clientY - r.top) / r.height * svgH };
+    }
+
+    function genId() { return 'a' + Math.random().toString(36).substr(2, 8); }
+
+    function getHandles(a) {
+      if (a.type === 'circle') return [
+        {x: a.cx, y: a.cy - a.r}, {x: a.cx, y: a.cy + a.r},
+        {x: a.cx - a.r, y: a.cy}, {x: a.cx + a.r, y: a.cy}
+      ];
+      if (a.type === 'arrow') return [{x: a.x1, y: a.y1}, {x: a.x2, y: a.y2}];
+      return [];
+    }
+
+    var HANDLE_HIT = 28;
+
+    function findHandle(pt) {
+      if (!selectedId) return null;
+      var a = null;
+      for (var i = 0; i < annotations.length; i++) { if (annotations[i].id === selectedId) { a = annotations[i]; break; } }
+      if (!a) return null;
+      var handles = getHandles(a);
+      for (var j = 0; j < handles.length; j++) {
+        if (Math.hypot(pt.x - handles[j].x, pt.y - handles[j].y) < HANDLE_HIT) return j;
+      }
+      return null;
+    }
+
+    function findAnnot(pt) {
+      for (var i = annotations.length - 1; i >= 0; i--) {
+        var a = annotations[i];
+        if (a.type === 'circle') {
+          if (Math.hypot(pt.x - a.cx, pt.y - a.cy) <= a.r + 20) return a;
+        } else if (a.type === 'arrow') {
+          var dx = a.x2 - a.x1, dy = a.y2 - a.y1;
+          var len = Math.hypot(dx, dy);
+          if (len < 1) continue;
+          var t = Math.max(0, Math.min(1, ((pt.x - a.x1) * dx + (pt.y - a.y1) * dy) / (len * len)));
+          var cx = a.x1 + t * dx, cy = a.y1 + t * dy;
+          if (Math.hypot(pt.x - cx, pt.y - cy) < 20) return a;
+        }
+      }
+      return null;
+    }
+
+    // ── Render Annotations ────────────────────────────────────
+    function appendDeleteBtn(x, y, annotId) {
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('data-delete-id', annotId);
+      g.style.cursor = 'pointer';
+      var circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circ.setAttribute('cx', x); circ.setAttribute('cy', y); circ.setAttribute('r', 20);
+      circ.setAttribute('fill', '#dc2626');
+      var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      txt.setAttribute('x', x); txt.setAttribute('y', String(parseFloat(y) + 7));
+      txt.setAttribute('text-anchor', 'middle');
+      txt.setAttribute('fill', 'white'); txt.setAttribute('font-size', '22');
+      txt.setAttribute('font-weight', 'bold'); txt.setAttribute('pointer-events', 'none');
+      txt.textContent = '\u00d7';
+      g.appendChild(circ); g.appendChild(txt);
+      svg.appendChild(g);
+    }
+
+    function renderAnnot() {
+      svg.innerHTML = '';
+      annotations.forEach(function(a) {
+        var isSel = a.id === selectedId;
+        var color = COLORS[a.color] || '#FF3B30';
+        var sw = isSel ? 4 : 3;
+
+        if (a.type === 'circle') {
+          var circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circ.setAttribute('cx', a.cx); circ.setAttribute('cy', a.cy); circ.setAttribute('r', a.r);
+          circ.setAttribute('fill', 'none'); circ.setAttribute('stroke', color); circ.setAttribute('stroke-width', sw);
+          svg.appendChild(circ);
+          if (isSel) {
+            getHandles(a).forEach(function(h) {
+              var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              rect.setAttribute('x', h.x - 12); rect.setAttribute('y', h.y - 12);
+              rect.setAttribute('width', 24); rect.setAttribute('height', 24);
+              rect.setAttribute('fill', 'white'); rect.setAttribute('stroke', '#333'); rect.setAttribute('stroke-width', 2);
+              rect.setAttribute('rx', 3);
+              svg.appendChild(rect);
+            });
+            var dAngle = -Math.PI / 4;
+            appendDeleteBtn(
+              a.cx + (a.r + 22) * Math.cos(dAngle),
+              a.cy + (a.r + 22) * Math.sin(dAngle),
+              a.id
+            );
+          }
+
+        } else if (a.type === 'arrow') {
+          var dx = a.x2 - a.x1, dy = a.y2 - a.y1;
+          var len = Math.hypot(dx, dy);
+          var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', a.x1); line.setAttribute('y1', a.y1);
+          line.setAttribute('x2', a.x2); line.setAttribute('y2', a.y2);
+          line.setAttribute('stroke', color); line.setAttribute('stroke-width', sw);
+          svg.appendChild(line);
+          if (len > 1) {
+            var arrowSz = Math.max(20, Math.min(30, svgW * 0.025));
+            var ux = dx / len, uy = dy / len;
+            var px = -uy, py = ux;
+            var pts = [
+              a.x2 + ',' + a.y2,
+              (a.x2 - ux * arrowSz + px * arrowSz * 0.4) + ',' + (a.y2 - uy * arrowSz + py * arrowSz * 0.4),
+              (a.x2 - ux * arrowSz - px * arrowSz * 0.4) + ',' + (a.y2 - uy * arrowSz - py * arrowSz * 0.4)
+            ].join(' ');
+            var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            poly.setAttribute('points', pts); poly.setAttribute('fill', color);
+            svg.appendChild(poly);
+          }
+          if (isSel) {
+            getHandles(a).forEach(function(h) {
+              var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              rect.setAttribute('x', h.x - 12); rect.setAttribute('y', h.y - 12);
+              rect.setAttribute('width', 24); rect.setAttribute('height', 24);
+              rect.setAttribute('fill', 'white'); rect.setAttribute('stroke', '#333'); rect.setAttribute('stroke-width', 2);
+              rect.setAttribute('rx', 3);
+              svg.appendChild(rect);
+            });
+            appendDeleteBtn(a.x2 + 28, a.y2 - 28, a.id);
+          }
+        }
+      });
+    }
+
+    // ── Pointer Events ────────────────────────────────────────
+    svg.addEventListener('pointerdown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      svg.setPointerCapture(e.pointerId);
+      var pt = svgPt(e.clientX, e.clientY);
+
+      // Check delete button
+      var el2 = e.target;
+      while (el2 && el2 !== svg) {
+        var delId = el2.getAttribute('data-delete-id');
+        if (delId) {
+          annotations = annotations.filter(function(a) { return a.id !== delId; });
+          selectedId = null; renderAnnot(); return;
+        }
+        el2 = el2.parentElement;
+      }
+
+      // Check handle on selected annotation
+      var handleIdx = findHandle(pt);
+      if (handleIdx !== null) {
+        var selAnnot = null;
+        for (var i = 0; i < annotations.length; i++) { if (annotations[i].id === selectedId) { selAnnot = annotations[i]; break; } }
+        if (selAnnot) {
+          dragState = { type: 'handle', annotId: selectedId, hi: handleIdx, sx: pt.x, sy: pt.y, orig: JSON.parse(JSON.stringify(selAnnot)) };
+          return;
+        }
+      }
+
+      // Check body hit
+      var hit = findAnnot(pt);
+      if (hit) {
+        selectedId = hit.id;
+        dragState = { type: 'body', annotId: hit.id, sx: pt.x, sy: pt.y, orig: JSON.parse(JSON.stringify(hit)) };
+        renderAnnot(); return;
+      }
+
+      // Place new annotation
+      selectedId = null;
+      var color = activeColor;
+      if (activeTool === 'circle') {
+        var defR = Math.max(30, Math.min(80, svgW * 0.04));
+        var newA = { type: 'circle', id: genId(), cx: pt.x, cy: pt.y, r: defR, color: color };
+        annotations.push(newA); selectedId = newA.id;
+      } else {
+        var cX = svgW / 2, cY = svgH / 2;
+        var ddx = cX - pt.x, ddy = cY - pt.y;
+        var dist = Math.hypot(ddx, ddy) || 1;
+        var arrowLen = Math.max(60, Math.min(svgW * 0.12, 150));
+        var newArr = { type: 'arrow', id: genId(), x1: pt.x, y1: pt.y, x2: pt.x + ddx / dist * arrowLen, y2: pt.y + ddy / dist * arrowLen, color: color };
+        annotations.push(newArr); selectedId = newArr.id;
+      }
+      renderAnnot();
+    });
+
+    svg.addEventListener('pointermove', function(e) {
+      if (!dragState) return;
+      e.preventDefault();
+      var pt = svgPt(e.clientX, e.clientY);
+      var a = null;
+      for (var i = 0; i < annotations.length; i++) { if (annotations[i].id === dragState.annotId) { a = annotations[i]; break; } }
+      if (!a) return;
+      var o = dragState.orig;
+      var dx = pt.x - dragState.sx, dy = pt.y - dragState.sy;
+
+      if (dragState.type === 'body') {
+        if (a.type === 'circle') { a.cx = o.cx + dx; a.cy = o.cy + dy; }
+        else if (a.type === 'arrow') { a.x1 = o.x1 + dx; a.y1 = o.y1 + dy; a.x2 = o.x2 + dx; a.y2 = o.y2 + dy; }
+      } else if (dragState.type === 'handle') {
+        if (a.type === 'circle') {
+          var hi = dragState.hi;
+          if (hi === 0) a.r = Math.max(10, o.cy - pt.y);
+          else if (hi === 1) a.r = Math.max(10, pt.y - o.cy);
+          else if (hi === 2) a.r = Math.max(10, o.cx - pt.x);
+          else if (hi === 3) a.r = Math.max(10, pt.x - o.cx);
+        } else if (a.type === 'arrow') {
+          if (dragState.hi === 0) { a.x1 = pt.x; a.y1 = pt.y; }
+          else { a.x2 = pt.x; a.y2 = pt.y; }
+        }
+      }
+      renderAnnot();
+    });
+
+    svg.addEventListener('pointerup', function() { dragState = null; });
+    svg.addEventListener('pointercancel', function() { dragState = null; });
+
+    var keyHandler = function(e) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && document.getElementById('annotation-overlay')) {
+        annotations = annotations.filter(function(a) { return a.id !== selectedId; });
+        selectedId = null; renderAnnot();
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    // ── Save ──────────────────────────────────────────────────
+    function saveAnnotation() {
+      document.removeEventListener('keydown', keyHandler);
+      if (!annotations.length) { overlay.remove(); return; }
+      var canv = document.createElement('canvas');
+      var baseImg = new Image();
+      baseImg.onload = function() {
+        canv.width = baseImg.naturalWidth;
+        canv.height = baseImg.naturalHeight;
+        var ctx = canv.getContext('2d');
+        ctx.drawImage(baseImg, 0, 0);
+        var scX = canv.width / svgW, scY = canv.height / svgH;
+        annotations.forEach(function(a) {
+          var color = COLORS[a.color] || '#FF3B30';
+          ctx.strokeStyle = color; ctx.fillStyle = color;
+          ctx.lineWidth = 3 * Math.max(scX, scY);
+          if (a.type === 'circle') {
+            ctx.beginPath();
+            ctx.arc(a.cx * scX, a.cy * scY, a.r * scX, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if (a.type === 'arrow') {
+            var dx = a.x2 - a.x1, dy = a.y2 - a.y1;
+            var len = Math.hypot(dx, dy);
+            if (len < 1) return;
+            var ux = dx / len, uy = dy / len, ppx = -uy, ppy = ux;
+            var arrowSz = Math.max(20, Math.min(30, svgW * 0.025)) * Math.max(scX, scY);
+            var x1 = a.x1 * scX, y1 = a.y1 * scY, x2 = a.x2 * scX, y2 = a.y2 * scY;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - ux * arrowSz + ppx * arrowSz * 0.4, y2 - uy * arrowSz + ppy * arrowSz * 0.4);
+            ctx.lineTo(x2 - ux * arrowSz - ppx * arrowSz * 0.4, y2 - uy * arrowSz - ppy * arrowSz * 0.4);
+            ctx.closePath(); ctx.fill();
+          }
+        });
+        if (!photo.originalDataUrl) photo.originalDataUrl = photo.dataUrl;
+        photo.dataUrl = canv.toDataURL('image/jpeg', 0.85);
+        photo.annotations = JSON.parse(JSON.stringify(annotations));
+        onSave();
+        overlay.remove();
+      };
+      baseImg.src = srcUrl;
+    }
+  }
+
   // ── Field: Photo Capture ───────────────────────────────────
   function renderPhoto(photos, onUpdate, roomName, stepName) {
     if (!photos) photos = [];
@@ -548,6 +960,18 @@
             }
           }
         }, '\u00d7'));
+        card.appendChild(el('button', {
+          type: 'button', className: 'photo-annotate-btn',
+          title: 'Annotate',
+          onClick: (e) => {
+            e.stopPropagation();
+            openAnnotationEditor(p, function() {
+              onUpdate();
+              const newSection = renderPhoto(photos, onUpdate, roomName, stepName);
+              section.replaceWith(newSection);
+            });
+          }
+        }, '\u270F\uFE0F'));
         grid.appendChild(card);
       });
       section.appendChild(grid);
@@ -1169,6 +1593,6 @@
     renderText, renderTextarea, renderNumber, renderSelect, renderYesNo, renderRadio,
     renderCheck, renderChecklist, renderChips, renderReading, renderPhoto, renderTimer,
     renderHeading, renderInfo, renderDivider, compressImage, playAlert, fmtDate, fmtDuration,
-    micBtn, showToast, flashUncheckedItems, updateShowIf
+    micBtn, showToast, flashUncheckedItems, updateShowIf, openAnnotationEditor
   };
 })();
