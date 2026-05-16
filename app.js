@@ -1053,14 +1053,24 @@
 
   // ── Room Navigation Drawer ─────────────────────────────────
   function buildRoomDrawer() {
+    // Sections match the inspection workflow levels
+    // addRooms: array of { label, section, prefix } for add-room buttons at bottom of section
     const DRAWER_GROUPS = [
-      { label: 'SETUP', phases: ['setup', 'arrival', 'exterior'] },
-      { label: 'LOWER LEVEL', phases: ['lowest', 'utility'] },
-      { label: 'UPPER LEVEL', phases: ['upper'] },
-      { label: 'BEDROOMS & BATHROOMS', phases: ['rooms'] },
-      { label: 'MAIN LEVEL', phases: ['main'] },
-      { label: 'ADDITIONAL ROOMS', phases: ['supplementary'] },
-      { label: 'WRAP-UP', phases: ['wrapup', 'propdetails', 'post'] }
+      { label: 'Setup', phases: ['setup', 'arrival'] },
+      { label: 'Exterior', phases: ['exterior'] },
+      { label: 'Lowest Level', phases: ['lowest'], addRooms: [
+        { label: '+ Add Room', section: 'lowest', prefix: null }
+      ]},
+      { label: 'Utility Room', phases: ['utility'] },
+      { label: 'Upper Level', phases: ['upper', 'rooms'], addRooms: [
+        { label: '+ Add Bedroom', section: 'additional', prefix: 'Bedroom' },
+        { label: '+ Add Bathroom', section: 'additional', prefix: 'Bathroom' }
+      ]},
+      { label: 'Main Level', phases: ['main'] },
+      { label: 'Additional Rooms', phases: ['supplementary'], addRooms: [
+        { label: '+ Add Room', section: 'additional', prefix: null }
+      ]},
+      { label: 'Wrap-Up', phases: ['wrapup', 'propdetails', 'post', 'review'] }
     ];
 
     const overlay = el('div', { id: 'room-drawer-overlay', className: 'room-drawer-overlay' });
@@ -1075,7 +1085,8 @@
     const scrollArea = el('div', { className: 'room-drawer-scroll' });
 
     DRAWER_GROUPS.forEach(group => {
-      const groupSteps = stepList.filter(s => group.phases.includes(s.phase) && s.type !== 'review');
+      // All steps in this group's phases — no type restrictions (review included in Wrap-Up)
+      const groupSteps = stepList.filter(s => group.phases.includes(s.phase));
       if (!groupSteps.length) return;
 
       scrollArea.appendChild(el('div', { className: 'room-drawer-group-label' }, group.label));
@@ -1111,13 +1122,23 @@
           statusText ? el('span', { className: 'room-item-status' + (completed ? ' status-done' : ' status-partial') }, statusText) : null
         ]));
       });
-    });
 
-    scrollArea.appendChild(el('button', {
-      type: 'button',
-      className: 'btn btn-outline btn-full room-drawer-add-btn',
-      onClick: () => { overlay.remove(); addDynamicRoom('additional'); }
-    }, '+ Add Room'));
+      // Per-section add-room buttons (Lowest Level, Upper Level, Additional Rooms)
+      if (group.addRooms && group.addRooms.length) {
+        const addRow = el('div', { className: 'room-drawer-section-add' });
+        group.addRooms.forEach(addDef => {
+          addRow.appendChild(el('button', {
+            type: 'button',
+            className: 'room-drawer-add-item-btn',
+            onClick: () => {
+              overlay.remove();
+              addDynamicRoom(addDef.section, addDef.prefix);
+            }
+          }, addDef.label));
+        });
+        scrollArea.appendChild(addRow);
+      }
+    });
 
     drawer.appendChild(scrollArea);
     overlay.appendChild(drawer);
@@ -1779,7 +1800,7 @@
     });
     c.appendChild(renderProgressBar(phasesWithState, currentPhase, step.name, phaseId => {
       const idx = stepList.findIndex(s => s.phase === phaseId);
-      if (idx >= 0 && idx <= currentStepIdx) { currentStepIdx = idx; render(); }
+      if (idx >= 0) { currentStepIdx = idx; render(); }
     }, currentStepIdx + 1, stepList.length));
 
     const phaseSteps = stepList.filter(s => s.phase === currentPhase && s.type !== 'review');

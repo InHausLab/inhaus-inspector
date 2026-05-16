@@ -695,6 +695,20 @@ body {
 .status-partial { color: var(--warning); }
 .room-drawer-add-btn { margin-top: 16px; font-size: 0.95rem; }
 
+/* Per-section add-room buttons inside drawer */
+.room-drawer-section-add {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 6px 0 4px;
+}
+.room-drawer-add-item-btn {
+  background: var(--accent-light); color: var(--primary);
+  border: 2px dashed var(--accent); border-radius: 20px;
+  padding: 7px 16px; font-size: 0.78rem; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+  min-height: 38px; transition: all 0.12s; line-height: 1.2;
+}
+.room-drawer-add-item-btn:active { background: var(--accent); color: #fff; border-style: solid; }
+
 /* ── Search Overlay ──────────────────────── */
 .search-overlay {
   position: fixed; inset: 0;

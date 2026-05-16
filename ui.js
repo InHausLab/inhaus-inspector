@@ -820,15 +820,12 @@
   // ── Progress Bar ───────────────────────────────────────────
   function renderProgressBar(phases, currentPhaseId, stepName, onPhaseClick, stepNumber, totalSteps) {
     const bar = el('div', { className: 'progress-bar' });
-    let pastCurrent = false;
     phases.forEach(p => {
       const isCurrent = p.id === currentPhaseId;
-      if (isCurrent) pastCurrent = true;
-      const isFuture = !isCurrent && pastCurrent && !p.done;
-      const canTap = p.done || isCurrent;
+      // Free navigation — all phases are tappable (v60)
       const dot = el('div', {
-        className: 'phase-dot' + (isCurrent ? ' active' : '') + (p.done ? ' done' : '') + (isFuture ? ' future' : ''),
-        onClick: canTap ? () => onPhaseClick(p.id) : undefined
+        className: 'phase-dot' + (isCurrent ? ' active' : '') + (p.done ? ' done' : ''),
+        onClick: () => onPhaseClick(p.id)
       }, [
         el('div', { className: 'phase-circle' }, p.done ? '\u2713' : p.icon || ''),
         el('div', { className: 'phase-name' }, p.name)
