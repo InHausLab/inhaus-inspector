@@ -789,11 +789,24 @@
     return wrapper;
   }
 
-  // ── Status Bar (save + online) ─────────────────────────────
+  // ── Status Bar (save + online + clock) ──────────────────────
   function renderStatusBar(saveText) {
+    function fmtClock() {
+      const n = new Date();
+      let h = n.getHours(), m = n.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return h + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+    }
+    const clockEl = el('span', { className: 'status-clock', id: 'step-clock' }, fmtClock());
+    const iv = setInterval(() => {
+      if (!document.body.contains(clockEl)) { clearInterval(iv); return; }
+      clockEl.textContent = fmtClock();
+    }, 60000);
     return el('div', { className: 'status-bar' }, [
       el('span', { className: 'save-status', id: 'save-status' }, saveText || ''),
-      el('span', { className: 'online-badge ' + (navigator.onLine ? 'online' : 'offline') }, navigator.onLine ? 'Online' : 'Offline')
+      clockEl,
+      el('span', { className: 'online-badge ' + (navigator.onLine ? 'online' : 'offline') }, navigator.onLine ? '' : '● Offline')
     ]);
   }
 

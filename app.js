@@ -1089,6 +1089,11 @@
           (completed ? ' room-item-done' : '') +
           (visited && !completed ? ' room-item-partial' : '');
 
+        const ROOM_NAMED_TYPES = ['bedroom', 'bathroom', 'room-test', 'additional-room'];
+        const stepRoomName = ROOM_NAMED_TYPES.includes(s.type) &&
+          inspection.stepData && inspection.stepData[s.id] && inspection.stepData[s.id].roomName;
+        const displayName = stepRoomName || s.name;
+
         scrollArea.appendChild(el('div', {
           className: cls,
           onClick: () => {
@@ -1098,7 +1103,7 @@
             window.scrollTo(0, 0);
           }
         }, [
-          el('span', { className: 'room-item-name' }, s.name),
+          el('span', { className: 'room-item-name' }, displayName),
           statusText ? el('span', { className: 'room-item-status' + (completed ? ' status-done' : ' status-partial') }, statusText) : null
         ]));
       });
@@ -1893,6 +1898,16 @@
       currentStepIdx > 0
         ? el('button', { className: 'btn btn-outline btn-nav', onClick: () => { currentStepIdx--; render(); window.scrollTo(0, 0); } }, '\u2190 Back')
         : el('div'),
+      el('button', {
+        type: 'button',
+        className: 'btn btn-outline btn-home',
+        onClick: () => {
+          if (confirm('Return to home? Your progress is saved.')) {
+            screen = 'home';
+            render();
+          }
+        }
+      }, '\uD83C\uDFE0'),
       el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
         const missing = validateStep(step);
         if (missing.length) { showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); flashUncheckedItems(c); return; }
@@ -2257,11 +2272,11 @@
   // ── Init ───────────────────────────────────────────────────
   window.addEventListener('online', () => {
     const badge = document.querySelector('.online-badge');
-    if (badge) { badge.textContent = 'Online'; badge.className = 'online-badge online'; }
+    if (badge) { badge.textContent = ''; badge.className = 'online-badge online'; }
   });
   window.addEventListener('offline', () => {
     const badge = document.querySelector('.online-badge');
-    if (badge) { badge.textContent = 'Offline'; badge.className = 'online-badge offline'; }
+    if (badge) { badge.textContent = '\u25cf Offline'; badge.className = 'online-badge offline'; }
   });
 
   if ('serviceWorker' in navigator) {
