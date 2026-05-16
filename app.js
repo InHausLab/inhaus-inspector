@@ -696,6 +696,10 @@
         { key: 'qtrakExported', label: 'Q-Trak data downloaded locally and exported to spreadsheet' }
       ]),
       divider(),
+      heading('Q-Trak Data'),
+      info('Upload the CSV exported from the Q-Trak device after the inspection'),
+      { type: 'qtrak-upload' },
+      divider(),
       heading('Final Check'),
       checklist('finalCheck', null, [
         { key: 'allSectionsComplete', label: 'All form sections completed' },

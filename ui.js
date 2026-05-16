@@ -757,6 +757,62 @@
       }
       case 'timer':
         return renderTimer(f.timerId || (f.key + '-' + (data._stepId || '')), f.label, f.duration, inspection, onSave);
+      case 'qtrak-upload': {
+        const qWrap = document.createElement('div');
+        qWrap.className = 'field-group';
+        const qFileId = 'qtrak-upload-' + Math.random().toString(36).substr(2, 6);
+        const qFileInp = document.createElement('input');
+        qFileInp.type = 'file';
+        qFileInp.accept = '.csv,.xlsx';
+        qFileInp.id = qFileId;
+        qFileInp.style = 'display:none;';
+        const qExisting = inspection && inspection.qtrakUpload;
+        const qLabel = document.createElement('label');
+        qLabel.htmlFor = qFileId;
+        qLabel.style = [
+          'display:flex', 'flex-direction:column', 'align-items:center', 'justify-content:center',
+          'border:2px dashed #2C3F16', 'border-radius:12px', 'padding:24px 16px',
+          'cursor:pointer', 'background:#f0f7ee', 'gap:8px', 'text-align:center',
+          'width:100%', 'box-sizing:border-box', 'margin:4px 0'
+        ].join(';');
+        function qUpdateLabel(filename) {
+          if (filename) {
+            qLabel.innerHTML = '<span style="font-size:1.8rem">\u2705</span>' +
+              '<span style="font-weight:700;color:#166534;font-size:0.95rem">' +
+              '\u2713 ' + filename + ' loaded</span>' +
+              '<span style="font-size:11px;color:#64748b">Tap to replace</span>';
+          } else {
+            qLabel.innerHTML = '<span style="font-size:1.8rem">\u2601\uFE0F</span>' +
+              '<span style="font-weight:700;color:#2C3F16;font-size:0.95rem">Tap to upload Q-Trak file</span>' +
+              '<span style="font-size:11px;color:#64748b">.csv or .xlsx accepted</span>';
+          }
+        }
+        qUpdateLabel(qExisting && qExisting.filename);
+        qFileInp.onchange = function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            if (inspection) {
+              inspection.qtrakUpload = {
+                filename: file.name,
+                content: ev.target.result,
+                uploadedAt: new Date().toISOString()
+              };
+            }
+            qUpdateLabel(file.name);
+            onChange();
+          };
+          if (file.name.toLowerCase().endsWith('.csv')) {
+            reader.readAsText(file);
+          } else {
+            reader.readAsDataURL(file);
+          }
+        };
+        qWrap.appendChild(qFileInp);
+        qWrap.appendChild(qLabel);
+        return qWrap;
+      }
       default: return null;
     }
   }
