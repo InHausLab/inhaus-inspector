@@ -175,59 +175,15 @@
 
   function getEquipmentFields() {
     return [
-      checklist('preAssessment', 'Pre-Assessment', [
-        { key: 'reviewConcerns', label: 'Review customer concerns from customer intake form' },
-        { key: 'reviewTechForm', label: 'Review and complete pre-assessment section of the technician form' },
-        { key: 'reviewHome', label: 'Review home for general details (layout, etc.)' },
-        { key: 'devicesCharged', label: 'All devices charged' },
-        { key: 'corentiumRegistered', label: 'Airthings Corentium Pro registered to house (radon monitor)' },
+      info('Equipment was already verified at the truck. Complete these on-site steps before starting.'),
+      link('\uD83D\uDCCB Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
+      checklist('preAssessment', 'Before You Start', [
+        { key: 'reviewConcerns', label: 'Review customer concerns from intake form' },
+        { key: 'reviewHome', label: 'Walk through home \u2014 note layout, levels, access points' },
+        { key: 'corentiumRegistered', label: 'Airthings Corentium Pro registered to this property' },
         { key: 'waterTestsActivated', label: 'Water tests activated' },
         { key: 'radonPrepared', label: 'Radon test prepared' },
-        { key: 'qtrakSetup', label: 'Q-Trak device set up (previous data deleted, room templates configured)' }
-      ]),
-      link('\uD83D\uDCCB Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
-      checklist('airEquip', 'Air Testing Equipment', [
-        { key: 'qtrak', label: 'Q-Trak 7585 \u2014 charged, previous data deleted, rooms configured' },
-
-        { key: 'flir', label: 'FLIR MR277' },
-        { key: 'airthings', label: 'Airthings Corentium Pro (radon monitor app) device + charging cube' },
-        { key: 'breezeET', label: 'Breeze ET pump + tripod' },
-        { key: 'breezeST', label: 'Breeze ST spore traps (6)' },
-        { key: 'breezeSwabs', label: 'Breeze mold swabs (2)' },
-        { key: 'boulderBlue', label: 'Boulder Blue fan + filter' }
-      ]),
-
-      checklist('waterEquip', 'Water Testing', [
-        { key: 'waterKit', label: 'Full panel water test kit (SafeHome)' },
-        { key: 'pfasKit', label: 'PFAS test kit (Cyclopure)', optional: true },
-        { key: 'microKit', label: 'Microplastics test kit (Brooks Applied Labs)', optional: true }
-      ]),
-      checklist('surfaceEquip', 'Surface Testing', [
-        { key: 'atpDevice', label: 'ATP device (SystemSURE Plus)' },
-        { key: 'atpSwabs', label: 'ATP swabs (2) \u2014 refrigerated, bring ice pack' }
-      ]),
-      checklist('otherEquip', 'Other Equipment', [
-        { key: 'vacuum', label: 'Dewalt vacuum + attachments + bendy light' },
-        { key: 'endoscope', label: 'Endoscope' },
-        { key: 'tape', label: 'Measuring tape' },
-        { key: 'cleaning', label: 'Cleaning supplies' }
-      ]),
-      checklist('safetyEquip', 'Personal / Safety', [
-        { key: 'shoeCovers', label: 'Shoe covers' },
-        { key: 'n95', label: 'N95 masks' },
-        { key: 'gloves', label: 'Nitrile gloves' },
-        { key: 'sanitizer', label: 'Hand sanitizer' }
-      ]),
-      checklist('techEquip', 'Technology', [
-        { key: 'ipad', label: 'iPad \u2014 fully charged, all apps downloaded' },
-        { key: 'airthingsApp', label: 'Airthings app' },
-        { key: 'viewPlusApp', label: 'Airthings View Plus app' }
-      ]),
-      checklist('shippingEquip', 'Shipping Supplies', [
-        { key: 'fedex', label: 'FedEx prepaid label (Breeze STs)' },
-        { key: 'ups', label: 'UPS label (Boulder Blue)' },
-        { key: 'safeHome', label: 'Safe Home water panel \u2014 prepaid label + package' },
-        { key: 'cyclopure', label: 'Cyclopure \u2014 prepaid label + package', optional: true }
+        { key: 'qtrakSetup', label: 'Q-Trak configured (previous data deleted, rooms set up)' }
       ])
     ];
   }
