@@ -10,7 +10,8 @@
   // Set this to your Anthropic API key for AI HVAC scanning
   // Leave blank to disable AI scanning (fields can still be filled manually)
   // Contact Matt to set this API key — needed for AI HVAC scanner and room summaries
-  const ANTHROPIC_KEY = '';
+  // Key stored in localStorage u2014 never hardcoded (enter via u2699ufe0f Settings on home screen)
+  const ANTHROPIC_KEY = localStorage.getItem('inhaus_anthropic_key') || '';
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
@@ -1320,6 +1321,26 @@
       className: 'btn btn-primary btn-full',
       onClick: () => { screen = 'truck-check'; render(); }
     }, 'New Inspection'));
+
+    // ── AI Settings button ────────────────────────────────────
+    const hasKey = !!localStorage.getItem('inhaus_anthropic_key');
+    c.appendChild(el('button', {
+      className: 'btn btn-outline btn-full',
+      style: 'margin-top:8px;font-size:0.9rem;',
+      onClick: () => {
+        const current = localStorage.getItem('inhaus_anthropic_key') || '';
+        const hint = current ? '(currently set \u2014 leave blank to keep)' : '(not set \u2014 AI features disabled)';
+        const val = prompt('Enter Anthropic API key for AI features\n' + hint);
+        if (val === null) return;
+        if (val.trim()) {
+          localStorage.setItem('inhaus_anthropic_key', val.trim());
+          alert('\u2705 API key saved. AI features are now enabled.');
+        } else if (current) {
+          alert('Key unchanged.');
+        }
+        render();
+      }
+    }, hasKey ? '\u2699\ufe0f AI Settings (key set \u2713)' : '\u2699\ufe0f AI Settings (tap to enable AI)'));
 
     const list = el('div', { className: 'inspection-list' });
     c.appendChild(list);
