@@ -696,7 +696,9 @@
       yesno('debriefCompleted', 'Debrief completed'),
       yesno('radonPickupReminder', 'Homeowner reminded about radon pickup'),
       yesno('reportDateCommunicated', 'Expected report date communicated'),
-      textarea('debriefNotes', 'Notes from debrief')
+      textarea('debriefNotes', 'Notes from debrief'),
+      divider(),
+      { type: 'ai-followup-plan' }
     ];
   }
 
@@ -2259,6 +2261,13 @@
       }
     });
     exp.roomSummaries = roomSummaries;
+
+    // Follow-up plan
+    const debriefData = inspection.stepData && inspection.stepData.debrief;
+    if (debriefData && debriefData.aiFollowUpPlan) {
+      exp.aiFollowUpPlan = debriefData.aiFollowUpPlan;
+      exp.aiFollowUpPlanGeneratedAt = debriefData.aiFollowUpPlanGeneratedAt || null;
+    }
 
     return exp;
   }

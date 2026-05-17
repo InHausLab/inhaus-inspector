@@ -1363,7 +1363,28 @@
               if (!k.startsWith('_')) summaryData[k] = v;
             }
 
-            const prompt = 'You are writing a professional home health inspection room summary for a client report. Based on the following inspection data, write a clear, professional 2-4 sentence summary of findings for this room. Be specific about values that are flagged or concerning. Be reassuring about findings that are normal. Do not mention the inspector by name. Data: ' + JSON.stringify(summaryData);
+            // Filter to meaningful fields only — skip photo arrays, internal keys, empty values
+            const meaningful = {};
+            const skipKeys = new Set(['roomName','aiSummary','aiSummaryGeneratedAt','_roomName','_stepId']);
+            for (const [k, v] of Object.entries(summaryData)) {
+              if (skipKeys.has(k)) continue;
+              if (v === null || v === undefined || v === '' || v === false) continue;
+              if (Array.isArray(v) && v.length === 0) continue;
+              meaningful[k] = v;
+            }
+
+            const prompt = `You are a professional home health inspector writing a room findings note.
+Room: ${summaryData.roomName || 'Unknown'}
+Data: ${JSON.stringify(meaningful)}
+
+Instructions:
+- ONLY mention findings that are concerning, elevated, abnormal, or worth monitoring.
+- If everything looks normal and nothing needs follow-up, respond with exactly: "No concerns identified."
+- For each concern, specify the recommended follow-up timeframe: 3 months, 6 months, 12 months, or "after lab results".
+- Be specific — include actual values when relevant (e.g. "humidity 71%").
+- Do not mention the inspector by name.
+- Format as a short bullet list. Maximum 4 bullets.
+- Do not describe normal findings. Only flag problems or watch items.`;
 
             try {
               const resp = await fetch(PROXY_URL, {
@@ -1408,6 +1429,107 @@
         buildSummaryUI();
         return wrap;
       }
+
+      case 'ai-followup-plan': {
+        const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+        const wrap = document.createElement('div');
+        wrap.className = 'field-group ai-room-summary-wrap';
+
+        function buildPlanUI() {
+          wrap.innerHTML = '';
+
+          const genBtn = document.createElement('button');
+          genBtn.type = 'button';
+          genBtn.className = 'btn btn-primary btn-full ai-room-summary-btn';
+          genBtn.textContent = '\uD83D\uDCCB Generate Follow-Up Plan';
+
+          const ta = document.createElement('textarea');
+          ta.className = 'field-textarea ai-room-summary-textarea';
+          ta.rows = 10;
+          ta.placeholder = 'Tap to generate the follow-up inspection plan\u2026';
+          ta.value = data.aiFollowUpPlan || '';
+          ta.addEventListener('input', () => { data.aiFollowUpPlan = ta.value; onChange(); });
+
+          const hint = document.createElement('div');
+          hint.className = 'ai-room-summary-hint';
+          hint.textContent = 'AI-generated follow-up plan \u2014 review and edit before client handoff';
+
+          async function doGenerate() {
+            genBtn.disabled = true;
+            genBtn.textContent = '\u23F3 Generating plan\u2026';
+
+            // Collect all room findings flagged during inspection
+            const roomFindings = [];
+            if (window.inspection && window.inspection.stepData) {
+              const sd = window.inspection.stepData;
+              for (const [stepId, stepData] of Object.entries(sd)) {
+                if (stepData && stepData.aiSummary && stepData.aiSummary.trim() !== 'No concerns identified.') {
+                  roomFindings.push({ room: stepData.roomName || stepId, findings: stepData.aiSummary });
+                }
+              }
+            }
+
+            const insp = window.inspection || {};
+            const facts = {
+              address: insp.propertyAddress || '',
+              waterSource: insp.waterSource || '',
+              yearBuilt: (insp.stepData && insp.stepData['property-details'] && insp.stepData['property-details'].yearBuilt) || '',
+              radonReading: (insp.stepData && insp.stepData.radon && insp.stepData.radon.radonReading) || '',
+              hvacFilterCondition: (insp.stepData && insp.stepData.utility && insp.stepData.utility.filterCondition) || '',
+              hvacFilterAge: (insp.stepData && insp.stepData.utility && insp.stepData.utility.filterEstimatedAge) || '',
+            };
+
+            const findingsText = roomFindings.length
+              ? roomFindings.map(r => '- ' + r.room + ': ' + r.findings).join('\n')
+              : 'No specific room concerns flagged.';
+
+            const prompt = 'You are a professional home health inspector writing a follow-up plan for a client.\n\n'
+              + 'Property: ' + facts.address + '\n'
+              + 'Year Built: ' + (facts.yearBuilt || 'Unknown') + '\n'
+              + 'Water Source: ' + (facts.waterSource || 'Unknown') + '\n'
+              + 'Radon Reading: ' + (facts.radonReading || 'Not recorded') + '\n'
+              + 'HVAC Filter Condition: ' + (facts.hvacFilterCondition || 'Not recorded') + '\n\n'
+              + 'Concerns flagged during this inspection:\n' + findingsText + '\n\n'
+              + 'Instructions:\n'
+              + '- Create an actionable follow-up plan grouped by timeframe: Immediate (30 days), 3-6 Months, 12 Months, Annual.\n'
+              + '- Only include items that need follow-up based on actual findings above.\n'
+              + '- For each item: what to check, why it matters, what test or inspection is needed.\n'
+              + '- End with one sentence on overall home health status.\n'
+              + '- Be direct and specific. No generic filler. Use bullet points.';
+
+            try {
+              const resp = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ prompt })
+              });
+              if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
+              const result = await resp.json();
+              const text = result.content && result.content[0] && result.content[0].text;
+              if (!text) throw new Error('EMPTY_RESPONSE');
+              data.aiFollowUpPlan = text;
+              data.aiFollowUpPlanGeneratedAt = new Date().toISOString();
+              ta.value = text;
+              onChange();
+              genBtn.textContent = '\u2713 Plan Generated';
+              setTimeout(() => { genBtn.disabled = false; genBtn.textContent = '\u21BA Regenerate Plan'; }, 2000);
+            } catch (err) {
+              genBtn.disabled = false;
+              genBtn.textContent = '\uD83D\uDCCB Generate Follow-Up Plan';
+              showToast('Could not generate plan \u2014 please write manually');
+            }
+          }
+
+          genBtn.onclick = doGenerate;
+          wrap.appendChild(genBtn);
+          wrap.appendChild(ta);
+          wrap.appendChild(hint);
+        }
+
+        buildPlanUI();
+        return wrap;
+      }
+
       case 'qtrak-upload': {
         const qWrap = document.createElement('div');
         qWrap.className = 'field-group';
