@@ -1952,20 +1952,50 @@
 
     // ── Room Summaries ──
     const summariesCard = el('div', { className: 'card' });
-    summariesCard.appendChild(el('h3', { className: 'section-heading' }, 'Room Summaries'));
-    const summarySteps = stepList.filter(s => {
+    summariesCard.appendChild(el('h3', { className: 'section-heading' }, 'Room Findings'));
+
+    // Collect all rooms that have raw notes OR an AI summary
+    const roomStepTypes = ['room-test','bedroom','bathroom','living-area','kitchen-appliance','water-sample','atp-kitchen','kitchen-air','additional-room','utility'];
+    const roomSteps = stepList.filter(s => {
+      if (!roomStepTypes.includes(s.type)) return false;
       const d = inspection.stepData && inspection.stepData[s.id];
-      return d && d.aiSummary;
+      return d && (d.aiSummary || d.notes || (d.observations && d.observations.length) || d.followUpNote);
     });
-    if (summarySteps.length === 0) {
-      summariesCard.appendChild(el('p', { style: 'color:var(--text-muted);font-size:0.9rem;padding:8px 0;' }, 'No room summaries generated yet'));
+
+    if (roomSteps.length === 0) {
+      summariesCard.appendChild(el('p', { style: 'color:var(--text-muted);font-size:0.9rem;padding:8px 0;' }, 'No room findings yet'));
     } else {
-      summarySteps.forEach(s => {
+      roomSteps.forEach(s => {
         const d = inspection.stepData[s.id];
-        const roomLabel = el('div', { className: 'room-summary-label' }, d.roomName || s.name);
-        const summaryText = el('p', { className: 'room-summary-text' }, d.aiSummary);
-        summariesCard.appendChild(roomLabel);
-        summariesCard.appendChild(summaryText);
+        const roomBlock = el('div', { style: 'margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--accent-light);' });
+
+        // Room name
+        roomBlock.appendChild(el('div', { style: 'font-weight:700;font-size:1rem;color:var(--primary);margin-bottom:8px;' }, d.roomName || s.name));
+
+        // Raw notes side
+        const hasObs = d.observations && d.observations.length > 0;
+        const hasNotes = d.notes && d.notes.trim();
+        const hasFollowUp = d.followUpNote && d.followUpNote.trim();
+        const hasRaw = hasObs || hasNotes || hasFollowUp;
+
+        if (hasRaw) {
+          const rawBlock = el('div', { style: 'background:#f8f9fa;border-left:3px solid #aaa;border-radius:0 6px 6px 0;padding:8px 10px;margin-bottom:8px;font-size:0.85rem;' });
+          rawBlock.appendChild(el('div', { style: 'font-size:0.75rem;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;' }, 'Inspector Notes'));
+          if (hasObs) rawBlock.appendChild(el('div', { style: 'margin-bottom:4px;' }, 'Observations: ' + d.observations.join(', ')));
+          if (hasNotes) rawBlock.appendChild(el('div', { style: 'margin-bottom:4px;' }, d.notes.trim()));
+          if (hasFollowUp) rawBlock.appendChild(el('div', { style: 'color:#b45309;' }, '⚠️ Follow-up: ' + d.followUpNote.trim()));
+          roomBlock.appendChild(rawBlock);
+        }
+
+        // AI summary side
+        if (d.aiSummary) {
+          const aiBlock = el('div', { style: 'background:#f0f7ee;border-left:3px solid var(--primary);border-radius:0 6px 6px 0;padding:8px 10px;font-size:0.85rem;' });
+          aiBlock.appendChild(el('div', { style: 'font-size:0.75rem;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;' }, 'AI Summary'));
+          aiBlock.appendChild(el('div', null, d.aiSummary));
+          roomBlock.appendChild(aiBlock);
+        }
+
+        summariesCard.appendChild(roomBlock);
       });
     }
     c.appendChild(summariesCard);
