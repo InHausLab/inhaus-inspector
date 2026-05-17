@@ -191,43 +191,57 @@
   // ── #3: Arrival & Setup (expanded) ─────────────────────────
   function getArrivalFields() {
     return [
+      // ── DATA: always visible ──────────────────────────────
       timeInput('assessmentStartTime', 'Assessment Start Time'),
-      check('homeownerGreeted', 'Homeowner greeted (or entry instructions noted)'),
+      text('utilityRoomLevel', 'Utility Room Location \u2014 which level?'),
+      divider(),
 
-      check('tarpPlaced', 'Tarp placed in entryway'),
-      check('equipmentUnloaded', 'Equipment unloaded from car to tarp'),
-      check('equipmentTidy', 'Equipment tidy, not blocking doorways'),
+      // ── PROCESS: arrival setup ────────────────────────────
+      { type: 'process-checklist', title: 'Arrival Setup', items: [
+        { key: 'homeownerGreeted', label: 'Homeowner greeted (or entry instructions noted)' },
+        { key: 'tarpPlaced', label: 'Tarp placed in entryway' },
+        { key: 'equipmentUnloaded', label: 'Equipment unloaded from car to tarp' },
+        { key: 'equipmentTidy', label: 'Equipment tidy, not blocking doorways' }
+      ]},
       divider(),
-      heading('Homeowner Engagement'),
-      check('reviewConcerns', 'Review customer concerns from intake form'),
-      check('askAdditional', 'Ask about additional concerns / problem areas'),
-      check('testsExplained', 'Explain tests being performed'),
-      check('durationExplained', 'Estimate testing duration'),
-      check('sedentaryAdvised', 'Ask homeowner to remain sedentary during testing'),
+
+      // ── PROCESS: homeowner engagement ────────────────────
+      { type: 'process-checklist', title: 'Homeowner Engagement', items: [
+        { key: 'reviewConcerns', label: 'Review customer concerns from intake form' },
+        { key: 'askAdditional', label: 'Ask about any additional concerns or problem areas' },
+        { key: 'testsExplained', label: 'Explain tests being performed today' },
+        { key: 'durationExplained', label: 'Give estimate of testing duration' },
+        { key: 'sedentaryAdvised', label: 'Ask homeowner to remain sedentary during testing' }
+      ]},
       divider(),
-      heading('Airthings View Plus Setup'),
-      check('airthingsPaired', 'Pair to Airthings account'),
-      check('airthingsWifiConnected', 'Connect to home wifi'),
-      check('airthingsPlaced', 'Place at breathing height, away from vents/fans/windows/doors'),
-      info('Keep 3ft from vents, fans, windows, doors'),
+
+      // ── PROCESS: Airthings setup ──────────────────────────
+      { type: 'process-checklist', title: 'Airthings View Plus Setup', items: [
+        { key: 'airthingsPaired', label: 'Paired to Airthings account' },
+        { key: 'airthingsWifiConnected', label: 'Connected to home wifi' },
+        { key: 'airthingsPlaced', label: 'Placed at breathing height — 3ft from vents, fans, windows, doors' }
+      ]},
       divider(),
+
+      // ── DATA + PROCESS: Boulder Blue ─────────────────────
       heading('Boulder Blue Fan'),
-      checklist('boulderBlueSetup', 'Boulder Blue Setup', [
+      { type: 'process-checklist', title: 'Boulder Blue Setup', items: [
         { key: 'filterInserted', label: 'Filter inserted into fan' },
         { key: 'fanPluggedIn', label: 'Fan plugged in at main living space with access to airflow' },
-        { key: 'allergenPlacement', label: 'If client has specific allergen concerns: placed in desired location' }
-      ]),
+        { key: 'allergenPlacement', label: 'If allergen concerns: placed in client-requested location' }
+      ]},
       text('boulderBlueSampleId', 'Boulder Blue Sample ID', { placeholder: 'e.g. B2BJC43G' }),
       text('boulderBlueTestLocation', 'Boulder Blue Test Location', { placeholder: 'e.g. Living Room' }),
-      timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (need 2 hours)'),
-      timer('boulderBlueTimer', 'Boulder Blue Fan Timer (2 hours)', 7200),
+      timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (2 hrs needed)'),
+      timer('boulderBlueTimer', 'Boulder Blue Timer (2 hours)', 7200),
       divider(),
-      heading('Q-Trak Sensor Test'),
-      check('qtrakSensorTest', 'Hold Q-Trak to alcohol wipe \u2014 confirm elevated reading before starting'),
-      info('During sensor test, you should see Formaldehyde and VOC readings spike.'),
+
+      // ── PROCESS: Q-Trak sensor test ───────────────────────
+      { type: 'process-checklist', title: 'Q-Trak Sensor Test', items: [
+        { key: 'qtrakSensorTest', label: 'Hold Q-Trak to alcohol wipe — confirm VOC + formaldehyde spike before starting' }
+      ]},
       divider(),
-      text('utilityRoomLevel', 'Utility Room Location \u2014 which level is it on?'),
-      divider(),
+
       textarea('arrivalNotes', 'Notes'),
       photo('Arrival Setup')
     ];
@@ -1277,6 +1291,22 @@
       className: 'btn btn-primary btn-full',
       onClick: () => { screen = 'truck-check'; render(); }
     }, 'New Inspection'));
+
+    // ── Inspector mode toggle ─────────────────────────────────
+    const isExp = localStorage.getItem('inhaus_experienced') === 'true';
+    const modeBtn = el('button', {
+      className: 'btn btn-outline btn-full',
+      style: 'margin-top:8px;font-size:0.85rem;color:#5a7a3a;border-color:#c8d8b8;',
+      onClick: () => {
+        const nowExp = localStorage.getItem('inhaus_experienced') === 'true';
+        localStorage.setItem('inhaus_experienced', nowExp ? 'false' : 'true');
+        render();
+      }
+    }, isExp
+      ? '\uD83D\uDCCB Process steps collapsed (experienced mode) — tap to show all'
+      : '\u2705 Process steps expanded (guided mode) — tap to collapse for experienced inspectors'
+    );
+    c.appendChild(modeBtn);
 
     const list = el('div', { className: 'inspection-list' });
     c.appendChild(list);

@@ -1298,6 +1298,44 @@
         details.appendChild(inner);
         return details;
       }
+      case 'process-checklist': {
+        // Process steps — collapsible. Collapsed by default for experienced inspectors.
+        const isExperienced = localStorage.getItem('inhaus_experienced') === 'true';
+        const defaultOpen = !isExperienced;
+        const details = document.createElement('details');
+        details.className = 'process-checklist-details';
+        details.style = 'margin:8px 0;background:#f8faf5;border:1.5px solid #c8d8b8;border-radius:10px;overflow:hidden;';
+        if (defaultOpen) details.setAttribute('open', '');
+        const summary = document.createElement('summary');
+        summary.style = 'font-weight:600;font-size:0.9rem;color:#5a7a3a;cursor:pointer;padding:10px 14px;list-style:none;display:flex;justify-content:space-between;align-items:center;';
+        summary.innerHTML = '\uD83D\uDCCB ' + (f.title || 'Process Steps') + ' <span style="font-size:0.75rem;opacity:0.7">tap to ' + (defaultOpen ? 'collapse' : 'expand') + '</span>';
+        summary.addEventListener('click', () => {
+          setTimeout(() => {
+            const arrow = summary.querySelector('span');
+            if (arrow) arrow.textContent = details.hasAttribute('open') ? 'tap to collapse' : 'tap to expand';
+          }, 10);
+        });
+        details.appendChild(summary);
+        const inner = document.createElement('div');
+        inner.style = 'padding:8px 14px 12px;';
+        (f.items || []).forEach(item => {
+          const row = document.createElement('label');
+          row.style = 'display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid #e4edd8;cursor:pointer;font-size:0.95rem;';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.style = 'margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:#2C3F16;';
+          cb.checked = !!(data[item.key]);
+          cb.addEventListener('change', () => { data[item.key] = cb.checked; onChange(); });
+          const lbl = document.createElement('span');
+          lbl.textContent = item.label;
+          lbl.style = 'line-height:1.4;';
+          row.appendChild(cb);
+          row.appendChild(lbl);
+          inner.appendChild(row);
+        });
+        details.appendChild(inner);
+        return details;
+      }
       case 'heading': return renderHeading(f.label);
       case 'info': return renderInfo(f.label);
       case 'divider': return renderDivider();
