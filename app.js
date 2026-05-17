@@ -10,8 +10,6 @@
   // Set this to your Anthropic API key for AI HVAC scanning
   // Leave blank to disable AI scanning (fields can still be filled manually)
   // Contact Matt to set this API key — needed for AI HVAC scanner and room summaries
-  // Key stored in localStorage u2014 never hardcoded (enter via u2699ufe0f Settings on home screen)
-  const ANTHROPIC_KEY = localStorage.getItem('inhaus_anthropic_key') || '';
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
@@ -380,7 +378,7 @@
       ...bathroomLeakFields().map(f => showIf(f, 'roomType', 'Bathroom')),
       ...observationFields(),
       ...followUpFields(),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -407,7 +405,7 @@
       ]),
       divider(),
       heading('HVAC Filter'),
-      { type: 'ai-hvac-scanner', anthropicKey: ANTHROPIC_KEY },
+      { type: 'ai-hvac-scanner' },
       text('hvacManufacturer', 'Manufacturer'),
       text('hvacModel', 'Model number'),
       text('hvacSerial', 'Serial number'),
@@ -450,7 +448,7 @@
       showIf(photo('Water Softening', '_waterSoftPhotos'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
       photo('Utility Room', '_utilityRoomPhotos'),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -476,7 +474,7 @@
       divider(),
       ...observationFields(),
       ...followUpFields(),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -489,7 +487,7 @@
       ...bathroomCheckFields(),
       ...observationFields(),
       ...followUpFields(),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -514,7 +512,7 @@
       ...formaldehydeField(),
       ...followUpFields(),
       ...observationFields(),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -615,7 +613,7 @@
       ...formaldehydeField(),
       ...observationFields(),
       ...followUpFields(),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -629,7 +627,7 @@
       ...formaldehydeField(),
       ...observationFields(),
       ...followUpFields(),
-      { type: 'ai-room-summary', anthropicKey: ANTHROPIC_KEY }
+      { type: 'ai-room-summary' }
     ];
   }
 
@@ -1321,26 +1319,6 @@
       className: 'btn btn-primary btn-full',
       onClick: () => { screen = 'truck-check'; render(); }
     }, 'New Inspection'));
-
-    // ── AI Settings button ────────────────────────────────────
-    const hasKey = !!localStorage.getItem('inhaus_anthropic_key');
-    c.appendChild(el('button', {
-      className: 'btn btn-outline btn-full',
-      style: 'margin-top:8px;font-size:0.9rem;',
-      onClick: () => {
-        const current = localStorage.getItem('inhaus_anthropic_key') || '';
-        const hint = current ? '(currently set \u2014 leave blank to keep)' : '(not set \u2014 AI features disabled)';
-        const val = prompt('Enter Anthropic API key for AI features\n' + hint);
-        if (val === null) return;
-        if (val.trim()) {
-          localStorage.setItem('inhaus_anthropic_key', val.trim());
-          alert('\u2705 API key saved. AI features are now enabled.');
-        } else if (current) {
-          alert('Key unchanged.');
-        }
-        render();
-      }
-    }, hasKey ? '\u2699\ufe0f AI Settings (key set \u2713)' : '\u2699\ufe0f AI Settings (tap to enable AI)'));
 
     const list = el('div', { className: 'inspection-list' });
     c.appendChild(list);

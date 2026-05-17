@@ -1107,31 +1107,18 @@
         return panel;
       }
       case 'ai-hvac-scanner': {
-        const apiKey = f.anthropicKey || '';
         const wrap = document.createElement('div');
         wrap.className = 'ai-hvac-scanner';
 
-        // ── Anthropic API call ──────────────────────────────────
+        // ── Proxy API call ──────────────────────────────────────
+        const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
         async function callAnthropic(imageDataUrl, promptText) {
-          if (!apiKey) throw new Error('NO_KEY');
           const base64 = imageDataUrl.split(',')[1];
           const mimeType = (imageDataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
-          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          const resp = await fetch(PROXY_URL, {
             method: 'POST',
-            headers: {
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
-              'content-type': 'application/json',
-              'anthropic-dangerous-direct-browser-access': 'true'
-            },
-            body: JSON.stringify({
-              model: 'claude-opus-4-5',
-              max_tokens: 200,
-              messages: [{ role: 'user', content: [
-                { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-                { type: 'text', text: promptText }
-              ]}]
-            })
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ imageBase64: base64, mimeType, prompt: promptText })
           });
           if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
           const result = await resp.json();
@@ -1218,10 +1205,7 @@
             tagStatus.textContent = '✓ Data tag scanned';
             tagStatus.className = 'ai-scan-status ai-scan-success';
           } catch (err) {
-            const isNoKey = err.message === 'NO_KEY';
-            tagStatus.textContent = isNoKey
-              ? 'AI scanning unavailable — please enter manually'
-              : 'Could not read tag — please enter manually';
+            tagStatus.textContent = 'Could not read tag — please enter manually';
             tagStatus.className = 'ai-scan-status ai-scan-error';
           } finally {
             tagBtn.disabled = false;
@@ -1281,10 +1265,7 @@
             filterStatus.textContent = '✓ Filter scanned';
             filterStatus.className = 'ai-scan-status ai-scan-success';
           } catch (err) {
-            const isNoKey = err.message === 'NO_KEY';
-            filterStatus.textContent = isNoKey
-              ? 'AI scanning unavailable — please enter manually'
-              : 'Could not read filter — please enter manually';
+            filterStatus.textContent = 'Could not read filter — please enter manually';
             filterStatus.className = 'ai-scan-status ai-scan-error';
           } finally {
             filterBtn.disabled = false;
@@ -1350,7 +1331,7 @@
       case 'timer':
         return renderTimer(f.timerId || (f.key + '-' + (data._stepId || '')), f.label, f.duration, inspection, onSave);
       case 'ai-room-summary': {
-        const apiKey = f.anthropicKey || '';
+        const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
         const wrap = document.createElement('div');
         wrap.className = 'field-group ai-room-summary-wrap';
 
@@ -1385,20 +1366,10 @@
             const prompt = 'You are writing a professional home health inspection room summary for a client report. Based on the following inspection data, write a clear, professional 2-4 sentence summary of findings for this room. Be specific about values that are flagged or concerning. Be reassuring about findings that are normal. Do not mention the inspector by name. Data: ' + JSON.stringify(summaryData);
 
             try {
-              if (!apiKey) throw new Error('NO_KEY');
-              const resp = await fetch('https://api.anthropic.com/v1/messages', {
+              const resp = await fetch(PROXY_URL, {
                 method: 'POST',
-                headers: {
-                  'x-api-key': apiKey,
-                  'anthropic-version': '2023-06-01',
-                  'content-type': 'application/json',
-                  'anthropic-dangerous-direct-browser-access': 'true'
-                },
-                body: JSON.stringify({
-                  model: 'claude-haiku-3-5',
-                  max_tokens: 200,
-                  messages: [{ role: 'user', content: prompt }]
-                })
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ prompt })
               });
               if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
               const result = await resp.json();
@@ -1416,13 +1387,7 @@
             } catch (err) {
               genBtn.disabled = false;
               genBtn.textContent = '\uD83D\uDCDD Generate Room Summary';
-              if (err.message === 'NO_KEY') {
-                ta.value = '';
-                ta.placeholder = 'AI unavailable \u2014 please write summary manually';
-              } else {
-                showToast('AI unavailable \u2014 please write summary manually');
-              }
-            }
+              showToast('AI unavailable — please write summary manually');
           }
 
           genBtn.onclick = doGenerate;
