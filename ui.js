@@ -1409,6 +1409,7 @@ Instructions:
               genBtn.disabled = false;
               genBtn.textContent = '\uD83D\uDCDD Generate Room Summary';
               showToast('AI unavailable — please write summary manually');
+            }
           }
 
           genBtn.onclick = doGenerate;
