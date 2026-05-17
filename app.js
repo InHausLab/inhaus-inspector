@@ -10,7 +10,7 @@
   // Set this to your Anthropic API key for AI HVAC scanning
   // Leave blank to disable AI scanning (fields can still be filled manually)
   // Contact Matt to set this API key — needed for AI HVAC scanner and room summaries
-  const ANTHROPIC_KEY = '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';
+  const ANTHROPIC_KEY = '';
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
