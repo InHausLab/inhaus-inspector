@@ -254,6 +254,10 @@
       showIf(text('pfasKitBarcode', 'PFAS Test Kit # / Barcode', { placeholder: 'e.g. WTK_PFAS_27099' }), 'pfasSetup', 'Yes'),
       showIf(timer('pfasTimer', 'PFAS Drain Timer', 3600), 'pfasSetup', 'Yes'),
       showIf(info('Note: needs ~1 hour to drain'), 'pfasSetup', 'Yes'),
+      { type: 'process-checklist', title: 'Device Setup Steps', items: [
+        { key: 'pfasKitchenFaucet', label: 'Start draining kitchen faucet now if PFAS test requested' },
+        { key: 'airthingsViewPlusSetup', label: 'Place Airthings View Plus at breathing height, away from vents' }
+      ]},
       textarea('notes', 'Notes'),
       photo('Device Setup')
     ];
@@ -262,18 +266,18 @@
   // ── #2: Exterior Assessment (new) ──────────────────────────
   function getExteriorFields() {
     return [
-      checklist('equipNeededExterior', 'Equipment Needed', [
+      { type: 'process-checklist', title: 'Equipment Needed', items: [
         { key: 'breezeOutdoor', label: 'Breeze ET pump + tripod' },
         { key: 'qtrakOut', label: 'Q-Trak 7585' },
         { key: 'flirExt', label: 'FLIR MR277' }
-      ]),
+      ]},
       divider(),
       heading('Breeze ET Outdoor Control'),
-      checklist('breezeOutdoorSetup', 'Setup Checklist', [
+      { type: 'process-checklist', title: 'Breeze ET Setup', items: [
         { key: 'pumpSetUp', label: 'Set up pump' },
-        { key: 'placement', label: 'Place 6\u201310 ft from main entrance' },
-        { key: 'tripodHeight', label: 'Set to full tripod height (60\u2033)' }
-      ]),
+        { key: 'placement', label: 'Place 6–10 ft from main entrance' },
+        { key: 'tripodHeight', label: 'Set to full tripod height (60″)' }
+      ]},
       timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600),
       photo('Outdoor Spore Trap Setup', '_outdoorSporePhotos'),
       divider(),
@@ -316,12 +320,14 @@
   // ── Radon setup (expanded for #4) ──────────────────────────
   function getRadonFields() {
     return [
-      heading('Radon Monitor Placement'),
-      check('radonTripod', 'On tripod — 3 ft from exterior wall, 20"+ above floor, central/low-traffic'),
-      check('radonWindowsClosed', 'Windows and doors closed'),
+      { type: 'process-checklist', title: 'Radon Monitor Placement', items: [
+        { key: 'radonTripod', label: 'On tripod — 3 ft from exterior wall, 20"+ above floor, central/low-traffic area' },
+        { key: 'radonWindowsClosed', label: 'Windows and doors closed' }
+      ]},
       divider(),
-      heading('Radon App Setup'),
-      check('radonInitialMeasurement', 'Select "Initial measurement" + "48-hour test with 4-hour calibration"'),
+      { type: 'process-checklist', title: 'Radon App Setup', items: [
+        { key: 'radonInitialMeasurement', label: 'Select "Initial measurement" + "48-hour test with 4-hour calibration"' }
+      ]},
       divider(),
       check('radonMultipleMonitors', 'Set up multiple monitors if >2,000 sq ft or different foundations'),
       text('radonLocation', 'Radon Monitor Location'),
@@ -333,12 +339,10 @@
   // ── Room test (with FLIR log + bathroom leak for #4) ───────
   function getRoomTestFields() {
     return [
-      info('Complete this section for each room in the lower/basement level. Add additional rooms using the button at the bottom of the page.'),
-      heading('Room Setup'),
-      checklist('roomSetup', null, [
-        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
-        { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
-      ]),
+      { type: 'process-checklist', title: 'Room Setup', items: [
+        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan template — draw in rooms or correct layout' },
+        { key: 'labelRooms', label: 'Label rooms using Q-Trak naming convention (e.g. Bedroom 1, Bedroom 2)' }
+      ]},
       text('roomName', 'Room Name', { required: true }),
       radio('roomType', 'Room Type', ['Bedroom', 'Bathroom', 'Office', 'Storage', 'Other']),
       ...flirFields(),
@@ -355,10 +359,10 @@
   // ── Utility Room (expanded for #8) ─────────────────────────
   function getUtilityFields() {
     return [
-      checklist('equipNeededUtility', 'Equipment Needed', [
+      { type: 'process-checklist', title: 'Equipment Needed', items: [
         { key: 'flirUtil', label: 'FLIR MR277' },
         { key: 'qtrakUtil', label: 'Q-Trak 7585' }
-      ]),
+      ]},
       divider(),
       text('levelLocation', 'Level location'),
       divider(),
@@ -390,8 +394,10 @@
       photo('HVAC Filter', '_hvacFilterPhotos'),
       divider(),
       heading('HVAC Inspection'),
-      check('servicePanelRemoved', 'Service panel removed'),
-      check('filtersChecked', 'Filters checked'),
+      { type: 'process-checklist', title: 'HVAC Inspection Steps', items: [
+        { key: 'servicePanelRemoved', label: 'Service panel removed' },
+        { key: 'filtersChecked', label: 'Filters checked' }
+      ]},
       yesno('hvacCondensation', 'Condensation noted'),
       yesno('hvacLeaks', 'Leaks noted'),
       text('hvacDetails', 'Notable details'),
@@ -424,18 +430,10 @@
 
   function getBedroomFields() {
     return [
-      info('Complete this section for each bedroom.'),
-      checklist('equipNeededBedroom', 'Equipment Needed', [
-        { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps' },
-        { key: 'flirRooms', label: 'FLIR MR277' },
-        { key: 'qtrakRooms', label: 'Q-Trak 7585' }
-      ]),
-      divider(),
-      heading('Room Setup'),
-      checklist('roomSetup', null, [
-        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
-        { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
-      ]),
+      { type: 'process-checklist', title: 'Room Setup', items: [
+        { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps ready' },
+        { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open — rooms labelled correctly' }
+      ]},
       text('roomName', 'Room Name', { required: true }),
       ...flirFields(),
       ...breezeFields(),
@@ -464,17 +462,10 @@
   // ── Living area (with FLIR log + bathroom leak for #4) ─────
   function getLivingAreaFields() {
     return [
-      checklist('equipNeededMain', 'Equipment Needed', [
-        { key: 'breezeMain', label: 'Breeze ET pump + tripod + spore traps' },
-        { key: 'flirMain', label: 'FLIR MR277' },
-        { key: 'qtrakMain', label: 'Q-Trak 7585' }
-      ]),
-      divider(),
-      heading('Room Setup'),
-      checklist('roomSetup', null, [
-        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan room template and draw in rooms or correct floorplan if needed' },
-        { key: 'labelRooms', label: 'Label rooms using Q-Trak room template naming convention (e.g. Bedroom 1, Bedroom 2)' }
-      ]),
+      { type: 'process-checklist', title: 'Room Setup', items: [
+        { key: 'breezeMain', label: 'Breeze ET pump + tripod + spore traps ready' },
+        { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open — rooms labelled correctly' }
+      ]},
       text('roomNames', 'Room(s) tested (e.g., Living Room, Dining Room)', { required: true }),
       ...flirLogFields(),
       ...breezeFields(),
@@ -489,12 +480,12 @@
   // ── Kitchen appliance (expanded for #5) ────────────────────
   function getKitchenApplianceFields() {
     return [
-      checklist('equipNeededKitchen', 'Equipment Needed', [
+      { type: 'process-checklist', title: 'Equipment Needed', items: [
         { key: 'breezeKitchen', label: 'Breeze ET pump + tripod + spore traps' },
         { key: 'flirKitchen', label: 'FLIR MR277' },
         { key: 'qtrakKitchen', label: 'Q-Trak 7585' },
         { key: 'atpKitchen', label: 'ATP device + swabs' }
-      ]),
+      ]},
       divider(),
       heading('Stove / Range'),
       sel('stoveType', 'Stove/Range Type', ['Gas', 'Electric (Radiant)', 'Induction', 'Dual-Fuel', 'Other (specify)']),
@@ -506,16 +497,16 @@
       showIf(timer('flushTimer', 'Kitchen Water Flush Timer (5 min)', 300), 'waterFlushed', 'Yes'),
       divider(),
       heading('Appliance Inspection'),
-      info('Check and clean each area. Take before/after photos where applicable.'),
-      checklist('appliances', null, [
-        { key: 'fridge', label: 'Under refrigerator \u2014 checked, cleaned', subFields: [{ key: 'fridgeFindings', label: 'Notable findings' }] },
-        { key: 'dishwasher', label: 'Under dishwasher \u2014 checked, cleaned', subFields: [{ key: 'dishwasherFindings', label: 'Notable findings' }] },
-        { key: 'dishwasherFilter', label: 'Dishwasher filter \u2014 checked, cleaned', subFields: [{ key: 'dishFilterFindings', label: 'Notable findings' }] },
-        { key: 'underSink', label: 'Under sink \u2014 checked, cleaned', subFields: [{ key: 'sinkFindings', label: 'Notable findings' }] },
-        { key: 'iceMaker', label: 'Under ice maker \u2014 checked, cleaned', subFields: [{ key: 'iceMakerFindings', label: 'Notable findings' }] },
-        { key: 'backsplash', label: 'Grout/caulking on backsplash \u2014 checked', subFields: [{ key: 'backsplashFindings', label: 'Notable findings' }] },
-        { key: 'stoveVent', label: 'Above stove vent \u2014 checked, cleaned (before/after photos)', subFields: [{ key: 'stoveVentFindings', label: 'Notable findings' }] }
-      ]),
+      { type: 'process-checklist', title: 'Areas to Check & Clean (take before/after photos)', items: [
+        { key: 'fridge', label: 'Under refrigerator — checked, cleaned' },
+        { key: 'dishwasher', label: 'Under dishwasher — checked, cleaned' },
+        { key: 'dishwasherFilter', label: 'Dishwasher filter — checked, cleaned' },
+        { key: 'underSink', label: 'Under sink — checked, cleaned' },
+        { key: 'iceMaker', label: 'Under ice maker — checked, cleaned' },
+        { key: 'backsplash', label: 'Grout/caulking on backsplash — checked' },
+        { key: 'stoveVent', label: 'Above stove vent — checked, cleaned' }
+      ]},
+      textarea('applianceFindings', 'Notable findings'),
       photo('Appliance Inspection'),
       divider(),
       heading('Overall Assessment'),
@@ -531,13 +522,11 @@
 
   function getWaterSampleFields() {
     return [
-      info('Label bottles with customer last name and address. Ensure chain of custody forms are filled out.'),
-      heading('Sample Labeling'),
-      checklist('sampleLabeling', null, [
+      { type: 'process-checklist', title: 'Sample Labeling', items: [
         { key: 'bottlesLabeled', label: 'Bottles labeled with client last name and property address' },
         { key: 'preMadeLabels', label: 'Pre-made labels applied (if available)' },
         { key: 'chainOfCustody', label: 'Chain of custody forms completed for each sample' }
-      ]),
+      ]},
       divider(),
       heading('Water Panel'),
       yesno('waterPanelCollected', 'Water panel collected'),
@@ -636,18 +625,18 @@
       text('boulderBlueTestDuration', 'Boulder Blue Test Duration', { placeholder: 'e.g. 2 hours 15 minutes' }),
       info('Compare to start time captured in Arrival & Setup. Must be 2+ hours.'),
       divider(),
-      checklist('finalChecks', 'Final Checks Before Leaving', [
+      { type: 'process-checklist', title: 'Final Checks Before Leaving', items: [
         { key: 'breezeCollected', label: 'All Breeze ET tests collected and spore traps packed' },
-        { key: 'boulderBlueDone', label: 'Boulder Blue fan run for 2 hours \u2014 filter collected and packed' },
-        { key: 'pfasCollected', label: 'PFAS test collected from sink' },
+        { key: 'boulderBlueDone', label: 'Boulder Blue fan run 2+ hours — filter collected and packed' },
+        { key: 'pfasCollected', label: 'PFAS test collected from kitchen sink' },
         { key: 'waterLabeled', label: 'Water samples labeled and ready to ship' },
         { key: 'appliancesRestored', label: 'All appliances returned to original state' },
         { key: 'doorsLightsRestored', label: 'All doors/lights returned to original state' },
         { key: 'radonLeftInPlace', label: 'Radon monitor left in place' },
         { key: 'formComplete', label: 'Technician form fully completed' },
         { key: 'photosUploaded', label: 'All photos uploaded/captured' },
-        { key: 'boulderBlueRegistered', label: 'Boulder Blue filter sample registered (Jonah Ventures portal)' }
-      ]),
+        { key: 'boulderBlueRegistered', label: 'Boulder Blue filter registered on Jonah Ventures portal' }
+      ]},
     ];
   }
 
@@ -655,10 +644,11 @@
     return [
       timeInput('assessmentEndTime', 'Assessment End Time'),
       divider(),
-      info('Perform the customer debrief before completing the final departure checks.'),
-      check('informComplete', 'Inform customer assessment is complete'),
-      check('adviseReport', 'Advise report in approximately 3 weeks'),
-      check('remindRadon', 'Remind about radon monitor in basement'),
+      { type: 'process-checklist', title: 'Customer Debrief Steps', items: [
+        { key: 'informComplete', label: 'Inform customer assessment is complete' },
+        { key: 'adviseReport', label: 'Advise report in approximately 3 weeks' },
+        { key: 'remindRadon', label: 'Remind homeowner about radon monitor pickup' }
+      ]},
       info('Radon pickup auto-set to 54 hrs after inspection start \u2014 override below if needed'),
       dateTimeInput('radonPickupTime', 'Radon Pickup Date/Time'),
       dateTimeInput('radonPickupTime2', 'Radon Pickup 2 Date/Time (if second monitor)'),
