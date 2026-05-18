@@ -1411,18 +1411,17 @@
               meaningful[k] = v;
             }
 
-            const prompt = `You are a professional home health inspector writing a room findings note.
-Room: ${summaryData.roomName || 'Unknown'}
-Data: ${JSON.stringify(meaningful)}
-
-Instructions:
-- ONLY mention findings that are concerning, elevated, abnormal, or worth monitoring.
-- If everything looks normal and nothing needs follow-up, respond with exactly: "No concerns identified."
-- For each concern, specify the recommended follow-up timeframe: 3 months, 6 months, 12 months, or "after lab results".
-- Be specific — include actual values when relevant (e.g. "humidity 71%").
-- Do not mention the inspector by name.
-- Format as a short bullet list. Maximum 4 bullets.
-- Do not describe normal findings. Only flag problems or watch items.`;
+            const prompt = 'You are writing brief internal notes for a home health inspection report.' +
+              ' Room: ' + (summaryData.roomName || 'Unknown') +
+              '. Data: ' + JSON.stringify(meaningful) +
+              '\n\nWrite 1-3 plain sentences. Rules:' +
+              '\n- Use calm, factual language. Never use words like "concerning", "alarming", "dangerous", or "significant".' +
+              '\n- Only mention things that need follow-up or re-testing. Skip anything that is normal.' +
+              '\n- If something needs re-checking, say when: "recommend re-test in 6 months" or "follow up after lab results".' +
+              '\n- Include actual values when relevant (e.g. "humidity at 68%").' +
+              '\n- Write in plain prose — no bullet points, no headers, no markdown.' +
+              '\n- If nothing needs follow-up, write only: No items flagged.' +
+              '\n- Maximum 3 sentences. Be brief.';
 
             try {
               const resp = await fetch(PROXY_URL, {
