@@ -935,7 +935,12 @@
       const grid = el('div', { className: 'photo-grid' });
       photos.forEach((p, idx) => {
         const card = el('div', { className: 'photo-card' });
-        card.appendChild(el('img', { src: p.dataUrl, className: 'photo-img', alt: 'Photo ' + (idx + 1) }));
+        if (p.dataUrl === '__uploaded__' || !p.dataUrl) {
+          const placeholder = el('div', { className: 'photo-img', style: 'display:flex;align-items:center;justify-content:center;background:#e8f5e9;color:#2e7d32;font-size:13px;font-weight:bold;min-height:120px;border-radius:6px;' }, '\u2601\ufe0f Uploaded to Drive');
+          card.appendChild(placeholder);
+        } else {
+          card.appendChild(el('img', { src: p.dataUrl, className: 'photo-img', alt: 'Photo ' + (idx + 1) }));
+        }
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
 
         const capRow = el('div', { className: 'input-row' });

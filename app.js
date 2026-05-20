@@ -821,6 +821,20 @@
     if (el) el.textContent = msg;
   }
 
+  function showSaveError(msg) {
+    showSave(msg);
+    // Big visible banner so Dave notices immediately
+    let banner = document.getElementById('save-error-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'save-error-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;font-size:15px;font-weight:bold;text-align:center;padding:12px;z-index:99999;cursor:pointer;';
+      banner.addEventListener('click', () => banner.remove());
+      document.body.appendChild(banner);
+    }
+    banner.textContent = msg + ' — Tap to dismiss';
+  }
+
   async function saveNow() {
     if (!inspection) return;
     showSave('Saving...');
@@ -828,9 +842,16 @@
       await DB.save(inspection);
       const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       showSave('Saved \u2713 ' + t);
+      // Clear any previous save error banner
+      const b = document.getElementById('save-error-banner');
+      if (b) b.remove();
     } catch (e) {
       console.error('Save failed:', e);
-      showSave('Save failed!');
+      if (e && (e.name === 'QuotaExceededError' || (e.message && e.message.includes('quota')))) {
+        showSaveError('\u26a0\ufe0f Storage full \u2014 SCREENSHOT THIS SCREEN NOW then tap Sync to Drive');
+      } else {
+        showSaveError('\u26a0\ufe0f Save failed \u2014 data may be lost on reload. Tap Sync to Drive now.');
+      }
     }
   }
 
@@ -952,6 +973,7 @@
   // ── Real-time single-photo upload ─────────────────────────
   async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
     if (!GOOGLE_SCRIPT_URL || !inspectionId) return;
+    const originalDataUrl = photo.dataUrl;
     try {
       const payload = {
         photoUploadOnly: true,
@@ -962,7 +984,7 @@
           photoId: photo.photoId || '',
           roomName: photo.roomName || '',
           stepName: photo.stepName || '',
-          imageData: photo.dataUrl || '',
+          imageData: originalDataUrl || '',
           caption: photo.caption || ''
         }]
       };
@@ -972,8 +994,15 @@
         body: JSON.stringify(payload)
       });
       photo._uploaded = true;
+      // ── Critical: clear the large dataUrl after upload to prevent IndexedDB overflow ──
+      // no-cors means we can't confirm server receipt, but the fetch completed without throwing.
+      // Keeping full base64 photos in IndexedDB causes quota errors after ~30 photos.
+      photo.dataUrl = '__uploaded__';
+      scheduleSave(); // persist the smaller record immediately
     } catch(e) {
       console.warn('Real-time photo upload failed, will retry on export:', e);
+      // Keep original dataUrl so it can be retried
+      photo.dataUrl = originalDataUrl;
     }
   }
   window.uploadPhotoImmediate = uploadPhotoImmediate;
@@ -2318,6 +2347,28 @@
 
   retryQueuedUploads();
   render();
+
+  // ── Storage quota monitor ──────────────────────────────────
+  async function checkStorageQuota() {
+    if (!navigator.storage || !navigator.storage.estimate) return;
+    try {
+      const { usage, quota } = await navigator.storage.estimate();
+      const pct = quota > 0 ? (usage / quota) * 100 : 0;
+      if (pct > 80) {
+        let banner = document.getElementById('save-error-banner');
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.id = 'save-error-banner';
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#e67e22;color:#fff;font-size:15px;font-weight:bold;text-align:center;padding:12px;z-index:99999;cursor:pointer;';
+          banner.addEventListener('click', () => banner.remove());
+          document.body.appendChild(banner);
+        }
+        banner.textContent = '\u26a0\ufe0f Storage ' + Math.round(pct) + '% full \u2014 go to Review and tap Sync to Drive now';
+      }
+    } catch(e) { /* quota check not critical */ }
+  }
+  checkStorageQuota();
+  setInterval(checkStorageQuota, 60000); // check every minute
 
   // ── Periodic auto-save every 30s (safety net) ───────────────
   setInterval(() => {
