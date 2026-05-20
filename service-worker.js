@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inhaus-v70';
+const CACHE_NAME = 'inhaus-v71';
 const ASSETS = [
   'index.html',
   'styles.css',
@@ -12,11 +12,14 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // Do NOT call skipWaiting() — wait for all tabs to close before activating.
+  // This prevents mid-inspection reloads when a new version is pushed.
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
+  // Do NOT call clients.claim() — existing sessions keep the old SW until they reload.
 });
 
 self.addEventListener('fetch', e => {

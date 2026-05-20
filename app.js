@@ -929,6 +929,8 @@
   function extractAllPhotosFromExport(exportData) {
     const photos = [];
     function pickPhoto(p, fallbackRoomName) {
+      // Skip photos already uploaded (dataUrl cleared to '__uploaded__')
+      if (!p.imageData || p.imageData === '__uploaded__') return null;
       return {
         photoId: p.photoId || '',
         imageData: p.imageData || '',
@@ -942,7 +944,8 @@
       if (!s) return;
       for (const v of Object.values(s)) {
         if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
-          photos.push(...v.map(p => pickPhoto(p, fallbackRoomName)));
+          const picked = v.map(p => pickPhoto(p, fallbackRoomName)).filter(Boolean);
+          photos.push(...picked);
         }
       }
     }
