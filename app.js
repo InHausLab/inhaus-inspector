@@ -1831,7 +1831,9 @@
             const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name) };
             inspection.sparePhotos.push(sp);
             saveNow();
-            showToast('📸 Spare photo saved — sort it later in Review');
+            showToast('\uD83D\uDCF8 Spare photo saved — sort it later in Review');
+            // Save to device camera roll
+            if (window.savePhotoToDevice) window.savePhotoToDevice(dataUrl, sp.photoId);
           } catch(err) { console.error(err); }
         };
         document.body.appendChild(inp); inp.click(); setTimeout(() => inp.remove(), 2000);

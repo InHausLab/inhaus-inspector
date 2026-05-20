@@ -150,7 +150,7 @@
         function tick() {
           const rem = endMs - Date.now();
           if (rem <= 0) {
-            display.textContent = '00:00 — COMPLETE';
+            display.textContent = '00:00 - COMPLETE';
             display.classList.add('timer-done');
             if (!t.alerted) { playAlert(durationSec === 600); if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]); t.alerted = true; onSave(); }
             return false;
@@ -982,6 +982,24 @@
       section.appendChild(grid);
     }
 
+    // ── Save photo to device camera roll via Web Share API ────────────
+    async function saveToDevicePhotos(dataUrl, photoId) {
+      try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const filename = 'inhaus-' + photoId + '.jpg';
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          // iOS: share sheet lets inspector tap "Save Image" to camera roll
+          await navigator.share({ files: [file], title: 'InHaus Photo' });
+        }
+        // If Web Share not supported, silently skip — Drive upload is still the backup
+      } catch (e) {
+        // User dismissed share sheet or share failed — not critical
+        if (e && e.name !== 'AbortError') console.warn('Save to photos failed:', e);
+      }
+    }
+
     async function handleFiles(files) {
       for (const file of Array.from(files)) {
         try {
@@ -995,7 +1013,9 @@
           photos.push(newPhoto);
           onUpdate();
           section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName));
-          // ⚡ Upload immediately to Drive — don’t wait for export
+          // ⚡ Save to device camera roll immediately (user taps "Save Image" on share sheet)
+          await saveToDevicePhotos(dataUrl, newPhoto.photoId);
+          // ⚡ Upload immediately to Drive
           if (window.uploadPhotoImmediate && window.inspection && window.inspection.inspectionId) {
             window.uploadPhotoImmediate(
               newPhoto,
@@ -1163,7 +1183,7 @@
         const recallBanner = document.createElement('div');
         recallBanner.className = 'ai-recall-banner';
         recallBanner.style.display = 'none';
-        recallBanner.textContent = '⚠️ Possible recall notice visible — verify with manufacturer';
+        recallBanner.textContent = '⚠️ Possible recall notice visible - verify with manufacturer';
 
         // ── DATA TAG scanner ────────────────────────────────────
         const tagSection = document.createElement('div');
@@ -1196,7 +1216,7 @@
             }
             tagPreview.src = dataUrl;
             tagBtn.disabled = true;
-            tagStatus.textContent = '⏳ Analyzing data tag…';
+            tagStatus.textContent = '⏳ Analyzing data tag...';
             tagStatus.className = 'ai-scan-status ai-scan-loading';
             const prompt = 'Analyze this HVAC equipment data tag. Extract and return JSON with: filterSize (e.g. "16x25x1"), mervRating (number or null), manufacturer (string or null), modelNumber (string or null), serialNumber (string or null). If any field is not visible or readable, use null. Return ONLY the JSON object, no other text.';
             const result = await callAnthropic(dataUrl, prompt);
@@ -1210,7 +1230,7 @@
             tagStatus.textContent = '✓ Data tag scanned';
             tagStatus.className = 'ai-scan-status ai-scan-success';
           } catch (err) {
-            tagStatus.textContent = 'Could not read tag — please enter manually';
+            tagStatus.textContent = 'Could not read tag - please enter manually';
             tagStatus.className = 'ai-scan-status ai-scan-error';
           } finally {
             tagBtn.disabled = false;
@@ -1252,7 +1272,7 @@
             }
             filterPreview.src = dataUrl;
             filterBtn.disabled = true;
-            filterStatus.textContent = '⏳ Analyzing filter…';
+            filterStatus.textContent = '⏳ Analyzing filter...';
             filterStatus.className = 'ai-scan-status ai-scan-loading';
             const prompt = 'Analyze this HVAC filter photo. Extract and return JSON with: filterSize (e.g. "16x25x1" or null), mervRating (number or null), filterCondition (one of: "Clean", "Dirty", "Very Dirty", "Damaged"), estimatedAge (one of: "New", "Less than 6 months", "6-12 months", "Over 1 year"), visibleRecallNotice (true or false), notes (any relevant text visible on filter, or null). Return ONLY the JSON object, no other text.';
             const result = await callAnthropic(dataUrl, prompt);
@@ -1270,7 +1290,7 @@
             filterStatus.textContent = '✓ Filter scanned';
             filterStatus.className = 'ai-scan-status ai-scan-success';
           } catch (err) {
-            filterStatus.textContent = 'Could not read filter — please enter manually';
+            filterStatus.textContent = 'Could not read filter - please enter manually';
             filterStatus.className = 'ai-scan-status ai-scan-error';
           } finally {
             filterBtn.disabled = false;
@@ -1304,7 +1324,7 @@
         return details;
       }
       case 'process-checklist': {
-        // Process steps — collapsible. Collapsed by default for experienced inspectors.
+        // Process steps - collapsible. Collapsed by default for experienced inspectors.
         const isExperienced = localStorage.getItem('inhaus_experienced') === 'true';
         const defaultOpen = !isExperienced;
         const details = document.createElement('details');
@@ -1406,7 +1426,7 @@
               if (!k.startsWith('_')) summaryData[k] = v;
             }
 
-            // Filter to meaningful fields only — skip photo arrays, internal keys, empty values
+            // Filter to meaningful fields only - skip photo arrays, internal keys, empty values
             const meaningful = {};
             const skipKeys = new Set(['roomName','aiSummary','aiSummaryGeneratedAt','_roomName','_stepId']);
             for (const [k, v] of Object.entries(summaryData)) {
@@ -1424,7 +1444,7 @@
               '\n- Only mention things that need follow-up or re-testing. Skip anything that is normal.' +
               '\n- If something needs re-checking, say when: "recommend re-test in 6 months" or "follow up after lab results".' +
               '\n- Include actual values when relevant (e.g. "humidity at 68%").' +
-              '\n- Write in plain prose — no bullet points, no headers, no markdown.' +
+              '\n- Write in plain prose - no bullet points, no headers, no markdown.' +
               '\n- If nothing needs follow-up, write only: No items flagged.' +
               '\n- Maximum 3 sentences. Be brief.';
 
@@ -1450,7 +1470,7 @@
             } catch (err) {
               genBtn.disabled = false;
               genBtn.textContent = '\uD83D\uDCDD Generate Room Summary';
-              showToast('AI unavailable — please write summary manually');
+              showToast('AI unavailable - please write summary manually');
             }
           }
 
@@ -1638,7 +1658,7 @@
     const bar = el('div', { className: 'progress-bar' });
     phases.forEach(p => {
       const isCurrent = p.id === currentPhaseId;
-      // Free navigation — all phases are tappable (v60)
+      // Free navigation - all phases are tappable (v60)
       const dot = el('div', {
         className: 'phase-dot' + (isCurrent ? ' active' : '') + (p.done ? ' done' : ''),
         onClick: () => onPhaseClick(p.id)
@@ -1718,6 +1738,21 @@
   }
 
   // ── Export ─────────────────────────────────────────────────
+  // ── Global: save a photo to device camera roll ─────────────────
+  window.savePhotoToDevice = async function(dataUrl, photoId) {
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const filename = 'inhaus-' + (photoId || 'photo') + '.jpg';
+      const file = new File([blob], filename, { type: 'image/jpeg' });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'InHaus Photo' });
+      }
+    } catch (e) {
+      if (e && e.name !== 'AbortError') console.warn('savePhotoToDevice failed:', e);
+    }
+  };
+
   window.UI = {
     el, frag, renderField, renderProgressBar, renderStatusBar, renderTimersBar,
     renderText, renderTextarea, renderNumber, renderSelect, renderYesNo, renderRadio,
