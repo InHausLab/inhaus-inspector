@@ -1038,6 +1038,25 @@
     }
   }
 
+  // ── Step Checkpoint Sync ──────────────────────────────────
+  // Fire-and-forget backup after each step completes.
+  // Silent on failure — close-out export is still the authoritative save.
+  async function checkpointToCloud() {
+    if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+    try {
+      const exportData = buildExportJSON();
+      const payload = stripPhotosFromExport(exportData);
+      payload._checkpoint = true;
+      fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.log('Checkpoint sync skipped:', e);
+    }
+  }
+
   async function submitInspection(exportData) {
     if (!GOOGLE_SCRIPT_URL) return true;
     showUploadBanner('pending', 'Uploading to Google Drive\u2026');
@@ -1911,6 +1930,7 @@
         data._completedAt = new Date().toISOString();
         currentStepIdx++;
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
+        checkpointToCloud(); // fire-and-forget backup — silent on failure
       }}, currentStepIdx < stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
     ];
     if (isDevMode()) {
