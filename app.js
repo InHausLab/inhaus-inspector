@@ -13,6 +13,23 @@
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
+  // ── Auto-sync version badge from service worker ────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(reg => {
+      const swURL = reg.active && reg.active.scriptURL;
+      if (swURL) {
+        fetch(swURL).then(r => r.text()).then(txt => {
+          const m = txt.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+          if (m) {
+            const v = m[1].replace('inhaus-', '');
+            const badge = document.getElementById('version-badge');
+            if (badge) badge.textContent = v;
+          }
+        }).catch(() => {});
+      }
+    });
+  }
+
   // ── Field Definition Helpers ───────────────────────────────
   function text(key, label, opts) { return { key, type: 'text', label, ...opts }; }
   function textarea(key, label, opts) { return { key, type: 'textarea', label, ...opts }; }
