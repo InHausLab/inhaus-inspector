@@ -879,6 +879,7 @@
       await DB.save(inspection);
       const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       showSave('Saved \u2713 ' + t);
+      backupToLocalStorage(); // mirror to localStorage as secondary safety net
       // Clear any previous save error banner
       const b = document.getElementById('save-error-banner');
       if (b) b.remove();
@@ -895,6 +896,44 @@
   function scheduleSave() {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(saveNow, 300);
+  }
+
+  // ── localStorage Shadow Backup ────────────────────────────
+  // Secondary safety net: stores inspection JSON (no photo data) in localStorage.
+  // Survives IndexedDB failures, quota issues, and accidental clears.
+  function backupToLocalStorage() {
+    if (!inspection || !inspection.inspectionId) return;
+    try {
+      const bak = JSON.parse(JSON.stringify(inspection));
+      // Strip photo dataUrls — keep metadata only, not pixel data
+      if (bak.stepData) {
+        Object.values(bak.stepData).forEach(step => {
+          Object.keys(step).forEach(k => {
+            if (Array.isArray(step[k]) && step[k].length && step[k][0] && typeof step[k][0].photoId === 'string') {
+              step[k] = step[k].map(p => ({
+                photoId: p.photoId, stepName: p.stepName, roomName: p.roomName,
+                caption: p.caption, timestamp: p.timestamp,
+                uploaded: p.dataUrl === '__uploaded__'
+              }));
+            }
+          });
+        });
+      }
+      const key = 'inhaus_bak_' + inspection.inspectionId;
+      localStorage.setItem(key, JSON.stringify({ data: bak, savedAt: new Date().toISOString() }));
+      cleanOldLocalStorageBackups();
+    } catch(e) { /* localStorage full or unavailable — not critical */ }
+  }
+
+  function cleanOldLocalStorageBackups() {
+    try {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('inhaus_bak_'));
+      if (keys.length <= 5) return;
+      const withTime = keys.map(k => {
+        try { return { k, t: JSON.parse(localStorage.getItem(k)).savedAt }; } catch(e) { return { k, t: '' }; }
+      }).sort((a, b) => (a.t < b.t ? -1 : 1));
+      withTime.slice(0, withTime.length - 5).forEach(({ k }) => localStorage.removeItem(k));
+    } catch(e) {}
   }
 
   // ── Validation ─────────────────────────────────────────────
@@ -1013,35 +1052,54 @@
   // ── Real-time single-photo upload ─────────────────────────
   async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
     if (!GOOGLE_SCRIPT_URL || !inspectionId) return;
+    if (!photo.dataUrl || photo.dataUrl === '__uploaded__') return;
     const originalDataUrl = photo.dataUrl;
-    try {
-      const payload = {
-        photoUploadOnly: true,
-        inspectionId: inspectionId,
-        clientName: clientName || '',
-        propertyAddress: propertyAddress || '',
-        photos: [{
-          photoId: photo.photoId || '',
-          roomName: photo.roomName || '',
-          stepName: photo.stepName || '',
-          imageData: originalDataUrl || '',
-          caption: photo.caption || ''
-        }]
-      };
-      await fetch(GOOGLE_SCRIPT_URL, {
+
+    const payload = {
+      photoUploadOnly: true,
+      inspectionId: inspectionId,
+      clientName: clientName || '',
+      propertyAddress: propertyAddress || '',
+      photos: [{
+        photoId: photo.photoId || '',
+        roomName: photo.roomName || '',
+        stepName: photo.stepName || '',
+        imageData: originalDataUrl || '',
+        caption: photo.caption || ''
+      }]
+    };
+
+    async function doUpload() {
+      return fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      photo._uploaded = true;
-      // ── Critical: clear the large dataUrl after upload to prevent IndexedDB overflow ──
-      // no-cors means we can't confirm server receipt, but the fetch completed without throwing.
-      // Keeping full base64 photos in IndexedDB causes quota errors after ~30 photos.
-      photo.dataUrl = '__uploaded__';
-      scheduleSave(); // persist the smaller record immediately
+    }
+
+    try {
+      // ── First upload attempt ──────────────────────────────────────────
+      await doUpload();
+      photo._uploadAttempts = 1;
+      // Keep dataUrl in IndexedDB for now — schedule a second attempt before clearing.
+      // no-cors means we cannot confirm server receipt. Uploading twice dramatically
+      // reduces the chance of silent loss before we clear the local copy.
+      setTimeout(async () => {
+        if (!photo.dataUrl || photo.dataUrl === '__uploaded__') return; // cleared by manual sync
+        try {
+          await doUpload();
+          photo._uploadAttempts = 2;
+        } catch(e) {
+          console.warn('Photo second-attempt failed, keeping in IndexedDB:', e);
+          // Don't clear — keep original so manual Sync to Drive can retry
+          return;
+        }
+        photo._uploaded = true;
+        photo.dataUrl = '__uploaded__';
+        scheduleSave();
+      }, 12000); // 12-second gap before second attempt
     } catch(e) {
-      console.warn('Real-time photo upload failed, will retry on export:', e);
-      // Keep original dataUrl so it can be retried
+      console.warn('Photo upload failed, keeping in IndexedDB for retry on export:', e);
       photo.dataUrl = originalDataUrl;
     }
   }
@@ -2438,5 +2496,15 @@
       saveNow();
     }
   }, 30000);
+
+  // ── 5-minute auto-checkpoint + localStorage backup ────────────
+  // Pushes full data JSON to Drive every 5 minutes during active inspection.
+  // Also refreshes localStorage mirror. Belt-and-suspenders against data loss.
+  setInterval(() => {
+    if (inspection && screen === 'step') {
+      checkpointToCloud();
+      backupToLocalStorage();
+    }
+  }, 5 * 60 * 1000);
 
 })();
