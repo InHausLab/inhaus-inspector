@@ -128,13 +128,15 @@
       link('📋 Open Priority Lab app', 'https://app.prioritylaboratory.com'),
       link('🔬 Priority Lab order portal', 'https://prioritylaboratory.com/inhaus'),
       yesno('breezeDone', 'Breeze ET test performed'),
-      showIf(timer(timerKey || 'breezeTimer', 'Breeze ET Timer (10 min)', 600), 'breezeDone', 'Yes')
+      showIf(timer(timerKey || 'breezeTimer', 'Breeze ET Timer (10 min)', 600), 'breezeDone', 'Yes'),
+      showIf(text('breezeLocation', 'Spore trap location in this room', { placeholder: 'e.g. Center of room, tripod at 60", north corner' }), 'breezeDone', 'Yes')
     ];
   }
 
   function qtrakSection() {
     return [
       heading('Q-Trak 7585'),
+      text('qtrakLocation', 'Q-Trak reading location', { placeholder: 'e.g. Center of room, desk height, 3ft from window' }),
       yesno('qtrakDownloaded', 'Q-Trak data downloaded from device?'),
       text('qtrakExportFilename', 'Q-Trak export filename or notes', { placeholder: 'e.g. QTRAK_2026-04-06_123MainSt.xlsx' })
     ];
@@ -147,7 +149,8 @@
   function observationFields() {
     return [
       chips('observations', 'Observations', OBS_TAGS),
-      textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments...' }),
+      textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments... (\uD83C\uDF99 Voice dictation: read back and fix errors before moving on)' }),
+      check('voiceReviewed', '\u2713 Voice-dictated notes reviewed and corrected'),
       divider(),
       heading('Photos'),
       photo('Before', '_beforePhotos'),
@@ -161,7 +164,7 @@
       heading('Follow-Up'),
       yesno('followUpNeeded', 'Follow-up recommended?'),
       showIf(sel('followUpTimeframe', 'Re-check in', ['3 months', '6 months', '12 months']), 'followUpNeeded', 'Yes'),
-      showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return...' }), 'followUpNeeded', 'Yes'),
+      showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return... (\uD83C\uDF99 Voice dictation: read back and fix errors)' }), 'followUpNeeded', 'Yes'),
       showIf(photo('Follow-Up', '_followUpPhotos'), 'followUpNeeded', 'Yes')
     ];
   }
@@ -654,6 +657,23 @@
         { key: 'photosUploaded', label: 'All photos uploaded/captured' },
         { key: 'boulderBlueRegistered', label: 'Boulder Blue filter registered on Jonah Ventures portal' }
       ]},
+      divider(),
+      heading('Tests Conducted — Confirm for Tanner'),
+      info('Check every test actually performed so Tanner knows exactly what lab results to expect.'),
+      checklist('testsConfirmed', null, [
+        { key: 'testBreeze', label: 'Breeze ET mold spore traps — collected' },
+        { key: 'testBoulderBlue', label: 'Boulder Blue allergen filter — collected' },
+        { key: 'testWaterPanel', label: 'Water panel — collected' },
+        { key: 'testPFAS', label: 'PFAS test — collected' },
+        { key: 'testMicroplastics', label: 'Microplastics test — collected' },
+        { key: 'testRadon', label: 'Radon monitor — placed (48hr test running)' },
+        { key: 'testATP', label: 'ATP surface test — performed' },
+        { key: 'testMoldSwabs', label: 'Mold swab samples — collected' }
+      ]),
+      text('breezeSampleCount', 'Number of Breeze ET spore traps collected', { placeholder: 'e.g. 4' }),
+      text('moldSwabSampleCount', 'Number of mold swab samples collected', { placeholder: 'e.g. 2 (only if visible mold found)' }),
+      text('atpTestCount', 'Number of ATP tests performed', { placeholder: 'e.g. 3 — kitchen sink, dishwasher, ice maker' }),
+      textarea('testsNotConducted', 'Tests NOT performed — note reason', { placeholder: 'e.g. PFAS not requested by client. Microplastics kit not in truck.' }),
     ];
   }
 
@@ -1630,7 +1650,7 @@
       text('wifiNetwork', 'Home wifi network name'),
       text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
       { type: 'wifi-copy' },
-      textarea('clientConcerns', 'Client concerns / known problem areas'),
+      textarea('clientConcerns', 'Client concerns / known problem areas', { placeholder: '\uD83C\uDF99 Using voice dictation? Read it back and fix errors before saving.' }),
       textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
     ];
 
