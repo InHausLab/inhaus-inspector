@@ -343,7 +343,7 @@
         </div>
         <div class="slider-row">
           <div class="slider-label"><span>Revenue per test</span><span id="v-rpt">$2,000</span></div>
-          <input type="range" id="s-rpt" min="1000" max="5000" step="50" value="2000" oninput="updateAll()">
+          <input type="range" id="s-rpt" min="1000" max="5000" step="50" value="2200" oninput="updateAll()">
           <div class="slider-range"><span>$1,000</span><span>$5,000</span></div>
         </div>
         <div class="slider-row">
@@ -984,6 +984,15 @@ function updateAll() {
 
   const totalTrucks = nmkt * tpm;
   document.getElementById('network-chip').textContent = `Network at maturity: ${totalTrucks} trucks across ${nmkt} markets`;
+
+  // ── Sync shared variables to Unit Economics + Break-Even tabs ──
+  const syncSlider = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  syncSlider('ue-s-tpd', tpd); syncSlider('ue-s-rpt', rpt); syncSlider('ue-s-wdm', wdm);
+  syncSlider('be-s-rpt', rpt);
+  // Also sync truck lease
+  const leaseEl = document.getElementById('ue-lease');
+  if (leaseEl) { leaseEl.value = fmtNum(leasePerTruckMo); }
+  updateUE(); updateBE();
 
   // Per-truck monthly revenue
   const testsPerMonth = tpd * wdm;
@@ -1828,7 +1837,10 @@ function checkPw() {
   if (val === 'BWCA') {
     document.getElementById('pw-gate').style.display = 'none';
     document.getElementById('app-wrap').style.display = 'block';
-    updateAll(); updateUE(); updateBE(); updateRR(); updateMix(); updateEquip(); updateCons(); updateRef();
+    updateEquip(); applyEquipToModel();
+    updateCons(); applyConsToModel();
+    updateMix();
+    updateAll(); updateRR(); updateRef();
   } else {
     document.getElementById('pw-error').style.display = 'block';
     document.getElementById('pw-input').value = '';
