@@ -699,6 +699,34 @@
     ];
   }
 
+  // ── Actions Taken / Assessment Observations helpers ────────
+  function postActionsTakenFields() {
+    const items = [];
+    for (let i = 1; i <= 6; i++) {
+      if (i > 1) items.push(divider());
+      items.push(text(`actionTaken_${i}_desc`, `Action ${i}`, {
+        placeholder: 'e.g. Replaced HVAC filter — 20x20x1 MERV 11, installed new (🎙 speak then review)'
+      }));
+      items.push(photo(`Actions Taken ${i}`, `_actionPhoto_${i}`));
+    }
+    return items;
+  }
+
+  function postObservationFields() {
+    const items = [];
+    for (let i = 1; i <= 6; i++) {
+      if (i > 1) items.push(divider());
+      items.push(text(`obs_${i}_location`, `Observation ${i} — Location`, {
+        placeholder: 'e.g. Primary Bathroom / Basement Corner'
+      }));
+      items.push(textarea(`obs_${i}_note`, 'What was observed', {
+        placeholder: 'e.g. Active moisture staining on drywall below showerhead — see photo. No active drip at time of inspection. (🎙 speak then review)'
+      }));
+      items.push(photo(`Observation ${i}`, `_obsPhoto_${i}`));
+    }
+    return items;
+  }
+
   // ── #7: Post-Assessment (new) ──────────────────────────────
   function getPostAssessmentFields() {
     return [
@@ -727,7 +755,15 @@
         { key: 'allPhotosUploaded', label: 'All photos uploaded' },
         { key: 'allSamplesShipped', label: 'All samples shipped' },
         { key: 'assessmentComplete', label: 'Assessment marked Complete' }
-      ])
+      ]),
+      divider(),
+      heading('Actions Taken During Assessment'),
+      info('Document what you physically did on-site. Each entry appears in the report. Fill as many as apply — leave the rest blank.'),
+      ...postActionsTakenFields(),
+      divider(),
+      heading('Assessment Observations'),
+      info('Notable findings that need to appear in the report — include location, what you saw, and a photo for each. Leave unused entries blank.'),
+      ...postObservationFields()
     ];
   }
 
