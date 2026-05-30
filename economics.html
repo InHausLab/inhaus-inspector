@@ -399,7 +399,7 @@
         </div>
         <div class="input-row">
           <label>Truck-level COGS % of revenue</label>
-          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="i-cogs" value="33" step="1" oninput="updateAll()"></div>
+          <div class="input-with-prefix"><span class="prefix">%</span><input type="number" id="i-cogs" value="45" step="1" oninput="updateAll()"></div>
         </div>
         <div class="input-row">
           <label>Truck lease ($/mo per truck)</label>
@@ -1140,6 +1140,7 @@ function updateAll() {
     <tr><td>Peak cash low point (operations + capex)</td><td>${fmtFull$(Math.min(0, Math.min(...cumCashArr)))}</td></tr>
     <tr class="pl-total"><td>Total capital required</td><td class="bad">${fmtFull$(Math.abs(Math.min(0, Math.min(...cumCashArr))))}</td></tr>
     <tr><td colspan="2" style="font-size:11px; color:var(--text-muted); padding-top:6px;">Capital required = deepest the cash balance goes underwater. This already includes equipment purchases — they are not added separately.</td></tr>
+    <tr><td colspan="2" style="font-size:11px; color:#2C3F16; background:#ECEFE9; padding:8px; border-radius:4px; margin-top:8px; display:block;">📍 <strong>Market note:</strong> Aspen = beachhead market (1 truck). Scale volume comes from Denver &amp; MSP (3 trucks each). Model uses uniform trucks-per-market as a simplification.</td></tr>
   `;
 }
 
