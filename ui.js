@@ -37,35 +37,92 @@
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+  // ── Voice dictation confirmation overlay ────────────────────────
+  function showDictationConfirm(transcript, onAccept, onRedo) {
+    const existing = document.getElementById('dictation-confirm');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'dictation-confirm';
+    overlay.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1a2710;color:#fff;z-index:9999;padding:16px 16px calc(env(safe-area-inset-bottom)+16px);box-shadow:0 -4px 20px rgba(0,0,0,0.4);';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;font-weight:700;text-transform:uppercase;color:#9cc47a;margin-bottom:8px;letter-spacing:0.05em;';
+    label.textContent = '\ud83c\udf99 Voice result — review before saving';
+    const text = document.createElement('div');
+    text.style.cssText = 'font-size:1rem;line-height:1.5;background:#2c3f16;padding:10px 12px;border-radius:8px;margin-bottom:12px;word-break:break-word;';
+    text.textContent = transcript;
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:10px;';
+    const useBtn = document.createElement('button');
+    useBtn.type = 'button';
+    useBtn.style.cssText = 'flex:1;background:#4a7c28;color:#fff;border:none;border-radius:8px;padding:12px;font-size:1rem;font-weight:700;cursor:pointer;touch-action:manipulation;';
+    useBtn.textContent = '\u2713 Use This';
+    useBtn.onclick = () => { overlay.remove(); onAccept(transcript); };
+    const redoBtn = document.createElement('button');
+    redoBtn.type = 'button';
+    redoBtn.style.cssText = 'flex:1;background:#5a1d1d;color:#fff;border:none;border-radius:8px;padding:12px;font-size:1rem;font-weight:700;cursor:pointer;touch-action:manipulation;';
+    redoBtn.textContent = '\u21ba Redo';
+    redoBtn.onclick = () => { overlay.remove(); if (onRedo) onRedo(); };
+    const discardBtn = document.createElement('button');
+    discardBtn.type = 'button';
+    discardBtn.style.cssText = 'background:transparent;color:#9ca3af;border:1px solid #4b5563;border-radius:8px;padding:12px 16px;font-size:0.9rem;cursor:pointer;touch-action:manipulation;';
+    discardBtn.textContent = '\u00d7';
+    discardBtn.onclick = () => overlay.remove();
+    btnRow.appendChild(useBtn);
+    btnRow.appendChild(redoBtn);
+    btnRow.appendChild(discardBtn);
+    overlay.appendChild(label);
+    overlay.appendChild(text);
+    overlay.appendChild(btnRow);
+    document.body.appendChild(overlay);
+  }
+
   function micBtn(onResult) {
     if (!hasSpeech) {
-      if (isIOS) return el('button', {
-        type: 'button', className: 'mic-hint-btn', 'aria-label': 'Use keyboard dictation',
-        onClick: (e) => {
-          e.preventDefault();
-          const inp = e.target.closest('.input-row, .textarea-row');
-          if (inp) {
-            const field = inp.querySelector('input, textarea');
-            if (field) field.focus();
+      if (isIOS) {
+        // On iOS: no native SR — recommend Whispr app
+        const wrap = document.createElement('span');
+        const hint = el('button', {
+          type: 'button', className: 'mic-hint-btn', 'aria-label': 'Voice dictation: use Whispr app on iOS',
+          title: 'On iOS: use the Whispr app for voice dictation (tap mic in keyboard)',
+          onClick: (e) => {
+            e.preventDefault();
+            showToast('\ud83c\udf99 iOS tip: use Whispr app or tap \ud83c\udfa4 in your keyboard for voice dictation', 4000);
+            const inp = e.target.closest('.input-row, .textarea-row');
+            if (inp) { const field = inp.querySelector('input, textarea'); if (field) field.focus(); }
           }
-        }
-      }, '\u2328\uFE0F');
+        }, '\ud83c\udf99');
+        wrap.appendChild(hint);
+        return wrap;
+      }
       return null;
     }
     let rec = null, active = false;
     const btn = el('button', { type: 'button', className: 'mic-btn', 'aria-label': 'Voice input' }, '\uD83C\uDF99');
-    btn.addEventListener('click', () => {
-      if (active && rec) { rec.stop(); return; }
+    function startRecording() {
       rec = new SR();
       rec.continuous = false;
       rec.interimResults = false;
       rec.lang = 'en-US';
-      rec.onresult = e => { onResult(e.results[0][0].transcript); };
+      rec.onresult = e => {
+        const transcript = e.results[0][0].transcript;
+        active = false;
+        btn.classList.remove('recording');
+        // Show confirmation before committing
+        showDictationConfirm(
+          transcript,
+          (accepted) => { onResult(accepted); },
+          () => { startRecording(); } // redo: restart recording
+        );
+      };
       rec.onend = () => { active = false; btn.classList.remove('recording'); };
       rec.onerror = () => { active = false; btn.classList.remove('recording'); };
       rec.start();
       active = true;
       btn.classList.add('recording');
+    }
+    btn.addEventListener('click', () => {
+      if (active && rec) { rec.stop(); return; }
+      startRecording();
     });
     return btn;
   }
@@ -121,10 +178,21 @@
   }
 
   // ── Format helpers ─────────────────────────────────────────
-  function fmtDate(iso) {
+  function fmtDateOnly(iso) {
     if (!iso) return '--';
     const d = new Date(iso);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+  }
+
+  function fmtTimeOnly(iso) {
+    if (!iso) return '--';
+    const d = new Date(iso);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Denver', timeZoneName: 'short' });
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '--';
+    return fmtDateOnly(iso) + ' ' + fmtTimeOnly(iso);
   }
 
   function fmtDuration(sec) {
@@ -1070,7 +1138,10 @@
     if (f.showIf) {
       const dv = data[f.showIf.key];
       const target = f.showIf.value;
-      const visible = Array.isArray(target) ? target.includes(dv) : dv === target;
+      // Support arrays in both data value (chips) and target (multiple allowed values)
+      const visible = Array.isArray(target)
+        ? (Array.isArray(dv) ? target.some(t => dv.includes(t)) : target.includes(dv))
+        : (Array.isArray(dv) ? dv.includes(target) : dv === target);
       const fCopy = Object.assign({}, f);
       delete fCopy.showIf;
       const inner = renderField(fCopy, data, onChange, inspection, onSave);
@@ -1732,7 +1803,10 @@
       var target;
       try { target = JSON.parse(rawValue); } catch(e) { target = rawValue; }
       const dv = data[key];
-      const visible = Array.isArray(target) ? target.includes(dv) : dv === target;
+      // Support arrays in both data value (chips) and target (multiple allowed values)
+      const visible = Array.isArray(target)
+        ? (Array.isArray(dv) ? target.some(t => dv.includes(t)) : target.includes(dv))
+        : (Array.isArray(dv) ? dv.includes(target) : dv === target);
       w.classList.toggle('showif-hidden', !visible);
     });
   }
