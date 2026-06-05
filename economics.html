@@ -96,38 +96,6 @@
   .tab-btn:hover { color: var(--forest); }
   .tab-btn.active { color: var(--forest); border-bottom-color: var(--forest); }
 
-  /* Scenario Bar */
-  .scenario-bar {
-    background: var(--fog);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 32px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .scenario-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-right: 4px;
-  }
-  .scenario-btn {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 5px 18px;
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .scenario-btn:hover { border-color: var(--forest); color: var(--forest); }
-  .scenario-btn.active { background: var(--forest); color: white; border-color: var(--forest); }
-
   /* Layout */
   .tab-content { display: none; padding: 24px 32px; }
   .tab-content.active { display: block; }
@@ -348,13 +316,6 @@
     </div>
   </div>
   <div class="meta">v1.3<br>Built for Matt</div>
-</div>
-
-<div class="scenario-bar">
-  <span class="scenario-label">Scenario:</span>
-  <button class="scenario-btn" onclick="applyScenario('conservative', this)">Conservative</button>
-  <button class="scenario-btn active" onclick="applyScenario('base', this)">Base Case</button>
-  <button class="scenario-btn" onclick="applyScenario('aggressive', this)">Aggressive</button>
 </div>
 
 <div class="tabs">
@@ -1869,43 +1830,6 @@ function updateRef() {
     html += `<tr><td>Year ${yr}</td><td style="text-align:right">${activeMaturedMarkets} of ${nmkt}</td><td style="text-align:right" class="pos">$${Math.round(yearRevenue).toLocaleString()}</td></tr>`;
   }
   document.getElementById('ref-timeline-table').innerHTML = html;
-}
-
-// ─── SCENARIOS ──────────────────────────────────────────────
-const SCENARIOS = {
-  conservative: { tpd: 1.5, rpt: 1700, wdm: 20, ramp: 12, nmkt: 2, tpm: 2, mbl: 6, mbt: 6, gm: '120,000', ga: '800,000', mkt: 15, cogs: 50, lease: '1,200' },
-  base:         { tpd: 2.0, rpt: 2200, wdm: 22, ramp:  9, nmkt: 3, tpm: 3, mbl: 4, mbt: 4, gm: '120,000', ga: '800,000', mkt: 12, cogs: 45, lease: '1,200' },
-  aggressive:   { tpd: 3.0, rpt: 2500, wdm: 22, ramp:  6, nmkt: 5, tpm: 4, mbl: 3, mbt: 3, gm: '120,000', ga: '800,000', mkt: 10, cogs: 40, lease: '1,200' }
-};
-
-function applyScenario(name, btn) {
-  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const s = SCENARIOS[name];
-  // Tab 1 sliders
-  document.getElementById('s-tpd').value = s.tpd;
-  document.getElementById('s-rpt').value = s.rpt;
-  document.getElementById('s-wdm').value = s.wdm;
-  document.getElementById('s-ramp').value = s.ramp;
-  document.getElementById('s-nmkt').value = s.nmkt;
-  document.getElementById('s-tpm').value = s.tpm;
-  document.getElementById('s-mbl').value = s.mbl;
-  document.getElementById('s-mbt').value = s.mbt;
-  // Tab 1 inputs
-  document.getElementById('i-gm').value = s.gm;
-  document.getElementById('i-ga').value = s.ga;
-  document.getElementById('i-mkt').value = s.mkt;
-  document.getElementById('i-cogs').value = s.cogs;
-  document.getElementById('i-lease').value = s.lease;
-  // Tab 2 UE sliders (keep in sync)
-  document.getElementById('ue-s-tpd').value = s.tpd;
-  document.getElementById('ue-s-rpt').value = Math.min(s.rpt, 3000);
-  document.getElementById('ue-s-wdm').value = s.wdm;
-  document.getElementById('ue-lease').value = s.lease;
-  // Tab 3 break-even slider
-  document.getElementById('be-s-rpt').value = s.rpt;
-  // Trigger all updates
-  updateAll(); updateUE(); updateBE(); updateRef();
 }
 
 // ─── PASSWORD GATE ──────────────────────────────────────────
