@@ -16,7 +16,7 @@
   // ── AI Vision Config ──────────────────────────────────────
   // Set this to your Anthropic API key for AI HVAC scanning
   // Leave blank to disable AI scanning (fields can still be filled manually)
-  // Contact Matt to set this API key — needed for AI HVAC scanner and room summaries
+  // Contact Matt to set this API key - needed for AI HVAC scanner and room summaries
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
@@ -81,7 +81,7 @@
       ]),
       yesno('flirDone', 'FLIR scan completed'),
       showIf(yesno('flirConcerns', 'Areas of concern found'), 'flirDone', 'Yes'),
-      showIf(text('flirImageLabel', 'FLIR Image Label', { placeholder: 'e.g. Bedroom 1 — Image #0023' }), 'flirDone', 'Yes'),
+      showIf(text('flirImageLabel', 'FLIR Image Label', { placeholder: 'e.g. Bedroom 1 - Image #0023' }), 'flirDone', 'Yes'),
       showIf(text('flirPhotoNum', 'FLIR photo number noted'), 'flirDone', 'Yes'),
       showIf(num('flirMoisture', 'Moisture reading', { unit: '%', note: 'Flag if >20%' }), 'flirDone', 'Yes')
     ], { defaultOpen: false })
@@ -100,19 +100,19 @@
         check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
         heading('FLIR Photo Log'),
         info('Add each room scanned with its FLIR image number'),
-        text('flirImageLabel1', 'FLIR Image Label', { placeholder: 'e.g. Living Room — Image #0023' }),
+        text('flirImageLabel1', 'FLIR Image Label', { placeholder: 'e.g. Living Room - Image #0023' }),
         text('flirRoom1', 'Room name'),
         text('flirImg1', 'FLIR Image #'),
-        text('flirImageLabel2', 'FLIR Image Label', { placeholder: 'e.g. Dining Room — Image #0024' }),
+        text('flirImageLabel2', 'FLIR Image Label', { placeholder: 'e.g. Dining Room - Image #0024' }),
         text('flirRoom2', 'Room name'),
         text('flirImg2', 'FLIR Image #'),
-        text('flirImageLabel3', 'FLIR Image Label', { placeholder: 'e.g. Hallway — Image #0025' }),
+        text('flirImageLabel3', 'FLIR Image Label', { placeholder: 'e.g. Hallway - Image #0025' }),
         text('flirRoom3', 'Room name'),
         text('flirImg3', 'FLIR Image #'),
-        text('flirImageLabel4', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0026' }),
+        text('flirImageLabel4', 'FLIR Image Label', { placeholder: 'e.g. Room - Image #0026' }),
         text('flirRoom4', 'Room name (if needed)'),
         text('flirImg4', 'FLIR Image #'),
-        text('flirImageLabel5', 'FLIR Image Label', { placeholder: 'e.g. Room — Image #0027' }),
+        text('flirImageLabel5', 'FLIR Image Label', { placeholder: 'e.g. Room - Image #0027' }),
         text('flirRoom5', 'Room name (if needed)'),
         text('flirImg5', 'FLIR Image #')
       ], { defaultOpen: false })
@@ -156,6 +156,7 @@
   function observationFields() {
     return [
       chips('observations', 'Observations', OBS_TAGS),
+      info('\uD83D\uDCA1 Tip: Use Whispr app for more accurate voice dictation'),
       textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments... (\uD83C\uDF99 Voice dictation: read back and fix errors before moving on)' }),
       check('voiceReviewed', '\u2713 Voice-dictated notes reviewed and corrected'),
       divider(),
@@ -205,12 +206,14 @@
       info('Equipment was already verified at the truck. Complete these on-site steps before starting.'),
       link('\uD83D\uDCCB Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
       checklist('preAssessment', 'Before You Start', [
-        { key: 'reviewConcerns', label: 'Review customer concerns from intake form' },
+        { key: 'reviewConcerns', label: 'Review customer concerns from customer intake form' },
+        { key: 'devicesCharged', label: 'All devices charged' },
         { key: 'reviewHome', label: 'Walk through home \u2014 note layout, levels, access points' },
-        { key: 'corentiumRegistered', label: 'Airthings Corentium Pro registered to this property' },
+        { key: 'corentiumRegistered', label: 'Airthings device registered to house' },
+        { key: 'boulderBlueRegistered', label: 'Boulder Blue sample registered' },
         { key: 'waterTestsActivated', label: 'Water tests activated' },
         { key: 'radonPrepared', label: 'Radon test prepared' },
-        { key: 'qtrakSetup', label: 'Q-Trak configured (previous data deleted, rooms set up)' }
+        { key: 'qtrakSetup', label: 'Q-Trak device set up (delete previous data, set up room templates)' }
       ])
     ];
   }
@@ -282,7 +285,7 @@
       { type: 'process-checklist', title: 'Airthings View Plus Setup', items: [
         { key: 'airthingsPaired', label: 'Paired to Airthings account' },
         { key: 'airthingsWifiConnected', label: 'Connected to home wifi' },
-        { key: 'airthingsPlaced', label: 'Placed at breathing height — 3ft from vents, fans, windows, doors' }
+        { key: 'airthingsPlaced', label: 'Placed at breathing height - 3ft from vents, fans, windows, doors' }
       ]},
       divider(),
 
@@ -301,7 +304,7 @@
 
       // ── PROCESS: Q-Trak sensor test ───────────────────────
       { type: 'process-checklist', title: 'Q-Trak Sensor Test', items: [
-        { key: 'qtrakSensorTest', label: 'Hold Q-Trak to alcohol wipe — confirm VOC + formaldehyde spike before starting' }
+        { key: 'qtrakSensorTest', label: 'Hold Q-Trak to alcohol wipe - confirm VOC + formaldehyde spike before starting' }
       ]},
       divider(),
 
@@ -338,8 +341,8 @@
       heading('Breeze ET Outdoor Control'),
       { type: 'process-checklist', title: 'Breeze ET Setup', items: [
         { key: 'pumpSetUp', label: 'Set up pump' },
-        { key: 'placement', label: 'Place 6–10 ft from main entrance' },
-        { key: 'tripodHeight', label: 'Set to full tripod height (60″)' }
+        { key: 'placement', label: 'Place 6-10 ft from main entrance' },
+        { key: 'tripodHeight', label: 'Set to full tripod height (60′′)' }
       ]},
       timer('breezeOutdoorTimer', 'Breeze ET Outdoor Timer (10 min)', 600),
       photo('Outdoor Spore Trap Setup', '_outdoorSporePhotos'),
@@ -350,7 +353,7 @@
       divider(),
       collapsible('🔍 What to Look For', [
         checklist('exteriorGuidance', null, [
-          { key: 'visualInspection', label: 'Conduct visual inspection of exterior — look for signs that might indicate further investigation inside' },
+          { key: 'visualInspection', label: 'Conduct visual inspection of exterior - look for signs that might indicate further investigation inside' },
           { key: 'leaksStains', label: 'Visible leaks or water stains on exterior walls' },
           { key: 'poolingWater', label: 'Pooling water or poor drainage near foundation' },
           { key: 'foundationCracks', label: 'Cracks in foundation or walls' },
@@ -384,7 +387,7 @@
   function getRadonFields() {
     return [
       { type: 'process-checklist', title: 'Radon Monitor Placement', items: [
-        { key: 'radonTripod', label: 'On tripod — 3 ft from exterior wall, 20"+ above floor, central/low-traffic area' },
+        { key: 'radonTripod', label: 'On tripod - 3 ft from exterior wall, 20"+ above floor, central/low-traffic area' },
         { key: 'radonWindowsClosed', label: 'Windows and doors closed' }
       ]},
       divider(),
@@ -403,7 +406,7 @@
   function getRoomTestFields() {
     return [
       { type: 'process-checklist', title: 'Room Setup', items: [
-        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan template — draw in rooms or correct layout' },
+        { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan template - draw in rooms or correct layout' },
         { key: 'labelRooms', label: 'Label rooms using Q-Trak naming convention (e.g. Bedroom 1, Bedroom 2)' }
       ]},
       text('roomName', 'Room Name', { required: true }),
@@ -495,7 +498,7 @@
     return [
       { type: 'process-checklist', title: 'Room Setup', items: [
         { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps ready' },
-        { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open — rooms labelled correctly' }
+        { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open - rooms labelled correctly' }
       ]},
       text('roomName', 'Room Name', { required: true }),
       ...flirFields(),
@@ -527,9 +530,9 @@
     return [
       { type: 'process-checklist', title: 'Room Setup', items: [
         { key: 'breezeMain', label: 'Breeze ET pump + tripod + spore traps ready' },
-        { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open — rooms labelled correctly' }
+        { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open - rooms labelled correctly' }
       ]},
-      text('roomNames', 'Which specific rooms are in this Main Living Area? (e.g. Living Room, Dining Room, Office — list all rooms you tested here)', { required: true }),
+      text('roomNames', 'Which specific rooms are in this Main Living Area? (e.g. Living Room, Dining Room, Office - list all rooms you tested here)', { required: true }),
       ...flirLogFields(),
       ...breezeFields(),
       ...qtrakSection(),
@@ -597,6 +600,7 @@
 
   function getWaterSampleFields() {
     return [
+      info('Label each bottle with customer last name and property address. Ensure chain of custody forms are completed for each test.'),
       { type: 'process-checklist', title: 'Sample Labeling', items: [
         { key: 'bottlesLabeled', label: 'Bottles labeled with client last name and property address' },
         { key: 'preMadeLabels', label: 'Pre-made labels applied (if available)' },
@@ -697,7 +701,7 @@
     return [
       { type: 'process-checklist', title: 'Final Checks Before Leaving', items: [
         { key: 'breezeCollected', label: 'All Breeze ET tests collected and spore traps packed' },
-        { key: 'boulderBlueDone', label: 'Boulder Blue fan run 2+ hours — filter collected and packed' },
+        { key: 'boulderBlueDone', label: 'Boulder Blue fan run 2+ hours - filter collected and packed' },
         { key: 'pfasCollected', label: 'PFAS test collected from kitchen sink' },
         { key: 'waterLabeled', label: 'Water samples labeled and ready to ship' },
         { key: 'appliancesRestored', label: 'All appliances returned to original state' },
@@ -708,22 +712,22 @@
         { key: 'boulderBlueRegistered', label: 'Boulder Blue filter registered on Jonah Ventures portal' }
       ]},
       divider(),
-      heading('Tests Conducted — Confirm for Tanner'),
+      heading('Tests Conducted - Confirm for Tanner'),
       info('Check every test actually performed so Tanner knows exactly what lab results to expect.'),
       checklist('testsConfirmed', null, [
-        { key: 'testBreeze', label: 'Breeze ET mold spore traps — collected' },
-        { key: 'testBoulderBlue', label: 'Boulder Blue allergen filter — collected' },
-        { key: 'testWaterPanel', label: 'Water panel — collected' },
-        { key: 'testPFAS', label: 'PFAS test — collected' },
-        { key: 'testMicroplastics', label: 'Microplastics test — collected' },
-        { key: 'testRadon', label: 'Radon monitor — placed (48hr test running)' },
-        { key: 'testATP', label: 'ATP surface test — performed' },
-        { key: 'testMoldSwabs', label: 'Mold swab samples — collected' }
+        { key: 'testBreeze', label: 'Breeze ET mold spore traps - collected' },
+        { key: 'testBoulderBlue', label: 'Boulder Blue allergen filter - collected' },
+        { key: 'testWaterPanel', label: 'Water panel - collected' },
+        { key: 'testPFAS', label: 'PFAS test - collected' },
+        { key: 'testMicroplastics', label: 'Microplastics test - collected' },
+        { key: 'testRadon', label: 'Radon monitor - placed (48hr test running)' },
+        { key: 'testATP', label: 'ATP surface test - performed' },
+        { key: 'testMoldSwabs', label: 'Mold swab samples - collected' }
       ]),
       text('breezeSampleCount', 'Number of Breeze ET spore traps collected', { placeholder: 'e.g. 4' }),
       text('moldSwabSampleCount', 'Number of mold swab samples collected', { placeholder: 'e.g. 2 (only if visible mold found)' }),
-      text('atpTestCount', 'Number of ATP tests performed', { placeholder: 'e.g. 3 — kitchen sink, dishwasher, ice maker' }),
-      textarea('testsNotConducted', 'Tests NOT performed — note reason', { placeholder: 'e.g. PFAS not requested by client. Microplastics kit not in truck.' }),
+      text('atpTestCount', 'Number of ATP tests performed', { placeholder: 'e.g. 3 - kitchen sink, dishwasher, ice maker' }),
+      textarea('testsNotConducted', 'Tests NOT performed - note reason', { placeholder: 'e.g. PFAS not requested by client. Microplastics kit not in truck.' }),
     ];
   }
 
@@ -760,12 +764,11 @@
     const items = [];
     for (let i = 1; i <= 5; i++) {
       if (i > 1) items.push(divider());
-      items.push(text(`followUpAction_${i}`, `Follow-Up Action ${i}`, {
-        placeholder: 'e.g. Monitor basement humidity — re-test in 6 months (🎙 speak then review)'
-      }));
-      items.push(text(`followUpAction_${i}_priority`, 'Priority / Timeframe', {
-        placeholder: 'e.g. Immediate / Within 3 months / Annual'
-      }));
+      items.push(heading(`Follow-Up Action ${i}`));
+      items.push(text(`followUp_${i}_room`, 'Room', { placeholder: 'e.g. Primary Bedroom' }));
+      items.push(sel(`followUp_${i}_timeframe`, 'Re-check timeframe', ['1 month', '3 months', '6 months', '1 year', 'As needed']));
+      items.push(text(`followUp_${i}_whatToWatch`, 'What to watch for', { placeholder: 'e.g. Moisture return under sink, condensation on windows (\uD83C\uDF99 speak then review)' }));
+      items.push(text(`followUp_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #023' }));
     }
     return items;
   }
@@ -776,8 +779,9 @@
     for (let i = 1; i <= 6; i++) {
       if (i > 1) items.push(divider());
       items.push(text(`actionTaken_${i}_desc`, `Action ${i}`, {
-        placeholder: 'e.g. Replaced HVAC filter — 20x20x1 MERV 11, installed new (🎙 speak then review)'
+        placeholder: 'e.g. Replaced HVAC filter - 20x20x1 MERV 11, installed new (\uD83C\uDF99 speak then review)'
       }));
+      items.push(text(`actionTaken_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #045' }));
       items.push(photo(`Actions Taken ${i}`, `_actionPhoto_${i}`));
     }
     return items;
@@ -787,12 +791,13 @@
     const items = [];
     for (let i = 1; i <= 6; i++) {
       if (i > 1) items.push(divider());
-      items.push(text(`obs_${i}_location`, `Observation ${i} — Location`, {
-        placeholder: 'e.g. Primary Bathroom / Basement Corner'
+      items.push(text(`obs_${i}_location`, `Observation ${i} - Room`, {
+        placeholder: 'e.g. Primary Bathroom'
       }));
-      items.push(textarea(`obs_${i}_note`, 'What was observed', {
-        placeholder: 'e.g. Active moisture staining on drywall below showerhead — see photo. No active drip at time of inspection. (🎙 speak then review)'
+      items.push(textarea(`obs_${i}_note`, 'Observation', {
+        placeholder: 'e.g. Active moisture staining on drywall below showerhead - no active drip at time of inspection. (\uD83C\uDF99 speak then review)'
       }));
+      items.push(text(`obs_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #023' }));
       items.push(photo(`Observation ${i}`, `_obsPhoto_${i}`));
     }
     return items;
@@ -828,8 +833,25 @@
         { key: 'assessmentComplete', label: 'Assessment marked Complete' }
       ]),
       divider(),
+      heading('Tests Conducted \u2014 Confirm Each Test'),
+      info('Confirm each test run during this assessment and record how many samples were taken.'),
+      yesno('testRunBreeze', 'Breeze ET (mold) \u2014 conducted?'),
+      showIf(num('testRunBreezeCount', 'How many samples?'), 'testRunBreeze', 'Yes'),
+      yesno('testRunBoulderBlue', 'Boulder Blue (allergen) \u2014 conducted?'),
+      showIf(num('testRunBoulderBlueCount', 'How many?'), 'testRunBoulderBlue', 'Yes'),
+      yesno('testRunWaterPanel', 'Water Panel (SafeHome) \u2014 conducted?'),
+      showIf(num('testRunWaterPanelCount', 'How many?'), 'testRunWaterPanel', 'Yes'),
+      yesno('testRunPFAS', 'PFAS (Cyclopure) \u2014 conducted?'),
+      showIf(num('testRunPFASCount', 'How many?'), 'testRunPFAS', 'Yes'),
+      yesno('testRunMicroplastics', 'Microplastics (IEH) \u2014 conducted?'),
+      showIf(num('testRunMicroplasticsCount', 'How many?'), 'testRunMicroplastics', 'Yes'),
+      yesno('testRunRadon', 'Radon (Airthings) \u2014 conducted?'),
+      showIf(num('testRunRadonCount', 'How many?'), 'testRunRadon', 'Yes'),
+      yesno('testRunATP', 'ATP \u2014 conducted?'),
+      showIf(num('testRunATPCount', 'How many?'), 'testRunATP', 'Yes'),
+      divider(),
       heading('Follow-Up Actions Needed'),
-      info('Document recommended follow-up actions for Tanner and the client report. Fill as many as apply — leave unused entries blank.'),
+      info('Document recommended follow-up actions for Tanner and the client report. Fill as many as apply - leave unused entries blank.'),
       ...postFollowUpFields(),
       divider(),
       heading('Actions Taken During Assessment'),
@@ -837,18 +859,18 @@
       ...postActionsTakenFields(),
       divider(),
       heading('Assessment Observations'),
-      info('Notable findings for the report — include location, what you saw, and a photo for each. Specify photo number for each callout. Leave unused entries blank.'),
+      info('Notable findings for the report - include location, what you saw, and a photo for each. Specify photo number for each callout. Leave unused entries blank.'),
       ...postObservationFields(),
       divider(),
       heading('Test Locations Summary'),
-      info('Confirm exactly where each test was taken — this context appears in lab submissions and the report.'),
-      text('postTestLocWater', 'Water tap location (water panel)', { placeholder: 'e.g. Kitchen faucet — cold side, first floor' }),
+      info('Confirm exactly where each test was taken - this context appears in lab submissions and the report.'),
+      text('postTestLocWater', 'Water tap location (water panel)', { placeholder: 'e.g. Kitchen faucet - cold side, first floor' }),
       text('postTestLocPFAS', 'PFAS water test tap location', { placeholder: 'e.g. Kitchen faucet (same as water panel)' }),
       text('postTestLocBoulderBlue', 'Boulder Blue allergen filter location', { placeholder: 'e.g. Main living room, center of room on tripod' }),
       text('postTestLocBreeze', 'Breeze ET spore trap locations (all rooms tested)', { placeholder: 'e.g. Bedroom 1 center, Basement NW corner, Living Room center' }),
-      text('postTestLocRadon', 'Radon monitor location', { placeholder: 'e.g. Basement, 3ft from exterior wall, tripod at 24”, center area' }),
+      text('postTestLocRadon', 'Radon monitor location', { placeholder: 'e.g. Basement, 3ft from exterior wall, tripod at 24", center area' }),
       text('postTestLocQtrak', 'Q-Trak rooms measured', { placeholder: 'e.g. Outdoor control + all indoor rooms, desk height' }),
-      text('postTestLocMold', 'Mold swab locations (if any)', { placeholder: 'e.g. N/A — no visible mold, or: Basement wall corner, Under kitchen sink' }),
+      text('postTestLocMold', 'Mold swab locations (if any)', { placeholder: 'e.g. N/A - no visible mold, or: Basement wall corner, Under kitchen sink' }),
       text('postTestLocAllergen', 'Allergen swab locations (if any)', { placeholder: 'e.g. N/A, or: Master bedroom mattress edge' })
     ];
   }
@@ -957,7 +979,7 @@
       steps.push({ id: 'additional-' + i, type: 'additional-room', phase: 'supplementary', name: r.name, dynamic: 'additional', index: i });
     });
 
-    // Wrap Up — Debrief first, then final departure checks
+    // Wrap Up - Debrief first, then final departure checks
     steps.push({ id: 'debrief', type: 'debrief', phase: 'wrapup', name: 'Customer Debrief' });
     steps.push({ id: 'final-checks', type: 'final-checks', phase: 'wrapup', name: 'Before Leaving' });
 
@@ -991,7 +1013,7 @@
       banner.addEventListener('click', () => banner.remove());
       document.body.appendChild(banner);
     }
-    banner.textContent = msg + ' — Tap to dismiss';
+    banner.textContent = msg + ' - Tap to dismiss';
   }
 
   async function saveNow() {
@@ -1027,7 +1049,7 @@
     if (!inspection || !inspection.inspectionId) return;
     try {
       const bak = JSON.parse(JSON.stringify(inspection));
-      // Strip photo dataUrls — keep metadata only, not pixel data
+      // Strip photo dataUrls - keep metadata only, not pixel data
       if (bak.stepData) {
         Object.values(bak.stepData).forEach(step => {
           Object.keys(step).forEach(k => {
@@ -1044,7 +1066,7 @@
       const key = 'inhaus_bak_' + inspection.inspectionId;
       localStorage.setItem(key, JSON.stringify({ data: bak, savedAt: new Date().toISOString() }));
       cleanOldLocalStorageBackups();
-    } catch(e) { /* localStorage full or unavailable — not critical */ }
+    } catch(e) { /* localStorage full or unavailable - not critical */ }
   }
 
   function cleanOldLocalStorageBackups() {
@@ -1101,7 +1123,7 @@
 
     const arr = inspection.dynamicRooms[section];
     const idx = arr.length;
-    const defaultPrefix = section === 'lowest' ? 'Lowest Level — Room ' : 'Additional Room ';
+    const defaultPrefix = section === 'lowest' ? 'Lowest Level - Room ' : 'Additional Room ';
     const prefix = namePrefix || defaultPrefix;
     const count = namePrefix ? arr.filter(r => r.name && r.name.startsWith(namePrefix)).length + 1 : idx + 1;
     arr.push({ name: prefix + ' ' + count });
@@ -1203,7 +1225,7 @@
       // ── First upload attempt ──────────────────────────────────────────
       await doUpload();
       photo._uploadAttempts = 1;
-      // Keep dataUrl in IndexedDB for now — schedule a second attempt before clearing.
+      // Keep dataUrl in IndexedDB for now - schedule a second attempt before clearing.
       // no-cors means we cannot confirm server receipt. Uploading twice dramatically
       // reduces the chance of silent loss before we clear the local copy.
       setTimeout(async () => {
@@ -1213,7 +1235,7 @@
           photo._uploadAttempts = 2;
         } catch(e) {
           console.warn('Photo second-attempt failed, keeping in IndexedDB:', e);
-          // Don't clear — keep original so manual Sync to Drive can retry
+          // Don't clear - keep original so manual Sync to Drive can retry
           return;
         }
         photo._uploaded = true;
@@ -1228,7 +1250,7 @@
   window.uploadPhotoImmediate = uploadPhotoImmediate;
 
   async function sendToGoogleScript(exportData) {
-    // Always strip photos from main payload — send data first, then photos separately
+    // Always strip photos from main payload - send data first, then photos separately
     const mainPayload = stripPhotosFromExport(exportData);
     const allPhotos = extractAllPhotosFromExport(exportData);
 
@@ -1257,7 +1279,7 @@
 
   // ── Step Checkpoint Sync ──────────────────────────────────
   // Fire-and-forget backup after each step completes.
-  // Silent on failure — close-out export is still the authoritative save.
+  // Silent on failure - close-out export is still the authoritative save.
   async function checkpointToCloud() {
     if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
     try {
@@ -1337,7 +1359,7 @@
     const scrollArea = el('div', { className: 'room-drawer-scroll' });
 
     DRAWER_GROUPS.forEach(group => {
-      // All steps in this group's phases — no type restrictions (review included in Wrap-Up)
+      // All steps in this group's phases - no type restrictions (review included in Wrap-Up)
       const groupSteps = stepList.filter(s => group.phases.includes(s.phase));
       if (!groupSteps.length) return;
 
@@ -1561,8 +1583,8 @@
         render();
       }
     }, isExp
-      ? '\uD83D\uDCCB Process steps collapsed (experienced mode) — tap to show all'
-      : '\u2705 Process steps expanded (guided mode) — tap to collapse for experienced inspectors'
+      ? '\uD83D\uDCCB Process steps collapsed (experienced mode) - tap to show all'
+      : '\u2705 Process steps expanded (guided mode) - tap to collapse for experienced inspectors'
     );
     c.appendChild(modeBtn);
 
@@ -1634,7 +1656,7 @@
       {
         title: 'Air Testing',
         items: [
-          { key: 'tc_qtrak',        label: 'Q-Trak 7585 — charged, previous data deleted, rooms configured', required: true },
+          { key: 'tc_qtrak',        label: 'Q-Trak 7585 - charged, previous data deleted, rooms configured', required: true },
           { key: 'tc_flir',         label: 'FLIR MR277', required: true },
           { key: 'tc_corentium',    label: 'Airthings Corentium Pro + charging cube', required: true },
           { key: 'tc_breezePump',   label: 'Breeze ET pump + tripod', required: true },
@@ -1655,7 +1677,7 @@
         title: 'Surface Testing',
         items: [
           { key: 'tc_atpDevice',    label: 'ATP device (SystemSURE Plus)', required: true },
-          { key: 'tc_atpSwabs',     label: 'ATP swabs (2) — refrigerated, bring ice pack', required: true }
+          { key: 'tc_atpSwabs',     label: 'ATP swabs (2) - refrigerated, bring ice pack', required: true }
         ]
       },
       {
@@ -1679,7 +1701,7 @@
       {
         title: 'Technology',
         items: [
-          { key: 'tc_ipad',         label: 'iPad — fully charged, all apps downloaded', required: true },
+          { key: 'tc_ipad',         label: 'iPad - fully charged, all apps downloaded', required: true },
           { key: 'tc_airthingsApp', label: 'Airthings app installed', required: true },
           { key: 'tc_airthingsVP',  label: 'Airthings View Plus app installed', required: true }
         ]
@@ -1689,9 +1711,9 @@
         items: [
           { key: 'tc_fedexLabel',   label: 'FedEx prepaid label (Breeze STs)', required: true },
           { key: 'tc_upsLabel',     label: 'UPS label (Boulder Blue)', required: true },
-          { key: 'tc_waterLabel',   label: 'Safe Home water panel — prepaid label + package', required: true },
-          { key: 'tc_cyclopureLabel', label: 'Cyclopure PFAS — prepaid label + package', required: false, asNeeded: true },
-          { key: 'tc_microLabel',     label: 'Microplastics (Brooks Applied Labs) — prepaid label + package', required: false, asNeeded: true }
+          { key: 'tc_waterLabel',   label: 'Safe Home water panel - prepaid label + package', required: true },
+          { key: 'tc_cyclopureLabel', label: 'Cyclopure PFAS - prepaid label + package', required: false, asNeeded: true },
+          { key: 'tc_microLabel',     label: 'Microplastics (Brooks Applied Labs) - prepaid label + package', required: false, asNeeded: true }
         ]
       }
     ];
@@ -1826,7 +1848,7 @@
       sel('numberOfBedrooms', 'Number of Bedrooms *', ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15']),
       sel('numberOfBathrooms', 'Number of Bathrooms *', ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20']),
       chips('waterSource', 'Water Source * (select all that apply)', ['Municipal', 'Well', 'Spring', 'Cistern', 'Other']),
-      text('waterSourceDescription', 'If “Other”: describe water source', { placeholder: 'e.g. Private spring on property' }),
+      showIf(text('waterSourceDescription', 'If "Other": describe water source', { placeholder: 'e.g. Private spring on property' }), 'waterSource', 'Other'),
       divider(),
       text('wifiNetwork', 'Home wifi network name'),
       text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
@@ -1927,7 +1949,7 @@
     startBtn.onclick = () => {
       data._visited = true;
       data._completedAt = new Date().toISOString();
-      currentStepIdx = 1; // skip equipment step — already done here
+      currentStepIdx = 1; // skip equipment step - already done here
       screen = 'step';
       saveNow().then(() => { render(); window.scrollTo(0, 0); });
     };
@@ -1981,7 +2003,7 @@
       data.radonPickupTime = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 
-    // Room name left blank intentionally — Dave types the actual room name
+    // Room name left blank intentionally - Dave types the actual room name
 
     inspection._lastStepIdx = currentStepIdx;
     if (inspection._furthestStepIdx === undefined || currentStepIdx > inspection._furthestStepIdx) {
@@ -2072,7 +2094,7 @@
             const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name) };
             inspection.sparePhotos.push(sp);
             saveNow();
-            showToast('\uD83D\uDCF8 Spare photo saved — sort it later in Review');
+            showToast('\uD83D\uDCF8 Spare photo saved - sort it later in Review');
             // Save to device camera roll
             if (window.savePhotoToDevice) window.savePhotoToDevice(dataUrl, sp.photoId);
           } catch(err) { console.error(err); }
@@ -2149,7 +2171,7 @@
         data._completedAt = new Date().toISOString();
         currentStepIdx++;
         saveNow().then(() => { render(); window.scrollTo(0, 0); });
-        checkpointToCloud(); // fire-and-forget backup — silent on failure
+        checkpointToCloud(); // fire-and-forget backup - silent on failure
       }}, currentStepIdx < stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
     ];
     if (isDevMode()) {
@@ -2176,8 +2198,8 @@
     legendBar.innerHTML = '<strong style="color:#2C3F16">Status guide:</strong>' +
       ' <span style="background:#e8f5e9;padding:2px 6px;border-radius:4px;">Visited</span> = section opened during inspection.' +
       ' <span style="background:#fef3c7;padding:2px 6px;border-radius:4px;">Not visited</span> = section was skipped.' +
-      ' Photos showing <strong>\u2601\ufe0f Uploaded to Drive</strong> have been synced to Google Drive — their local copy has been cleared to save storage.' +
-      ' A photo marked <strong>?</strong> or <em>Unreviewed</em> in a report means no caption was added — tap the photo here to add one.';
+      ' Photos showing <strong>\u2601\ufe0f Uploaded to Drive</strong> have been synced to Google Drive - their local copy has been cleared to save storage.' +
+      ' A photo marked <strong>?</strong> or <em>Unreviewed</em> in a report means no caption was added - tap the photo here to add one.';
     c.appendChild(legendBar);
 
     // ── 6a: Departure Checklist ──
