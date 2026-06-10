@@ -1305,40 +1305,67 @@
     };
 
     async function doUpload() {
-      return fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+      const resp = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },  // simple request = no preflight = readable response
         body: JSON.stringify(payload)
       });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const result = await resp.json();
+      return result;
     }
 
     try {
-      // ── First upload attempt ──────────────────────────────────────────
-      await doUpload();
-      photo._uploadAttempts = 1;
-      // Keep dataUrl in IndexedDB for now - schedule a second attempt before clearing.
-      // no-cors means we cannot confirm server receipt. Uploading twice dramatically
-      // reduces the chance of silent loss before we clear the local copy.
-      setTimeout(async () => {
-        if (!photo.dataUrl || photo.dataUrl === '__uploaded__') return; // cleared by manual sync
-        try {
-          await doUpload();
-          photo._uploadAttempts = 2;
-        } catch(e) {
-          console.warn('Photo second-attempt failed, keeping in IndexedDB:', e);
-          // Don't clear - keep original so manual Sync to Drive can retry
-          return;
-        }
+      const result = await doUpload();
+      if (result && result.photosUploaded > 0) {
+        // CONFIRMED: Drive has the photo
+        photo._driveConfirmed = true;
         photo._uploaded = true;
         photo.dataUrl = '__uploaded__';
         scheduleSave();
-      }, 12000); // 12-second gap before second attempt
+        updateSyncStatus('checkpoint'); // show "Photo synced to Drive"
+      } else {
+        // Drive returned OK but reported 0 photos uploaded — keep for retry
+        console.warn('Photo upload returned 0 — keeping in IndexedDB for retry', photo.photoId);
+        photo._uploadFailed = true;
+        addToPhotoRetryQueue(photo);
+      }
     } catch(e) {
-      console.warn('Photo upload failed, keeping in IndexedDB for retry on export:', e);
-      photo.dataUrl = originalDataUrl;
+      // Network failure or CORS issue — keep in IndexedDB
+      console.warn('Photo upload failed, keeping in IndexedDB:', e.message, photo.photoId);
+      photo.dataUrl = originalDataUrl; // restore if it was cleared
+      photo._uploadFailed = true;
+      addToPhotoRetryQueue(photo);
     }
   }
   window.uploadPhotoImmediate = uploadPhotoImmediate;
+
+  function addToPhotoRetryQueue(photo) {
+    if (!inspection) return;
+    if (!inspection._photoRetryQueue) inspection._photoRetryQueue = [];
+    const already = inspection._photoRetryQueue.find(function(p) { return p.photoId === photo.photoId; });
+    if (!already) inspection._photoRetryQueue.push(photo);
+    scheduleSave();
+  }
+
+  async function retryFailedPhotos() {
+    if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+    const queue = (inspection._photoRetryQueue || []).filter(function(p) { return p.dataUrl && p.dataUrl !== '__uploaded__'; });
+    if (!queue.length) return;
+
+    updateSyncStatus('syncing');
+    let confirmed = 0;
+    for (const photo of queue) {
+      try {
+        await uploadPhotoImmediate(photo, inspection.inspectionId, inspection.clientName, inspection.propertyAddress);
+        if (photo._driveConfirmed) {
+          inspection._photoRetryQueue = (inspection._photoRetryQueue || []).filter(function(p) { return p.photoId !== photo.photoId; });
+          confirmed++;
+        }
+      } catch(e) { /* keep in queue */ }
+    }
+    if (confirmed > 0) scheduleSave();
+  }
 
   // NOTE: Photos are uploaded to Drive as private files.
   // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
@@ -1363,11 +1390,43 @@
         photos: allPhotos
       };
       showUploadBanner('pending', 'Uploading photos\u2026');
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(photoPayload)
-      });
+      try {
+        const photoResp = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },  // simple request = no preflight = readable response
+          body: JSON.stringify(photoPayload)
+        });
+        if (photoResp.ok) {
+          const photoResult = await photoResp.json();
+          if (photoResult && photoResult.photosUploaded > 0 && inspection) {
+            // Mark all remaining local photos as confirmed in Drive
+            function markAllPhotosConfirmed(photoArr) {
+              if (!Array.isArray(photoArr)) return;
+              photoArr.forEach(function(p) {
+                if (p && p.dataUrl && p.dataUrl !== '__uploaded__') {
+                  p._driveConfirmed = true;
+                  p._uploaded = true;
+                  p.dataUrl = '__uploaded__';
+                }
+              });
+            }
+            if (inspection.stepData) {
+              Object.values(inspection.stepData).forEach(function(stepData) {
+                Object.values(stepData).forEach(function(v) {
+                  if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
+                    markAllPhotosConfirmed(v);
+                  }
+                });
+              });
+            }
+            if (inspection.sparePhotos) markAllPhotosConfirmed(inspection.sparePhotos);
+            inspection._photoRetryQueue = [];
+            scheduleSave();
+          }
+        }
+      } catch(e) {
+        console.warn('Photo bulk upload error:', e.message);
+      }
     }
   }
 
@@ -1418,6 +1477,8 @@
   // ── Final Sync (Changes 3 & 4) ─────────────────────────────
   async function triggerFinalSync() {
     showFinalSyncOverlay('syncing');
+    // Retry any individually-queued photos before the main sync
+    await retryFailedPhotos();
     try {
       const exportData = buildExportJSON();
       const success = await submitInspection(exportData);
@@ -1454,6 +1515,7 @@
         '<strong>Rooms:</strong> ' + r.roomCount + '<br>' +
         '<strong>Photos pending upload:</strong> ' + r.photosExpected + '<br>' +
         '<strong>Photos already uploaded:</strong> ' + r.photosUploaded + '<br>' +
+        (r.photosUnconfirmed > 0 ? '<span style="color:#ff6b6b;">\u26a0\ufe0f ' + r.photosUnconfirmed + ' photo' + (r.photosUnconfirmed === 1 ? '' : 's') + ' not confirmed in Drive \u2014 tap Retry</span><br>' : '') +
         '<strong>Drive folder:</strong> ' + r.driveFolderId + '<br>' +
         '<strong>App version:</strong> ' + r.appVersion +
         '</div></div>';
@@ -1515,14 +1577,16 @@
     if (inspection && inspection.sparePhotos) {
       photosUploaded += inspection.sparePhotos.filter(function(p) { return p._uploaded === true || p.dataUrl === '__uploaded__'; }).length;
     }
+    var photosUnconfirmed = inspection ? (inspection._photoRetryQueue || []).filter(function(p) { return p.dataUrl && p.dataUrl !== '__uploaded__'; }).length : 0;
     return {
       inspectionId: (exportData && exportData.inspectionId) || (inspection && inspection.inspectionId),
       timestamp: new Date().toLocaleString('en-US', { timeZone: 'America/Denver' }),
       roomCount: (exportData && exportData.rooms ? exportData.rooms.length : 0),
       photosExpected: allPhotos.length,
       photosUploaded: photosUploaded,
+      photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v80',
+      appVersion: 'v81',
       success: success
     };
   }
@@ -1540,7 +1604,7 @@
     }
   }
 
-  window.addEventListener('online', () => { retryQueuedUploads(); });
+  window.addEventListener('online', () => { retryQueuedUploads(); retryFailedPhotos(); });
 
   // ── Room Navigation Drawer ─────────────────────────────────
   function buildRoomDrawer() {
