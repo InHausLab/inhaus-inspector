@@ -281,6 +281,10 @@
       ]},
       divider(),
 
+      // ── DATA: WiFi password (for Airthings + device connectivity) ──
+      text('wifiPassword', 'Home WiFi Password', { placeholder: 'e.g. MyWiFi2024! (for device connectivity during inspection)' }),
+      divider(),
+
       // ── PROCESS: Airthings setup ──────────────────────────
       { type: 'process-checklist', title: 'Airthings View Plus Setup', items: [
         { key: 'airthingsPaired', label: 'Paired to Airthings account' },
@@ -674,6 +678,7 @@
     return [
       heading('Property Details'),
       sel('residenceType', 'Residence Type', ['Single-Family Home', 'Townhome', 'Condo', 'Duplex', 'Apartment', 'Other']),
+      showIf(text('residenceTypeOther', 'Residence Type — describe', { placeholder: 'e.g. Multi-family home, mobile home' }), 'residenceType', 'Other'),
       num('yearBuilt', 'Year Home Was Built'),
       text('squareFootage', 'Approximate Square Footage'),
       sel('basement', 'Basement', ['Yes - Finished', 'Yes - Unfinished', 'No', 'Partial']),
@@ -684,6 +689,7 @@
       showIf(chips('fireplace', 'Fireplace type(s)', ['Wood Burning', 'Gas', 'Electric']), 'fireplacePresent', 'Yes'),
       showIf(num('fireplaceCount', 'How many fireplaces?'), 'fireplacePresent', 'Yes'),
       sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
+      showIf(text('petsOther', 'Pet type — describe', { placeholder: 'e.g. Birds, rabbits, reptiles' }), 'pets', 'Yes - Other'),
       sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only']),
       divider(),
       heading('Assessment Conditions'),
@@ -749,6 +755,8 @@
       info('Radon pickup auto-set to 54 hrs after inspection start \u2014 override below if needed'),
       dateTimeInput('radonPickupTime', 'Radon Pickup Date/Time'),
       dateTimeInput('radonPickupTime2', 'Radon Pickup 2 Date/Time (if second monitor)'),
+      divider(),
+      link('📋 Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
       divider(),
       yesno('debriefCompleted', 'Debrief completed'),
       yesno('radonPickupReminder', 'Homeowner reminded about radon pickup'),
@@ -1692,6 +1700,7 @@
       {
         title: 'Personal / Safety',
         items: [
+          { key: 'tc_tarp',         label: 'Tarp (for entryway)', required: true },
           { key: 'tc_shoeCovers',   label: 'Shoe covers', required: true },
           { key: 'tc_n95',          label: 'N95 masks', required: true },
           { key: 'tc_gloves',       label: 'Nitrile gloves', required: true },
