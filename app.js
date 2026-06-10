@@ -932,6 +932,14 @@
   let saveTimeout = null;
   let lastSaveText = '';
 
+  // ── Sync state timestamps (Change 1) ─────────────────────────
+  let lastSuccessfulCloudSyncAt = null;  // timestamp of last confirmed Drive sync
+  let lastLocalSaveAt = null;            // timestamp of last IndexedDB save
+  let lastCheckpointAttemptAt = null;    // timestamp of last checkpoint attempt
+  let lastCheckpointSucceededAt = null;  // timestamp of last successful checkpoint
+  let _finalSyncTriggeredId = null;      // tracks which inspection triggered final sync
+  let _currentSyncState = 'local';       // current sync state for time-ago timer
+
   const root = document.getElementById('app');
 
   // ── ID Generator ───────────────────────────────────────────
@@ -1004,21 +1012,92 @@
   }
 
   // ── Save ───────────────────────────────────────────────────
+  // ── Sync Status Indicator (Change 2) ──────────────────────
+  // States: local | synced | syncing | checkpoint | failed | offline | final-failed
+  function updateSyncStatus(state, detail) {
+    _currentSyncState = state;
+    var LABELS = {
+      local: 'Saved locally',
+      synced: 'Synced to Drive ✓',
+      syncing: 'Syncing to Drive…',
+      checkpoint: 'Checkpoint saved ✓',
+      failed: 'Sync failed — tap to retry',
+      offline: 'Offline — saving locally',
+      'final-failed': 'FINAL SYNC FAILED — do not leave'
+    };
+    var COLORS = {
+      local: '#6b7280',
+      synced: '#16a34a',
+      syncing: '#2563eb',
+      checkpoint: '#16a34a',
+      failed: '#dc2626',
+      offline: '#d97706',
+      'final-failed': '#7f1d1d'
+    };
+    var bestSync = Math.max(lastSuccessfulCloudSyncAt || 0, lastCheckpointSucceededAt || 0);
+    var timeAgo = '';
+    if (bestSync && (state === 'local' || state === 'synced')) {
+      var min = Math.round((Date.now() - bestSync) / 60000);
+      if (min >= 1) timeAgo = ' (' + min + ' min ago)';
+    }
+    var fullText = (LABELS[state] || state) + timeAgo + (detail ? ' — ' + detail : '');
+    lastSaveText = fullText;
+    var saveEl = document.getElementById('save-status');
+    if (saveEl) {
+      saveEl.textContent = fullText;
+      saveEl.style.color = COLORS[state] || '';
+      if (state === 'failed') {
+        saveEl.style.cursor = 'pointer';
+        saveEl.onclick = function() { checkpointToCloud(); updateSyncStatus('syncing'); };
+      } else {
+        saveEl.style.cursor = '';
+        saveEl.onclick = null;
+      }
+    }
+    // Persistent overlay banner for critical errors
+    var banner = document.getElementById('sync-status-banner');
+    if (state === 'failed' || state === 'final-failed') {
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'sync-status-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99997;padding:10px 12px;font-size:14px;font-weight:700;text-align:center;touch-action:manipulation;';
+        document.body.appendChild(banner);
+      }
+      banner.style.background = COLORS[state];
+      banner.style.color = '#fff';
+      banner.textContent = fullText;
+      if (state === 'failed') {
+        banner.style.cursor = 'pointer';
+        banner.onclick = function() { banner.remove(); checkpointToCloud(); updateSyncStatus('syncing'); };
+      } else {
+        banner.style.cursor = 'default';
+        banner.onclick = null;
+      }
+    } else if (banner) {
+      banner.remove();
+    }
+    // Fade checkpoint → grey after 10s
+    if (state === 'checkpoint') {
+      setTimeout(function() { if (_currentSyncState === 'checkpoint') updateSyncStatus('local'); }, 10000);
+    }
+  }
+
+  // ── Save ─────────────────────────────────────────────
   function showSave(msg) {
     lastSaveText = msg;
-    const el = document.getElementById('save-status');
-    if (el) el.textContent = msg;
+    var saveEl = document.getElementById('save-status');
+    if (saveEl) { saveEl.textContent = msg; saveEl.style.color = ''; saveEl.onclick = null; saveEl.style.cursor = ''; }
   }
 
   function showSaveError(msg) {
-    showSave(msg);
-    // Big visible banner so Dave notices immediately
-    let banner = document.getElementById('save-error-banner');
+    updateSyncStatus('failed');
+    // Legacy high-visibility banner so Dave notices immediately
+    var banner = document.getElementById('save-error-banner');
     if (!banner) {
       banner = document.createElement('div');
       banner.id = 'save-error-banner';
       banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;font-size:15px;font-weight:bold;text-align:center;padding:12px;z-index:99999;cursor:pointer;';
-      banner.addEventListener('click', () => banner.remove());
+      banner.addEventListener('click', function() { banner.remove(); });
       document.body.appendChild(banner);
     }
     banner.textContent = msg + ' - Tap to dismiss';
@@ -1029,10 +1108,11 @@
     showSave('Saving...');
     try {
       await DB.save(inspection);
+      lastLocalSaveAt = Date.now(); // Change 1
       const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      showSave('Saved \u2713 ' + t);
+      updateSyncStatus('local'); // Change 2
       backupToLocalStorage(); // mirror to localStorage as secondary safety net
-      // Clear any previous save error banner
+      // Clear any previous error banners
       const b = document.getElementById('save-error-banner');
       if (b) b.remove();
     } catch (e) {
@@ -1202,6 +1282,9 @@
   }
 
   // ── Real-time single-photo upload ─────────────────────────
+  // NOTE: Photos are uploaded to Drive as private files.
+  // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
+  // for the review portal to display them. This is a known workaround - see issue tracker.
   async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
     if (!GOOGLE_SCRIPT_URL || !inspectionId) return;
     if (!photo.dataUrl || photo.dataUrl === '__uploaded__') return;
@@ -1257,6 +1340,9 @@
   }
   window.uploadPhotoImmediate = uploadPhotoImmediate;
 
+  // NOTE: Photos are uploaded to Drive as private files.
+  // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
+  // for the review portal to display them. This is a known workaround - see issue tracker.
   async function sendToGoogleScript(exportData) {
     // Always strip photos from main payload - send data first, then photos separately
     const mainPayload = stripPhotosFromExport(exportData);
@@ -1285,40 +1371,163 @@
     }
   }
 
-  // ── Step Checkpoint Sync ──────────────────────────────────
+  // ── Step Checkpoint Sync ────────────────────────────
   // Fire-and-forget backup after each step completes.
   // Silent on failure - close-out export is still the authoritative save.
   async function checkpointToCloud() {
     if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+    lastCheckpointAttemptAt = Date.now(); // Change 1
     try {
       const exportData = buildExportJSON();
       const payload = stripPhotosFromExport(exportData);
       payload._checkpoint = true;
-      fetch(GOOGLE_SCRIPT_URL, {
+      updateSyncStatus('syncing'); // Change 2
+      await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      lastCheckpointSucceededAt = Date.now(); // Change 1
+      updateSyncStatus('checkpoint'); // Change 2
     } catch (e) {
       console.log('Checkpoint sync skipped:', e);
+      updateSyncStatus('failed'); // Change 2
     }
   }
 
   async function submitInspection(exportData) {
     if (!GOOGLE_SCRIPT_URL) return true;
+    updateSyncStatus('syncing'); // Change 2
     showUploadBanner('pending', 'Uploading to Google Drive\u2026');
     try {
       await sendToGoogleScript(exportData);
       await DB.removeFromQueue(exportData.inspectionId);
+      lastSuccessfulCloudSyncAt = Date.now(); // Change 1
+      updateSyncStatus('synced'); // Change 2
       showUploadBanner('success', '\u2713 Saved to Google Drive');
       return true;
     } catch (e) {
       console.log('Upload failed, queuing for retry:', e);
       await DB.queueUpload(exportData);
+      updateSyncStatus('failed'); // Change 2
       showUploadBanner('pending', 'Saved locally \u2014 will upload when online');
       return false;
     }
   }
+
+  // ── Final Sync (Changes 3 & 4) ─────────────────────────────
+  async function triggerFinalSync() {
+    showFinalSyncOverlay('syncing');
+    try {
+      const exportData = buildExportJSON();
+      const success = await submitInspection(exportData);
+      const receipt = buildSyncReceipt(exportData, success);
+      if (success) {
+        lastSuccessfulCloudSyncAt = Date.now();
+        updateSyncStatus('synced');
+        showFinalSyncOverlay('success', receipt);
+      } else {
+        updateSyncStatus('final-failed');
+        showFinalSyncOverlay('failed', receipt);
+      }
+    } catch(e) {
+      console.error('triggerFinalSync error:', e);
+      updateSyncStatus('final-failed');
+      showFinalSyncOverlay('failed', null);
+    }
+  }
+
+  function showFinalSyncOverlay(state, receipt) {
+    var existing = document.getElementById('final-sync-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'final-sync-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:inherit;box-sizing:border-box;';
+
+    function receiptCard(r) {
+      if (!r) return '';
+      return '<div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:16px;margin:12px 0;width:100%;max-width:420px;text-align:left;">' +
+        '<div style="color:inherit;font-size:0.85rem;line-height:2;">' +
+        '<strong>ID:</strong> ' + (r.inspectionId || '-') + '<br>' +
+        '<strong>Time:</strong> ' + r.timestamp + '<br>' +
+        '<strong>Rooms:</strong> ' + r.roomCount + '<br>' +
+        '<strong>Photos pending upload:</strong> ' + r.photosExpected + '<br>' +
+        '<strong>Photos already uploaded:</strong> ' + r.photosUploaded + '<br>' +
+        '<strong>Drive folder:</strong> ' + r.driveFolderId + '<br>' +
+        '<strong>App version:</strong> ' + r.appVersion +
+        '</div></div>';
+    }
+
+    if (state === 'syncing') {
+      overlay.style.background = 'rgba(0,0,0,0.88)';
+      overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:16px;">⏳</div>' +
+        '<div style="color:#fff;font-size:1.3rem;font-weight:800;text-align:center;">Final sync in progress…</div>' +
+        '<div style="color:#ccc;font-size:0.95rem;margin-top:8px;text-align:center;">Do not close the app</div>';
+      // NOT dismissable while syncing
+
+    } else if (state === 'success') {
+      overlay.style.background = '#16a34a';
+      overlay.style.color = '#fff';
+      overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:12px;">✅</div>' +
+        '<div style="font-size:1.4rem;font-weight:800;text-align:center;">Final sync complete</div>' +
+        '<div style="color:#d1fae5;font-size:0.95rem;margin-top:6px;margin-bottom:4px;text-align:center;">Safe to leave the app</div>' +
+        receiptCard(receipt);
+      var dismissBtn = document.createElement('button');
+      dismissBtn.type = 'button';
+      dismissBtn.style.cssText = 'background:#fff;color:#16a34a;border:none;border-radius:10px;padding:14px 36px;font-size:1rem;font-weight:800;cursor:pointer;margin-top:8px;touch-action:manipulation;font-family:inherit;';
+      dismissBtn.textContent = 'Dismiss';
+      dismissBtn.onclick = function() { overlay.remove(); };
+      overlay.appendChild(dismissBtn);
+
+    } else { // failed
+      overlay.style.background = '#7f1d1d';
+      overlay.style.color = '#fff';
+      overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:12px;">❌</div>' +
+        '<div style="font-size:1.4rem;font-weight:800;text-align:center;">Final sync FAILED</div>' +
+        '<div style="color:#fca5a5;font-size:0.95rem;margin-top:6px;margin-bottom:4px;text-align:center;">Do NOT leave the app yet</div>' +
+        receiptCard(receipt);
+      var retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.style.cssText = 'background:#fff;color:#7f1d1d;border:none;border-radius:10px;padding:14px 36px;font-size:1rem;font-weight:800;cursor:pointer;margin-top:8px;touch-action:manipulation;font-family:inherit;';
+      retryBtn.textContent = 'Tap to Retry';
+      retryBtn.onclick = function() { overlay.remove(); triggerFinalSync(); };
+      overlay.appendChild(retryBtn);
+    }
+
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  // Change 4: Final sync receipt
+  function buildSyncReceipt(exportData, success) {
+    var allPhotos = extractAllPhotosFromExport(exportData);
+    var photosUploaded = 0;
+    if (inspection && inspection.stepData) {
+      Object.values(inspection.stepData).forEach(function(stepData) {
+        Object.values(stepData).forEach(function(v) {
+          if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
+            photosUploaded += v.filter(function(p) { return p._uploaded === true || p.dataUrl === '__uploaded__'; }).length;
+          }
+        });
+      });
+    }
+    if (inspection && inspection.sparePhotos) {
+      photosUploaded += inspection.sparePhotos.filter(function(p) { return p._uploaded === true || p.dataUrl === '__uploaded__'; }).length;
+    }
+    return {
+      inspectionId: (exportData && exportData.inspectionId) || (inspection && inspection.inspectionId),
+      timestamp: new Date().toLocaleString('en-US', { timeZone: 'America/Denver' }),
+      roomCount: (exportData && exportData.rooms ? exportData.rooms.length : 0),
+      photosExpected: allPhotos.length,
+      photosUploaded: photosUploaded,
+      driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
+      appVersion: 'v80',
+      success: success
+    };
+  }
+
+
 
   async function retryQueuedUploads() {
     if (!GOOGLE_SCRIPT_URL || !navigator.onLine) return;
@@ -2123,6 +2332,13 @@
         data._updatedAt = new Date().toISOString();
         scheduleSave();
         updateShowIf(card, data);
+        // Change 3: Detect allSectionsComplete on post-assessment step
+        if (step.type === 'post-assessment' && data.finalCheck && data.finalCheck.allSectionsComplete === true) {
+          if (_finalSyncTriggeredId !== (inspection && inspection.inspectionId)) {
+            _finalSyncTriggeredId = inspection.inspectionId;
+            triggerFinalSync();
+          }
+        }
       };
       fields.forEach(f => {
         const rendered = renderField(f, data, onFieldChange, inspection, () => { scheduleSave(); });
@@ -2677,6 +2893,7 @@
   window.addEventListener('offline', () => {
     const badge = document.querySelector('.online-badge');
     if (badge) { badge.textContent = '\u25cf Offline'; badge.className = 'online-badge offline'; }
+    updateSyncStatus('offline'); // Change 2
   });
 
   if ('serviceWorker' in navigator) {
@@ -2692,7 +2909,8 @@
     try {
       const { usage, quota } = await navigator.storage.estimate();
       const pct = quota > 0 ? (usage / quota) * 100 : 0;
-      if (pct > 80) {
+      // Change 5: lowered from 80% to 70%
+      if (pct > 70) {
         let banner = document.getElementById('save-error-banner');
         if (!banner) {
           banner = document.createElement('div');
@@ -2702,6 +2920,23 @@
           document.body.appendChild(banner);
         }
         banner.textContent = '\u26a0\ufe0f Storage ' + Math.round(pct) + '% full \u2014 go to Review and tap Sync to Drive now';
+      }
+      // Change 5: time-based warning - not synced to Drive in 30+ min
+      const THIRTY_MIN = 30 * 60 * 1000;
+      const notSynced = lastSuccessfulCloudSyncAt === null || (Date.now() - lastSuccessfulCloudSyncAt) > THIRTY_MIN;
+      if (notSynced && inspection && screen === 'step') {
+        let syncWarn = document.getElementById('sync-age-warning');
+        if (!syncWarn) {
+          syncWarn = document.createElement('div');
+          syncWarn.id = 'sync-age-warning';
+          syncWarn.style.cssText = 'position:fixed;bottom:80px;left:0;right:0;background:#d97706;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:8px 12px;z-index:9990;cursor:pointer;';
+          syncWarn.addEventListener('click', () => { syncWarn.remove(); checkpointToCloud(); updateSyncStatus('syncing'); });
+          document.body.appendChild(syncWarn);
+        }
+        syncWarn.textContent = '\u26a0\ufe0f Not synced to Drive in 30+ min \u2014 tap Sync now to protect your data';
+      } else {
+        const existing = document.getElementById('sync-age-warning');
+        if (existing) existing.remove();
       }
     } catch(e) { /* quota check not critical */ }
   }
@@ -2724,5 +2959,15 @@
       backupToLocalStorage();
     }
   }, 5 * 60 * 1000);
+
+  // Change 2: Update "X min ago" text in sync status every 30s
+  setInterval(() => {
+    if (_currentSyncState === 'local' || _currentSyncState === 'synced') {
+      const bestSync = Math.max(lastSuccessfulCloudSyncAt || 0, lastCheckpointSucceededAt || 0);
+      if (bestSync) {
+        updateSyncStatus(_currentSyncState);
+      }
+    }
+  }, 30000);
 
 })();
