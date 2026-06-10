@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inhaus-v81';
+const CACHE_NAME = 'inhaus-v82';
 const ASSETS = [
   'index.html',
   'styles.css',
