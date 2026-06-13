@@ -2795,10 +2795,12 @@
       basement: (inspection.stepData?.['property-details']?.basement) || '',
       carpetedRooms: (inspection.stepData?.['property-details']?.carpetedRooms) || '',
       fireplace: (inspection.stepData?.['property-details']?.fireplace) || '',
-      pets: (inspection.stepData?.['property-details']?.pets) || '',
+      // NOTE: pets + stoveType are now chips (arrays) — normalize to string immediately so
+      // Apps Script receives a plain string regardless of old vs new format.
+      pets: (() => { const v = (inspection.stepData?.['property-details']?.pets) || ''; return Array.isArray(v) ? v.join(', ') : v; })(),
       petsOther: (inspection.stepData?.['property-details']?.petsOther) || '',
       smokingVaping: (inspection.stepData?.['property-details']?.smokingVaping) || '',
-      stoveType: (inspection.stepData?.['kitchen-appliance']?.stoveType) || (inspection.stepData?.['property-details']?.stoveType) || '',
+      stoveType: (() => { const v = (inspection.stepData?.['kitchen-appliance']?.stoveType) || (inspection.stepData?.['property-details']?.stoveType) || ''; return Array.isArray(v) ? v.join(', ') : v; })(),
       stoveTypeOther: (inspection.stepData?.['kitchen-appliance']?.stoveTypeOther) || (inspection.stepData?.['property-details']?.stoveTypeOther) || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
