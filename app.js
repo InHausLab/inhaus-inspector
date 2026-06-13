@@ -558,7 +558,8 @@
       ]},
       divider(),
       heading('Stove / Range'),
-      sel('stoveType', 'Stove/Range Type', ['Gas', 'Electric (Radiant)', 'Induction', 'Dual-Fuel', 'Other (specify)']),
+      chips('stoveType', 'Stove/Range Type (select all that apply)', ['Gas', 'Electric (Radiant)', 'Induction', 'Dual-Fuel', 'Other']),
+      showIf(text('stoveTypeOther', 'Stove/Range — describe', { placeholder: 'e.g. Wood stove, pellet stove' }), 'stoveType', 'Other'),
       sel('exhaustHoodType', 'Type of cooking exhaust hood or vent', ['Under cabinet range hood', 'Over the range microwave with vent', 'Wall mount range hood', 'Ceiling mount range hood', 'Downdraft range hood', 'None', 'Other (specify)']),
       sel('exhaustVented', 'Is cooking exhaust vented to outdoors?', ['Ducted (to outside)', 'Ductless (recirculating)', 'Unknown']),
       divider(),
@@ -688,8 +689,8 @@
       yesno('fireplacePresent', 'Fireplace(s) in home?'),
       showIf(chips('fireplace', 'Fireplace type(s)', ['Wood Burning', 'Gas', 'Electric']), 'fireplacePresent', 'Yes'),
       showIf(num('fireplaceCount', 'How many fireplaces?'), 'fireplacePresent', 'Yes'),
-      sel('pets', 'Pets in Home', ['No', 'Yes - Dog', 'Yes - Cat', 'Yes - Dog and Cat', 'Yes - Other']),
-      showIf(text('petsOther', 'Pet type — describe', { placeholder: 'e.g. Birds, rabbits, reptiles' }), 'pets', 'Yes - Other'),
+      chips('pets', 'Pets in Home (select all that apply)', ['No pets', 'Dog', 'Cat', 'Bird(s)', 'Fish', 'Reptile(s)', 'Other']),
+      showIf(text('petsOther', 'Pet type — describe', { placeholder: 'e.g. guinea pig, rabbit, hamster' }), 'pets', 'Other'),
       sel('smokingVaping', 'Smoking or Vaping in Home', ['No', 'Yes - Indoors', 'Yes - Outdoors Only']),
       divider(),
       heading('Assessment Conditions'),
@@ -2795,8 +2796,10 @@
       carpetedRooms: (inspection.stepData?.['property-details']?.carpetedRooms) || '',
       fireplace: (inspection.stepData?.['property-details']?.fireplace) || '',
       pets: (inspection.stepData?.['property-details']?.pets) || '',
+      petsOther: (inspection.stepData?.['property-details']?.petsOther) || '',
       smokingVaping: (inspection.stepData?.['property-details']?.smokingVaping) || '',
       stoveType: (inspection.stepData?.['kitchen-appliance']?.stoveType) || (inspection.stepData?.['property-details']?.stoveType) || '',
+      stoveTypeOther: (inspection.stepData?.['kitchen-appliance']?.stoveTypeOther) || (inspection.stepData?.['property-details']?.stoveTypeOther) || '',
       wifiNetwork: inspection.wifiNetwork || '',
       clientConcerns: inspection.clientConcerns || '',
 
@@ -2921,6 +2924,16 @@
     exp.waterSourceReadable = Array.isArray(exp.waterSource)
       ? exp.waterSource.join(', ') + (exp.waterSourceDescription ? ' (' + exp.waterSourceDescription + ')' : '')
       : ((exp.waterSource || '') + (exp.waterSourceDescription ? ' (' + exp.waterSourceDescription + ')' : ''));
+
+    // ── Pets as readable string ───────────────────────────────
+    exp.petsReadable = Array.isArray(exp.pets)
+      ? exp.pets.join(', ') + (exp.petsOther ? ' (' + exp.petsOther + ')' : '')
+      : ((exp.pets || '') + (exp.petsOther ? ' (' + exp.petsOther + ')' : ''));
+
+    // ── Stove type as readable string ─────────────────────────
+    exp.stoveTypeReadable = Array.isArray(exp.stoveType)
+      ? exp.stoveType.join(', ') + (exp.stoveTypeOther ? ' (' + exp.stoveTypeOther + ')' : '')
+      : ((exp.stoveType || '') + (exp.stoveTypeOther ? ' (' + exp.stoveTypeOther + ')' : ''));
 
     return exp;
   }
