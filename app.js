@@ -1301,7 +1301,8 @@
         roomName: photo.roomName || '',
         stepName: photo.stepName || '',
         imageData: originalDataUrl || '',
-        caption: photo.caption || ''
+        caption: photo.caption || '',
+        assignedSlot: photo.assignedSlot || ''
       }]
     };
 
@@ -2749,27 +2750,128 @@
 
     // Spare Photos section in Review
     if (inspection.sparePhotos && inspection.sparePhotos.length) {
+      const SPARE_SLOTS = [
+        ...Array.from({length:6}, (_,i) => ({ value: 'obs_' + (i+1),        label: 'Observation ' + (i+1) })),
+        ...Array.from({length:6}, (_,i) => ({ value: 'actionTaken_' + (i+1), label: 'Action Taken ' + (i+1) })),
+        ...Array.from({length:5}, (_,i) => ({ value: 'followUp_' + (i+1),   label: 'Follow-up ' + (i+1) }))
+      ];
+
+      const unassigned = inspection.sparePhotos.filter(sp => !sp.assignedSlot);
+      const assigned   = inspection.sparePhotos.filter(sp =>  sp.assignedSlot);
+
+      // ── Bucket header ──
       const spHead = document.createElement('div');
-      spHead.style = 'background:#fff8e1;border-left:4px solid #f59e0b;padding:12px 16px;margin:16px 0 8px;border-radius:4px;';
-      spHead.innerHTML = '<span style="font-weight:800;color:#92400e;">📸 Spare Photos (' + inspection.sparePhotos.length + ')</span><span style="font-size:11px;color:#64748b;margin-left:8px;">Add captions to assign them</span>';
+      spHead.style = 'background:' + (unassigned.length ? '#fff8e1' : '#f0fdf4') + ';border-left:4px solid ' + (unassigned.length ? '#f59e0b' : '#22c55e') + ';padding:12px 16px;margin:16px 0 8px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;';
+      spHead.innerHTML = '<span style="font-weight:800;color:' + (unassigned.length ? '#92400e' : '#166534') + ';">📸 Spare Photos (' + inspection.sparePhotos.length + ')</span>' +
+        (unassigned.length ? '<span style="font-size:12px;font-weight:700;background:#f59e0b;color:#fff;padding:2px 10px;border-radius:99px;">' + unassigned.length + ' need assignment</span>' : '<span style="font-size:12px;color:#166534;">✓ All assigned</span>');
       c.appendChild(spHead);
-      inspection.sparePhotos.forEach((sp, i) => {
+
+      // ── Render a single spare photo card ──
+      function renderSpareCard(sp, i) {
         const spCard = document.createElement('div');
         spCard.className = 'photo-card';
-        spCard.style = 'margin-bottom:10px;';
+        spCard.style = 'margin-bottom:10px;border:2px solid ' + (sp.assignedSlot ? '#22c55e' : '#f59e0b') + ';border-radius:8px;overflow:hidden;';
+        spCard.id = 'spare-card-' + sp.photoId;
+
+        // Photo
         const spImg = document.createElement('img');
-        spImg.src = sp.dataUrl; spImg.className = 'photo-img'; spImg.alt = 'Spare ' + (i+1);
+        spImg.src = sp.dataUrl || '';
+        spImg.className = 'photo-img';
+        spImg.alt = 'Spare ' + (i + 1);
+        spCard.appendChild(spImg);
+
+        // Meta
         const spMeta = document.createElement('div');
         spMeta.style = 'padding:4px 10px;font-size:11px;color:#64748b;';
         spMeta.textContent = 'Captured during: ' + (sp.roomName || sp.stepName || 'inspection') + ' • ' + new Date(sp.timestamp).toLocaleTimeString();
+        spCard.appendChild(spMeta);
+
+        // Caption
         const spCap = document.createElement('input');
-        spCap.type = 'text'; spCap.placeholder = 'Caption or room assignment...';
+        spCap.type = 'text';
+        spCap.placeholder = 'Caption…';
         spCap.value = sp.caption || '';
-        spCap.style = 'width:100%;border:none;border-top:1px solid #e5e7eb;padding:10px;font-size:13px;font-family:inherit;';
+        spCap.style = 'width:100%;border:none;border-top:1px solid #e5e7eb;padding:10px;font-size:13px;font-family:inherit;box-sizing:border-box;';
         spCap.oninput = () => { sp.caption = spCap.value; scheduleSave(); };
-        spCard.appendChild(spImg); spCard.appendChild(spMeta); spCard.appendChild(spCap);
-        c.appendChild(spCard);
-      });
+        spCard.appendChild(spCap);
+
+        // Section assignment dropdown
+        const assignWrap = document.createElement('div');
+        assignWrap.style = 'padding:8px 10px;border-top:1px solid #e5e7eb;background:#f8fafc;';
+
+        const assignLabel = document.createElement('div');
+        assignLabel.style = 'font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;';
+        assignLabel.textContent = 'Assign to section';
+        assignWrap.appendChild(assignLabel);
+
+        const sel = document.createElement('select');
+        sel.style = 'width:100%;padding:10px 12px;font-size:14px;font-family:inherit;border:2px solid ' + (sp.assignedSlot ? '#22c55e' : '#f59e0b') + ';border-radius:6px;background:#fff;color:#1e293b;-webkit-appearance:none;appearance:none;cursor:pointer;';
+
+        const blankOpt = document.createElement('option');
+        blankOpt.value = '';
+        blankOpt.textContent = '— Select section —';
+        sel.appendChild(blankOpt);
+
+        SPARE_SLOTS.forEach(slot => {
+          const opt = document.createElement('option');
+          opt.value = slot.value;
+          opt.textContent = slot.label;
+          if (sp.assignedSlot === slot.value) opt.selected = true;
+          sel.appendChild(opt);
+        });
+
+        sel.onchange = () => {
+          sp.assignedSlot = sel.value || null;
+          scheduleSave();
+          // Refresh the whole spare photos section so bucket counts update
+          const container = document.getElementById('spare-photos-container');
+          if (container) {
+            container.parentNode.removeChild(container);
+          }
+          renderSpareSection();
+        };
+
+        assignWrap.appendChild(sel);
+        spCard.appendChild(assignWrap);
+        return spCard;
+      }
+
+      // ── Render the full spare section ──
+      function renderSpareSection() {
+        const wrap = document.createElement('div');
+        wrap.id = 'spare-photos-container';
+
+        const unassignedNow = inspection.sparePhotos.filter(sp => !sp.assignedSlot);
+        const assignedNow   = inspection.sparePhotos.filter(sp =>  sp.assignedSlot);
+
+        // Update header
+        spHead.style.background = unassignedNow.length ? '#fff8e1' : '#f0fdf4';
+        spHead.style.borderLeftColor = unassignedNow.length ? '#f59e0b' : '#22c55e';
+        spHead.innerHTML = '<span style="font-weight:800;color:' + (unassignedNow.length ? '#92400e' : '#166534') + ';">📸 Spare Photos (' + inspection.sparePhotos.length + ')</span>' +
+          (unassignedNow.length ? '<span style="font-size:12px;font-weight:700;background:#f59e0b;color:#fff;padding:2px 10px;border-radius:99px;">' + unassignedNow.length + ' need assignment</span>' : '<span style="font-size:12px;color:#166534;">✓ All assigned</span>');
+
+        // Unassigned bucket
+        if (unassignedNow.length) {
+          const bucketHdr = document.createElement('div');
+          bucketHdr.style = 'font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;padding:8px 0 4px;';
+          bucketHdr.textContent = '⚠️ Needs assignment (' + unassignedNow.length + ')';
+          wrap.appendChild(bucketHdr);
+          unassignedNow.forEach((sp, i) => wrap.appendChild(renderSpareCard(sp, inspection.sparePhotos.indexOf(sp))));
+        }
+
+        // Assigned bucket
+        if (assignedNow.length) {
+          const assignedHdr = document.createElement('div');
+          assignedHdr.style = 'font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;padding:12px 0 4px;';
+          assignedHdr.textContent = '✓ Assigned (' + assignedNow.length + ')';
+          wrap.appendChild(assignedHdr);
+          assignedNow.forEach((sp, i) => wrap.appendChild(renderSpareCard(sp, inspection.sparePhotos.indexOf(sp))));
+        }
+
+        c.appendChild(wrap);
+      }
+
+      renderSpareSection();
     }
 
     root.appendChild(c);
