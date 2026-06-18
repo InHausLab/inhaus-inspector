@@ -1588,7 +1588,7 @@
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v84',
+      appVersion: 'v86',
       success: success
     };
   }
@@ -2794,6 +2794,57 @@
         spCap.style = 'width:100%;border:none;border-top:1px solid #e5e7eb;padding:10px;font-size:13px;font-family:inherit;box-sizing:border-box;';
         spCap.oninput = () => { sp.caption = spCap.value; scheduleSave(); };
         spCard.appendChild(spCap);
+
+        // ── AI Caption Suggestion (spare photos) ────────────────────
+        if (sp.dataUrl && sp.dataUrl !== '__uploaded__') {
+          const aiSpareBtn = document.createElement('button');
+          aiSpareBtn.type = 'button';
+          aiSpareBtn.textContent = '✨ Suggest caption';
+          aiSpareBtn.style = 'display:block;width:100%;padding:6px 10px;border-top:1px solid #e5e7eb;background:#f0f4ff;border-left:none;border-right:none;border-bottom:none;color:#3a5ec5;font-size:0.82rem;font-weight:600;cursor:pointer;text-align:left;';
+          aiSpareBtn.onclick = async () => {
+            aiSpareBtn.disabled = true;
+            aiSpareBtn.textContent = '⏳ Analyzing photo...';
+            try {
+              const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+              const base64 = sp.dataUrl.split(',')[1];
+              const mimeType = (sp.dataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
+              const prompt = 'You are a home health inspector writing a caption for a photo taken during a residential inspection.' +
+                ' The caption should be 1-2 sentences, written in plain, accessible language — not overly technical.' +
+                ' Describe what is visible in the photo.' +
+                ' If there is any issue present, briefly explain how it could affect the health or comfort of the home\'s occupants if left unaddressed (e.g. mold risk, air quality, water quality, structural safety).' +
+                ' If the photo shows something that appears normal and fine, just describe it briefly.' +
+                ' Do not use alarming language. Be matter-of-fact and helpful.' +
+                (sp.roomName ? ' Room: ' + sp.roomName + '.' : '') +
+                (sp.stepName ? ' Section: ' + sp.stepName + '.' : '') +
+                ' Return ONLY the caption text, no quotes, no labels, no extra formatting.';
+              const resp = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64, mimeType, prompt })
+              });
+              if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
+              const result = await resp.json();
+              const text = result.content && result.content[0] && result.content[0].text;
+              if (!text) throw new Error('EMPTY_RESPONSE');
+              sp.caption = text.trim();
+              spCap.value = sp.caption;
+              scheduleSave();
+              aiSpareBtn.textContent = '✓ Caption added — edit if needed';
+              aiSpareBtn.style.background = '#edfaf1';
+              aiSpareBtn.style.color = '#1e7e34';
+              setTimeout(() => {
+                aiSpareBtn.textContent = '✨ Re-suggest caption';
+                aiSpareBtn.disabled = false;
+                aiSpareBtn.style.background = '#f0f4ff';
+                aiSpareBtn.style.color = '#3a5ec5';
+              }, 3000);
+            } catch (err) {
+              aiSpareBtn.disabled = false;
+              aiSpareBtn.textContent = '✨ Suggest caption';
+            }
+          };
+          spCard.appendChild(aiSpareBtn);
+        }
 
         // Section assignment dropdown
         const assignWrap = document.createElement('div');

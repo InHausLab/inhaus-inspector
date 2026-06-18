@@ -1022,6 +1022,61 @@
         capRow.appendChild(capInp);
         card.appendChild(capRow);
 
+        // ── AI Caption Suggestion ────────────────────────────────
+        if (p.dataUrl && p.dataUrl !== '__uploaded__') {
+          const aiCaptionBtn = document.createElement('button');
+          aiCaptionBtn.type = 'button';
+          aiCaptionBtn.className = 'ai-caption-btn';
+          aiCaptionBtn.textContent = '✨ Suggest caption';
+          aiCaptionBtn.style.cssText = 'display:block;width:100%;margin-top:4px;padding:6px 10px;background:#f0f4ff;border:1px solid #c7d4f8;border-radius:6px;color:#3a5ec5;font-size:0.82rem;font-weight:600;cursor:pointer;text-align:left;';
+          aiCaptionBtn.onclick = async () => {
+            aiCaptionBtn.disabled = true;
+            aiCaptionBtn.textContent = '⏳ Analyzing photo...';
+            try {
+              const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+              const base64 = p.dataUrl.split(',')[1];
+              const mimeType = (p.dataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
+              const prompt = 'You are a home health inspector writing a caption for a photo taken during a residential inspection.' +
+                ' The caption should be 1-2 sentences, written in plain, accessible language — not overly technical.' +
+                ' Describe what is visible in the photo.' +
+                ' If there is any issue present, briefly explain how it could affect the health or comfort of the home\'s occupants if left unaddressed (e.g. mold risk, air quality, water quality, structural safety).' +
+                ' If the photo shows something that appears normal and fine, just describe it briefly.' +
+                ' Do not use alarming language. Be matter-of-fact and helpful.' +
+                (roomName ? ' Room: ' + roomName + '.' : '') +
+                (stepName ? ' Section: ' + stepName + '.' : '') +
+                ' Return ONLY the caption text, no quotes, no labels, no extra formatting.';
+              const resp = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64, mimeType, prompt })
+              });
+              if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
+              const result = await resp.json();
+              const text = result.content && result.content[0] && result.content[0].text;
+              if (!text) throw new Error('EMPTY_RESPONSE');
+              p.caption = text.trim();
+              capInp.value = p.caption;
+              onUpdate();
+              aiCaptionBtn.textContent = '✓ Caption added — edit if needed';
+              aiCaptionBtn.style.background = '#edfaf1';
+              aiCaptionBtn.style.borderColor = '#a3d9b1';
+              aiCaptionBtn.style.color = '#1e7e34';
+              setTimeout(() => {
+                aiCaptionBtn.textContent = '✨ Re-suggest caption';
+                aiCaptionBtn.disabled = false;
+                aiCaptionBtn.style.background = '#f0f4ff';
+                aiCaptionBtn.style.borderColor = '#c7d4f8';
+                aiCaptionBtn.style.color = '#3a5ec5';
+              }, 3000);
+            } catch (err) {
+              aiCaptionBtn.disabled = false;
+              aiCaptionBtn.textContent = '✨ Suggest caption';
+              if (window.showToast) window.showToast('AI unavailable — add caption manually');
+            }
+          };
+          card.appendChild(aiCaptionBtn);
+        }
+
         card.appendChild(el('button', {
           type: 'button', className: 'photo-del-btn',
           onClick: () => {
