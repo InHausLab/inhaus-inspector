@@ -156,8 +156,7 @@
   function observationFields() {
     return [
       chips('observations', 'Observations', OBS_TAGS),
-      info('\uD83D\uDCA1 Tip: Use Whispr app for more accurate voice dictation'),
-      textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments... (\uD83C\uDF99 Voice dictation: read back and fix errors before moving on)' }),
+      textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments... (tap \uD83C\uDF99 mic in your iPhone keyboard, then read back and fix errors)' }),
       check('voiceReviewed', '\u2713 Voice-dictated notes reviewed and corrected'),
       divider(),
       heading('Photos'),
@@ -172,7 +171,7 @@
       heading('Follow-Up'),
       yesno('followUpNeeded', 'Follow-up recommended?'),
       showIf(sel('followUpTimeframe', 'Re-check in', ['3 months', '6 months', '12 months']), 'followUpNeeded', 'Yes'),
-      showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return... (\uD83C\uDF99 Voice dictation: read back and fix errors)' }), 'followUpNeeded', 'Yes'),
+      showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return... (tap \uD83C\uDF99 mic in keyboard, read back before saving)' }), 'followUpNeeded', 'Yes'),
       showIf(photo('Follow-Up', '_followUpPhotos'), 'followUpNeeded', 'Yes')
     ];
   }
@@ -764,7 +763,7 @@
       items.push(heading(`Follow-Up Action ${i}`));
       items.push(text(`followUp_${i}_room`, 'Room', { placeholder: 'e.g. Primary Bedroom' }));
       items.push(sel(`followUp_${i}_timeframe`, 'Re-check timeframe', ['1 month', '3 months', '6 months', '1 year', 'As needed']));
-      items.push(text(`followUp_${i}_whatToWatch`, 'What to watch for', { placeholder: 'e.g. Moisture return under sink, condensation on windows (\uD83C\uDF99 speak then review)' }));
+      items.push(text(`followUp_${i}_whatToWatch`, 'What to watch for', { placeholder: 'e.g. Moisture return under sink, condensation on windows (tap \uD83C\uDF99 mic in keyboard)' }));
       items.push(text(`followUp_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #023' }));
     }
     return items;
@@ -776,7 +775,7 @@
     for (let i = 1; i <= 6; i++) {
       if (i > 1) items.push(divider());
       items.push(text(`actionTaken_${i}_desc`, `Action ${i}`, {
-        placeholder: 'e.g. Replaced HVAC filter - 20x20x1 MERV 11, installed new (\uD83C\uDF99 speak then review)'
+        placeholder: 'e.g. Replaced HVAC filter - 20x20x1 MERV 11, installed new (tap \uD83C\uDF99 mic in keyboard)'
       }));
       items.push(text(`actionTaken_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #045' }));
       items.push(photo(`Actions Taken ${i}`, `_actionPhoto_${i}`));
@@ -792,7 +791,7 @@
         placeholder: 'e.g. Primary Bathroom'
       }));
       items.push(textarea(`obs_${i}_note`, 'Observation', {
-        placeholder: 'e.g. Active moisture staining on drywall below showerhead - no active drip at time of inspection. (\uD83C\uDF99 speak then review)'
+        placeholder: 'e.g. Active moisture staining on drywall below showerhead - no active drip at time of inspection. (tap \uD83C\uDF99 mic in keyboard)'
       }));
       items.push(text(`obs_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #023' }));
       items.push(photo(`Observation ${i}`, `_obsPhoto_${i}`));
@@ -2125,7 +2124,7 @@
       text('wifiNetwork', 'Home wifi network name'),
       text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
       { type: 'wifi-copy' },
-      textarea('clientConcerns', 'Client concerns / known problem areas', { placeholder: '\uD83C\uDF99 Using voice dictation? Read it back and fix errors before saving.' }),
+      textarea('clientConcerns', 'Client concerns / known problem areas', { placeholder: 'Tap \uD83C\uDF99 mic in your iPhone keyboard to dictate \u2014 read back and fix errors before saving.' }),
       textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
     ];
 

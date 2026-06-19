@@ -79,14 +79,14 @@
   function micBtn(onResult) {
     if (!hasSpeech) {
       if (isIOS) {
-        // On iOS: no native SR — recommend Whispr app
+        // On iOS: no native SR — prompt to use keyboard mic
         const wrap = document.createElement('span');
         const hint = el('button', {
-          type: 'button', className: 'mic-hint-btn', 'aria-label': 'Voice dictation: use Whispr app on iOS',
-          title: 'On iOS: use the Whispr app for voice dictation (tap mic in keyboard)',
+          type: 'button', className: 'mic-hint-btn', 'aria-label': 'Voice input: use mic in your keyboard',
+          title: 'Tap the 🎙 mic key in your iPhone keyboard for voice input',
           onClick: (e) => {
             e.preventDefault();
-            showToast('\ud83c\udf99 iOS tip: use Whispr app or tap \ud83c\udfa4 in your keyboard for voice dictation', 4000);
+            showToast('Tap the \ud83c\udf99 mic in your iPhone keyboard to dictate \u2014 read back and fix before saving', 4000);
             const inp = e.target.closest('.input-row, .textarea-row');
             if (inp) { const field = inp.querySelector('input, textarea'); if (field) field.focus(); }
           }
