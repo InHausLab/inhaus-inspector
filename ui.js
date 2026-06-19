@@ -1258,11 +1258,18 @@
         return panel;
       }
       case 'ai-hvac-scanner': {
+        // ─────────────────────────────────────────────────────────
+        // SCAN-FIRST, CONFIRM-SECOND HVAC flow
+        // Step 1: Take photo of data tag  → AI fills unit specs
+        // Step 2: Take photo of filter    → AI fills filter specs
+        // Step 3: Confirm card appears    → tech edits + adds notes
+        // ─────────────────────────────────────────────────────────
         const wrap = document.createElement('div');
         wrap.className = 'ai-hvac-scanner';
+        wrap.style = 'display:flex;flex-direction:column;gap:0;';
 
-        // ── Proxy API call ──────────────────────────────────────
         const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+
         async function callAnthropic(imageDataUrl, promptText) {
           const base64 = imageDataUrl.split(',')[1];
           const mimeType = (imageDataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
@@ -1278,158 +1285,391 @@
           return JSON.parse(text);
         }
 
-        // ── Field updater ───────────────────────────────────────
-        function setFieldValue(key, value, card) {
-          if (value === null || value === undefined) return;
+        // ── helpers ─────────────────────────────────────────────
+        function mkLabel(txt) {
+          const l = document.createElement('div');
+          l.style = 'font-size:11px;font-weight:700;color:#5a7a3a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;';
+          l.textContent = txt;
+          return l;
+        }
+        function mkInput(key, placeholder, type) {
+          const inp = document.createElement(type === 'textarea' ? 'textarea' : 'input');
+          if (type !== 'textarea') inp.type = type || 'text';
+          inp.placeholder = placeholder || '';
+          inp.value = data[key] || '';
+          inp.style = 'width:100%;padding:8px 10px;border:1.5px solid #d0dcc8;border-radius:8px;font-size:0.95rem;background:#fff;box-sizing:border-box;' + (type === 'textarea' ? 'min-height:64px;resize:vertical;' : '');
+          inp.addEventListener('input', () => { data[key] = inp.value; onChange(); });
+          return inp;
+        }
+        function mkSelect(key, options) {
+          const sel = document.createElement('select');
+          sel.style = 'width:100%;padding:8px 10px;border:1.5px solid #d0dcc8;border-radius:8px;font-size:0.95rem;background:#fff;box-sizing:border-box;';
+          [{ value: '', label: '— select —' }, ...options.map(o => ({ value: o, label: o }))].forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.value; opt.textContent = o.label;
+            sel.appendChild(opt);
+          });
+          sel.value = data[key] || '';
+          sel.addEventListener('change', () => { data[key] = sel.value; onChange(); });
+          return sel;
+        }
+        function setVal(key, value) {
+          if (value === null || value === undefined || value === '') return;
           data[key] = value;
-          if (!card) return;
-          const inp = card.querySelector('[data-field-key="' + key + '"]');
-          if (inp) {
-            if (inp.tagName === 'SELECT') {
-              const opts = Array.from(inp.options);
-              const strVal = String(value).toLowerCase();
-              const match = opts.find(o => o.value.toLowerCase() === strVal) ||
-                            opts.find(o => o.value.toLowerCase().includes(strVal) || strVal.includes(o.value.toLowerCase()));
-              if (match) { inp.value = match.value; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+        }
+        function syncConfirmCard() {
+          // push data values into confirm card inputs
+          confirmCard.querySelectorAll('[data-hvac-key]').forEach(el => {
+            const k = el.getAttribute('data-hvac-key');
+            if (el.tagName === 'SELECT') {
+              if (data[k]) el.value = data[k];
             } else {
-              inp.value = String(value);
-              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              el.value = data[k] || '';
             }
-          }
-          const yesnoGroup = card.querySelector('[data-yesno-key="' + key + '"]');
-          if (yesnoGroup) {
-            const strVal = String(value).toLowerCase();
-            const target = (strVal === 'true' || strVal === 'yes') ? 'Yes' : 'No';
-            const btn = yesnoGroup.querySelector('[data-yesno-val="' + target + '"]');
-            if (btn) btn.click();
-          }
+          });
         }
 
-        // ── Recall warning banner ───────────────────────────────
-        const recallBanner = document.createElement('div');
-        recallBanner.className = 'ai-recall-banner';
-        recallBanner.style.display = 'none';
-        recallBanner.textContent = '⚠️ Possible recall notice visible - verify with manufacturer';
+        // ── State tracking ──────────────────────────────────────
+        let tagScanned = !!(data.hvacTagPhoto);
+        let filterScanned = !!(data.hvacFilterPhoto);
 
-        // ── DATA TAG scanner ────────────────────────────────────
-        const tagSection = document.createElement('div');
-        tagSection.className = 'ai-scan-section';
+        // ═══════════════════════════════════════════════════════
+        // STEP 1 — Data Tag
+        // ═══════════════════════════════════════════════════════
+        const step1 = document.createElement('div');
+        step1.className = 'hvac-scan-step';
+        step1.style = 'background:#f4f8f0;border:2px solid #c8d8b0;border-radius:12px;padding:16px;margin-bottom:12px;';
+
+        const step1Header = document.createElement('div');
+        step1Header.style = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;';
+        const step1Num = document.createElement('div');
+        step1Num.style = 'width:28px;height:28px;border-radius:50%;background:#2C3F16;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+        step1Num.textContent = '1';
+        const step1Title = document.createElement('div');
+        step1Title.style = 'font-weight:700;font-size:1rem;color:#2C3F16;';
+        step1Title.textContent = 'Photo: HVAC Unit Data Tag';
+        step1Header.appendChild(step1Num); step1Header.appendChild(step1Title);
+
+        const step1Hint = document.createElement('div');
+        step1Hint.style = 'font-size:0.85rem;color:#6a7a60;margin-bottom:12px;';
+        step1Hint.textContent = 'Take a clear photo of the data tag on the HVAC unit. AI will read the model, serial number, and specs.';
 
         const tagInp = document.createElement('input');
         tagInp.type = 'file'; tagInp.accept = 'image/*'; tagInp.capture = 'environment'; tagInp.style = 'display:none;';
 
+        const tagPreviewWrap = document.createElement('div');
+        tagPreviewWrap.style = 'position:relative;margin-bottom:10px;' + (tagScanned ? '' : 'display:none;');
+        const tagPreview = document.createElement('img');
+        tagPreview.className = 'ai-scan-preview';
+        tagPreview.style = 'width:100%;border-radius:8px;border:1.5px solid #c8d8b0;';
+        if (data.hvacTagPhoto) tagPreview.src = data.hvacTagPhoto.dataUrl || '';
+        const tagRetake = document.createElement('button');
+        tagRetake.type = 'button';
+        tagRetake.style = 'position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;';
+        tagRetake.textContent = '↩ Retake';
+        tagRetake.onclick = () => tagInp.click();
+        tagPreviewWrap.appendChild(tagPreview); tagPreviewWrap.appendChild(tagRetake);
+
         const tagBtn = document.createElement('button');
         tagBtn.type = 'button';
         tagBtn.className = 'ai-scan-btn ai-scan-tag-btn';
-        tagBtn.innerHTML = '📷 Scan HVAC Data Tag';
+        tagBtn.innerHTML = '📷 Take Photo of Data Tag';
+        if (tagScanned) tagBtn.style.display = 'none';
 
         const tagStatus = document.createElement('div');
         tagStatus.className = 'ai-scan-status';
-
-        let tagPreview = null;
+        if (tagScanned) { tagStatus.textContent = '✓ Data tag scanned'; tagStatus.className = 'ai-scan-status ai-scan-success'; }
 
         tagInp.onchange = async e => {
           const file = e.target.files[0]; if (!file) return;
           tagInp.value = '';
+          tagBtn.style.display = 'none';
+          tagStatus.textContent = '⏳ Reading data tag...';
+          tagStatus.className = 'ai-scan-status ai-scan-loading';
           try {
             const dataUrl = await compressImage(file);
             data.hvacTagPhoto = { dataUrl, timestamp: new Date().toISOString() };
-            onChange();
-            if (!tagPreview) {
-              tagPreview = document.createElement('img');
-              tagPreview.className = 'ai-scan-preview';
-              tagSection.insertBefore(tagPreview, tagBtn);
-            }
             tagPreview.src = dataUrl;
-            tagBtn.disabled = true;
-            tagStatus.textContent = '⏳ Analyzing data tag...';
-            tagStatus.className = 'ai-scan-status ai-scan-loading';
-            const prompt = 'Analyze this HVAC equipment data tag. Extract and return JSON with: filterSize (e.g. "16x25x1"), mervRating (number or null), manufacturer (string or null), modelNumber (string or null), serialNumber (string or null). If any field is not visible or readable, use null. Return ONLY the JSON object, no other text.';
+            tagPreviewWrap.style.display = '';
+            const prompt = 'Analyze this HVAC equipment data tag. Extract and return JSON with these exact keys: manufacturer (brand name, string or null), modelNumber (string or null), serialNumber (string or null), filterSize (e.g. "16x25x1", string or null), mervRating (number or null), brand (same as manufacturer or filter brand if different, string or null). If any field is not visible or readable, use null. Return ONLY valid JSON, no other text.';
             const result = await callAnthropic(dataUrl, prompt);
-            const card = wrap.closest('.card');
-            if (result.filterSize) setFieldValue('filterSize', result.filterSize, card);
-            if (result.mervRating != null) setFieldValue('mervRating', result.mervRating, card);
-            if (result.manufacturer) setFieldValue('hvacManufacturer', result.manufacturer, card);
-            if (result.modelNumber) setFieldValue('hvacModel', result.modelNumber, card);
-            if (result.serialNumber) setFieldValue('hvacSerial', result.serialNumber, card);
-            onChange();
-            tagStatus.textContent = '✓ Data tag scanned';
+            if (result.manufacturer) setVal('hvacManufacturer', result.manufacturer);
+            if (result.modelNumber)   setVal('hvacModel', result.modelNumber);
+            if (result.serialNumber)  setVal('hvacSerial', result.serialNumber);
+            if (result.filterSize)    setVal('filterSize', result.filterSize);
+            if (result.mervRating != null) setVal('mervRating', String(result.mervRating));
+            if (result.brand)         setVal('filterMakeModel', result.brand);
+            tagScanned = true;
+            tagStatus.textContent = '✓ Data tag read — check details below';
             tagStatus.className = 'ai-scan-status ai-scan-success';
+            syncConfirmCard();
+            revealConfirmIfReady();
+            onChange();
           } catch (err) {
-            tagStatus.textContent = 'Could not read tag - please enter manually';
+            tagBtn.style.display = '';
+            tagStatus.textContent = '⚠️ Could not read tag — fill in manually below';
             tagStatus.className = 'ai-scan-status ai-scan-error';
-          } finally {
-            tagBtn.disabled = false;
+            tagScanned = true; // let them proceed
+            revealConfirmIfReady();
           }
         };
         tagBtn.onclick = () => tagInp.click();
-        tagSection.appendChild(tagInp);
-        tagSection.appendChild(tagBtn);
-        tagSection.appendChild(tagStatus);
 
-        // ── FILTER scanner ──────────────────────────────────────
-        const filterSection = document.createElement('div');
-        filterSection.className = 'ai-scan-section';
+        step1.appendChild(step1Header);
+        step1.appendChild(step1Hint);
+        step1.appendChild(tagInp);
+        step1.appendChild(tagPreviewWrap);
+        step1.appendChild(tagBtn);
+        step1.appendChild(tagStatus);
+
+        // ═══════════════════════════════════════════════════════
+        // STEP 2 — Filter
+        // ═══════════════════════════════════════════════════════
+        const step2 = document.createElement('div');
+        step2.className = 'hvac-scan-step';
+        step2.style = 'background:#f4f8f0;border:2px solid #c8d8b0;border-radius:12px;padding:16px;margin-bottom:12px;';
+
+        const step2Header = document.createElement('div');
+        step2Header.style = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;';
+        const step2Num = document.createElement('div');
+        step2Num.style = 'width:28px;height:28px;border-radius:50%;background:#2C3F16;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+        step2Num.textContent = '2';
+        const step2Title = document.createElement('div');
+        step2Title.style = 'font-weight:700;font-size:1rem;color:#2C3F16;';
+        step2Title.textContent = 'Photo: HVAC Filter';
+        step2Header.appendChild(step2Num); step2Header.appendChild(step2Title);
+
+        const step2Hint = document.createElement('div');
+        step2Hint.style = 'font-size:0.85rem;color:#6a7a60;margin-bottom:12px;';
+        step2Hint.textContent = 'Take a photo of the filter. AI will read the size, MERV rating, brand, and assess condition.';
 
         const filterInp = document.createElement('input');
         filterInp.type = 'file'; filterInp.accept = 'image/*'; filterInp.capture = 'environment'; filterInp.style = 'display:none;';
 
+        const filterPreviewWrap = document.createElement('div');
+        filterPreviewWrap.style = 'position:relative;margin-bottom:10px;' + (filterScanned ? '' : 'display:none;');
+        const filterPreview = document.createElement('img');
+        filterPreview.className = 'ai-scan-preview';
+        filterPreview.style = 'width:100%;border-radius:8px;border:1.5px solid #c8d8b0;';
+        if (data.hvacFilterPhoto) filterPreview.src = data.hvacFilterPhoto.dataUrl || '';
+        const filterRetake = document.createElement('button');
+        filterRetake.type = 'button';
+        filterRetake.style = 'position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;';
+        filterRetake.textContent = '↩ Retake';
+        filterRetake.onclick = () => filterInp.click();
+        filterPreviewWrap.appendChild(filterPreview); filterPreviewWrap.appendChild(filterRetake);
+
         const filterBtn = document.createElement('button');
         filterBtn.type = 'button';
         filterBtn.className = 'ai-scan-btn ai-scan-filter-btn';
-        filterBtn.innerHTML = '📷 Scan Filter';
+        filterBtn.innerHTML = '📷 Take Photo of Filter';
+        if (filterScanned) filterBtn.style.display = 'none';
 
         const filterStatus = document.createElement('div');
         filterStatus.className = 'ai-scan-status';
-
-        let filterPreview = null;
+        if (filterScanned) { filterStatus.textContent = '✓ Filter scanned'; filterStatus.className = 'ai-scan-status ai-scan-success'; }
 
         filterInp.onchange = async e => {
           const file = e.target.files[0]; if (!file) return;
           filterInp.value = '';
+          filterBtn.style.display = 'none';
+          filterStatus.textContent = '⏳ Reading filter...';
+          filterStatus.className = 'ai-scan-status ai-scan-loading';
           try {
             const dataUrl = await compressImage(file);
             data.hvacFilterPhoto = { dataUrl, timestamp: new Date().toISOString() };
-            onChange();
-            if (!filterPreview) {
-              filterPreview = document.createElement('img');
-              filterPreview.className = 'ai-scan-preview';
-              filterSection.insertBefore(filterPreview, filterBtn);
-            }
             filterPreview.src = dataUrl;
-            filterBtn.disabled = true;
-            filterStatus.textContent = '⏳ Analyzing filter...';
-            filterStatus.className = 'ai-scan-status ai-scan-loading';
-            const prompt = 'Analyze this HVAC filter photo. Extract and return JSON with: filterSize (e.g. "16x25x1" or null), mervRating (number or null), filterCondition (one of: "Clean", "Dirty", "Very Dirty", "Damaged"), estimatedAge (one of: "New", "Less than 6 months", "6-12 months", "Over 1 year"), visibleRecallNotice (true or false), notes (any relevant text visible on filter, or null). Return ONLY the JSON object, no other text.';
+            filterPreviewWrap.style.display = '';
+            const prompt = 'Analyze this HVAC filter photo. Extract and return JSON with these exact keys: filterSize (e.g. "16x25x1" or null), mervRating (number or null), filterBrand (brand name on filter, string or null), filterCondition (one of: "Clean", "Dirty", "Very Dirty", "Damaged"), estimatedAge (one of: "New", "Less than 6 months", "6-12 months", "Over 1 year"), visibleRecallNotice (true or false), notes (any relevant visible text or observations, string or null). Return ONLY valid JSON, no other text.';
             const result = await callAnthropic(dataUrl, prompt);
-            const card = wrap.closest('.card');
-            if (result.filterSize) setFieldValue('filterSize', result.filterSize, card);
-            if (result.mervRating != null) setFieldValue('mervRating', result.mervRating, card);
-            if (result.filterCondition) setFieldValue('filterCondition', result.filterCondition, card);
-            if (result.estimatedAge) setFieldValue('filterEstimatedAge', result.estimatedAge, card);
-            if (result.notes) setFieldValue('filterNotes', result.notes, card);
+            if (result.filterSize)    setVal('filterSize', result.filterSize);
+            if (result.mervRating != null) setVal('mervRating', String(result.mervRating));
+            if (result.filterBrand)   setVal('filterMakeModel', result.filterBrand);
+            if (result.filterCondition) setVal('filterCondition', result.filterCondition);
+            if (result.estimatedAge)  setVal('filterEstimatedAge', result.estimatedAge);
+            if (result.notes)         setVal('filterNotes', result.notes);
             if (result.visibleRecallNotice) {
-              setFieldValue('filterRecallFlag', 'Yes', card);
+              setVal('filterRecallFlag', 'Yes');
               recallBanner.style.display = 'block';
             }
-            onChange();
-            filterStatus.textContent = '✓ Filter scanned';
+            filterScanned = true;
+            filterStatus.textContent = '✓ Filter read — check details below';
             filterStatus.className = 'ai-scan-status ai-scan-success';
+            syncConfirmCard();
+            revealConfirmIfReady();
+            onChange();
           } catch (err) {
-            filterStatus.textContent = 'Could not read filter - please enter manually';
+            filterBtn.style.display = '';
+            filterStatus.textContent = '⚠️ Could not read filter — fill in manually below';
             filterStatus.className = 'ai-scan-status ai-scan-error';
-          } finally {
-            filterBtn.disabled = false;
+            filterScanned = true;
+            revealConfirmIfReady();
           }
         };
         filterBtn.onclick = () => filterInp.click();
-        filterSection.appendChild(filterInp);
-        filterSection.appendChild(filterBtn);
-        filterSection.appendChild(filterStatus);
 
-        wrap.appendChild(tagSection);
-        wrap.appendChild(filterSection);
-        wrap.appendChild(recallBanner);
+        step2.appendChild(step2Header);
+        step2.appendChild(step2Hint);
+        step2.appendChild(filterInp);
+        step2.appendChild(filterPreviewWrap);
+        step2.appendChild(filterBtn);
+        step2.appendChild(filterStatus);
+
+        // ═══════════════════════════════════════════════════════
+        // STEP 3 — Confirm card (hidden until both photos taken)
+        // ═══════════════════════════════════════════════════════
+        const recallBanner = document.createElement('div');
+        recallBanner.className = 'ai-recall-banner';
+        recallBanner.style.display = (data.filterRecallFlag === 'Yes') ? 'block' : 'none';
+        recallBanner.textContent = '⚠️ Possible recall notice visible — verify with manufacturer';
+
+        const confirmCard = document.createElement('div');
+        confirmCard.style = 'background:#fff;border:2px solid #2C3F16;border-radius:12px;padding:16px;margin-bottom:4px;' + ((tagScanned || filterScanned) ? '' : 'display:none;');
+
+        const confirmHeader = document.createElement('div');
+        confirmHeader.style = 'display:flex;align-items:center;gap:10px;margin-bottom:14px;';
+        const confirmNum = document.createElement('div');
+        confirmNum.style = 'width:28px;height:28px;border-radius:50%;background:#2C3F16;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+        confirmNum.textContent = '3';
+        const confirmTitle = document.createElement('div');
+        confirmTitle.style = 'font-weight:700;font-size:1rem;color:#2C3F16;';
+        confirmTitle.textContent = 'Confirm & Correct';
+        const confirmSubtitle = document.createElement('div');
+        confirmSubtitle.style = 'font-size:0.8rem;color:#6a7a60;margin-top:1px;';
+        confirmSubtitle.textContent = 'AI pre-filled these — verify and fix anything wrong';
+        const confirmTitleWrap = document.createElement('div');
+        confirmTitleWrap.appendChild(confirmTitle); confirmTitleWrap.appendChild(confirmSubtitle);
+        confirmHeader.appendChild(confirmNum); confirmHeader.appendChild(confirmTitleWrap);
+        confirmCard.appendChild(confirmHeader);
+
+        function addConfirmRow(label, key, type, options) {
+          const row = document.createElement('div');
+          row.style = 'margin-bottom:12px;';
+          row.appendChild(mkLabel(label));
+          let inp;
+          if (type === 'select') {
+            inp = mkSelect(key, options);
+          } else if (type === 'textarea') {
+            inp = mkInput(key, '', 'textarea');
+          } else {
+            inp = mkInput(key, '', type || 'text');
+          }
+          inp.setAttribute('data-hvac-key', key);
+          row.appendChild(inp);
+          confirmCard.appendChild(row);
+        }
+
+        // ── Unit identity ────────────────────────────────────
+        const unitSection = document.createElement('div');
+        unitSection.style = 'background:#f4f8f0;border-radius:8px;padding:12px;margin-bottom:12px;';
+        const unitSectionTitle = document.createElement('div');
+        unitSectionTitle.style = 'font-size:12px;font-weight:700;color:#2C3F16;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;';
+        unitSectionTitle.textContent = '🏠 Unit Location';
+        unitSection.appendChild(unitSectionTitle);
+
+        const locRow = document.createElement('div');
+        locRow.style = 'margin-bottom:0;';
+        locRow.appendChild(mkLabel('Which unit is this? (confirm location in home)'));
+        const locInp = mkInput('hvacUnitLocation', 'e.g. Basement furnace, Attic air handler, Hall closet', 'text');
+        locInp.setAttribute('data-hvac-key', 'hvacUnitLocation');
+        locRow.appendChild(locInp);
+        unitSection.appendChild(locRow);
+        confirmCard.appendChild(unitSection);
+
+        // ── Unit specs (from tag scan) ───────────────────────
+        const unitSpecsSection = document.createElement('div');
+        unitSpecsSection.style = 'background:#f4f8f0;border-radius:8px;padding:12px;margin-bottom:12px;';
+        const unitSpecsTitle = document.createElement('div');
+        unitSpecsTitle.style = 'font-size:12px;font-weight:700;color:#2C3F16;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;';
+        unitSpecsTitle.textContent = '🔧 Unit Specs (from data tag)';
+        unitSpecsSection.appendChild(unitSpecsTitle);
+
+        function addSpecRow(label, key, placeholder) {
+          const row = document.createElement('div');
+          row.style = 'margin-bottom:10px;';
+          row.appendChild(mkLabel(label));
+          const inp = mkInput(key, placeholder || '', 'text');
+          inp.setAttribute('data-hvac-key', key);
+          row.appendChild(inp);
+          unitSpecsSection.appendChild(row);
+        }
+        addSpecRow('Manufacturer / Brand', 'hvacManufacturer', 'e.g. Carrier, Lennox, Trane');
+        addSpecRow('Model Number', 'hvacModel', '');
+        addSpecRow('Serial Number', 'hvacSerial', '');
+        confirmCard.appendChild(unitSpecsSection);
+
+        // ── Filter specs (from filter scan) ─────────────────
+        const filterSpecsSection = document.createElement('div');
+        filterSpecsSection.style = 'background:#f4f8f0;border-radius:8px;padding:12px;margin-bottom:12px;';
+        const filterSpecsTitle = document.createElement('div');
+        filterSpecsTitle.style = 'font-size:12px;font-weight:700;color:#2C3F16;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;';
+        filterSpecsTitle.textContent = '🌬️ Filter (from filter scan)';
+        filterSpecsSection.appendChild(filterSpecsTitle);
+
+        function addFilterSpecRow(label, key, type, options, placeholder) {
+          const row = document.createElement('div');
+          row.style = 'margin-bottom:10px;';
+          row.appendChild(mkLabel(label));
+          let inp;
+          if (type === 'select') { inp = mkSelect(key, options); }
+          else { inp = mkInput(key, placeholder || '', 'text'); }
+          inp.setAttribute('data-hvac-key', key);
+          row.appendChild(inp);
+          filterSpecsSection.appendChild(row);
+        }
+        addFilterSpecRow('Filter Size', 'filterSize', 'text', null, 'e.g. 16x25x1');
+        addFilterSpecRow('MERV Rating', 'mervRating', 'text', null, 'e.g. 11');
+        addFilterSpecRow('Filter Brand / Model', 'filterMakeModel', 'text', null, '');
+        addFilterSpecRow('Filter Condition', 'filterCondition', 'select', ['Clean', 'Dirty', 'Very Dirty', 'Damaged']);
+        addFilterSpecRow('Estimated Filter Age', 'filterEstimatedAge', 'select', ['New', 'Less than 6 months', '6-12 months', 'Over 1 year']);
+        confirmCard.appendChild(filterSpecsSection);
+        confirmCard.appendChild(recallBanner);
+
+        // ── Recall flag ──────────────────────────────────────
+        const recallRow = document.createElement('div');
+        recallRow.style = 'margin-bottom:12px;';
+        recallRow.appendChild(mkLabel('Recall Notice Visible?'));
+        const recallSel = mkSelect('filterRecallFlag', ['Yes', 'No']);
+        recallSel.setAttribute('data-hvac-key', 'filterRecallFlag');
+        recallRow.appendChild(recallSel);
+        recallSel.addEventListener('change', () => {
+          recallBanner.style.display = recallSel.value === 'Yes' ? 'block' : 'none';
+        });
+        confirmCard.appendChild(recallRow);
+
+        // ── Filter cleaned checkbox ──────────────────────────
+        const cleanedRow = document.createElement('label');
+        cleanedRow.style = 'display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #e4edd8;font-size:0.95rem;cursor:pointer;margin-bottom:12px;';
+        const cleanedCb = document.createElement('input');
+        cleanedCb.type = 'checkbox';
+        cleanedCb.style = 'width:18px;height:18px;flex-shrink:0;accent-color:#2C3F16;';
+        cleanedCb.checked = !!(data.filterCleaned);
+        cleanedCb.addEventListener('change', () => { data.filterCleaned = cleanedCb.checked; onChange(); });
+        cleanedRow.appendChild(cleanedCb);
+        cleanedRow.appendChild(document.createTextNode('Filters checked and cleaned if needed'));
+        confirmCard.appendChild(cleanedRow);
+
+        // ── Notes ────────────────────────────────────────────
+        const notesRow = document.createElement('div');
+        notesRow.style = 'margin-bottom:0;';
+        notesRow.appendChild(mkLabel('Notes (add anything the AI missed)'));
+        const notesInp = mkInput('filterNotes', '🎙 Speak or type any observations...', 'textarea');
+        notesInp.setAttribute('data-hvac-key', 'filterNotes');
+        notesRow.appendChild(notesInp);
+        confirmCard.appendChild(notesRow);
+
+        // ── Show confirm card once either photo is taken ─────
+        function revealConfirmIfReady() {
+          if (tagScanned || filterScanned) {
+            confirmCard.style.display = '';
+            syncConfirmCard();
+          }
+        }
+        revealConfirmIfReady();
+
+        wrap.appendChild(step1);
+        wrap.appendChild(step2);
+        wrap.appendChild(confirmCard);
         return wrap;
       }
       case 'collapsible-section': {

@@ -447,21 +447,8 @@
         { key: 'ventNotSure', label: 'Not sure' }
       ]), 'forcedHVAC', 'Yes'),
       showIf(divider(), 'forcedHVAC', 'Yes'),
-      showIf(heading('HVAC Filter'), 'forcedHVAC', 'Yes'),
+      showIf(heading('HVAC Filter & Unit Scan'), 'forcedHVAC', 'Yes'),
       showIf({ type: 'ai-hvac-scanner' }, 'forcedHVAC', 'Yes'),
-      showIf(info('📍 After scanning: confirm the unit below matches the correct location in the home.'), 'forcedHVAC', 'Yes'),
-      showIf(text('hvacUnitLocation', 'Unit location (confirm)', { placeholder: 'e.g. Basement furnace, Attic air handler, Hallway closet' }), 'forcedHVAC', 'Yes'),
-      showIf(text('hvacManufacturer', 'Manufacturer'), 'forcedHVAC', 'Yes'),
-      showIf(text('hvacModel', 'Model number'), 'forcedHVAC', 'Yes'),
-      showIf(text('hvacSerial', 'Serial number'), 'forcedHVAC', 'Yes'),
-      showIf(text('filterSize', 'Filter size'), 'forcedHVAC', 'Yes'),
-      showIf(num('mervRating', 'MERV rating'), 'forcedHVAC', 'Yes'),
-      showIf(text('filterMakeModel', 'Filter make / model / brand'), 'forcedHVAC', 'Yes'),
-      showIf(sel('filterCondition', 'Filter condition', ['Clean', 'Dirty', 'Very Dirty', 'Damaged']), 'forcedHVAC', 'Yes'),
-      showIf(sel('filterEstimatedAge', 'Estimated filter age', ['New', 'Less than 6 months', '6-12 months', 'Over 1 year']), 'forcedHVAC', 'Yes'),
-      showIf(yesno('filterRecallFlag', 'Recall notice visible?'), 'forcedHVAC', 'Yes'),
-      showIf(textarea('filterNotes', 'Filter notes'), 'forcedHVAC', 'Yes'),
-      showIf(check('filterCleaned', 'Filters checked and cleaned if needed'), 'forcedHVAC', 'Yes'),
       showIf(photo('HVAC Filter', '_hvacFilterPhotos'), 'forcedHVAC', 'Yes'),
       showIf(divider(), 'forcedHVAC', 'Yes'),
       showIf(heading('HVAC Inspection'), 'forcedHVAC', 'Yes'),
@@ -1589,7 +1576,7 @@
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v87',
+      appVersion: 'v88',
       success: success
     };
   }
