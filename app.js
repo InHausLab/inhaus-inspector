@@ -81,9 +81,9 @@
       ]),
       yesno('flirDone', 'FLIR scan completed'),
       showIf(yesno('flirConcerns', 'Areas of concern found'), 'flirDone', 'Yes'),
-      showIf(text('flirImageLabel', 'FLIR Image Label', { placeholder: 'e.g. Bedroom 1 - Image #0023' }), 'flirDone', 'Yes'),
-      showIf(text('flirPhotoNum', 'FLIR photo number noted'), 'flirDone', 'Yes'),
-      showIf(num('flirMoisture', 'Moisture reading', { unit: '%', note: 'Flag if >20%' }), 'flirDone', 'Yes')
+      showIf(num('flirMoisture', 'Moisture reading', { unit: '%', note: 'Flag if >20%' }), 'flirDone', 'Yes'),
+      showIf(info('Log each FLIR image. Tap "+ Add another image" for more.'), 'flirDone', 'Yes'),
+      showIf({ type: 'flir-photo-log' }, 'flirDone', 'Yes')
     ], { defaultOpen: false })
     ];
   }
@@ -99,22 +99,8 @@
         ]),
         check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
         heading('FLIR Photo Log'),
-        info('Add each room scanned with its FLIR image number'),
-        text('flirImageLabel1', 'FLIR Image Label', { placeholder: 'e.g. Living Room - Image #0023' }),
-        text('flirRoom1', 'Room name'),
-        text('flirImg1', 'FLIR Image #'),
-        text('flirImageLabel2', 'FLIR Image Label', { placeholder: 'e.g. Dining Room - Image #0024' }),
-        text('flirRoom2', 'Room name'),
-        text('flirImg2', 'FLIR Image #'),
-        text('flirImageLabel3', 'FLIR Image Label', { placeholder: 'e.g. Hallway - Image #0025' }),
-        text('flirRoom3', 'Room name'),
-        text('flirImg3', 'FLIR Image #'),
-        text('flirImageLabel4', 'FLIR Image Label', { placeholder: 'e.g. Room - Image #0026' }),
-        text('flirRoom4', 'Room name (if needed)'),
-        text('flirImg4', 'FLIR Image #'),
-        text('flirImageLabel5', 'FLIR Image Label', { placeholder: 'e.g. Room - Image #0027' }),
-        text('flirRoom5', 'Room name (if needed)'),
-        text('flirImg5', 'FLIR Image #')
+        info('One entry per image. Tap \u201c+ Add another image\u201d for each additional one.'),
+        { type: 'flir-photo-log' }
       ], { defaultOpen: false })
     ];
   }
@@ -3056,14 +3042,14 @@
     stepList.forEach(step => {
       const d = inspection.stepData && inspection.stepData[step.id];
       if (!d) return;
-      // Single FLIR fields (bedroom/room-test)
+      // Legacy single FLIR fields (old saved data compat)
       if (d.flirImageLabel || d.flirPhotoNum) {
         flirLog.push({ room: d.roomName || step.name, label: d.flirImageLabel || '', imgNum: d.flirPhotoNum || '' });
       }
-      // FLIR log fields (living-area uses numbered fields)
-      for (let i = 1; i <= 5; i++) {
-        if (d['flirImageLabel' + i] || d['flirImg' + i]) {
-          flirLog.push({ room: d['flirRoom' + i] || step.name + ' (' + i + ')', label: d['flirImageLabel' + i] || '', imgNum: d['flirImg' + i] || '' });
+      // Numbered FLIR log entries (all steps now use this format; up to 20)
+      for (let i = 1; i <= 20; i++) {
+        if (d['flirImageLabel' + i] || d['flirImg' + i] || d['flirRoom' + i]) {
+          flirLog.push({ room: d['flirRoom' + i] || step.name, label: d['flirImageLabel' + i] || '', imgNum: d['flirImg' + i] || '' });
         }
       }
     });
