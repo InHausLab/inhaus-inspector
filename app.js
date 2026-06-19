@@ -1303,27 +1303,35 @@
 
     try {
       const result = await doUpload();
-      if (result && result.photosUploaded > 0) {
-        // CONFIRMED: Drive has the photo — store the Drive URL so the portal can render it
-        if (result.photos && result.photos.length > 0 && result.photos[0].driveUrl) {
-          photo.driveUrl = result.photos[0].driveUrl;
-          photo.driveId  = result.photos[0].driveId || '';
-        }
+      const returnedPhoto = result && result.photos && result.photos[0];
+      const confirmedDriveUrl = returnedPhoto && returnedPhoto.driveUrl;
+
+      if (result && result.photosUploaded > 0 && confirmedDriveUrl) {
+        // SAFE TO CLEAR: Drive confirmed receipt AND returned a retrievable URL
+        photo.driveUrl = confirmedDriveUrl;
+        photo.driveId  = returnedPhoto.driveId || '';
         photo._driveConfirmed = true;
         photo._uploaded = true;
-        photo.dataUrl = '__uploaded__';
+        photo.dataUrl = '__uploaded__'; // only cleared AFTER driveUrl is stored
         scheduleSave();
-        updateSyncStatus('checkpoint'); // show "Photo synced to Drive"
+        updateSyncStatus('checkpoint');
+      } else if (result && result.photosUploaded > 0 && !confirmedDriveUrl) {
+        // Drive uploaded but didn't return a URL — keep dataUrl, mark for investigation
+        // Photo is safe on device until we can confirm it's retrievable
+        console.warn('Photo uploaded but no driveUrl returned — retaining local copy', photo.photoId);
+        photo._uploadFailed = true;
+        photo._uploadWarning = 'no_drive_url';
+        addToPhotoRetryQueue(photo);
       } else {
-        // Drive returned OK but reported 0 photos uploaded — keep for retry
+        // Drive returned OK but 0 photos — keep for retry
         console.warn('Photo upload returned 0 — keeping in IndexedDB for retry', photo.photoId);
         photo._uploadFailed = true;
         addToPhotoRetryQueue(photo);
       }
     } catch(e) {
-      // Network failure or CORS issue — keep in IndexedDB
+      // Network failure or any error — restore dataUrl and keep for retry
       console.warn('Photo upload failed, keeping in IndexedDB:', e.message, photo.photoId);
-      photo.dataUrl = originalDataUrl; // restore if it was cleared
+      photo.dataUrl = originalDataUrl;
       photo._uploadFailed = true;
       addToPhotoRetryQueue(photo);
     }
@@ -1469,6 +1477,23 @@
     showFinalSyncOverlay('syncing');
     // Retry any individually-queued photos before the main sync
     await retryFailedPhotos();
+
+    // ── PHOTO INTEGRITY GATE ──────────────────────────────────────
+    // Any photo with neither a driveUrl nor a local dataUrl is LOST.
+    // Block the sync and show a hard error so the inspector knows.
+    const audit = auditPhotos(inspection);
+    if (audit.lost.length > 0) {
+      var lostDesc = audit.lost.map(function(p) {
+        return (p.roomName || p.context) + (p.caption ? ' — ' + p.caption : '');
+      }).join('\n');
+      showFinalSyncOverlay('photo-error', {
+        lostPhotos: audit.lost,
+        lostDesc: lostDesc
+      });
+      return; // do NOT proceed with sync
+    }
+    // ───────────────────────────────────────────────────────
+
     try {
       const exportData = buildExportJSON();
       const success = await submitInspection(exportData);
@@ -1532,10 +1557,26 @@
       dismissBtn.onclick = function() { overlay.remove(); };
       overlay.appendChild(dismissBtn);
 
+    } else if (state === 'photo-error') {
+      // Hard block — photos are lost (no local data, no Drive URL)
+      overlay.style.background = '#7f1d1d';
+      overlay.style.color = '#fff';
+      var lostCount = receipt && receipt.lostPhotos ? receipt.lostPhotos.length : 0;
+      overlay.innerHTML = '📸' +
+        '<div style="font-size:1.4rem;font-weight:800;text-align:center;margin-bottom:8px;">PHOTO ERROR — DO NOT CLOSE APP</div>' +
+        '<div style="color:#fca5a5;font-size:0.95rem;margin-bottom:16px;text-align:center;">' +
+          lostCount + ' photo' + (lostCount === 1 ? '' : 's') + ' cannot be found on device or in Drive.<br>' +
+          'Do NOT close this app. Call Matt now.' +
+        '</div>' +
+        '<div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;width:100%;max-width:420px;font-size:0.82rem;color:#fca5a5;white-space:pre-wrap;">' +
+          (receipt && receipt.lostDesc ? receipt.lostDesc : '') +
+        '</div>';
+      // No dismiss button — inspector must not close the app
+
     } else { // failed
       overlay.style.background = '#7f1d1d';
       overlay.style.color = '#fff';
-      overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:12px;">❌</div>' +
+      overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:12px;">\u274C</div>' +
         '<div style="font-size:1.4rem;font-weight:800;text-align:center;">Final sync FAILED</div>' +
         '<div style="color:#fca5a5;font-size:0.95rem;margin-top:6px;margin-bottom:4px;text-align:center;">Do NOT leave the app yet</div>' +
         receiptCard(receipt);
@@ -1549,6 +1590,39 @@
 
     document.body.appendChild(overlay);
     return overlay;
+  }
+
+  // ── Photo integrity audit — runs before any final sync —————————————————
+  // Rule: every photo must have EITHER a driveUrl (safe in Drive)
+  //       OR a non-empty dataUrl (safe on device).
+  // Any photo with neither is LOST and must block the sync with a hard error.
+  function auditPhotos(insp) {
+    const lost = [];
+    const pending = []; // have dataUrl but not yet uploaded
+    function checkArr(arr, context) {
+      if (!Array.isArray(arr)) return;
+      arr.forEach(function(p) {
+        if (!p || !p.photoId) return;
+        const hasDrive = p.driveUrl && p.driveUrl.length > 0;
+        const hasLocal = p.dataUrl && p.dataUrl !== '__uploaded__';
+        if (!hasDrive && !hasLocal) {
+          lost.push({ photoId: p.photoId, context, caption: p.caption || '', roomName: p.roomName || '' });
+        } else if (!hasDrive && hasLocal) {
+          pending.push({ photoId: p.photoId, context });
+        }
+      });
+    }
+    if (insp && insp.stepData) {
+      Object.entries(insp.stepData).forEach(function([stepId, stepData]) {
+        Object.values(stepData || {}).forEach(function(v) {
+          if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
+            checkArr(v, stepId);
+          }
+        });
+      });
+    }
+    if (insp && insp.sparePhotos) checkArr(insp.sparePhotos, 'spare');
+    return { lost, pending };
   }
 
   // Change 4: Final sync receipt
@@ -1576,7 +1650,7 @@
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v89',
+      appVersion: 'v90',
       success: success
     };
   }
