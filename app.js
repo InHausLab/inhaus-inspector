@@ -594,18 +594,18 @@
       divider(),
       heading('Water Panel'),
       yesno('waterPanelCollected', 'Water panel collected'),
-      showIf(text('waterSampleId', 'Sample ID / label'), 'waterPanelCollected', 'Yes'),
+      showIf({ type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Water Panel Sample ID' }, 'waterPanelCollected', 'Yes'),
       showIf(text('waterFaucetLocation', 'Faucet location'), 'waterPanelCollected', 'Yes'),
       showIf(photo('Water Panel'), 'waterPanelCollected', 'Yes'),
       divider(),
       heading('Microplastics Test'),
       radio('microplasticsStatus', 'Microplastics test', ['Collected', 'Not requested']),
-      showIf(text('microplasticsSampleId', 'Sample ID'), 'microplasticsStatus', 'Collected'),
+      showIf({ type: 'sample-id-scanner', dataKey: 'microplasticsSampleId', label: 'Microplastics Sample ID' }, 'microplasticsStatus', 'Collected'),
       divider(),
       heading('PFAS Test'),
       info('Reminder: Collect PFAS sample from kitchen faucet (should have been draining since Device Setup)'),
       radio('pfasStatus', 'PFAS test', ['Collected', 'Not requested']),
-      showIf(text('pfasSampleId', 'Sample ID'), 'pfasStatus', 'Collected'),
+      showIf({ type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS Sample ID' }, 'pfasStatus', 'Collected'),
       textarea('notes', 'Notes')
     ];
   }

@@ -1232,6 +1232,121 @@
         };
         return btn;
       }
+      case 'sample-id-scanner': {
+        // Photo → AI reads sample ID → inspector confirms
+        // f.dataKey: where to store the confirmed ID string
+        // f.label: display label (e.g. 'Sample ID')
+        const dataKey = f.dataKey || 'sampleId';
+        const labelText = f.label || 'Sample ID';
+
+        const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+        const wrap = document.createElement('div');
+        wrap.style = 'background:#f0f7ff;border:2px solid #93c5fd;border-radius:12px;padding:14px;margin:4px 0 8px;';
+
+        // Header
+        const hdr = document.createElement('div');
+        hdr.style = 'font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;';
+        hdr.textContent = labelText;
+
+        // File input (hidden)
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.style = 'display:none;';
+
+        // Preview
+        const previewWrap = document.createElement('div');
+        previewWrap.style = 'position:relative;margin-bottom:10px;display:none;';
+        const preview = document.createElement('img');
+        preview.style = 'width:100%;border-radius:8px;border:1.5px solid #93c5fd;max-height:140px;object-fit:cover;';
+        const retakeBtn = document.createElement('button');
+        retakeBtn.type = 'button';
+        retakeBtn.style = 'position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;';
+        retakeBtn.textContent = '\u21a9 Retake';
+        retakeBtn.onclick = () => inp.click();
+        previewWrap.appendChild(preview); previewWrap.appendChild(retakeBtn);
+
+        // Shoot button
+        const shootBtn = document.createElement('button');
+        shootBtn.type = 'button';
+        shootBtn.style = 'width:100%;padding:10px;background:#1e40af;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:0.9rem;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;';
+        shootBtn.innerHTML = '\uD83D\uDCF7 Scan Sample Label';
+
+        // Status
+        const status = document.createElement('div');
+        status.style = 'font-size:0.82rem;margin-bottom:8px;min-height:18px;';
+        if (data[dataKey]) {
+          shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
+          status.textContent = '\u2713 ID confirmed';
+          status.style += 'color:#15803d;font-weight:600;';
+        }
+
+        // Confirm row (editable field)
+        const confirmRow = document.createElement('div');
+        confirmRow.style = 'margin-top:4px;' + (data[dataKey] ? '' : 'display:none;');
+        const confirmLbl = document.createElement('div');
+        confirmLbl.style = 'font-size:11px;font-weight:600;color:#1e40af;margin-bottom:3px;';
+        confirmLbl.textContent = 'Confirm ID \u2014 correct if needed';
+        const confirmInp = document.createElement('input');
+        confirmInp.type = 'text';
+        confirmInp.style = 'width:100%;padding:9px 12px;border:2px solid #93c5fd;border-radius:8px;font-size:1rem;font-weight:700;letter-spacing:.5px;background:#fff;box-sizing:border-box;';
+        confirmInp.value = data[dataKey] || '';
+        confirmInp.placeholder = 'e.g. WP-123456';
+        confirmInp.addEventListener('input', () => { data[dataKey] = confirmInp.value; onChange(); });
+        confirmRow.appendChild(confirmLbl); confirmRow.appendChild(confirmInp);
+
+        inp.onchange = async e => {
+          const file = e.target.files[0]; if (!file) return;
+          inp.value = '';
+          shootBtn.disabled = true;
+          status.textContent = '\u23f3 Reading label...';
+          status.style.color = '#92400e';
+          status.style.fontWeight = '600';
+          try {
+            const dataUrl = await compressImage(file);
+            // store photo reference
+            data[dataKey + '_photo'] = { dataUrl, timestamp: new Date().toISOString() };
+            preview.src = dataUrl;
+            previewWrap.style.display = '';
+            shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
+            const prompt = 'This is a water testing sample label or chain-of-custody form. Extract the sample ID, bottle number, or accession number. Return JSON with one key: sampleId (string). Return ONLY the JSON. If you cannot read a number, return {"sampleId": null}.';
+            const resp = await fetch(PROXY_URL, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ imageBase64: dataUrl.split(',')[1], mimeType: 'image/jpeg', prompt })
+            });
+            const result = await resp.json();
+            const txt = result.content && result.content[0] && result.content[0].text;
+            const parsed = JSON.parse(txt);
+            if (parsed.sampleId) {
+              data[dataKey] = parsed.sampleId;
+              confirmInp.value = parsed.sampleId;
+              confirmRow.style.display = '';
+              status.textContent = '\u2713 ID read \u2014 confirm below';
+              status.style.color = '#15803d';
+            } else {
+              confirmRow.style.display = '';
+              confirmInp.value = data[dataKey] || '';
+              status.textContent = '\u26a0\ufe0f Could not read ID \u2014 type it below';
+              status.style.color = '#b45309';
+            }
+            onChange();
+          } catch (err) {
+            confirmRow.style.display = '';
+            status.textContent = '\u26a0\ufe0f Scan failed \u2014 type ID below';
+            status.style.color = '#b45309';
+          } finally {
+            shootBtn.disabled = false;
+          }
+        };
+        shootBtn.onclick = () => inp.click();
+
+        wrap.appendChild(hdr);
+        wrap.appendChild(inp);
+        wrap.appendChild(previewWrap);
+        wrap.appendChild(shootBtn);
+        wrap.appendChild(status);
+        wrap.appendChild(confirmRow);
+        return wrap;
+      }
       case 'flir-photo-log': {
         // Dynamic FLIR log: starts with 1 entry, + Add button appends more
         // Stores data as flirRoom1/flirImg1/flirImageLabel1, flirRoom2... etc.
