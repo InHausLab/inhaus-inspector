@@ -281,8 +281,8 @@
       ]},
       divider(),
 
-      // ── DATA: WiFi password (for Airthings + device connectivity) ──
-      text('wifiPassword', 'Home WiFi Password', { placeholder: 'e.g. MyWiFi2024! (for device connectivity during inspection)' }),
+      // ── WiFi quick-copy (entered at intake — no re-entry needed) ──
+      { type: 'wifi-copy' },
       divider(),
 
       // ── PROCESS: Airthings setup ──────────────────────────
@@ -352,8 +352,7 @@
       photo('Outdoor Spore Trap Setup', '_outdoorSporePhotos'),
       divider(),
       heading('Q-Trak Outdoor Measurement'),
-      check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template'),
-      timer('qtrakOutdoorTimer', 'Q-Trak Outdoor Timer (1 min)', 60),
+      check('qtrakOutdoorDone', 'Take 1-min outdoor measurement using outdoor room template (Q-Trak has built-in timer)'),
       divider(),
       collapsible('🔍 What to Look For', [
         checklist('exteriorGuidance', null, [
@@ -438,40 +437,42 @@
       divider(),
       heading('HVAC System'),
       yesno('forcedHVAC', 'Forced HVAC System present?'),
-      sel('heatingType', 'Heating Source Type', ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)']),
-      sel('acType', 'Air Conditioning Source Type', ['Central AC', 'Ductless Mini-Split System', 'Window AC Unit(s)', 'Portable AC Unit(s)', 'Heat Pump (Cooling Mode)', 'No Air Conditioning', 'Other (specify)']),
-      checklist('ventilationType', 'Ventilation Type', [
+      showIf(sel('heatingType', 'Heating Source Type', ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)']), 'forcedHVAC', 'Yes'),
+      showIf(sel('acType', 'Air Conditioning Source Type', ['Central AC', 'Ductless Mini-Split System', 'Window AC Unit(s)', 'Portable AC Unit(s)', 'Heat Pump (Cooling Mode)', 'No Air Conditioning', 'Other (specify)']), 'forcedHVAC', 'Yes'),
+      showIf(checklist('ventilationType', 'Ventilation Type', [
         { key: 'bathExhaust', label: 'Bathroom Exhaust Fan(s)' },
         { key: 'hrv', label: 'HRV (Heat Recovery Ventilator)' },
         { key: 'erv', label: 'ERV (Energy Recovery Ventilator)' },
         { key: 'ventNone', label: 'None' },
         { key: 'ventNotSure', label: 'Not sure' }
-      ]),
-      divider(),
-      heading('HVAC Filter'),
-      { type: 'ai-hvac-scanner' },
-      text('hvacManufacturer', 'Manufacturer'),
-      text('hvacModel', 'Model number'),
-      text('hvacSerial', 'Serial number'),
-      text('filterSize', 'Filter size'),
-      num('mervRating', 'MERV rating'),
-      text('filterMakeModel', 'Filter make / model / brand'),
-      sel('filterCondition', 'Filter condition', ['Clean', 'Dirty', 'Very Dirty', 'Damaged']),
-      sel('filterEstimatedAge', 'Estimated filter age', ['New', 'Less than 6 months', '6-12 months', 'Over 1 year']),
-      yesno('filterRecallFlag', 'Recall notice visible?'),
-      textarea('filterNotes', 'Filter notes'),
-      check('filterCleaned', 'Filters checked and cleaned if needed'),
-      photo('HVAC Filter', '_hvacFilterPhotos'),
-      divider(),
-      heading('HVAC Inspection'),
-      { type: 'process-checklist', title: 'HVAC Inspection Steps', items: [
+      ]), 'forcedHVAC', 'Yes'),
+      showIf(divider(), 'forcedHVAC', 'Yes'),
+      showIf(heading('HVAC Filter'), 'forcedHVAC', 'Yes'),
+      showIf({ type: 'ai-hvac-scanner' }, 'forcedHVAC', 'Yes'),
+      showIf(info('📍 After scanning: confirm the unit below matches the correct location in the home.'), 'forcedHVAC', 'Yes'),
+      showIf(text('hvacUnitLocation', 'Unit location (confirm)', { placeholder: 'e.g. Basement furnace, Attic air handler, Hallway closet' }), 'forcedHVAC', 'Yes'),
+      showIf(text('hvacManufacturer', 'Manufacturer'), 'forcedHVAC', 'Yes'),
+      showIf(text('hvacModel', 'Model number'), 'forcedHVAC', 'Yes'),
+      showIf(text('hvacSerial', 'Serial number'), 'forcedHVAC', 'Yes'),
+      showIf(text('filterSize', 'Filter size'), 'forcedHVAC', 'Yes'),
+      showIf(num('mervRating', 'MERV rating'), 'forcedHVAC', 'Yes'),
+      showIf(text('filterMakeModel', 'Filter make / model / brand'), 'forcedHVAC', 'Yes'),
+      showIf(sel('filterCondition', 'Filter condition', ['Clean', 'Dirty', 'Very Dirty', 'Damaged']), 'forcedHVAC', 'Yes'),
+      showIf(sel('filterEstimatedAge', 'Estimated filter age', ['New', 'Less than 6 months', '6-12 months', 'Over 1 year']), 'forcedHVAC', 'Yes'),
+      showIf(yesno('filterRecallFlag', 'Recall notice visible?'), 'forcedHVAC', 'Yes'),
+      showIf(textarea('filterNotes', 'Filter notes'), 'forcedHVAC', 'Yes'),
+      showIf(check('filterCleaned', 'Filters checked and cleaned if needed'), 'forcedHVAC', 'Yes'),
+      showIf(photo('HVAC Filter', '_hvacFilterPhotos'), 'forcedHVAC', 'Yes'),
+      showIf(divider(), 'forcedHVAC', 'Yes'),
+      showIf(heading('HVAC Inspection'), 'forcedHVAC', 'Yes'),
+      showIf({ type: 'process-checklist', title: 'HVAC Inspection Steps', items: [
         { key: 'servicePanelRemoved', label: 'Service panel removed' },
         { key: 'filtersChecked', label: 'Filters checked' }
-      ]},
-      yesno('hvacCondensation', 'Condensation noted'),
-      yesno('hvacLeaks', 'Leaks noted'),
-      text('hvacDetails', 'Notable details'),
-      photo('HVAC Inspection', '_hvacInspPhotos'),
+      ]}, 'forcedHVAC', 'Yes'),
+      showIf(yesno('hvacCondensation', 'Condensation noted'), 'forcedHVAC', 'Yes'),
+      showIf(yesno('hvacLeaks', 'Leaks noted'), 'forcedHVAC', 'Yes'),
+      showIf(text('hvacDetails', 'Notable details'), 'forcedHVAC', 'Yes'),
+      showIf(photo('HVAC Inspection', '_hvacInspPhotos'), 'forcedHVAC', 'Yes'),
       divider(),
       radio('radonMitigationPresent', 'Radon mitigation system present', ['Yes - Active', 'Yes - Passive', 'No', 'Unknown', 'Other']),
       showIf(text('radonMitigationOther', 'Please specify'), 'radonMitigationPresent', 'Other'),
@@ -1588,7 +1589,7 @@
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v86',
+      appVersion: 'v87',
       success: success
     };
   }
