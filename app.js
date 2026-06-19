@@ -612,7 +612,8 @@
 
   function getAtpKitchenFields() {
     return [
-      text('atpSurface', 'Surface tested', { required: true }),
+      sel('atpSurface', 'Surface tested *', ['Kitchen counter', 'Kitchen sink', 'Bathroom counter', 'Bathroom sink', 'Other']),
+      showIf(text('atpSurfaceOther', 'Describe surface', { placeholder: 'e.g. Laundry room sink', required: true }), 'atpSurface', 'Other'),
       info('\u26a0\ufe0f Both a Before photo and After photo are required for each ATP test.'),
       num('atpPreRLU', 'Pre-test RLU reading', { unit: 'RLU' }),
       radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
