@@ -1232,6 +1232,105 @@
         };
         return btn;
       }
+      case 'boulder-blue-duration': {
+        // Auto-calculates duration from start time (arrival step) + end time (current data)
+        // Updates whenever boulderBlueEndTime changes
+        const wrap = document.createElement('div');
+        wrap.style = 'background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:14px;margin:4px 0 8px;';
+
+        function calcDuration(startStr, endStr) {
+          if (!startStr || !endStr) return null;
+          const toMins = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+          let diff = toMins(endStr) - toMins(startStr);
+          if (diff < 0) diff += 24 * 60; // crossed midnight
+          const hrs = Math.floor(diff / 60);
+          const mins = diff % 60;
+          return hrs + ' hr' + (hrs !== 1 ? 's' : '') + (mins ? ' ' + mins + ' min' : '');
+        }
+
+        function getStartTime() {
+          return (window.inspection &&
+            window.inspection.stepData &&
+            window.inspection.stepData.arrival &&
+            window.inspection.stepData.arrival.boulderBlueStartTime) || '';
+        }
+
+        const hdr = document.createElement('div');
+        hdr.style = 'font-size:12px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;';
+        hdr.textContent = 'Test Duration';
+
+        const startRow = document.createElement('div');
+        startRow.style = 'font-size:0.85rem;color:#6a7a60;margin-bottom:8px;';
+
+        const durationDisplay = document.createElement('div');
+        durationDisplay.style = 'font-size:1.6rem;font-weight:800;color:#15803d;margin-bottom:8px;min-height:2rem;';
+
+        const warnBanner = document.createElement('div');
+        warnBanner.style = 'font-size:0.82rem;font-weight:600;padding:6px 10px;border-radius:7px;margin-bottom:8px;display:none;';
+
+        const confirmRow = document.createElement('div');
+        confirmRow.style = 'margin-top:4px;';
+        const confirmLbl = document.createElement('div');
+        confirmLbl.style = 'font-size:11px;font-weight:600;color:#15803d;margin-bottom:3px;';
+        confirmLbl.textContent = 'Confirm duration \u2014 edit if needed';
+        const confirmInp = document.createElement('input');
+        confirmInp.type = 'text';
+        confirmInp.style = 'width:100%;padding:9px 12px;border:2px solid #86efac;border-radius:8px;font-size:1rem;font-weight:700;background:#fff;box-sizing:border-box;';
+        confirmInp.value = data.boulderBlueTestDuration || '';
+        confirmInp.placeholder = 'e.g. 2 hrs 15 min';
+        confirmInp.addEventListener('input', () => { data.boulderBlueTestDuration = confirmInp.value; onChange(); });
+        confirmRow.appendChild(confirmLbl); confirmRow.appendChild(confirmInp);
+
+        function refresh() {
+          const start = getStartTime();
+          const end = data.boulderBlueEndTime || '';
+          startRow.textContent = start ? 'Start: ' + start + (end ? ' \u2192 End: ' + end : '') : 'Start time not set in Arrival step';
+          if (start && end) {
+            const dur = calcDuration(start, end);
+            const mins = (() => { const [h,m] = start.split(':').map(Number); const [eh,em] = end.split(':').map(Number); let d=(eh*60+em)-(h*60+m); if(d<0)d+=1440; return d; })();
+            durationDisplay.textContent = dur;
+            data.boulderBlueTestDuration = dur;
+            confirmInp.value = dur;
+            confirmRow.style.display = '';
+            if (mins < 120) {
+              warnBanner.style.display = 'block';
+              warnBanner.style.background = '#fef9c3';
+              warnBanner.style.color = '#854d0e';
+              warnBanner.textContent = '\u26a0\ufe0f Only ' + dur + ' \u2014 minimum is 2 hours';
+            } else {
+              warnBanner.style.display = 'block';
+              warnBanner.style.background = '#dcfce7';
+              warnBanner.style.color = '#15803d';
+              warnBanner.textContent = '\u2713 Meets 2-hour minimum';
+            }
+          } else {
+            durationDisplay.textContent = '\u2014';
+            warnBanner.style.display = 'none';
+            confirmRow.style.display = end ? '' : 'none';
+          }
+        }
+
+        // Watch boulderBlueEndTime changes via MutationObserver on the end-time input
+        // Use a small polling approach on the parent card's end-time field
+        let lastEnd = data.boulderBlueEndTime || '';
+        const pollInterval = setInterval(() => {
+          const currentEnd = data.boulderBlueEndTime || '';
+          if (currentEnd !== lastEnd) { lastEnd = currentEnd; refresh(); }
+        }, 500);
+        // Clean up on detach
+        const observer = new MutationObserver(() => {
+          if (!document.body.contains(wrap)) { clearInterval(pollInterval); observer.disconnect(); }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        refresh();
+        wrap.appendChild(hdr);
+        wrap.appendChild(startRow);
+        wrap.appendChild(durationDisplay);
+        wrap.appendChild(warnBanner);
+        wrap.appendChild(confirmRow);
+        return wrap;
+      }
       case 'sample-id-scanner': {
         // Photo → AI reads sample ID → inspector confirms
         // f.dataKey: where to store the confirmed ID string
@@ -2159,7 +2258,7 @@
               ? roomFindings.map(r => '- ' + r.room + ': ' + r.findings).join('\n')
               : 'No specific room concerns flagged.';
 
-            const prompt = 'You are a professional home health inspector writing a follow-up plan for a client.\n\n'
+            const prompt = 'You are a professional home health inspector writing a follow-up plan for a client. Write in plain, natural prose — no bullet points, no asterisks, no markdown, no bold, no headers with pound signs or dashes. Write like a professional writing a note, not like an AI generating a report.\n\n'
               + 'Property: ' + facts.address + '\n'
               + 'Year Built: ' + (facts.yearBuilt || 'Unknown') + '\n'
               + 'Water Source: ' + (facts.waterSource || 'Unknown') + '\n'
@@ -2167,11 +2266,13 @@
               + 'HVAC Filter Condition: ' + (facts.hvacFilterCondition || 'Not recorded') + '\n\n'
               + 'Concerns flagged during this inspection:\n' + findingsText + '\n\n'
               + 'Instructions:\n'
-              + '- Create an actionable follow-up plan grouped by timeframe: Immediate (30 days), 3-6 Months, 12 Months, Annual.\n'
-              + '- Only include items that need follow-up based on actual findings above.\n'
-              + '- For each item: what to check, why it matters, what test or inspection is needed.\n'
-              + '- End with one sentence on overall home health status.\n'
-              + '- Be direct and specific. No generic filler. Use bullet points.';
+              + '- Write in plain paragraphs grouped by timeframe: Immediate (within 30 days), 3 to 6 months, 12 months, and annually.\n'
+              + '- Only include timeframes that have actual items based on the findings above. Skip empty timeframes.\n'
+              + '- For each item explain what to check, why it matters, and what action is needed.\n'
+              + '- End with one sentence summarizing the overall home health status.\n'
+              + '- Do not use bullet points, asterisks, dashes as list markers, markdown formatting, or any special characters for emphasis. Plain text only.\n'
+              + '- Write each timeframe as a short label followed by a colon, then the items in sentence form. Example: Immediate: The kitchen faucet showed elevated lead levels and should be retested within 30 days using a certified lab.\n'
+              + '- Be direct and specific. No generic filler sentences.';
 
             try {
               const resp = await fetch(PROXY_URL, {
