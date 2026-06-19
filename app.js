@@ -1218,15 +1218,19 @@
   function extractAllPhotosFromExport(exportData) {
     const photos = [];
     function pickPhoto(p, fallbackRoomName) {
-      // Skip photos already uploaded (dataUrl cleared to '__uploaded__')
-      if (!p.imageData || p.imageData === '__uploaded__') return null;
+      // Include already-uploaded photos (they have driveUrl but dataUrl cleared)
+      const hasData = p.imageData && p.imageData !== '__uploaded__';
+      const hasDrive = p.driveUrl;
+      if (!hasData && !hasDrive) return null;
       return {
         photoId: p.photoId || '',
-        imageData: p.imageData || '',
+        imageData: hasData ? p.imageData : '',
         caption: p.caption || '',
         roomName: p.roomName || fallbackRoomName || '',
         stepName: p.stepName || '',
-        timestamp: p.timestamp || ''
+        timestamp: p.timestamp || '',
+        driveUrl: p.driveUrl || null,
+        driveId: p.driveId || null
       };
     }
     function extractFromSection(s, fallbackRoomName) {
@@ -1300,7 +1304,11 @@
     try {
       const result = await doUpload();
       if (result && result.photosUploaded > 0) {
-        // CONFIRMED: Drive has the photo
+        // CONFIRMED: Drive has the photo — store the Drive URL so the portal can render it
+        if (result.photos && result.photos.length > 0 && result.photos[0].driveUrl) {
+          photo.driveUrl = result.photos[0].driveUrl;
+          photo.driveId  = result.photos[0].driveId || '';
+        }
         photo._driveConfirmed = true;
         photo._uploaded = true;
         photo.dataUrl = '__uploaded__';
@@ -1568,7 +1576,7 @@
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v88',
+      appVersion: 'v89',
       success: success
     };
   }
@@ -3079,7 +3087,8 @@
     function exportPhotos(arr) {
       return arr.map(p => ({
         photoId: p.photoId, roomName: p.roomName, stepName: p.stepName,
-        timestamp: p.timestamp, caption: p.caption, imageData: p.dataUrl
+        timestamp: p.timestamp, caption: p.caption, imageData: p.dataUrl,
+        driveUrl: p.driveUrl || null, driveId: p.driveId || null
       }));
     }
     for (const [k, v] of Object.entries(data)) {
