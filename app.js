@@ -165,10 +165,16 @@
     ];
   }
 
-  function followUpFields() {
+  function followUpFields(staticLabel) {
+    // staticLabel: pass a string for fixed-name steps (e.g. 'Kitchen', 'Utility Room')
+    // omit/null for dynamic room steps — a live label reads data.roomName instead
+    const labelField = staticLabel
+      ? info('\uD83D\uDCCD Follow-up for: ' + staticLabel)
+      : { type: 'dynamic-room-label' };
     return [
       divider(),
       heading('Follow-Up'),
+      labelField,
       yesno('followUpNeeded', 'Follow-up recommended?'),
       showIf(sel('followUpTimeframe', 'Re-check in', ['3 months', '6 months', '12 months']), 'followUpNeeded', 'Yes'),
       showIf(textarea('followUpNote', 'What to watch for', { placeholder: 'e.g. Previous leak under sink, monitor for moisture return... (tap \uD83C\uDF99 mic in keyboard, read back before saving)' }), 'followUpNeeded', 'Yes'),
@@ -481,6 +487,7 @@
       showIf(photo('Water Softening', '_waterSoftPhotos'), 'waterSofteningPresent', 'Yes'),
       textarea('notes', 'General notes'),
       photo('Utility Room', '_utilityRoomPhotos'),
+      ...followUpFields('Utility Room'),
       { type: 'ai-room-summary' }
     ];
   }
@@ -642,7 +649,7 @@
       ...qtrakSection(),
       ...formaldehydeField(),
       ...observationFields(),
-      ...followUpFields(),
+      ...followUpFields('Kitchen'),
       { type: 'ai-room-summary' }
     ];
   }

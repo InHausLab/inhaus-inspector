@@ -1232,6 +1232,28 @@
         };
         return btn;
       }
+      case 'dynamic-room-label': {
+        // Renders a contextual label showing which room the follow-up is for
+        const wrap = document.createElement('div');
+        wrap.style = 'background:#fff8e1;border:1.5px solid #f59e0b;border-radius:8px;padding:9px 13px;margin:4px 0 2px;display:flex;align-items:center;gap:8px;';
+        const icon = document.createElement('span');
+        icon.textContent = '📍';
+        icon.style = 'font-size:1.1rem;flex-shrink:0;';
+        const lbl = document.createElement('span');
+        lbl.style = 'font-size:0.9rem;font-weight:600;color:#92400e;';
+        const roomName = data.roomName || data.roomNames || data.levelLocation || '';
+        lbl.textContent = roomName
+          ? 'Follow-up for: ' + roomName
+          : 'Follow-up for this room / area';
+        wrap.appendChild(icon); wrap.appendChild(lbl);
+        // Keep live — update if roomName changes
+        const obs = new MutationObserver(() => {
+          const rn = data.roomName || data.roomNames || data.levelLocation || '';
+          lbl.textContent = rn ? 'Follow-up for: ' + rn : 'Follow-up for this room / area';
+        });
+        obs.observe(wrap.closest('.card') || document.body, { subtree: true, childList: true, characterData: true });
+        return wrap;
+      }
       case 'wifi-copy': {
         const panel = document.createElement('div');
         panel.style = 'background:#f0f7ff;border-radius:8px;padding:10px 12px;margin:4px 0 8px;';
