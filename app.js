@@ -4,7 +4,7 @@
 
   // ── Google Drive Export Config ─────────────────────────────
   // Set this to your Google Apps Script web app URL
-  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwsRP4-RBAuldMh_BkNlbAkZyMLDz8ohNM1WwIRfB1ROz9JHGYjYsZdVNbgy98-d4gu8Q/exec';
+  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxh6xtKg3FKjoHzi6jbJ_8RmjIgihgvcgeG8jGrFWweGcD3iwjV9voLVj0cmy5VeczuPw/exec';
 
   // ── Google Shared Drive Config ──────────────────────────────
   // Set this to the Shared Drive folder ID where per-assessment subfolders should be created.
