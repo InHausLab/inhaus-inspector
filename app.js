@@ -2437,12 +2437,86 @@
           try {
             const dataUrl = await UI.compressImage ? UI.compressImage(e.target.files[0]) : new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
             if (!inspection.sparePhotos) inspection.sparePhotos = [];
-            const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name) };
+            const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name), assignedSlot: null };
             inspection.sparePhotos.push(sp);
             saveNow();
-            showToast('\uD83D\uDCF8 Spare photo saved - sort it later in Review');
-            // Save to device camera roll
             if (window.savePhotoToDevice) window.savePhotoToDevice(dataUrl, sp.photoId);
+
+            // ── Quick-assign sheet ──────────────────────────────────
+            const SPARE_SLOTS_CAPTURE = [
+              ...Array.from({length:6}, (_,i) => ({ value: 'obs_' + (i+1),         label: 'Observation ' + (i+1) })),
+              ...Array.from({length:6}, (_,i) => ({ value: 'actionTaken_' + (i+1), label: 'Action Taken ' + (i+1) })),
+              ...Array.from({length:5}, (_,i) => ({ value: 'followUp_' + (i+1),    label: 'Follow-up ' + (i+1) }))
+            ];
+
+            const overlay = document.createElement('div');
+            overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+
+            const sheet = document.createElement('div');
+            sheet.style = 'background:#fff;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:480px;box-sizing:border-box;';
+
+            const preview = document.createElement('img');
+            preview.src = dataUrl;
+            preview.style = 'width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:14px;';
+            sheet.appendChild(preview);
+
+            const sheetTitle = document.createElement('div');
+            sheetTitle.style = 'font-size:1rem;font-weight:800;color:#1e293b;margin-bottom:4px;';
+            sheetTitle.textContent = '📸 Assign spare photo';
+            sheet.appendChild(sheetTitle);
+
+            const sheetSub = document.createElement('div');
+            sheetSub.style = 'font-size:12px;color:#64748b;margin-bottom:14px;';
+            sheetSub.textContent = 'Pick a section now or skip — you can assign it later in Review.';
+            sheet.appendChild(sheetSub);
+
+            const selEl = document.createElement('select');
+            selEl.style = 'width:100%;padding:12px;font-size:15px;font-family:inherit;border:2px solid #f59e0b;border-radius:8px;background:#fff;color:#1e293b;-webkit-appearance:none;appearance:none;margin-bottom:14px;box-sizing:border-box;';
+            const blankOpt2 = document.createElement('option');
+            blankOpt2.value = ''; blankOpt2.textContent = '— Skip for now —';
+            selEl.appendChild(blankOpt2);
+            SPARE_SLOTS_CAPTURE.forEach(slot => {
+              const opt = document.createElement('option');
+              opt.value = slot.value; opt.textContent = slot.label;
+              selEl.appendChild(opt);
+            });
+            sheet.appendChild(selEl);
+
+            const capInput = document.createElement('input');
+            capInput.type = 'text';
+            capInput.placeholder = 'Caption (optional)…';
+            capInput.style = 'width:100%;padding:12px;font-size:14px;font-family:inherit;border:1px solid #e5e7eb;border-radius:8px;box-sizing:border-box;margin-bottom:16px;';
+            sheet.appendChild(capInput);
+
+            const btnRow = document.createElement('div');
+            btnRow.style = 'display:flex;gap:10px;';
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.textContent = 'Save';
+            confirmBtn.style = 'flex:1;padding:14px;background:#f59e0b;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;touch-action:manipulation;';
+            confirmBtn.onclick = () => {
+              if (selEl.value) sp.assignedSlot = selEl.value;
+              if (capInput.value.trim()) sp.caption = capInput.value.trim();
+              saveNow();
+              document.body.removeChild(overlay);
+              showToast(selEl.value ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
+            };
+
+            const skipBtn = document.createElement('button');
+            skipBtn.type = 'button';
+            skipBtn.textContent = 'Skip';
+            skipBtn.style = 'padding:14px 20px;background:transparent;color:#64748b;border:1px solid #e5e7eb;border-radius:10px;font-size:1rem;cursor:pointer;touch-action:manipulation;';
+            skipBtn.onclick = () => {
+              document.body.removeChild(overlay);
+              showToast('📸 Spare photo saved — assign in Review');
+            };
+
+            btnRow.appendChild(confirmBtn);
+            btnRow.appendChild(skipBtn);
+            sheet.appendChild(btnRow);
+            overlay.appendChild(sheet);
+            document.body.appendChild(overlay);
           } catch(err) { console.error(err); }
         };
         document.body.appendChild(inp); inp.click(); setTimeout(() => inp.remove(), 2000);
