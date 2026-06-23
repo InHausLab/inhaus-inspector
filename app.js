@@ -1650,7 +1650,7 @@
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v90',
+      appVersion: 'v91',
       success: success
     };
   }
