@@ -1,7 +1,7 @@
 // InHaus Inspector - Main Application
 import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js';
 import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt } from './state.js';
-import { saveNow, scheduleSave, backupToLocalStorage } from './storage.js';
+import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js';
 import { buildExportJSON, extractAllPhotosFromExport, stripPhotosFromExport } from './inspection.js';
 import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js';
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js';
@@ -1672,6 +1672,8 @@ import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, va
   // buildExportJSON, cleanStepData → moved to inspection.js
 
   // ── Init ───────────────────────────────────────────────────
+  initStorage({ onSyncStatusChange: updateSyncStatus });
+
   window.addEventListener('online', () => {
     const badge = document.querySelector('.online-badge');
     if (badge) { badge.textContent = ''; badge.className = 'online-badge online'; }

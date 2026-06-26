@@ -1,8 +1,12 @@
 // InHaus Inspector - Storage (save/load/backup logic)
 import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js';
-import { updateSyncStatus } from './sync.js';
 
+let _onSyncStatusChange = null;
 let _saveTimeout = null;
+
+export function initStorage({ onSyncStatusChange }) {
+  _onSyncStatusChange = onSyncStatusChange;
+}
 
 function showSave(msg) {
   setLastSaveText(msg);
@@ -11,7 +15,7 @@ function showSave(msg) {
 }
 
 function showSaveError(msg) {
-  updateSyncStatus('failed');
+  _onSyncStatusChange('failed');
   // Legacy high-visibility banner so Dave notices immediately
   var banner = document.getElementById('save-error-banner');
   if (!banner) {
@@ -32,7 +36,7 @@ export async function saveNow() {
     await DB.save(inspection);
     setLastLocalSaveAt(Date.now()); // Change 1
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    updateSyncStatus('local'); // Change 2
+    _onSyncStatusChange('local'); // Change 2
     backupToLocalStorage(); // mirror to localStorage as secondary safety net
     // Clear any previous error banners
     const b = document.getElementById('save-error-banner');
