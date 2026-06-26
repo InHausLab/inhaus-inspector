@@ -7,15 +7,14 @@ import { scriptFetch, updateSyncStatus, uploadPhotoImmediate, checkpointToCloud,
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js';
 import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js';
 
-// UI globals (deferred — ui.js sets window.UI via IIFE, must destructure after load)
-let el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf;
+// UI globals — accessed lazily via ui() to guarantee window.UI is ready
+function ui() { return window.UI; }
 
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
 
 export function initScreens(context) {
   ctx = context;
-  ({ el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI);
 }
 
 // ── Room Navigation Drawer ─────────────────────────────────
@@ -40,23 +39,23 @@ export function buildRoomDrawer() {
     { label: 'Wrap-Up', phases: ['wrapup', 'propdetails', 'post', 'review'] }
   ];
 
-  const overlay = el('div', { id: 'room-drawer-overlay', className: 'room-drawer-overlay' });
-  const drawer = el('div', { className: 'room-drawer' });
+  const overlay = ui().el('div', { id: 'room-drawer-overlay', className: 'room-drawer-overlay' });
+  const drawer = ui().el('div', { className: 'room-drawer' });
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   drawer.addEventListener('click', e => e.stopPropagation());
 
-  drawer.appendChild(el('div', { className: 'room-drawer-handle' }));
-  drawer.appendChild(el('div', { className: 'room-drawer-title' }, '\uD83D\uDCCD Navigate'));
+  drawer.appendChild(ui().el('div', { className: 'room-drawer-handle' }));
+  drawer.appendChild(ui().el('div', { className: 'room-drawer-title' }, '\uD83D\uDCCD Navigate'));
 
-  const scrollArea = el('div', { className: 'room-drawer-scroll' });
+  const scrollArea = ui().el('div', { className: 'room-drawer-scroll' });
 
   DRAWER_GROUPS.forEach(group => {
     // All steps in this group's phases - no type restrictions (review included in Wrap-Up)
     const groupSteps = ctx.stepList.filter(s => group.phases.includes(s.phase));
     if (!groupSteps.length) return;
 
-    scrollArea.appendChild(el('div', { className: 'room-drawer-group-label' }, group.label));
+    scrollArea.appendChild(ui().el('div', { className: 'room-drawer-group-label' }, group.label));
 
     groupSteps.forEach(s => {
       const sData = (ctx.inspection.stepData && ctx.inspection.stepData[s.id]) || {};
@@ -76,7 +75,7 @@ export function buildRoomDrawer() {
         ctx.inspection.stepData && ctx.inspection.stepData[s.id] && ctx.inspection.stepData[s.id].roomName;
       const displayName = stepRoomName || s.name;
 
-      scrollArea.appendChild(el('div', {
+      scrollArea.appendChild(ui().el('div', {
         className: cls,
         onClick: () => {
           ctx.currentStepIdx = sIdx;
@@ -85,16 +84,16 @@ export function buildRoomDrawer() {
           window.scrollTo(0, 0);
         }
       }, [
-        el('span', { className: 'room-item-name' }, displayName),
-        statusText ? el('span', { className: 'room-item-status' + (completed ? ' status-done' : ' status-partial') }, statusText) : null
+        ui().el('span', { className: 'room-item-name' }, displayName),
+        statusText ? ui().el('span', { className: 'room-item-status' + (completed ? ' status-done' : ' status-partial') }, statusText) : null
       ]));
     });
 
     // Per-section add-room buttons (Lowest Level, Upper Level, Additional Rooms)
     if (group.addRooms && group.addRooms.length) {
-      const addRow = el('div', { className: 'room-drawer-section-add' });
+      const addRow = ui().el('div', { className: 'room-drawer-section-add' });
       group.addRooms.forEach(addDef => {
-        addRow.appendChild(el('button', {
+        addRow.appendChild(ui().el('button', {
           type: 'button',
           className: 'room-drawer-add-item-btn',
           onClick: () => {
@@ -132,25 +131,25 @@ export function openSearch() {
     }
   });
 
-  const overlay = el('div', { id: 'search-overlay', className: 'search-overlay' });
-  const panel = el('div', { className: 'search-panel' });
+  const overlay = ui().el('div', { id: 'search-overlay', className: 'search-overlay' });
+  const panel = ui().el('div', { className: 'search-panel' });
 
-  const inputRow = el('div', { className: 'search-input-row' });
-  const inp = el('input', {
+  const inputRow = ui().el('div', { className: 'search-input-row' });
+  const inp = ui().el('input', {
     type: 'search', className: 'search-input',
     placeholder: 'Search sections, fields, rooms\u2026',
     autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off'
   });
-  const closeBtn = el('button', {
+  const closeBtn = ui().el('button', {
     type: 'button', className: 'search-close-btn',
     onClick: () => overlay.remove()
   }, '\u00d7');
-  inputRow.appendChild(el('span', { className: 'search-icon-prefix' }, '\uD83D\uDD0D'));
+  inputRow.appendChild(ui().el('span', { className: 'search-icon-prefix' }, '\uD83D\uDD0D'));
   inputRow.appendChild(inp);
   inputRow.appendChild(closeBtn);
   panel.appendChild(inputRow);
 
-  const resultsList = el('div', { className: 'search-results-list' });
+  const resultsList = ui().el('div', { className: 'search-results-list' });
   panel.appendChild(resultsList);
   overlay.appendChild(panel);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
@@ -176,12 +175,12 @@ export function openSearch() {
     });
 
     if (!allMatches.length) {
-      resultsList.appendChild(el('div', { className: 'search-no-results' }, 'No results found'));
+      resultsList.appendChild(ui().el('div', { className: 'search-no-results' }, 'No results found'));
       return;
     }
 
     allMatches.slice(0, 25).forEach(item => {
-      resultsList.appendChild(el('div', {
+      resultsList.appendChild(ui().el('div', {
         className: 'search-result-item',
         onClick: () => {
           ctx.currentStepIdx = item.stepIdx;
@@ -190,13 +189,13 @@ export function openSearch() {
           window.scrollTo(0, 0);
         }
       }, [
-        el('div', { className: 'search-result-label' }, item.label),
-        item.context ? el('div', { className: 'search-result-context' }, 'In: ' + item.context) : null
+        ui().el('div', { className: 'search-result-label' }, item.label),
+        item.context ? ui().el('div', { className: 'search-result-context' }, 'In: ' + item.context) : null
       ]));
     });
 
     if (allMatches.length > 1) {
-      resultsList.appendChild(el('button', {
+      resultsList.appendChild(ui().el('button', {
         type: 'button', className: 'btn btn-primary btn-full search-next-btn',
         onClick: () => {
           matchCursor = (matchCursor + 1) % allMatches.length;
@@ -233,41 +232,41 @@ function toggleDevMode() {
   const next = !isDevMode();
   localStorage.setItem('inhausDevMode', next ? 'true' : 'false');
   const msg = next ? '\u26a0\ufe0f Dev Mode ON \u2014 Skip buttons active' : 'Dev Mode OFF';
-  window.UI && window.UI.showToast(msg);
+  ui().showToast(msg);
   ctx.render();
 }
 
 export function buildAppHeader(subtitle) {
-  const header = el('div', { className: 'app-header' });
-  const logo = el('div', { className: 'app-logo', style: 'cursor:pointer;', onClick: () => {
+  const header = ui().el('div', { className: 'app-header' });
+  const logo = ui().el('div', { className: 'app-logo', style: 'cursor:pointer;', onClick: () => {
     _devTapCount++;
     if (_devTapTimer) clearTimeout(_devTapTimer);
     _devTapTimer = setTimeout(() => { _devTapCount = 0; }, 2000);
     if (_devTapCount >= 5) { _devTapCount = 0; toggleDevMode(); }
   }});
-  logo.appendChild(el('img', { src: 'icons/logo.png', alt: 'InHaus Lab' }));
+  logo.appendChild(ui().el('img', { src: 'icons/logo.png', alt: 'InHaus Lab' }));
   header.appendChild(logo);
   if (isDevMode()) {
-    const banner = el('div', { style: 'background:#ff9900;color:#000;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:4px;' }, '\u26a0\ufe0f DEV');
+    const banner = ui().el('div', { style: 'background:#ff9900;color:#000;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:4px;' }, '\u26a0\ufe0f DEV');
     header.appendChild(banner);
   }
-  header.appendChild(el('p', { className: 'app-subtitle' }, subtitle || 'Field Inspector'));
+  header.appendChild(ui().el('p', { className: 'app-subtitle' }, subtitle || 'Field Inspector'));
   return header;
 }
 
 // ── HOME SCREEN ────────────────────────────────────────────
 export function renderHome() {
-  const c = el('div', { className: 'screen home-screen' });
+  const c = ui().el('div', { className: 'screen home-screen' });
   c.appendChild(buildAppHeader());
 
-  c.appendChild(el('button', {
+  c.appendChild(ui().el('button', {
     className: 'btn btn-primary btn-full',
     onClick: () => { setScreen('truck-check'); ctx.render(); }
   }, 'New Inspection'));
 
   // ── Inspector mode toggle ─────────────────────────────────
   const isExp = localStorage.getItem('inhaus_experienced') === 'true';
-  const modeBtn = el('button', {
+  const modeBtn = ui().el('button', {
     className: 'btn btn-outline btn-full',
     style: 'margin-top:8px;font-size:0.85rem;color:#5a7a3a;border-color:#c8d8b8;',
     onClick: () => {
@@ -281,7 +280,7 @@ export function renderHome() {
   );
   c.appendChild(modeBtn);
 
-  const list = el('div', { className: 'inspection-list' });
+  const list = ui().el('div', { className: 'inspection-list' });
   c.appendChild(list);
 
   DB.getAll().then(all => {
@@ -290,15 +289,15 @@ export function renderHome() {
     const done = all.filter(x => x.status === 'completed');
 
     if (inProg.length) {
-      list.appendChild(el('h2', { className: 'list-heading' }, 'In Progress'));
+      list.appendChild(ui().el('h2', { className: 'list-heading' }, 'In Progress'));
       inProg.forEach(x => list.appendChild(renderInspCard(x, true)));
     }
     if (done.length) {
-      list.appendChild(el('h2', { className: 'list-heading' }, 'Completed'));
+      list.appendChild(ui().el('h2', { className: 'list-heading' }, 'Completed'));
       done.forEach(x => list.appendChild(renderInspCard(x, false)));
     }
     if (!all.length) {
-      list.appendChild(el('p', { className: 'empty-msg' }, 'No inspections yet. Tap "New Inspection" to begin.'));
+      list.appendChild(ui().el('p', { className: 'empty-msg' }, 'No inspections yet. Tap "New Inspection" to begin.'));
     }
   });
 
@@ -306,17 +305,17 @@ export function renderHome() {
 }
 
 export function renderInspCard(insp, canResume) {
-  return el('div', { className: 'card insp-card' }, [
-    el('div', { className: 'card-top' }, [
-      el('strong', null, insp.inspectionId),
-      el('span', { className: 'badge ' + insp.status }, insp.status === 'completed' ? 'Complete' : 'In Progress')
+  return ui().el('div', { className: 'card insp-card' }, [
+    ui().el('div', { className: 'card-top' }, [
+      ui().el('strong', null, insp.inspectionId),
+      ui().el('span', { className: 'badge ' + insp.status }, insp.status === 'completed' ? 'Complete' : 'In Progress')
     ]),
-    el('p', null, insp.propertyAddress || 'No address'),
-    el('p', { className: 'text-sm' }, (insp.inspectorName || '') + ' \u2022 ' + fmtDate(insp.startedAt)),
-    el('div', { className: 'card-actions' }, [
-      canResume ? el('button', { className: 'btn btn-primary', onClick: () => resumeInsp(insp.inspectionId) }, 'Resume') : null,
-      el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
-      el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
+    ui().el('p', null, insp.propertyAddress || 'No address'),
+    ui().el('p', { className: 'text-sm' }, (insp.inspectorName || '') + ' \u2022 ' + ui().fmtDate(insp.startedAt)),
+    ui().el('div', { className: 'card-actions' }, [
+      canResume ? ui().el('button', { className: 'btn btn-primary', onClick: () => resumeInsp(insp.inspectionId) }, 'Resume') : null,
+      ui().el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
+      ui().el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
         if (confirm('⚠️ Delete this inspection permanently?\n\nAll photos and data will be removed from this device.\n\nOnly delete after confirming your photos have been uploaded to Google Drive.\n\nThis cannot be undone.')) {
           DB.remove(insp.inspectionId).then(() => ctx.render());
         }
@@ -426,37 +425,37 @@ export function renderTruckCheck() {
     return allRequired.every(i => !!ctx._truckCheck[i.key]);
   }
 
-  const c = el('div', { className: 'screen' });
+  const c = ui().el('div', { className: 'screen' });
   c.appendChild(buildAppHeader());
 
   // Reset / back link
-  const resetBar = el('div', { className: 'truck-check-reset-bar' });
-  const resetLink = el('button', {
+  const resetBar = ui().el('div', { className: 'truck-check-reset-bar' });
+  const resetLink = ui().el('button', {
     className: 'btn-link',
     onClick: () => { setScreen('home'); ctx.render(); }
   }, '← Back to Home');
   resetBar.appendChild(resetLink);
   c.appendChild(resetBar);
 
-  const card = el('div', { className: 'card' });
+  const card = ui().el('div', { className: 'card' });
 
   // Header
-  card.appendChild(el('h2', { className: 'screen-title' }, '🚛 Loading Truck Checklist'));
-  card.appendChild(el('p', { className: 'truck-check-subtitle' }, 'Check off every item before leaving'));
+  card.appendChild(ui().el('h2', { className: 'screen-title' }, '🚛 Loading Truck Checklist'));
+  card.appendChild(ui().el('p', { className: 'truck-check-subtitle' }, 'Check off every item before leaving'));
 
   // Progress counter
-  const progressEl = el('div', { className: 'truck-check-progress' }, countChecked() + ' of ' + totalItems() + ' items checked');
+  const progressEl = ui().el('div', { className: 'truck-check-progress' }, countChecked() + ' of ' + totalItems() + ' items checked');
   card.appendChild(progressEl);
 
   // Sections
   SECTIONS.forEach(section => {
-    card.appendChild(el('div', { className: 'section-heading' }, section.title));
+    card.appendChild(ui().el('div', { className: 'section-heading' }, section.title));
     section.items.forEach(item => {
-      const box = el('div', {
+      const box = ui().el('div', {
         className: 'check-box' + (ctx._truckCheck[item.key] ? ' checked' : '')
       }, ctx._truckCheck[item.key] ? '\u2713' : '');
       const labelText = item.label + (item.asNeeded ? ' (as needed)' : !item.required ? ' (optional)' : '');
-      const row = el('div', {
+      const row = ui().el('div', {
         className: 'check-item' + (!item.required ? ' optional-item' : ''),
         onClick: () => {
           ctx._truckCheck[item.key] = !ctx._truckCheck[item.key];
@@ -469,14 +468,14 @@ export function renderTruckCheck() {
         }
       });
       row.appendChild(box);
-      row.appendChild(el('div', { className: 'check-label' }, labelText));
+      row.appendChild(ui().el('div', { className: 'check-label' }, labelText));
       card.appendChild(row);
     });
   });
 
   // Continue button
   const ready = allRequiredChecked();
-  const continueBtn = el('button', {
+  const continueBtn = ui().el('button', {
     className: 'btn btn-full ' + (ready ? 'btn-primary' : 'btn-disabled'),
     disabled: !ready,
     onClick: () => {
@@ -486,7 +485,7 @@ export function renderTruckCheck() {
     }
   }, 'Continue \u2192');
 
-  card.appendChild(el('div', { style: 'margin-top: 1.5rem;' }, [continueBtn]));
+  card.appendChild(ui().el('div', { style: 'margin-top: 1.5rem;' }, [continueBtn]));
   c.appendChild(card);
   ctx.root.appendChild(c);
 }
@@ -527,11 +526,11 @@ export function renderIntake() {
     blueprintNotes: ''
   };
 
-  const c = el('div', { className: 'screen' });
+  const c = ui().el('div', { className: 'screen' });
   c.appendChild(buildAppHeader(isEdit ? 'Edit Intake Details' : 'Customer & Property Intake'));
-  c.appendChild(renderStatusBar(getLastSaveText()));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
 
-  const card = el('div', { className: 'card' });
+  const card = ui().el('div', { className: 'card' });
   const fields = [
     { ...text('inspectionId', 'Inspection ID'), disabled: true },
     text('inspectorName', 'Inspector Name *'),
@@ -553,19 +552,19 @@ export function renderIntake() {
     textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
   ];
 
-  const onIntakeChange = () => { updateShowIf(card, data); };
+  const onIntakeChange = () => { ui().updateShowIf(card, data); };
   fields.forEach(f => {
-    const rendered = renderField(f, data, onIntakeChange, {}, () => {});
+    const rendered = ui().renderField(f, data, onIntakeChange, {}, () => {});
     if (rendered) card.appendChild(rendered);
   });
-  updateShowIf(card, data);
+  ui().updateShowIf(card, data);
   c.appendChild(card);
 
-  const nav = el('div', { className: 'bottom-nav' }, [
-    el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
+  const nav = ui().el('div', { className: 'bottom-nav' }, [
+    ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
       if (isEdit) { setScreen('step'); ctx.render(); } else { setScreen('truck-check'); ctx.render(); }
     } }, isEdit ? '\u2190 Back to Steps' : '\u2190 Back'),
-    el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
+    ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
       const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms'];
       const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
       if (!data.waterSource || (Array.isArray(data.waterSource) ? data.waterSource.length === 0 : !data.waterSource)) missing.push('waterSource');
@@ -622,12 +621,12 @@ export function renderPrecheck() {
   const fieldGen = STEP_FIELDS['equipment'];
   if (fieldGen) {
     const fields = fieldGen();
-    const onFieldChange = () => { data._updatedAt = new Date().toISOString(); scheduleSave(); UI.updateShowIf(card, data); };
+    const onFieldChange = () => { data._updatedAt = new Date().toISOString(); scheduleSave(); ui().updateShowIf(card, data); };
     fields.forEach(f => {
-      const rendered = UI.renderField(f, data, onFieldChange, ctx.inspection, () => scheduleSave());
+      const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => scheduleSave());
       if (rendered) card.appendChild(rendered);
     });
-    UI.updateShowIf(card, data);
+    ui().updateShowIf(card, data);
   }
   c.appendChild(card);
 
@@ -707,11 +706,11 @@ export function renderStep() {
     ctx.inspection._furthestStepIdx = ctx.currentStepIdx;
   }
 
-  const c = el('div', { className: 'screen step-screen' });
+  const c = ui().el('div', { className: 'screen step-screen' });
   c.appendChild(buildAppHeader(step.name));
-  c.appendChild(renderStatusBar(getLastSaveText()));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
 
-  const timersBar = renderTimersBar(ctx.inspection);
+  const timersBar = ui().renderTimersBar(ctx.inspection);
   if (timersBar) c.appendChild(timersBar);
 
   const currentPhase = step.phase;
@@ -723,7 +722,7 @@ export function renderStep() {
     });
     return { ...p, done: allDone };
   });
-  c.appendChild(renderProgressBar(phasesWithState, currentPhase, step.name, phaseId => {
+  c.appendChild(ui().renderProgressBar(phasesWithState, currentPhase, step.name, phaseId => {
     const idx = ctx.stepList.findIndex(s => s.phase === phaseId);
     if (idx >= 0) { ctx.currentStepIdx = idx; ctx.render(); }
   }, ctx.currentStepIdx + 1, ctx.stepList.length));
@@ -731,12 +730,12 @@ export function renderStep() {
   const phaseSteps = ctx.stepList.filter(s => s.phase === currentPhase && s.type !== 'review');
   const alwaysShowSubNav = ['lowest', 'upper', 'rooms', 'supplementary', 'wrapup'].includes(currentPhase);
   if (phaseSteps.length > 1 || alwaysShowSubNav) {
-    const subNav = el('div', { className: 'sub-nav' });
+    const subNav = ui().el('div', { className: 'sub-nav' });
     phaseSteps.forEach((s, i) => {
       const sIdx = ctx.stepList.indexOf(s);
       const isCurr = sIdx === ctx.currentStepIdx;
       const isDone = ctx.inspection.stepData && ctx.inspection.stepData[s.id] && ctx.inspection.stepData[s.id]._visited;
-      const btn = el('button', {
+      const btn = ui().el('button', {
         type: 'button',
         className: 'sub-nav-btn' + (isCurr ? ' active' : '') + (isDone ? ' done' : ''),
         onClick: () => { ctx.currentStepIdx = sIdx; ctx.render(); window.scrollTo(0, 0); }
@@ -747,7 +746,7 @@ export function renderStep() {
   }
 
   // Back to page 1 (edit intake) button
-  const backToIntakeBtn = el('button', {
+  const backToIntakeBtn = ui().el('button', {
     type: 'button',
     className: 'btn btn-outline btn-small',
     style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:10px;z-index:200;font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;justify-content:center;',
@@ -756,7 +755,7 @@ export function renderStep() {
   c.appendChild(backToIntakeBtn);
 
   // Search button
-  const searchBtn = el('button', {
+  const searchBtn = ui().el('button', {
     type: 'button',
     style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:82px;z-index:200;background:#2C3F16;color:#fff;border:none;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;',
     onClick: () => openSearch()
@@ -764,7 +763,7 @@ export function renderStep() {
   c.appendChild(searchBtn);
 
   // Room navigation FAB
-  const roomNavFab = el('button', {
+  const roomNavFab = ui().el('button', {
     type: 'button',
     className: 'room-nav-fab',
     onClick: () => {
@@ -776,7 +775,7 @@ export function renderStep() {
   c.appendChild(roomNavFab);
 
   // Spare photos FAB
-  const spareFab = el('button', {
+  const spareFab = ui().el('button', {
     type: 'button',
     style: 'position:fixed;bottom:160px;right:16px;width:48px;height:48px;background:#f59e0b;color:#fff;border:none;border-radius:50%;font-size:1.3rem;cursor:pointer;z-index:95;box-shadow:0 4px 14px rgba(0,0,0,0.25);touch-action:manipulation;display:flex;align-items:center;justify-content:center;',
     'aria-label': 'Add spare photo',
@@ -786,7 +785,7 @@ export function renderStep() {
       inp.onchange = async e => {
         if (!e.target.files[0]) return;
         try {
-          const dataUrl = await UI.compressImage ? UI.compressImage(e.target.files[0]) : new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
+          const dataUrl = await ui().compressImage ? ui().compressImage(e.target.files[0]) : new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
           if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
           const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name), assignedSlot: null };
           ctx.inspection.sparePhotos.push(sp);
@@ -851,7 +850,7 @@ export function renderStep() {
             if (capInput.value.trim()) sp.caption = capInput.value.trim();
             saveNow();
             document.body.removeChild(overlay);
-            window.UI && window.UI.showToast(selEl.value ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
+            ui().showToast(selEl.value ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
           };
 
           const skipBtn = document.createElement('button');
@@ -860,7 +859,7 @@ export function renderStep() {
           skipBtn.style = 'padding:14px 20px;background:transparent;color:#64748b;border:1px solid #e5e7eb;border-radius:10px;font-size:1rem;cursor:pointer;touch-action:manipulation;';
           skipBtn.onclick = () => {
             document.body.removeChild(overlay);
-            window.UI && window.UI.showToast('📸 Spare photo saved — assign in Review');
+            ui().showToast('📸 Spare photo saved — assign in Review');
           };
 
           btnRow.appendChild(confirmBtn);
@@ -875,16 +874,16 @@ export function renderStep() {
   }, '📸');
   c.appendChild(spareFab);
 
-  c.appendChild(el('h1', { className: 'screen-title' }, step.name));
+  c.appendChild(ui().el('h1', { className: 'screen-title' }, step.name));
 
   const fieldGen = STEP_FIELDS[step.type];
   if (fieldGen) {
     const fields = fieldGen();
-    const card = el('div', { className: 'card' });
+    const card = ui().el('div', { className: 'card' });
     const onFieldChange = () => {
       data._updatedAt = new Date().toISOString();
       scheduleSave();
-      updateShowIf(card, data);
+      ui().updateShowIf(card, data);
       // Change 3: Detect allSectionsComplete on post-assessment step
       if (step.type === 'post-assessment' && data.finalCheck && data.finalCheck.allSectionsComplete === true) {
         if (ctx._finalSyncTriggeredId !== (ctx.inspection && ctx.inspection.inspectionId)) {
@@ -894,34 +893,34 @@ export function renderStep() {
       }
     };
     fields.forEach(f => {
-      const rendered = renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
+      const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
       if (rendered) card.appendChild(rendered);
     });
-    updateShowIf(card, data);
+    ui().updateShowIf(card, data);
     c.appendChild(card);
   }
 
   if (step.dynamic === 'lowest') {
     const lowestSteps = ctx.stepList.filter(s => s.dynamic === 'lowest');
     if (step.id === lowestSteps[lowestSteps.length - 1].id) {
-      c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('lowest'); window.scrollTo(0, 0); } }, '+ Add Another Room (Lowest Level)'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('lowest'); window.scrollTo(0, 0); } }, '+ Add Another Room (Lowest Level)'));
     }
   }
   if (step.type === 'bedroom') {
     const bedroomSteps = ctx.stepList.filter(s => s.type === 'bedroom');
     if (step.id === bedroomSteps[bedroomSteps.length - 1].id) {
-      c.appendChild(el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('additional', 'Bedroom'); window.scrollTo(0, 0); } }, '+ Add Another Bedroom'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('additional', 'Bedroom'); window.scrollTo(0, 0); } }, '+ Add Another Bedroom'));
     }
   }
   if (step.type === 'bathroom') {
     const bathroomSteps = ctx.stepList.filter(s => s.type === 'bathroom');
     if (step.id === bathroomSteps[bathroomSteps.length - 1].id) {
-      c.appendChild(el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('additional', 'Bathroom'); window.scrollTo(0, 0); } }, '+ Add Another Bathroom'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('additional', 'Bathroom'); window.scrollTo(0, 0); } }, '+ Add Another Bathroom'));
     }
   }
   if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {
     if (step.id === 'kitchen-air' || (step.dynamic === 'additional' && step.id === ctx.stepList.filter(s => s.dynamic === 'additional').pop()?.id)) {
-      c.appendChild(el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('additional'); window.scrollTo(0, 0); } }, '+ Add Additional Room'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('additional'); window.scrollTo(0, 0); } }, '+ Add Additional Room'));
     }
   }
 
@@ -929,9 +928,9 @@ export function renderStep() {
 
   const navButtons = [
     ctx.currentStepIdx > 0
-      ? el('button', { className: 'btn btn-outline btn-nav', onClick: () => { ctx.currentStepIdx--; ctx.render(); window.scrollTo(0, 0); } }, '\u2190 Back')
-      : el('div'),
-    el('button', {
+      ? ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { ctx.currentStepIdx--; ctx.render(); window.scrollTo(0, 0); } }, '\u2190 Back')
+      : ui().el('div'),
+    ui().el('button', {
       type: 'button',
       className: 'btn btn-outline btn-home',
       onClick: () => {
@@ -941,13 +940,13 @@ export function renderStep() {
         }
       }
     }, '\uD83C\uDFE0'),
-    el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
+    ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
       alert('Next clicked - step: ' + (step && step.id));
       try {
         const missing = validateStep(step);
-        if (missing.length) { window.UI && window.UI.showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); window.UI && window.UI.flashUncheckedItems(c); return; }
+        if (missing.length) { ui().showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); ui().flashUncheckedItems(c); return; }
         const warnings = warnStep(step);
-        if (warnings.length) { window.UI && window.UI.showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
+        if (warnings.length) { ui().showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
         data._completedAt = new Date().toISOString();
         ctx.currentStepIdx++;
         saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
@@ -958,26 +957,26 @@ export function renderStep() {
     }}, ctx.currentStepIdx < ctx.stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
   ];
   if (isDevMode()) {
-    navButtons.push(el('button', { className: 'btn btn-nav', style: 'background:#ff9900;color:#000;font-size:12px;padding:6px 10px;', onClick: () => {
+    navButtons.push(ui().el('button', { className: 'btn btn-nav', style: 'background:#ff9900;color:#000;font-size:12px;padding:6px 10px;', onClick: () => {
       data._completedAt = new Date().toISOString();
       data._visited = true;
       ctx.currentStepIdx++;
       saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
     }}, 'Skip \u23e9'));
   }
-  const nav = el('div', { className: 'bottom-nav' }, navButtons);
+  const nav = ui().el('div', { className: 'bottom-nav' }, navButtons);
   c.appendChild(nav);
   ctx.root.appendChild(c);
 }
 
 // ── REVIEW SCREEN ──────────────────────────────────────────
 export function renderReview() {
-  const c = el('div', { className: 'screen review-screen' });
+  const c = ui().el('div', { className: 'screen review-screen' });
   c.appendChild(buildAppHeader('Final Review'));
-  c.appendChild(renderStatusBar(getLastSaveText()));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
 
   // Status legend bar
-  const legendBar = el('div', { style: 'background:#f0f7ee;border-radius:8px;padding:10px 14px;margin:0 0 8px;font-size:0.8rem;color:#4a5568;line-height:1.6;' });
+  const legendBar = ui().el('div', { style: 'background:#f0f7ee;border-radius:8px;padding:10px 14px;margin:0 0 8px;font-size:0.8rem;color:#4a5568;line-height:1.6;' });
   legendBar.innerHTML = '<strong style="color:#2C3F16">Status guide:</strong>' +
     ' <span style="background:#e8f5e9;padding:2px 6px;border-radius:4px;">Visited</span> = section opened during inspection.' +
     ' <span style="background:#fef3c7;padding:2px 6px;border-radius:4px;">Not visited</span> = section was skipped.' +
@@ -992,9 +991,9 @@ export function renderReview() {
     { key: 'downloadQtrak', label: 'Download Q-Trak data to computer' },
     { key: 'shipSamples', label: 'Ship all lab samples' }
   ];
-  const depCard = el('div', { className: 'card' });
-  depCard.appendChild(el('h3', { className: 'section-heading' }, 'Before You Leave'));
-  const allInspBtn = el('button', {
+  const depCard = ui().el('div', { className: 'card' });
+  depCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Before You Leave'));
+  const allInspBtn = ui().el('button', {
     className: 'btn btn-outline btn-full',
     onClick: () => { setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); ctx.render(); }
   }, 'All Inspections');
@@ -1008,15 +1007,15 @@ export function renderReview() {
   }
 
   depItems.forEach(item => {
-    depCard.appendChild(renderCheck(item.key, item.label, !!depData[item.key], v => {
+    depCard.appendChild(ui().renderCheck(item.key, item.label, !!depData[item.key], v => {
       depData[item.key] = v;
       updateDepState();
     }));
   });
   c.appendChild(depCard);
 
-  const hCard = el('div', { className: 'card' });
-  hCard.appendChild(el('h3', { className: 'section-heading' }, 'Inspection Details'));
+  const hCard = ui().el('div', { className: 'card' });
+  hCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Inspection Details'));
   const infoFields = [
     ['ID', ctx.inspection.inspectionId], ['Inspector', ctx.inspection.inspectorName],
     ['Client', ctx.inspection.clientName], ['Address', ctx.inspection.propertyAddress],
@@ -1025,21 +1024,21 @@ export function renderReview() {
     ['Water Source', (Array.isArray(ctx.inspection.waterSource) ? ctx.inspection.waterSource.join(', ') : (ctx.inspection.waterSource || '--')) + (ctx.inspection.waterSourceDescription ? ' (' + ctx.inspection.waterSourceDescription + ')' : '')],
     ['Wifi', ctx.inspection.wifiNetwork],
     ['Occupancy', ctx.inspection.stepData?.['property-details']?.occupancyDuringInspection], ['Weather', ctx.inspection.stepData?.['property-details']?.weatherConditions],
-    ['Started', fmtDate(ctx.inspection.startedAt)], ['Status', ctx.inspection.status]
+    ['Started', ui().fmtDate(ctx.inspection.startedAt)], ['Status', ctx.inspection.status]
   ];
   infoFields.forEach(([l, v]) => {
-    hCard.appendChild(el('div', { className: 'info-row' }, [
-      el('span', { className: 'info-label' }, l),
-      el('span', { className: 'info-value' }, v || '--')
+    hCard.appendChild(ui().el('div', { className: 'info-row' }, [
+      ui().el('span', { className: 'info-label' }, l),
+      ui().el('span', { className: 'info-value' }, v || '--')
     ]));
   });
-  if (ctx.inspection.clientConcerns) hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Client Concerns: '), document.createTextNode(ctx.inspection.clientConcerns)]));
-  if (ctx.inspection.knownProblemAreas) hCard.appendChild(el('div', { className: 'info-block' }, [el('strong', null, 'Known Problem Areas: '), document.createTextNode(ctx.inspection.knownProblemAreas)]));
+  if (ctx.inspection.clientConcerns) hCard.appendChild(ui().el('div', { className: 'info-block' }, [ui().el('strong', null, 'Client Concerns: '), document.createTextNode(ctx.inspection.clientConcerns)]));
+  if (ctx.inspection.knownProblemAreas) hCard.appendChild(ui().el('div', { className: 'info-block' }, [ui().el('strong', null, 'Known Problem Areas: '), document.createTextNode(ctx.inspection.knownProblemAreas)]));
   c.appendChild(hCard);
 
   // ── Room Summaries ──
-  const summariesCard = el('div', { className: 'card' });
-  summariesCard.appendChild(el('h3', { className: 'section-heading' }, 'Room Findings'));
+  const summariesCard = ui().el('div', { className: 'card' });
+  summariesCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Room Findings'));
 
   // Collect all rooms that have raw notes OR an AI summary
   const roomStepTypes = ['room-test','bedroom','bathroom','living-area','kitchen-appliance','water-sample','atp-kitchen','kitchen-air','additional-room','utility'];
@@ -1050,14 +1049,14 @@ export function renderReview() {
   });
 
   if (roomSteps.length === 0) {
-    summariesCard.appendChild(el('p', { style: 'color:var(--text-muted);font-size:0.9rem;padding:8px 0;' }, 'No room findings yet'));
+    summariesCard.appendChild(ui().el('p', { style: 'color:var(--text-muted);font-size:0.9rem;padding:8px 0;' }, 'No room findings yet'));
   } else {
     roomSteps.forEach(s => {
       const d = ctx.inspection.stepData[s.id];
-      const roomBlock = el('div', { style: 'margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--accent-light);' });
+      const roomBlock = ui().el('div', { style: 'margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--accent-light);' });
 
       // Room name
-      roomBlock.appendChild(el('div', { style: 'font-weight:700;font-size:1rem;color:var(--primary);margin-bottom:8px;' }, d.roomName || s.name));
+      roomBlock.appendChild(ui().el('div', { style: 'font-weight:700;font-size:1rem;color:var(--primary);margin-bottom:8px;' }, d.roomName || s.name));
 
       // Raw notes side
       const hasObs = d.observations && d.observations.length > 0;
@@ -1066,19 +1065,19 @@ export function renderReview() {
       const hasRaw = hasObs || hasNotes || hasFollowUp;
 
       if (hasRaw) {
-        const rawBlock = el('div', { style: 'background:#f8f9fa;border-left:3px solid #aaa;border-radius:0 6px 6px 0;padding:8px 10px;margin-bottom:8px;font-size:0.85rem;' });
-        rawBlock.appendChild(el('div', { style: 'font-size:0.75rem;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;' }, 'Inspector Notes'));
-        if (hasObs) rawBlock.appendChild(el('div', { style: 'margin-bottom:4px;' }, 'Observations: ' + d.observations.join(', ')));
-        if (hasNotes) rawBlock.appendChild(el('div', { style: 'margin-bottom:4px;' }, d.notes.trim()));
-        if (hasFollowUp) rawBlock.appendChild(el('div', { style: 'color:#b45309;' }, '⚠️ Follow-up: ' + d.followUpNote.trim()));
+        const rawBlock = ui().el('div', { style: 'background:#f8f9fa;border-left:3px solid #aaa;border-radius:0 6px 6px 0;padding:8px 10px;margin-bottom:8px;font-size:0.85rem;' });
+        rawBlock.appendChild(ui().el('div', { style: 'font-size:0.75rem;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;' }, 'Inspector Notes'));
+        if (hasObs) rawBlock.appendChild(ui().el('div', { style: 'margin-bottom:4px;' }, 'Observations: ' + d.observations.join(', ')));
+        if (hasNotes) rawBlock.appendChild(ui().el('div', { style: 'margin-bottom:4px;' }, d.notes.trim()));
+        if (hasFollowUp) rawBlock.appendChild(ui().el('div', { style: 'color:#b45309;' }, '⚠️ Follow-up: ' + d.followUpNote.trim()));
         roomBlock.appendChild(rawBlock);
       }
 
       // AI summary side
       if (d.aiSummary) {
-        const aiBlock = el('div', { style: 'background:#f0f7ee;border-left:3px solid var(--primary);border-radius:0 6px 6px 0;padding:8px 10px;font-size:0.85rem;' });
-        aiBlock.appendChild(el('div', { style: 'font-size:0.75rem;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;' }, 'AI Summary'));
-        aiBlock.appendChild(el('div', null, d.aiSummary));
+        const aiBlock = ui().el('div', { style: 'background:#f0f7ee;border-left:3px solid var(--primary);border-radius:0 6px 6px 0;padding:8px 10px;font-size:0.85rem;' });
+        aiBlock.appendChild(ui().el('div', { style: 'font-size:0.75rem;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;' }, 'AI Summary'));
+        aiBlock.appendChild(ui().el('div', null, d.aiSummary));
         roomBlock.appendChild(aiBlock);
       }
 
@@ -1091,16 +1090,16 @@ export function renderReview() {
     if (step.type === 'review') return;
     const data = (ctx.inspection.stepData && ctx.inspection.stepData[step.id]) || {};
     const visited = !!data._visited;
-    const sCard = el('div', { className: 'card' + (!visited ? ' card-incomplete' : '') });
-    sCard.appendChild(el('div', { className: 'review-step-header' }, [
-      el('h3', { className: 'section-heading' }, [
+    const sCard = ui().el('div', { className: 'card' + (!visited ? ' card-incomplete' : '') });
+    sCard.appendChild(ui().el('div', { className: 'review-step-header' }, [
+      ui().el('h3', { className: 'section-heading' }, [
         document.createTextNode(step.name + ' '),
-        el('span', { className: 'badge ' + (visited ? 'completed' : 'in-progress') }, visited ? 'Visited' : 'Not visited')
+        ui().el('span', { className: 'badge ' + (visited ? 'completed' : 'in-progress') }, visited ? 'Visited' : 'Not visited')
       ]),
-      el('button', { className: 'btn btn-small btn-outline', onClick: () => { ctx.currentStepIdx = idx; setScreen('step'); ctx.render(); } }, 'Edit')
+      ui().el('button', { className: 'btn btn-small btn-outline', onClick: () => { ctx.currentStepIdx = idx; setScreen('step'); ctx.render(); } }, 'Edit')
     ]));
 
-    const summary = el('div', { className: 'review-summary' });
+    const summary = ui().el('div', { className: 'review-summary' });
     const fieldGen = STEP_FIELDS[step.type];
     if (fieldGen && visited) {
       const fields = fieldGen();
@@ -1125,9 +1124,9 @@ export function renderReview() {
         } else {
           display = String(val);
         }
-        summary.appendChild(el('div', { className: 'review-item' }, [
-          el('span', { className: 'review-item-label' }, (f.label || f.key) + ': '),
-          el('span', null, display)
+        summary.appendChild(ui().el('div', { className: 'review-item' }, [
+          ui().el('span', { className: 'review-item-label' }, (f.label || f.key) + ': '),
+          ui().el('span', null, display)
         ]));
       });
       // Show all photo arrays (handles _photos, _beforePhotos, _afterPhotos, ATP photos, etc.)
@@ -1139,12 +1138,12 @@ export function renderReview() {
         const arr = data[pk];
         const labelRaw = pk.slice(1).replace(/Photos$/, '').replace(/([A-Z])/g, ' $1').trim();
         const label = (labelRaw || 'All') + ' Photos';
-        summary.appendChild(el('div', { className: 'review-photos-section' }, [el('strong', null, arr.length + ' ' + label + ':')]));
-        const grid = el('div', { className: 'review-photo-grid' });
+        summary.appendChild(ui().el('div', { className: 'review-photos-section' }, [ui().el('strong', null, arr.length + ' ' + label + ':')]));
+        const grid = ui().el('div', { className: 'review-photo-grid' });
         arr.forEach(p => {
-          grid.appendChild(el('div', { className: 'review-photo-item' }, [
-            el('img', { src: p.dataUrl, className: 'review-photo-img' }),
-            p.caption ? el('div', { className: 'review-photo-caption' }, p.caption) : null
+          grid.appendChild(ui().el('div', { className: 'review-photo-item' }, [
+            ui().el('img', { src: p.dataUrl, className: 'review-photo-img' }),
+            p.caption ? ui().el('div', { className: 'review-photo-caption' }, p.caption) : null
           ]));
         });
         summary.appendChild(grid);
@@ -1156,10 +1155,10 @@ export function renderReview() {
 
   const exportData = buildExportJSON(ctx.stepList);
 
-  const actCard = el('div', { className: 'card actions-card' });
+  const actCard = ui().el('div', { className: 'card actions-card' });
 
   if (ctx.inspection.status !== 'completed') {
-    const submitBtn = el('button', { className: 'btn btn-primary btn-full', onClick: () => {
+    const submitBtn = ui().el('button', { className: 'btn btn-primary btn-full', onClick: () => {
       const unvisited = ctx.stepList.filter(s => s.type !== 'review' && !(ctx.inspection.stepData && ctx.inspection.stepData[s.id] && ctx.inspection.stepData[s.id]._visited));
       const atpData = (ctx.inspection.stepData && ctx.inspection.stepData['atp-kitchen']) || {};
       const atpIssues = [];
@@ -1189,7 +1188,7 @@ export function renderReview() {
     }}, '\u2713 Submit Inspection');
     actCard.appendChild(submitBtn);
   } else {
-    const reuploadBtn = el('button', { className: 'btn btn-outline btn-full', onClick: async () => {
+    const reuploadBtn = ui().el('button', { className: 'btn btn-outline btn-full', onClick: async () => {
       reuploadBtn.disabled = true;
       reuploadBtn.textContent = 'Uploading\u2026 \u23f3';
       try {
@@ -1215,9 +1214,9 @@ export function renderReview() {
         alert('Upload failed: ' + e.message);
       }
     }}, '\u21ba Re-upload to Drive');
-    actCard.appendChild(el('div', { className: 'completed-banner' }, [
-      el('strong', null, '\u2713 Inspection Complete'),
-      el('p', null, 'Completed: ' + fmtDate(ctx.inspection.endedAt)),
+    actCard.appendChild(ui().el('div', { className: 'completed-banner' }, [
+      ui().el('strong', null, '\u2713 Inspection Complete'),
+      ui().el('p', null, 'Completed: ' + ui().fmtDate(ctx.inspection.endedAt)),
       reuploadBtn
     ]));
   }
@@ -1226,8 +1225,8 @@ export function renderReview() {
   // Initial departure checklist state
   updateDepState();
 
-  c.appendChild(el('div', { className: 'bottom-nav' }, [
-    el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
+  c.appendChild(ui().el('div', { className: 'bottom-nav' }, [
+    ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
       if (ctx.inspection.status !== 'completed') { ctx.currentStepIdx = ctx.stepList.length - 2; setScreen('step'); }
       else { setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); }
       ctx.render();
