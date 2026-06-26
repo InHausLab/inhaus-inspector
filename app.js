@@ -301,7 +301,9 @@ import { initScreens, render } from './screens.js';
     genId,
     addDynamicRoom,
     triggerFinalSync,
-    render
+    render,
+    startAutoSave,
+    stopAutoSave
   });
 
   window.addEventListener('online', () => {
@@ -361,22 +363,24 @@ import { initScreens, render } from './screens.js';
   checkStorageQuota();
   setInterval(checkStorageQuota, 60000); // check every minute
 
-  // ── Periodic auto-save every 30s (safety net) ───────────────
-  setInterval(() => {
-    if (inspection && getScreen() === 'step') {
-      saveNow();
-    }
-  }, 30000);
+  // ── Auto-save & auto-checkpoint (started/stopped with inspection lifecycle) ──
+  let _autoSaveInterval = null;
+  let _autoCheckpointInterval = null;
 
-  // ── 5-minute auto-checkpoint + localStorage backup ────────────
-  // Pushes full data JSON to Drive every 5 minutes during active inspection.
-  // Also refreshes localStorage mirror. Belt-and-suspenders against data loss.
-  setInterval(() => {
-    if (inspection && getScreen() === 'step') {
-      checkpointToCloud(stepList);
-      backupToLocalStorage();
-    }
-  }, 5 * 60 * 1000);
+  function startAutoSave() {
+    stopAutoSave();
+    _autoSaveInterval = setInterval(() => {
+      if (inspection) saveNow();
+    }, 30000);
+    _autoCheckpointInterval = setInterval(() => {
+      if (inspection) { checkpointToCloud(stepList); backupToLocalStorage(); }
+    }, 60000);
+  }
+
+  function stopAutoSave() {
+    if (_autoSaveInterval) { clearInterval(_autoSaveInterval); _autoSaveInterval = null; }
+    if (_autoCheckpointInterval) { clearInterval(_autoCheckpointInterval); _autoCheckpointInterval = null; }
+  }
 
   // Change 2: Update "X min ago" text in sync status every 30s
   setInterval(() => {

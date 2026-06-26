@@ -332,6 +332,7 @@ export async function resumeInsp(id) {
   const lastVisited = ctx.inspection._lastStepIdx || 0;
   ctx.currentStepIdx = Math.min(lastVisited, ctx.stepList.length - 1);
   setScreen('step');
+  ctx.startAutoSave();
   ctx.render();
 }
 
@@ -340,6 +341,7 @@ export async function viewInsp(id) {
   if (!ctx.inspection) return;
   ctx.stepList = buildStepList(ctx.inspection);
   setScreen('review');
+  ctx.startAutoSave();
   ctx.render();
 }
 
@@ -588,6 +590,7 @@ export function renderIntake() {
         ctx.stepList = buildStepList(ctx.inspection);
         ctx.currentStepIdx = 0;
         setScreen('precheck');
+        ctx.startAutoSave();
         saveNow().then(() => ctx.render());
       }
     }}, isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192')
@@ -988,7 +991,7 @@ export function renderReview() {
   depCard.appendChild(el('h3', { className: 'section-heading' }, 'Before You Leave'));
   const allInspBtn = el('button', {
     className: 'btn btn-outline btn-full',
-    onClick: () => { setScreen('home'); ctx.inspection = null; setInspection(null); ctx.render(); }
+    onClick: () => { setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); ctx.render(); }
   }, 'All Inspections');
 
   function updateDepState() {
@@ -1176,7 +1179,7 @@ export function renderReview() {
         submitInspection(completeData).then(ok => {
           if (!ok) { submitBtn.disabled = false; submitBtn.textContent = '\u2713 Submit Inspection'; }
         });
-        setScreen('home'); ctx.inspection = null; setInspection(null); ctx.render();
+        setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); ctx.render();
       });
     }}, '\u2713 Submit Inspection');
     actCard.appendChild(submitBtn);
@@ -1221,7 +1224,7 @@ export function renderReview() {
   c.appendChild(el('div', { className: 'bottom-nav' }, [
     el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
       if (ctx.inspection.status !== 'completed') { ctx.currentStepIdx = ctx.stepList.length - 2; setScreen('step'); }
-      else { setScreen('home'); ctx.inspection = null; setInspection(null); }
+      else { setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); }
       ctx.render();
     }}, ctx.inspection.status !== 'completed' ? '\u2190 Back to Steps' : '\u2190 Home'),
     allInspBtn
