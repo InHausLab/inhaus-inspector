@@ -6,6 +6,22 @@
   // Set this to your Google Apps Script web app URL
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxh6xtKg3FKjoHzi6jbJ_8RmjIgihgvcgeG8jGrFWweGcD3iwjV9voLVj0cmy5VeczuPw/exec';
 
+  // ── Sync secret (must match SYNC_SECRET in Apps Script Properties) ─────────
+  const SYNC_SECRET = 'ihl-sync-2026';
+
+  // Wrapper: always injects the sync secret into the JSON body so Apps Script
+  // can authenticate the request without CORS-breaking custom headers.
+  async function scriptFetch(payload) {
+    const body = Object.assign({}, payload, { 'x-sync-secret': SYNC_SECRET });
+    const resp = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }
+
   // ── Google Shared Drive Config ──────────────────────────────
   // Set this to the Shared Drive folder ID where per-assessment subfolders should be created.
   // Find it in the URL when browsing the Shared Drive in Google Drive:
@@ -1291,14 +1307,7 @@
     };
 
     async function doUpload() {
-      const resp = await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },  // simple request = no preflight = readable response
-        body: JSON.stringify(payload)
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const result = await resp.json();
-      return result;
+      return scriptFetch(payload);
     }
 
     try {
@@ -1373,11 +1382,7 @@
     const mainPayload = stripPhotosFromExport(exportData);
     const allPhotos = extractAllPhotosFromExport(exportData);
 
-    await fetch(GOOGLE_SCRIPT_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mainPayload)
-    });
+    await scriptFetch(mainPayload);
 
     if (allPhotos.length > 0) {
       const photoPayload = {
@@ -1389,16 +1394,10 @@
       };
       showUploadBanner('pending', 'Uploading photos\u2026');
       try {
-        const photoResp = await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },  // simple request = no preflight = readable response
-          body: JSON.stringify(photoPayload)
-        });
-        if (photoResp.ok) {
-          const photoResult = await photoResp.json();
-          if (photoResult && photoResult.photosUploaded > 0 && inspection) {
-            // Mark all remaining local photos as confirmed in Drive
-            function markAllPhotosConfirmed(photoArr) {
+        const photoResult = await scriptFetch(photoPayload);
+        if (photoResult && photoResult.photosUploaded > 0 && inspection) {
+          // Mark all remaining local photos as confirmed in Drive
+          function markAllPhotosConfirmed(photoArr) {
               if (!Array.isArray(photoArr)) return;
               photoArr.forEach(function(p) {
                 if (p && p.dataUrl && p.dataUrl !== '__uploaded__') {
@@ -1420,7 +1419,6 @@
             if (inspection.sparePhotos) markAllPhotosConfirmed(inspection.sparePhotos);
             inspection._photoRetryQueue = [];
             scheduleSave();
-          }
         }
       } catch(e) {
         console.warn('Photo bulk upload error:', e.message);
@@ -1439,11 +1437,7 @@
       const payload = stripPhotosFromExport(exportData);
       payload._checkpoint = true;
       updateSyncStatus('syncing'); // Change 2
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      await scriptFetch(payload);
       lastCheckpointSucceededAt = Date.now(); // Change 1
       updateSyncStatus('checkpoint'); // Change 2
     } catch (e) {
@@ -2840,11 +2834,7 @@
           const reuploadData = buildExportJSON();
           // Send main data first (no photos)
           const mainPayload = stripPhotosFromExport(reuploadData);
-          await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST', mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(mainPayload)
-          });
+          await scriptFetch(mainPayload);
           // Send photos one at a time to avoid payload size limits
           const allPhotos = extractAllPhotosFromExport(reuploadData);
           for (let i = 0; i < allPhotos.length; i++) {
