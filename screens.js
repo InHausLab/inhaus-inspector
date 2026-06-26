@@ -233,7 +233,7 @@ function toggleDevMode() {
   const next = !isDevMode();
   localStorage.setItem('inhausDevMode', next ? 'true' : 'false');
   const msg = next ? '\u26a0\ufe0f Dev Mode ON \u2014 Skip buttons active' : 'Dev Mode OFF';
-  showToast(msg);
+  window.UI && window.UI.showToast(msg);
   ctx.render();
 }
 
@@ -851,7 +851,7 @@ export function renderStep() {
             if (capInput.value.trim()) sp.caption = capInput.value.trim();
             saveNow();
             document.body.removeChild(overlay);
-            showToast(selEl.value ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
+            window.UI && window.UI.showToast(selEl.value ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
           };
 
           const skipBtn = document.createElement('button');
@@ -860,7 +860,7 @@ export function renderStep() {
           skipBtn.style = 'padding:14px 20px;background:transparent;color:#64748b;border:1px solid #e5e7eb;border-radius:10px;font-size:1rem;cursor:pointer;touch-action:manipulation;';
           skipBtn.onclick = () => {
             document.body.removeChild(overlay);
-            showToast('📸 Spare photo saved — assign in Review');
+            window.UI && window.UI.showToast('📸 Spare photo saved — assign in Review');
           };
 
           btnRow.appendChild(confirmBtn);
@@ -942,14 +942,19 @@ export function renderStep() {
       }
     }, '\uD83C\uDFE0'),
     el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
-      const missing = validateStep(step);
-      if (missing.length) { showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); flashUncheckedItems(c); return; }
-      const warnings = warnStep(step);
-      if (warnings.length) { showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
-      data._completedAt = new Date().toISOString();
-      ctx.currentStepIdx++;
-      saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
-      checkpointToCloud(ctx.stepList); // fire-and-forget backup - silent on failure
+      console.log('Next clicked', { el, showToast, ctx });
+      try {
+        const missing = validateStep(step);
+        if (missing.length) { window.UI && window.UI.showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); window.UI && window.UI.flashUncheckedItems(c); return; }
+        const warnings = warnStep(step);
+        if (warnings.length) { window.UI && window.UI.showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
+        data._completedAt = new Date().toISOString();
+        ctx.currentStepIdx++;
+        saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
+        checkpointToCloud(ctx.stepList); // fire-and-forget backup - silent on failure
+      } catch (e) {
+        console.error('Next button error:', e);
+      }
     }}, ctx.currentStepIdx < ctx.stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
   ];
   if (isDevMode()) {
