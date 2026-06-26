@@ -942,7 +942,7 @@ export function renderStep() {
       }
     }, '\uD83C\uDFE0'),
     el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
-      console.log('Next clicked', { el, showToast, ctx });
+      alert('Next clicked - step: ' + (step && step.id));
       try {
         const missing = validateStep(step);
         if (missing.length) { window.UI && window.UI.showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); window.UI && window.UI.flashUncheckedItems(c); return; }
@@ -953,7 +953,7 @@ export function renderStep() {
         saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
         checkpointToCloud(ctx.stepList); // fire-and-forget backup - silent on failure
       } catch (e) {
-        console.error('Next button error:', e);
+        alert('Next button error: ' + (e && e.message ? e.message : String(e)));
       }
     }}, ctx.currentStepIdx < ctx.stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
   ];
