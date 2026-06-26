@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inhaus-v92';
+const CACHE_NAME = 'inhaus-v93';
 const ASSETS = [
   'index.html',
   'styles.css',
@@ -20,14 +20,13 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  // Do NOT call skipWaiting() — wait for all tabs to close before activating.
-  // This prevents mid-inspection reloads when a new version is pushed.
+  self.skipWaiting();
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
-  // Do NOT call clients.claim() — existing sessions keep the old SW until they reload.
+  clients.claim();
 });
 
 self.addEventListener('fetch', e => {
