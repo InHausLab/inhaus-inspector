@@ -7,14 +7,15 @@ import { scriptFetch, updateSyncStatus, uploadPhotoImmediate, checkpointToCloud,
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js';
 import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js';
 
-// UI globals (from window.UI)
-const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
+// UI globals (deferred — ui.js sets window.UI via IIFE, must destructure after load)
+let el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf;
 
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
 
 export function initScreens(context) {
   ctx = context;
+  ({ el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI);
 }
 
 // ── Room Navigation Drawer ─────────────────────────────────
