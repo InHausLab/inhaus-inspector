@@ -1,10 +1,17 @@
-const CACHE_NAME = 'inhaus-v91';
+const CACHE_NAME = 'inhaus-v92';
 const ASSETS = [
   'index.html',
   'styles.css',
   'db.js',
   'ui.js',
   'app.js',
+  'config.js',
+  'state.js',
+  'storage.js',
+  'inspection.js',
+  'sync.js',
+  'fields.js',
+  'steps.js',
   'manifest.json',
   'icons/icon-192.png',
   'icons/icon-512.png',
