@@ -212,36 +212,21 @@ export function openSearch() {
 }
 
 // ── Render ─────────────────────────────────────────────────
-let __rendering = false;
-let __renderCount = 0;
 export function render() {
-  __renderCount++;
-  console.log('[render start]', { count: __renderCount, screen: getScreen(), stepIdx: ctx && ctx.currentStepIdx, stack: new Error().stack });
-  if (__rendering) {
-    console.error('[RE-ENTRANT RENDER BLOCKED]', { screen: getScreen(), stepIdx: ctx && ctx.currentStepIdx, stack: new Error().stack });
-    alert('Blocked re-entrant render — check console for stack trace.');
-    return;
-  }
-  __rendering = true;
-  try {
-    // Kill any body-level overlays that may have leaked across renders
-    ['room-drawer-overlay', 'search-overlay'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.remove();
-    });
-    window.inspection = ctx.inspection;
-    ctx.root.innerHTML = '';
-    switch (getScreen()) {
-      case 'home': renderHome(); break;
-      case 'truck-check': renderTruckCheck(); break;
-      case 'intake': renderIntake(); break;
-      case 'precheck': renderPrecheck(); break;
-      case 'step': renderStep(); break;
-      case 'review': renderReview(); break;
-    }
-  } finally {
-    __rendering = false;
-    console.log('[render end]', { count: __renderCount });
+  // Kill any body-level overlays that may have leaked across renders
+  ['room-drawer-overlay', 'search-overlay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+  window.inspection = ctx.inspection;
+  ctx.root.innerHTML = '';
+  switch (getScreen()) {
+    case 'home': renderHome(); break;
+    case 'truck-check': renderTruckCheck(); break;
+    case 'intake': renderIntake(); break;
+    case 'precheck': renderPrecheck(); break;
+    case 'step': renderStep(); break;
+    case 'review': renderReview(); break;
   }
 }
 
@@ -1005,18 +990,13 @@ export function renderStep() {
     }, '\uD83C\uDFE0'),
     ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
       try {
-        console.log('[next] before validate');
         const missing = validateStep(step);
-        console.log('[next] before warn');
         const warnings = warnStep(step);
         if (missing.length) { ui().showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); ui().flashUncheckedItems(c); return; }
         if (warnings.length) { ui().showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
         data._completedAt = new Date().toISOString();
-        console.log('[next] before increment, idx:', ctx.currentStepIdx);
         ctx.currentStepIdx++;
-        console.log('[next] before render, new idx:', ctx.currentStepIdx);
         ctx.render(); window.scrollTo(0, 0);
-        console.log('[next] after render');
         saveNow();
         checkpointToCloud(ctx.stepList);
       } catch (e) {
