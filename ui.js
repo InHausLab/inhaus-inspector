@@ -1007,18 +1007,17 @@
           const placeholder = el('div', { className: 'photo-img', style: 'display:flex;align-items:center;justify-content:center;background:#e8f5e9;color:#2e7d32;font-size:13px;font-weight:bold;min-height:120px;border-radius:6px;' }, '\u2601\ufe0f Uploaded to Drive');
           card.appendChild(placeholder);
         } else {
-          // Use object URL instead of raw dataUrl to avoid blocking DOM with large base64 strings
+          // Use async fetch to convert dataUrl → objectURL without blocking the main thread.
+          // (The old atob+Uint8Array loop was synchronous and froze iOS Safari during render.)
           const img = el('img', { className: 'photo-img', alt: 'Photo ' + (idx + 1) });
-          try {
-            const byteStr = atob(p.dataUrl.split(',')[1]);
-            const mime = p.dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
-            const ab = new Uint8Array(byteStr.length);
-            for (let i = 0; i < byteStr.length; i++) ab[i] = byteStr.charCodeAt(i);
-            const blob = new Blob([ab], { type: mime });
-            const objUrl = URL.createObjectURL(blob);
-            img.src = objUrl;
-            img.onload = () => URL.revokeObjectURL(objUrl);
-          } catch(e) { img.src = p.dataUrl; } // fallback
+          fetch(p.dataUrl)
+            .then(r => r.blob())
+            .then(blob => {
+              const objUrl = URL.createObjectURL(blob);
+              img.src = objUrl;
+              img.onload = () => URL.revokeObjectURL(objUrl);
+            })
+            .catch(() => { img.src = p.dataUrl; }); // fallback: set dataUrl directly
           card.appendChild(img);
         }
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
