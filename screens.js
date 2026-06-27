@@ -957,7 +957,7 @@ export function renderStep() {
     };
     // DEBUG: fields disabled to isolate freeze
     card.appendChild(ui().el('div', { style: 'padding:12px;background:#eef;border-radius:8px;' }, 'DEBUG: fields disabled — testing Next button'));
-    return; fields.forEach(f => {
+    if (false) fields.forEach(f => {
       const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
       if (rendered) card.appendChild(rendered);
     });
