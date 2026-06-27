@@ -615,7 +615,8 @@ export function renderIntake() {
         Object.assign(ctx.inspection, data);
         ctx.stepList = buildStepList(ctx.inspection);
         setScreen('step');
-        saveNow().then(() => ctx.render());
+        ctx.render();
+        saveNow();
       } else {
         ctx.inspection = {
           ...data,
@@ -632,7 +633,8 @@ export function renderIntake() {
         ctx.currentStepIdx = 0;
         setScreen('precheck');
         ctx.startAutoSave();
-        saveNow().then(() => ctx.render());
+        ctx.render();
+        saveNow();
       }
     }}, isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192')
   ]);
@@ -689,7 +691,8 @@ export function renderPrecheck() {
     data._completedAt = new Date().toISOString();
     ctx.currentStepIdx = 1; // skip equipment step - already done here
     setScreen('step');
-    saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
+    ctx.render(); window.scrollTo(0, 0);
+    saveNow();
   };
 
   nav.appendChild(backBtn);
@@ -990,7 +993,8 @@ export function renderStep() {
         if (warnings.length) { ui().showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
         data._completedAt = new Date().toISOString();
         ctx.currentStepIdx++;
-        saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
+        ctx.render(); window.scrollTo(0, 0); // render immediately — don't block on save
+        saveNow(); // fire-and-forget save in background
         checkpointToCloud(ctx.stepList); // fire-and-forget backup - silent on failure
       } catch (e) {
         console.error('Next button error:', e);
