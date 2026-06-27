@@ -1231,12 +1231,3 @@ body {
   cursor: text;
 }
 
-/* ── Overlay safety: prevent phantom tap-blocking ──────────── */
-.room-drawer-overlay:not(.active) {
-  pointer-events: none;
-  visibility: hidden;
-}
-.search-overlay:not(.active) {
-  pointer-events: none;
-  visibility: hidden;
-}

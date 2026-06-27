@@ -10,21 +10,6 @@ import { text, textarea, date, sel, chips, photo, divider, showIf } from './fiel
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
 
-// ── Tap diagnostics ────────────────────────────────────────
-document.addEventListener('click', e => {
-  console.log('CAPTURE click target:', e.target.tagName, e.target.className);
-}, true);
-
-document.addEventListener('touchstart', e => {
-  console.log('CAPTURE touchstart target:', e.target.tagName, e.target.className);
-}, true);
-
-window.debugTapTarget = () => {
-  const x = window.innerWidth / 2;
-  const y = window.innerHeight - 40;
-  console.log('elementFromPoint at bottom center:', document.elementFromPoint(x, y));
-};
-
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
 
@@ -228,6 +213,11 @@ export function openSearch() {
 
 // ── Render ─────────────────────────────────────────────────
 export function render() {
+  // Kill any body-level overlays that may have leaked across renders
+  ['room-drawer-overlay', 'search-overlay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
   window.inspection = ctx.inspection; // expose for real-time photo upload in ui.js
   ctx.root.innerHTML = ''
   switch (getScreen()) {
@@ -993,7 +983,6 @@ export function renderStep() {
       }
     }, '\uD83C\uDFE0'),
     ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
-      alert('Next clicked - step: ' + (step && step.id));
       try {
         const missing = validateStep(step);
         if (missing.length) { ui().showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); ui().flashUncheckedItems(c); return; }
@@ -1004,7 +993,8 @@ export function renderStep() {
         saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
         checkpointToCloud(ctx.stepList); // fire-and-forget backup - silent on failure
       } catch (e) {
-        alert('Next button error: ' + (e && e.message ? e.message : String(e)));
+        console.error('Next button error:', e);
+        ui().showToast('Error: ' + (e && e.message ? e.message : String(e)));
       }
     }}, ctx.currentStepIdx < ctx.stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
   ];

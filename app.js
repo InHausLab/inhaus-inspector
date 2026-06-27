@@ -259,7 +259,11 @@ import { initScreens, render } from './screens.js';
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
+<<<<<<< HEAD
       appVersion: 'v96',
+=======
+      appVersion: 'v97',
+>>>>>>> 7b299f9 (fix: clear leaked body overlays on render, strip debug alerts, bump v97)
       success: success
     };
   }
