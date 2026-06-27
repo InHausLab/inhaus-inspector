@@ -1145,24 +1145,31 @@
       section.appendChild(grid);
     }
 
-    // ── Save photo to device camera roll via Web Share API ────────────
+    // ── Save photo to device camera roll ────────
     async function saveToDevicePhotos(dataUrl, photoId) {
+      // Method 1: auto-download (Android + desktop)
+      try {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'inhaus-' + photoId + '.jpg';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 100);
+      } catch(e) { console.warn('Auto-download failed:', e); }
+      // Method 2: Web Share API (iOS — inspector taps Save Image)
       try {
         const res = await fetch(dataUrl);
         const blob = await res.blob();
         const filename = 'inhaus-' + photoId + '.jpg';
         const file = new File([blob], filename, { type: 'image/jpeg' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          // iOS: share sheet lets inspector tap "Save Image" to camera roll
-          await navigator.share({ files: [file], title: 'InHaus Photo' });
+          await navigator.share({ files: [file], title: 'InHaus Photo — tap Save Image to keep local copy' });
         }
-        // If Web Share not supported, silently skip — Drive upload is still the backup
       } catch (e) {
-        // User dismissed share sheet or share failed — not critical
-        if (e && e.name !== 'AbortError') console.warn('Save to photos failed:', e);
+        if (e && e.name !== 'AbortError') console.warn('Share to photos failed:', e);
       }
     }
-
     async function handleFiles(files) {
       for (const file of Array.from(files)) {
         try {
