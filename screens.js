@@ -955,8 +955,7 @@ export function renderStep() {
         }
       }
     };
-    // DEBUG: render first 6 fields only
-    fields.slice(0, 6).forEach(f => {
+    fields.forEach(f => {
       const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
       if (rendered) card.appendChild(rendered);
     });
