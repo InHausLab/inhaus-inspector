@@ -280,6 +280,43 @@ export function renderHome() {
   );
   c.appendChild(modeBtn);
 
+  // ── Dev Mode toggle ─────────────────────────────────────
+  const devToggle = ui().el('button', {
+    className: 'btn btn-outline btn-full',
+    style: 'margin-top:8px;font-size:0.8rem;color:#999;border-color:#ddd;',
+    onClick: () => {
+      toggleDevMode();
+    }
+  }, isDevMode() ? '\u26a0\ufe0f Dev Mode ON \u2014 tap to disable' : 'Enable Dev Mode');
+  c.appendChild(devToggle);
+
+  // ── Jump to Step (dev only) ─────────────────────────────
+  if (isDevMode()) {
+    const jumpBtn = ui().el('button', {
+      className: 'btn btn-outline btn-full',
+      style: 'margin-top:8px;font-size:0.8rem;color:#ff9900;border-color:#ff9900;',
+      onClick: () => {
+        DB.getAll().then(all => {
+          const inProg = all.filter(x => x.status === 'in-progress');
+          if (!inProg.length) { alert('No in-progress inspection. Start one first.'); return; }
+          const insp = inProg[0];
+          ctx.inspection = insp; setInspection(ctx.inspection);
+          ctx.stepList = buildStepList(ctx.inspection);
+          const stepListStr = ctx.stepList.map((s, i) => i + ': ' + s.name + ' (' + s.type + ')').join('\n');
+          const input = prompt('Enter step number (0-' + (ctx.stepList.length - 1) + '):\n\n' + stepListStr);
+          if (input === null) return;
+          const idx = parseInt(input);
+          if (isNaN(idx) || idx < 0 || idx >= ctx.stepList.length) { alert('Invalid step number'); return; }
+          ctx.currentStepIdx = idx;
+          setScreen('step');
+          ctx.startAutoSave();
+          ctx.render();
+        });
+      }
+    }, '\u26a1 Jump to Step');
+    c.appendChild(jumpBtn);
+  }
+
   const list = ui().el('div', { className: 'inspection-list' });
   c.appendChild(list);
 
