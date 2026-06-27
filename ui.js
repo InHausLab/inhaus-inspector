@@ -2049,10 +2049,21 @@
         details.appendChild(summary);
         const inner = document.createElement('div');
         inner.style = 'padding-top:8px;';
-        (f.fields || []).forEach(sf => {
-          const rendered = renderField(sf, data, onChange, inspection, onSave);
-          if (rendered) inner.appendChild(rendered);
-        });
+        let rendered = false;
+        function renderInner() {
+          if (rendered) return;
+          rendered = true;
+          (f.fields || []).forEach(sf => {
+            const r = renderField(sf, data, onChange, inspection, onSave);
+            if (r) inner.appendChild(r);
+          });
+        }
+        // Render immediately if open by default, lazily otherwise
+        if (f.defaultOpen !== false) {
+          renderInner();
+        } else {
+          details.addEventListener('toggle', () => { if (details.open) renderInner(); }, { once: false });
+        }
         details.appendChild(inner);
         return details;
       }
