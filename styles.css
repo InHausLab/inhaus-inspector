@@ -378,6 +378,13 @@ body {
 .timer-pill-label { opacity: 0.8; }
 .timer-pill-time { font-variant-numeric: tabular-nums; }
 
+.field-render-placeholder {
+  padding: 14px 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 /* ── Photos ──────────────────────────────── */
 .photo-section { margin-top: 10px; }
 .photo-grid {

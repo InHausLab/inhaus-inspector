@@ -31,6 +31,46 @@
     return f;
   }
 
+  function lazyImage(src, className, alt) {
+    const img = el('img', {
+      className: className || '',
+      alt: alt || '',
+      loading: 'lazy',
+      decoding: 'async'
+    });
+    img.dataset.src = src;
+
+    const load = () => {
+      if (img.dataset.loaded) return;
+      img.dataset.loaded = 'true';
+      requestAnimationFrame(() => {
+        fetch(src)
+          .then(r => r.blob())
+          .then(blob => {
+            const objectUrl = URL.createObjectURL(blob);
+            img.src = objectUrl;
+            img.onload = () => URL.revokeObjectURL(objectUrl);
+          })
+          .catch(() => { img.src = src; });
+      });
+    };
+
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          io.unobserve(img);
+          load();
+        });
+      }, { rootMargin: '250px 0px' });
+      io.observe(img);
+    } else {
+      requestAnimationFrame(load);
+    }
+
+    return img;
+  }
+
   // ── Voice Dictation ────────────────────────────────────────
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const hasSpeech = !!SR;
@@ -1007,28 +1047,7 @@
           const placeholder = el('div', { className: 'photo-img', style: 'display:flex;align-items:center;justify-content:center;background:#e8f5e9;color:#2e7d32;font-size:13px;font-weight:bold;min-height:120px;border-radius:6px;' }, '\u2601\ufe0f Uploaded to Drive');
           card.appendChild(placeholder);
         } else {
-          // Lazy-load: show placeholder immediately, load image only when scrolled into view
-          const img = el('img', { className: 'photo-img', alt: 'Photo ' + (idx + 1) });
-          img.style.cssText = 'background:#f0f0f0;min-height:120px;border-radius:6px;display:block;width:100%;';
-          const loadImg = () => {
-            fetch(p.dataUrl)
-              .then(r => r.blob())
-              .then(blob => {
-                const objUrl = URL.createObjectURL(blob);
-                img.src = objUrl;
-                img.onload = () => URL.revokeObjectURL(objUrl);
-              })
-              .catch(() => { img.src = p.dataUrl; });
-          };
-          if ('IntersectionObserver' in window) {
-            const obs = new IntersectionObserver(entries => {
-              if (entries[0].isIntersecting) { obs.disconnect(); loadImg(); }
-            }, { rootMargin: '200px' });
-            obs.observe(img);
-          } else {
-            loadImg(); // fallback for browsers without IntersectionObserver
-          }
-          card.appendChild(img);
+          card.appendChild(lazyImage(p.dataUrl, 'photo-img', 'Photo ' + (idx + 1)));
         }
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
 
@@ -1220,13 +1239,18 @@
         : (Array.isArray(dv) ? dv.includes(target) : dv === target);
       const fCopy = Object.assign({}, f);
       delete fCopy.showIf;
-      const inner = renderField(fCopy, data, onChange, inspection, onSave);
-      if (!inner) return null;
       const wrapper = document.createElement('div');
       wrapper.className = 'showif-wrapper' + (visible ? '' : ' showif-hidden');
       wrapper.setAttribute('data-showif-key', f.showIf.key);
       wrapper.setAttribute('data-showif-value', JSON.stringify(f.showIf.value));
-      wrapper.appendChild(inner);
+      wrapper.setAttribute('data-showif-built', 'false');
+      wrapper._buildShowIf = function() {
+        if (wrapper.getAttribute('data-showif-built') === 'true') return;
+        const inner = renderField(fCopy, data, onChange, inspection, onSave);
+        if (inner) wrapper.appendChild(inner);
+        wrapper.setAttribute('data-showif-built', 'true');
+      };
+      if (visible) wrapper._buildShowIf();
       return wrapper;
     }
 
@@ -1591,12 +1615,6 @@
           ? 'Follow-up for: ' + roomName
           : 'Follow-up for this room / area';
         wrap.appendChild(icon); wrap.appendChild(lbl);
-        // Keep live — update if roomName changes
-        const obs = new MutationObserver(() => {
-          const rn = data.roomName || data.roomNames || data.levelLocation || '';
-          lbl.textContent = rn ? 'Follow-up for: ' + rn : 'Follow-up for this room / area';
-        });
-        obs.observe(wrap.closest('.card') || document.body, { subtree: true, childList: true, characterData: true });
         return wrap;
       }
       case 'wifi-copy': {
@@ -2042,28 +2060,25 @@
       case 'collapsible-section': {
         const details = document.createElement('details');
         details.style = 'margin: 8px 0;';
-        if (f.defaultOpen !== false) details.setAttribute('open', '');
+        const defaultOpen = f.defaultOpen !== false;
+        if (defaultOpen) details.setAttribute('open', '');
         const summary = document.createElement('summary');
         summary.style = 'font-weight:700;font-size:1rem;color:var(--primary);cursor:pointer;padding:10px 0;list-style:none;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--accent-light);';
         summary.innerHTML = f.title + ' <span style="font-size:0.8rem;color:var(--text-muted)">▾</span>';
         details.appendChild(summary);
         const inner = document.createElement('div');
         inner.style = 'padding-top:8px;';
-        let rendered = false;
-        function renderInner() {
-          if (rendered) return;
-          rendered = true;
+        let built = false;
+        function buildInner() {
+          if (built) return;
+          built = true;
           (f.fields || []).forEach(sf => {
-            const r = renderField(sf, data, onChange, inspection, onSave);
-            if (r) inner.appendChild(r);
+            const rendered = renderField(sf, data, onChange, inspection, onSave);
+            if (rendered) inner.appendChild(rendered);
           });
         }
-        // Render immediately if open by default, lazily otherwise
-        if (f.defaultOpen !== false) {
-          renderInner();
-        } else {
-          details.addEventListener('toggle', () => { if (details.open) renderInner(); }, { once: false });
-        }
+        if (defaultOpen) buildInner();
+        else details.addEventListener('toggle', () => { if (details.open) buildInner(); }, { once: true });
         details.appendChild(inner);
         return details;
       }
@@ -2482,6 +2497,9 @@
       const visible = Array.isArray(target)
         ? (Array.isArray(dv) ? target.some(t => dv.includes(t)) : target.includes(dv))
         : (Array.isArray(dv) ? dv.includes(target) : dv === target);
+      if (visible && w.getAttribute('data-showif-built') !== 'true' && typeof w._buildShowIf === 'function') {
+        w._buildShowIf();
+      }
       w.classList.toggle('showif-hidden', !visible);
     });
   }
@@ -2503,7 +2521,7 @@
   };
 
   window.UI = {
-    el, frag, renderField, renderProgressBar, renderStatusBar, renderTimersBar,
+    el, frag, lazyImage, renderField, renderProgressBar, renderStatusBar, renderTimersBar,
     renderText, renderTextarea, renderNumber, renderSelect, renderYesNo, renderRadio,
     renderCheck, renderChecklist, renderChips, renderReading, renderPhoto, renderTimer,
     renderHeading, renderInfo, renderDivider, compressImage, playAlert, fmtDate, fmtDuration,

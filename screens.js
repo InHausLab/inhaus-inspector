@@ -12,9 +12,50 @@ function ui() { return window.UI; }
 
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
+let _stepRenderJob = 0;
 
 export function initScreens(context) {
   ctx = context;
+}
+
+function renderFieldsIncrementally({ card, fields, data, onFieldChange, inspection, onSave, jobId, onComplete }) {
+  let idx = 0;
+  const placeholder = ui().el('div', { className: 'field-render-placeholder' }, 'Loading fields...');
+  card.appendChild(placeholder);
+
+  function isCurrentJob() {
+    return ctx && jobId === _stepRenderJob && document.body.contains(card);
+  }
+
+  function finish() {
+    if (!isCurrentJob()) return;
+    placeholder.remove();
+    ui().updateShowIf(card, data);
+    if (onComplete) onComplete();
+  }
+
+  function frame() {
+    if (!isCurrentJob()) return;
+
+    const started = performance.now();
+    const batch = document.createDocumentFragment();
+    let renderedThisFrame = 0;
+
+    while (idx < fields.length && renderedThisFrame < 2 && (renderedThisFrame === 0 || performance.now() - started < 6)) {
+      const f = fields[idx++];
+      const rendered = ui().renderField(f, data, onFieldChange, inspection, onSave);
+      if (rendered) batch.appendChild(rendered);
+      renderedThisFrame++;
+    }
+
+    if (batch.childNodes.length) card.insertBefore(batch, placeholder);
+    ui().updateShowIf(card, data);
+
+    if (idx < fields.length) requestAnimationFrame(frame);
+    else finish();
+  }
+
+  requestAnimationFrame(frame);
 }
 
 // ── Room Navigation Drawer ─────────────────────────────────
@@ -39,7 +80,7 @@ export function buildRoomDrawer() {
     { label: 'Wrap-Up', phases: ['wrapup', 'propdetails', 'post', 'review'] }
   ];
 
-  const overlay = ui().el('div', { id: 'room-drawer-overlay', className: 'room-drawer-overlay' });
+  const overlay = ui().el('div', { id: 'room-drawer-overlay', className: 'room-drawer-overlay active' });
   const drawer = ui().el('div', { className: 'room-drawer' });
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
@@ -131,7 +172,7 @@ export function openSearch() {
     }
   });
 
-  const overlay = ui().el('div', { id: 'search-overlay', className: 'search-overlay' });
+  const overlay = ui().el('div', { id: 'search-overlay', className: 'search-overlay active' });
   const panel = ui().el('div', { className: 'search-panel' });
 
   const inputRow = ui().el('div', { className: 'search-input-row' });
@@ -703,6 +744,7 @@ export function renderPrecheck() {
 }
 
 export function renderStep() {
+  const renderJob = ++_stepRenderJob;
   if (ctx.currentStepIdx >= ctx.stepList.length || (ctx.stepList[ctx.currentStepIdx] && ctx.stepList[ctx.currentStepIdx].type === 'review')) {
     setScreen('review');
     renderReview();
@@ -925,6 +967,7 @@ export function renderStep() {
   c.appendChild(ui().el('h1', { className: 'screen-title' }, step.name));
 
   const fieldGen = STEP_FIELDS[step.type];
+  let pendingFieldRender = null;
   if (fieldGen) {
     const fields = fieldGen();
     const card = ui().el('div', { className: 'card' });
@@ -940,20 +983,16 @@ export function renderStep() {
         }
       }
     };
-    // Render fields in batches using setTimeout to avoid blocking the main thread
-    const BATCH = 5;
-    let i = 0;
-    function renderBatch() {
-      const end = Math.min(i + BATCH, fields.length);
-      for (; i < end; i++) {
-        const rendered = ui().renderField(fields[i], data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
-        if (rendered) card.appendChild(rendered);
-      }
-      ui().updateShowIf(card, data);
-      if (i < fields.length) setTimeout(renderBatch, 0);
-    }
-    renderBatch();
     c.appendChild(card);
+    pendingFieldRender = {
+      card,
+      fields,
+      data,
+      onFieldChange,
+      inspection: ctx.inspection,
+      onSave: () => { scheduleSave(); },
+      jobId: renderJob
+    };
   }
 
   if (step.dynamic === 'lowest') {
@@ -982,21 +1021,26 @@ export function renderStep() {
 
   data._visited = true;
 
-  const navButtons = [
-    ctx.currentStepIdx > 0
-      ? ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { ctx.currentStepIdx--; ctx.render(); window.scrollTo(0, 0); } }, '\u2190 Back')
-      : ui().el('div'),
-    ui().el('button', {
-      type: 'button',
-      className: 'btn btn-outline btn-home',
-      onClick: () => {
-        if (confirm('Return to home? Your progress is saved.')) {
-          setScreen('home');
-          ctx.render();
-        }
+  const fieldsStillRendering = !!pendingFieldRender;
+  const backButton = ctx.currentStepIdx > 0
+    ? ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { ctx.currentStepIdx--; ctx.render(); window.scrollTo(0, 0); } }, '\u2190 Back')
+    : ui().el('div');
+  const homeButton = ui().el('button', {
+    type: 'button',
+    className: 'btn btn-outline btn-home',
+    onClick: () => {
+      if (confirm('Return to home? Your progress is saved.')) {
+        setScreen('home');
+        ctx.render();
       }
-    }, '\uD83C\uDFE0'),
-    ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
+    }
+  }, '\uD83C\uDFE0');
+  const nextLabel = ctx.currentStepIdx < ctx.stepList.length - 2 ? 'Next \u2192' : 'Review \u2192';
+  const nextButton = ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
+      if (nextButton.dataset.fieldsReady === 'false') {
+        ui().showToast('Finishing this section...');
+        return;
+      }
       try {
         const missing = validateStep(step);
         const warnings = warnStep(step);
@@ -1011,7 +1055,14 @@ export function renderStep() {
         console.error('Next button error:', e);
         ui().showToast('Error: ' + (e && e.message ? e.message : String(e)));
       }
-    }}, ctx.currentStepIdx < ctx.stepList.length - 2 ? 'Next \u2192' : 'Review \u2192')
+    }}, fieldsStillRendering ? 'Loading...' : nextLabel);
+  nextButton.dataset.fieldsReady = fieldsStillRendering ? 'false' : 'true';
+  if (fieldsStillRendering) nextButton.disabled = true;
+
+  const navButtons = [
+    backButton,
+    homeButton,
+    nextButton
   ];
   if (isDevMode()) {
     navButtons.push(ui().el('button', { className: 'btn btn-nav', style: 'background:#ff9900;color:#000;font-size:12px;padding:6px 10px;', onClick: () => {
@@ -1024,6 +1075,15 @@ export function renderStep() {
   const nav = ui().el('div', { className: 'bottom-nav' }, navButtons);
   c.appendChild(nav);
   ctx.root.appendChild(c);
+
+  if (pendingFieldRender) {
+    pendingFieldRender.onComplete = () => {
+      nextButton.disabled = false;
+      nextButton.dataset.fieldsReady = 'true';
+      nextButton.textContent = nextLabel;
+    };
+    renderFieldsIncrementally(pendingFieldRender);
+  }
 }
 
 // ── REVIEW SCREEN ──────────────────────────────────────────
