@@ -940,11 +940,19 @@ export function renderStep() {
         }
       }
     };
-    fields.forEach(f => {
-      const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
-      if (rendered) card.appendChild(rendered);
-    });
-    ui().updateShowIf(card, data);
+    // Render fields in batches using setTimeout to avoid blocking the main thread
+    const BATCH = 5;
+    let i = 0;
+    function renderBatch() {
+      const end = Math.min(i + BATCH, fields.length);
+      for (; i < end; i++) {
+        const rendered = ui().renderField(fields[i], data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
+        if (rendered) card.appendChild(rendered);
+      }
+      ui().updateShowIf(card, data);
+      if (i < fields.length) setTimeout(renderBatch, 0);
+    }
+    renderBatch();
     c.appendChild(card);
   }
 
