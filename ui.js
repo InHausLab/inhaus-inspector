@@ -1007,17 +1007,27 @@
           const placeholder = el('div', { className: 'photo-img', style: 'display:flex;align-items:center;justify-content:center;background:#e8f5e9;color:#2e7d32;font-size:13px;font-weight:bold;min-height:120px;border-radius:6px;' }, '\u2601\ufe0f Uploaded to Drive');
           card.appendChild(placeholder);
         } else {
-          // Use async fetch to convert dataUrl → objectURL without blocking the main thread.
-          // (The old atob+Uint8Array loop was synchronous and froze iOS Safari during render.)
+          // Lazy-load: show placeholder immediately, load image only when scrolled into view
           const img = el('img', { className: 'photo-img', alt: 'Photo ' + (idx + 1) });
-          fetch(p.dataUrl)
-            .then(r => r.blob())
-            .then(blob => {
-              const objUrl = URL.createObjectURL(blob);
-              img.src = objUrl;
-              img.onload = () => URL.revokeObjectURL(objUrl);
-            })
-            .catch(() => { img.src = p.dataUrl; }); // fallback: set dataUrl directly
+          img.style.cssText = 'background:#f0f0f0;min-height:120px;border-radius:6px;display:block;width:100%;';
+          const loadImg = () => {
+            fetch(p.dataUrl)
+              .then(r => r.blob())
+              .then(blob => {
+                const objUrl = URL.createObjectURL(blob);
+                img.src = objUrl;
+                img.onload = () => URL.revokeObjectURL(objUrl);
+              })
+              .catch(() => { img.src = p.dataUrl; });
+          };
+          if ('IntersectionObserver' in window) {
+            const obs = new IntersectionObserver(entries => {
+              if (entries[0].isIntersecting) { obs.disconnect(); loadImg(); }
+            }, { rootMargin: '200px' });
+            obs.observe(img);
+          } else {
+            loadImg(); // fallback for browsers without IntersectionObserver
+          }
           card.appendChild(img);
         }
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
