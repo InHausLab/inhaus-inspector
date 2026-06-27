@@ -956,6 +956,7 @@ export function renderStep() {
       }
     };
     fields.forEach(f => {
+      if (f.type === 'photo') return; // DEBUG: skip photo fields
       const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
       if (rendered) card.appendChild(rendered);
     });
