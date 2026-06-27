@@ -703,9 +703,12 @@ export function renderPrecheck() {
 }
 
 export function renderStep() {
-  if (ctx.currentStepIdx >= ctx.stepList.length) { setScreen('review'); ctx.render(); return; }
+  if (ctx.currentStepIdx >= ctx.stepList.length || (ctx.stepList[ctx.currentStepIdx] && ctx.stepList[ctx.currentStepIdx].type === 'review')) {
+    setScreen('review');
+    renderReview();
+    return;
+  }
   const step = ctx.stepList[ctx.currentStepIdx];
-  if (step.type === 'review') { setScreen('review'); ctx.render(); return; }
 
   const data = getStepData(step.id);
   if (!data._enteredAt) data._enteredAt = new Date().toISOString();
