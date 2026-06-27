@@ -10,6 +10,21 @@ import { text, textarea, date, sel, chips, photo, divider, showIf } from './fiel
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
 
+// ── Tap diagnostics ────────────────────────────────────────
+document.addEventListener('click', e => {
+  console.log('CAPTURE click target:', e.target.tagName, e.target.className);
+}, true);
+
+document.addEventListener('touchstart', e => {
+  console.log('CAPTURE touchstart target:', e.target.tagName, e.target.className);
+}, true);
+
+window.debugTapTarget = () => {
+  const x = window.innerWidth / 2;
+  const y = window.innerHeight - 40;
+  console.log('elementFromPoint at bottom center:', document.elementFromPoint(x, y));
+};
+
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
 
