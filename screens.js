@@ -212,21 +212,36 @@ export function openSearch() {
 }
 
 // ── Render ─────────────────────────────────────────────────
+let __rendering = false;
+let __renderCount = 0;
 export function render() {
-  // Kill any body-level overlays that may have leaked across renders
-  ['room-drawer-overlay', 'search-overlay'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-  });
-  window.inspection = ctx.inspection; // expose for real-time photo upload in ui.js
-  ctx.root.innerHTML = ''
-  switch (getScreen()) {
-    case 'home': renderHome(); break;
-    case 'truck-check': renderTruckCheck(); break;
-    case 'intake': renderIntake(); break;
-    case 'precheck': renderPrecheck(); break;
-    case 'step': renderStep(); break;
-    case 'review': renderReview(); break;
+  __renderCount++;
+  console.log('[render start]', { count: __renderCount, screen: getScreen(), stepIdx: ctx && ctx.currentStepIdx, stack: new Error().stack });
+  if (__rendering) {
+    console.error('[RE-ENTRANT RENDER BLOCKED]', { screen: getScreen(), stepIdx: ctx && ctx.currentStepIdx, stack: new Error().stack });
+    alert('Blocked re-entrant render — check console for stack trace.');
+    return;
+  }
+  __rendering = true;
+  try {
+    // Kill any body-level overlays that may have leaked across renders
+    ['room-drawer-overlay', 'search-overlay'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    window.inspection = ctx.inspection;
+    ctx.root.innerHTML = '';
+    switch (getScreen()) {
+      case 'home': renderHome(); break;
+      case 'truck-check': renderTruckCheck(); break;
+      case 'intake': renderIntake(); break;
+      case 'precheck': renderPrecheck(); break;
+      case 'step': renderStep(); break;
+      case 'review': renderReview(); break;
+    }
+  } finally {
+    __rendering = false;
+    console.log('[render end]', { count: __renderCount });
   }
 }
 
@@ -940,7 +955,9 @@ export function renderStep() {
         }
       }
     };
-    fields.forEach(f => {
+    // DEBUG: fields disabled to isolate freeze
+    card.appendChild(ui().el('div', { style: 'padding:12px;background:#eef;border-radius:8px;' }, 'DEBUG: fields disabled — testing Next button'));
+    return; fields.forEach(f => {
       const rendered = ui().renderField(f, data, onFieldChange, ctx.inspection, () => { scheduleSave(); });
       if (rendered) card.appendChild(rendered);
     });
@@ -990,15 +1007,20 @@ export function renderStep() {
     }, '\uD83C\uDFE0'),
     ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
       try {
+        console.log('[next] before validate');
         const missing = validateStep(step);
-        if (missing.length) { ui().showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); ui().flashUncheckedItems(c); return; }
+        console.log('[next] before warn');
         const warnings = warnStep(step);
+        if (missing.length) { ui().showToast(missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' still required'); ui().flashUncheckedItems(c); return; }
         if (warnings.length) { ui().showToast('\u26a0\ufe0f ' + warnings.join(', '), 3500); }
         data._completedAt = new Date().toISOString();
+        console.log('[next] before increment, idx:', ctx.currentStepIdx);
         ctx.currentStepIdx++;
-        ctx.render(); window.scrollTo(0, 0); // render immediately — don't block on save
-        saveNow(); // fire-and-forget save in background
-        checkpointToCloud(ctx.stepList); // fire-and-forget backup - silent on failure
+        console.log('[next] before render, new idx:', ctx.currentStepIdx);
+        ctx.render(); window.scrollTo(0, 0);
+        console.log('[next] after render');
+        saveNow();
+        checkpointToCloud(ctx.stepList);
       } catch (e) {
         console.error('Next button error:', e);
         ui().showToast('Error: ' + (e && e.message ? e.message : String(e)));
