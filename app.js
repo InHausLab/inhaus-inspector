@@ -259,7 +259,7 @@ import { initScreens, render } from './screens.js';
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v97',
+      appVersion: 'v98',
       success: success
     };
   }
@@ -316,9 +316,7 @@ import { initScreens, render } from './screens.js';
     updateSyncStatus('offline'); // Change 2
   });
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js').catch(e => console.log('SW failed:', e));
-  }
+  // Service worker intentionally disabled — was causing Safari freeze on cache update
 
   retryQueuedUploads();
   render();
