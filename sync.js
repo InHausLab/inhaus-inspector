@@ -10,7 +10,7 @@ import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } fr
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
 export async function scriptFetch(payload) {
-  const body = Object.assign({}, payload, { 'x-sync-secret': SYNC_SECRET });
+  const body = Object.assign({}, payload, { '_apiKey': SYNC_SECRET });
   const resp = await fetch(GOOGLE_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },

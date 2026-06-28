@@ -2,11 +2,11 @@
 
 // ── Google Drive Export Config ─────────────────────────────
 // Google Apps Script web app URL
-export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxE6XNs9hLSSN4s81Rg1wVhQNv1Yg3fjU4gCYl0Wl0epROJ-Ae5jm_FQ8dTxDFaQ0Xwkw/exec';
+export const GOOGLE_SCRIPT_URL = 'https://inhaus-inspector-proxy.mjordanjay.workers.dev';
 
 // ── Sync secret ────────────────────────────────────────────
 // Frontend token only — not a true secret. Must match SYNC_SECRET in Apps Script Properties.
-export const SYNC_SECRET = 'ihl-sync-2026';
+export const SYNC_SECRET = 'ihl-873c6c3fc4dd26a348a8ab2b9ba2a4323514273f025edb1c'; // Rotated June 28 2026 — now validated server-side only
 
 // ── Google Shared Drive Config ──────────────────────────────
 // Shared Drive folder ID where per-assessment subfolders should be created.
