@@ -249,6 +249,8 @@ export async function sendToGoogleScript(exportData) {
 // ── Step Checkpoint Sync ────────────────────────────
 // Fire-and-forget backup after each step completes.
 // Silent on failure - close-out export is still the authoritative save.
+let _checkpointFailCount = 0;
+
 export async function checkpointToCloud(stepList) {
   const inspection = getInspection();
   if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
@@ -260,10 +262,21 @@ export async function checkpointToCloud(stepList) {
     updateSyncStatus('syncing'); // Change 2
     await scriptFetch(payload);
     setLastCheckpointSucceededAt(Date.now()); // Change 1
+    _checkpointFailCount = 0; // reset on success
     updateSyncStatus('checkpoint'); // Change 2
   } catch (e) {
     console.log('Checkpoint sync skipped:', e);
+    _checkpointFailCount++;
     updateSyncStatus('failed'); // Change 2
+    // After 3 consecutive failures show a modal — data is not backed up
+    if (_checkpointFailCount >= 3) {
+      const lastOk = getLastCheckpointSucceededAt ? getLastCheckpointSucceededAt() : null;
+      const minAgo = lastOk ? Math.round((Date.now() - lastOk) / 60000) : null;
+      const msg = 'Your inspection data is NOT being backed up to the cloud.\n\n' +
+        (minAgo !== null ? 'Last successful backup: ' + minAgo + ' min ago.\n\n' : 'No successful backup yet.\n\n') +
+        'Keep this app open and on screen. Do not force-close your browser.\n\nTap OK to retry.';
+      if (confirm(msg)) { checkpointToCloud(stepList); }
+    }
   }
 }
 

@@ -544,6 +544,9 @@ export function renderTruckCheck() {
           ctx._truckCheck[item.key] = !ctx._truckCheck[item.key];
           box.className = 'check-box' + (ctx._truckCheck[item.key] ? ' checked' : '');
           box.textContent = ctx._truckCheck[item.key] ? '\u2713' : '';
+          // Persist truck check state so interruptions don’t lose progress
+          const _tcKey = 'inhausTruckCheck_' + new Date().toISOString().slice(0, 10);
+          localStorage.setItem(_tcKey, JSON.stringify(ctx._truckCheck));
           const checked = countChecked();
           progressEl.textContent = checked + ' of ' + totalItems() + ' items checked';
           continueBtn.className = 'btn btn-full ' + (allRequiredChecked() ? 'btn-primary' : 'btn-disabled');

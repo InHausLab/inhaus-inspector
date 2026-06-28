@@ -2067,7 +2067,11 @@
       case 'collapsible-section': {
         const details = document.createElement('details');
         details.style = 'margin: 8px 0;';
-        const defaultOpen = f.defaultOpen !== false;
+        // Auto-open Room Registry if no rooms have been named yet
+        let defaultOpen = f.defaultOpen !== false;
+        if (f.title && f.title.includes('Room Registry') && inspection && !inspection.regRoom_1_name) {
+          defaultOpen = true;
+        }
         if (defaultOpen) details.setAttribute('open', '');
         const summary = document.createElement('summary');
         summary.style = 'font-weight:700;font-size:1rem;color:var(--primary);cursor:pointer;padding:10px 0;list-style:none;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--accent-light);';

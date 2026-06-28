@@ -39,7 +39,9 @@ import { initScreens, render } from './screens.js';
   let stepList = [];
   let currentStepIdx = 0;
   // screen moved to state.js
-  let _truckCheck = {};
+  // Load truck check from localStorage (persists across interruptions, expires at midnight)
+  const _truckCheckKey = 'inhausTruckCheck_' + new Date().toISOString().slice(0, 10);
+  let _truckCheck = JSON.parse(localStorage.getItem(_truckCheckKey) || '{}');
   // saveTimeout moved to storage.js
   // lastSaveText moved to state.js
 
