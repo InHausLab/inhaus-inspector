@@ -175,7 +175,7 @@ import { initScreens, render } from './screens.js';
         '<div style="font-size:1.4rem;font-weight:800;text-align:center;margin-bottom:8px;">PHOTO ERROR — DO NOT CLOSE APP</div>' +
         '<div style="color:#fca5a5;font-size:0.95rem;margin-bottom:16px;text-align:center;">' +
           lostCount + ' photo' + (lostCount === 1 ? '' : 's') + ' cannot be found on device or in Drive.<br>' +
-          'Do NOT close this app. Call Matt now.' +
+          'Do NOT close this app. Call support now: <a href="tel:+19706183064" style="color:#fff;font-weight:800;">970-618-3064</a>' +
         '</div>' +
         '<div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;width:100%;max-width:420px;font-size:0.82rem;color:#fca5a5;white-space:pre-wrap;">' +
           (receipt && receipt.lostDesc ? receipt.lostDesc : '') +

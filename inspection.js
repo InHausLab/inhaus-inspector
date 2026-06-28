@@ -38,6 +38,9 @@ export function extractAllPhotosFromExport(exportData) {
 
 export function stripPhotosFromExport(exportData) {
   const stripped = JSON.parse(JSON.stringify(exportData));
+  // Strip sensitive fields — WiFi password must not be in Drive/Sheets export
+  if (stripped.wifiPassword) delete stripped.wifiPassword;
+  if (stripped.intake && stripped.intake.wifiPassword) delete stripped.intake.wifiPassword;
   function stripFromSection(s) {
     if (!s) return;
     for (const k of Object.keys(s)) {
