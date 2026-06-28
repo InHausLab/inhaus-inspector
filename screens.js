@@ -326,15 +326,24 @@ export function renderHome() {
   );
   c.appendChild(modeBtn);
 
-  // ── Dev Mode toggle ─────────────────────────────────────
+  // ── Dev Mode toggle (hidden in Advanced section) ────────
+  const advancedSection = ui().el('details', { style: 'margin-top:16px;' });
+  const advancedSummary = ui().el('summary', {
+    style: 'font-size:0.75rem;color:#999;cursor:pointer;list-style:none;text-align:center;'
+  }, '\u2699\ufe0f Advanced');
+  advancedSection.appendChild(advancedSummary);
   const devToggle = ui().el('button', {
     className: 'btn btn-outline btn-full',
     style: 'margin-top:8px;font-size:0.8rem;color:#999;border-color:#ddd;',
     onClick: () => {
+      if (!isDevMode()) {
+        if (!confirm('\u26a0\ufe0f Dev Mode disables completion requirements and adds Skip buttons.\n\nOnly use for testing. Enable?')) return;
+      }
       toggleDevMode();
     }
   }, isDevMode() ? '\u26a0\ufe0f Dev Mode ON \u2014 tap to disable' : 'Enable Dev Mode');
-  c.appendChild(devToggle);
+  advancedSection.appendChild(devToggle);
+  c.appendChild(advancedSection);
 
   // ── Jump to Step (dev only) ─────────────────────────────
   if (isDevMode()) {

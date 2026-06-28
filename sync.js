@@ -44,9 +44,18 @@ export function updateSyncStatus(state, detail) {
   };
   var bestSync = Math.max(getLastSuccessfulCloudSyncAt() || 0, getLastCheckpointSucceededAt() || 0);
   var timeAgo = '';
-  if (bestSync && (state === 'local' || state === 'synced')) {
-    var min = Math.round((Date.now() - bestSync) / 60000);
-    if (min >= 1) timeAgo = ' (' + min + ' min ago)';
+  if (state === 'local' || state === 'synced') {
+    if (bestSync) {
+      var min = Math.round((Date.now() - bestSync) / 60000);
+      if (min >= 1) timeAgo = ' (' + min + ' min ago)';
+    }
+  } else if (state === 'failed') {
+    if (bestSync) {
+      var minFailed = Math.round((Date.now() - bestSync) / 60000);
+      timeAgo = ' — last backup ' + (minFailed < 1 ? 'just now' : minFailed + ' min ago');
+    } else {
+      timeAgo = ' — no backup yet';
+    }
   }
   var fullText = (LABELS[state] || state) + timeAgo + (detail ? ' — ' + detail : '');
   setLastSaveText(fullText);
@@ -290,6 +299,11 @@ export async function submitInspection(exportData) {
     setLastSuccessfulCloudSyncAt(Date.now()); // Change 1
     updateSyncStatus('synced'); // Change 2
     showUploadBanner('success', '\u2713 Saved to Google Drive');
+    // Auto-disable Dev Mode after successful final sync
+    if (localStorage.getItem('inhausDevMode') === 'true') {
+      localStorage.setItem('inhausDevMode', 'false');
+      console.log('Dev Mode auto-disabled after successful final sync');
+    }
     return true;
   } catch (e) {
     console.log('Upload failed, queuing for retry:', e);
