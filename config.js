@@ -2,7 +2,7 @@
 
 // ── Google Drive Export Config ─────────────────────────────
 // Google Apps Script web app URL
-export const GOOGLE_SCRIPT_URL = 'https://inhaus-inspector-proxy.mjordanjay.workers.dev';
+export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyhc5oLNk8yDglLqn8gshhugvdY4kEG1UtbWPFNYR9MIKzjFaPbA_ZcJvQuXBF8fO901w/exec';
 
 // ── Sync secret ────────────────────────────────────────────
 // Frontend token only — not a true secret. Must match SYNC_SECRET in Apps Script Properties.
