@@ -151,8 +151,13 @@ import { initScreens, render } from './screens.js';
       overlay.style.background = 'rgba(0,0,0,0.88)';
       overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:16px;">⏳</div>' +
         '<div style="color:#fff;font-size:1.3rem;font-weight:800;text-align:center;">Final sync in progress…</div>' +
-        '<div style="color:#ccc;font-size:0.95rem;margin-top:8px;text-align:center;">Do not close the app</div>';
-      // NOT dismissable while syncing
+        '<div style="color:#ccc;font-size:0.95rem;margin-top:8px;text-align:center;">Do not close the app</div>' +
+        '<div id="sync-timeout-msg" style="color:#aaa;font-size:0.85rem;margin-top:16px;text-align:center;display:none;">Taking longer than expected. <span onclick="document.getElementById(\"final-sync-overlay\").remove()" style="color:#f59e0b;text-decoration:underline;cursor:pointer;">Tap to dismiss and retry later.</span></div>';
+      // Show escape hatch after 60 seconds if still stuck
+      setTimeout(function() {
+        var msg = document.getElementById('sync-timeout-msg');
+        if (msg) msg.style.display = 'block';
+      }, 60000);
 
     } else if (state === 'success') {
       overlay.style.background = '#16a34a';
@@ -344,17 +349,30 @@ import { initScreens, render } from './screens.js';
       // Change 5: time-based warning - not synced to Drive in 30+ min
       const THIRTY_MIN = 30 * 60 * 1000;
       const notSynced = getLastSuccessfulCloudSyncAt() === null || (Date.now() - getLastSuccessfulCloudSyncAt()) > THIRTY_MIN;
-      if (notSynced && inspection && getScreen() === 'step') {
+      const wasDismissed = sessionStorage.getItem('syncWarnDismissed') === '1';
+      const lastSync = getLastSuccessfulCloudSyncAt();
+      // Clear dismissed flag if a successful sync happened after dismissal
+      if (wasDismissed && lastSync && lastSync > parseInt(sessionStorage.getItem('syncWarnDismissedAt')||'0')) {
+        sessionStorage.removeItem('syncWarnDismissed');
+        sessionStorage.removeItem('syncWarnDismissedAt');
+      }
+      if (notSynced && inspection && getScreen() === 'step' && !sessionStorage.getItem('syncWarnDismissed')) {
         let syncWarn = document.getElementById('sync-age-warning');
         if (!syncWarn) {
           syncWarn = document.createElement('div');
           syncWarn.id = 'sync-age-warning';
           syncWarn.style.cssText = 'position:fixed;bottom:80px;left:0;right:0;background:#d97706;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:8px 12px;z-index:9990;cursor:pointer;';
-          syncWarn.addEventListener('click', () => { syncWarn.remove(); checkpointToCloud(stepList); updateSyncStatus('syncing'); });
+          syncWarn.addEventListener('click', () => {
+            sessionStorage.setItem('syncWarnDismissed', '1');
+            sessionStorage.setItem('syncWarnDismissedAt', Date.now().toString());
+            syncWarn.remove();
+            checkpointToCloud(stepList);
+            updateSyncStatus('syncing');
+          });
           document.body.appendChild(syncWarn);
         }
-        syncWarn.textContent = '\u26a0\ufe0f Not synced to Drive in 30+ min \u2014 tap Sync now to protect your data';
-      } else {
+        syncWarn.textContent = '\u26a0\ufe0f Not synced to Drive in 30+ min \u2014 tap to sync now';
+      } else if (!notSynced || sessionStorage.getItem('syncWarnDismissed')) {
         const existing = document.getElementById('sync-age-warning');
         if (existing) existing.remove();
       }
