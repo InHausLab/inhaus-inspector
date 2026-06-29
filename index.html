@@ -15,16 +15,32 @@
 <body>
   <div id="app"></div>
   <script>
-    // Unregister any existing service workers immediately
+    // Service worker registration - safe iOS Safari pattern
+    // NO skipWaiting (causes Safari freeze), YES clients.claim in activate
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(r => r.unregister());
+      navigator.serviceWorker.register('/service-worker.js', {
+        updateViaCache: 'none' // bypass GitHub Pages caching of sw.js
+      }).then(reg => {
+        reg.addEventListener('updatefound', () => {
+          var newSW = reg.installing;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              // Show update banner - don't force reload mid-inspection
+              var banner = document.createElement('div');
+              banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1d4ed8;color:#fff;padding:12px 16px;font-size:14px;font-weight:600;z-index:99999;display:flex;justify-content:space-between;align-items:center;';
+              banner.innerHTML = 'App update available <button onclick="window.location.reload()" style="background:#fff;color:#1d4ed8;border:none;padding:6px 12px;border-radius:4px;font-weight:700;cursor:pointer;">Reload</button>';
+              document.body.appendChild(banner);
+            }
+          });
+        });
+      }).catch(err => {
+        console.warn('SW registration failed:', err);
       });
     }
   </script>
   <script src="db.js"></script>
   <script src="ui.js"></script>
   <script type="module" src="app.js"></script>
-  <div style="position:fixed;top:8px;right:10px;background:#6b7280;color:#fff;font-size:10px;padding:2px 7px;border-radius:999px;z-index:9999;pointer-events:none;opacity:0.6;"id="version-badge">v116</div>
+  <div style="position:fixed;top:8px;right:10px;background:#6b7280;color:#fff;font-size:10px;padding:2px 7px;border-radius:999px;z-index:9999;pointer-events:none;opacity:0.6;"id="version-badge">v117</div>
 </body>
 </html>
