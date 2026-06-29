@@ -261,6 +261,7 @@ export function render() {
   });
   window.inspection = ctx.inspection;
   ctx.root.innerHTML = '';
+  window.scrollTo(0, 0);
   switch (getScreen()) {
     case 'home': renderHome(); break;
     case 'truck-check': renderTruckCheck(); break;

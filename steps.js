@@ -22,42 +22,6 @@ export function getEquipmentFields() {
 // ── #3: Arrival & Setup (expanded) ─────────────────────────
 export function getArrivalFields() {
   return [
-    // ── ROOM REGISTRY ────────────────────────────────────────
-    collapsible('\ud83c\udfe0 Room Registry', [
-      info('Name every room ONCE here. These names will be referenced for test locations, photo labels, Q-Trak rooms, and the report throughout the inspection.'),
-      text('regRoom_1_name', 'Room 1 Name', { placeholder: 'e.g. Primary Bedroom' }),
-      sel('regRoom_1_level', 'Room 1 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_1_desc', 'Room 1 Description', { placeholder: 'e.g. NW corner \u2014 master suite' }),
-      divider(),
-      text('regRoom_2_name', 'Room 2 Name', { placeholder: 'e.g. Guest Bedroom' }),
-      sel('regRoom_2_level', 'Room 2 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_2_desc', 'Room 2 Description', { placeholder: 'e.g. NE corner' }),
-      divider(),
-      text('regRoom_3_name', 'Room 3 Name', { placeholder: 'e.g. Living Room' }),
-      sel('regRoom_3_level', 'Room 3 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_3_desc', 'Room 3 Description', { placeholder: 'e.g. Open plan, front of house' }),
-      divider(),
-      text('regRoom_4_name', 'Room 4 Name', { placeholder: 'e.g. Dining Room' }),
-      sel('regRoom_4_level', 'Room 4 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_4_desc', 'Room 4 Description', { placeholder: 'e.g. Adjacent to kitchen' }),
-      divider(),
-      text('regRoom_5_name', 'Room 5 Name', { placeholder: 'e.g. Office' }),
-      sel('regRoom_5_level', 'Room 5 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_5_desc', 'Room 5 Description', { placeholder: 'e.g. SE corner, second floor' }),
-      divider(),
-      text('regRoom_6_name', 'Room 6 Name (if needed)', { placeholder: 'e.g. Basement Rec Room' }),
-      sel('regRoom_6_level', 'Room 6 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_6_desc', 'Room 6 Description', { placeholder: 'e.g. Finished, west side' }),
-      divider(),
-      text('regRoom_7_name', 'Room 7 Name (if needed)', { placeholder: 'e.g. Laundry Room' }),
-      sel('regRoom_7_level', 'Room 7 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_7_desc', 'Room 7 Description', { placeholder: 'e.g. Basement' }),
-      divider(),
-      text('regRoom_8_name', 'Room 8 Name (if needed)', { placeholder: 'e.g. Sunroom' }),
-      sel('regRoom_8_level', 'Room 8 Level', ['Basement / Lowest Level', 'Ground Floor / Main', '2nd Floor', '3rd Floor', '4th Floor', 'Attic / Other']),
-      text('regRoom_8_desc', 'Room 8 Description', { placeholder: 'e.g. Addition, south side' })
-    ], { defaultOpen: false }),
-    divider(),
     // ── DATA: always visible ────────────────────
     timeInput('assessmentStartTime', 'Assessment Start Time'),
     text('utilityRoomLevel', 'Utility Room Location \u2014 which level?'),
