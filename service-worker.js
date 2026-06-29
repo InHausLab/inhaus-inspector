@@ -9,7 +9,7 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v117';
+const CACHE_NAME = 'inhaus-v120';
 
 const APP_SHELL = [
   '/',
