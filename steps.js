@@ -522,36 +522,6 @@ export function getDebriefFields() {
   ];
 }
 
-// ── Actions Taken / Assessment Observations helpers ────────
-export function postActionsTakenFields() {
-  const items = [];
-  for (let i = 1; i <= 6; i++) {
-    if (i > 1) items.push(divider());
-    items.push(text(`actionTaken_${i}_desc`, `Action ${i}`, {
-      placeholder: 'e.g. Replaced HVAC filter - 20x20x1 MERV 11, installed new (tap \uD83C\uDF99 mic in keyboard)'
-    }));
-    items.push(text(`actionTaken_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #045' }));
-    items.push(photo(`Actions Taken ${i}`, `_actionPhoto_${i}`));
-  }
-  return items;
-}
-
-export function postObservationFields() {
-  const items = [];
-  for (let i = 1; i <= 6; i++) {
-    if (i > 1) items.push(divider());
-    items.push(text(`obs_${i}_location`, `Observation ${i} - Room`, {
-      placeholder: 'e.g. Primary Bathroom'
-    }));
-    items.push(textarea(`obs_${i}_note`, 'Observation', {
-      placeholder: 'e.g. Active moisture staining on drywall below showerhead - no active drip at time of inspection. (tap \uD83C\uDF99 mic in keyboard)'
-    }));
-    items.push(text(`obs_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #023' }));
-    items.push(photo(`Observation ${i}`, `_obsPhoto_${i}`));
-  }
-  return items;
-}
-
 // ── #7: Post-Assessment (new) ──────────────────────────────
 export function getPostAssessmentFields() {
   return [
@@ -581,14 +551,6 @@ export function getPostAssessmentFields() {
       { key: 'allSamplesShipped', label: 'All samples shipped' },
       { key: 'assessmentComplete', label: 'Assessment marked Complete' }
     ]),
-    divider(),
-    heading('Actions Taken During Assessment'),
-    info('Document what you physically did on-site (replaced filter, cleaned under sink, etc.). Each entry appears in the report. Specify the photo number for each callout.'),
-    ...postActionsTakenFields(),
-    divider(),
-    heading('Assessment Observations'),
-    info('Notable findings for the report - include location, what you saw, and a photo for each. Specify photo number for each callout. Leave unused entries blank.'),
-    ...postObservationFields(),
     divider(),
     heading('Test Locations Summary'),
     info('Confirm exactly where each test was taken - this context appears in lab submissions and the report.'),
