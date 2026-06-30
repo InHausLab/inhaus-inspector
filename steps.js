@@ -178,7 +178,7 @@ export function getRoomTestFields() {
       { key: 'labelRooms', label: 'Label rooms using Q-Trak naming convention (e.g. Bedroom 1, Bedroom 2)' }
     ]},
     text('roomName', 'Room Name', { required: true }),
-    radio('roomType', 'Room Type', ['Bedroom', 'Bathroom', 'Office', 'Storage', 'Other']),
+    radio('roomType', 'Room Type', ['Bedroom', 'Bathroom', 'Office', 'Storage', 'Kitchen', 'Living Room', 'Other']),
     ...flirFields(),
     ...breezeFields(),
     ...qtrakSection(),
