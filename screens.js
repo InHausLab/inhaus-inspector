@@ -623,6 +623,13 @@ export function renderTruckCheck() {
   function allRequiredChecked() {
     return allRequired.every(i => !!ctx._truckCheck[i.key]);
   }
+  function missingRequiredItems() {
+    return allRequired.filter(i => !ctx._truckCheck[i.key]);
+  }
+  function persistTruckCheck() {
+    const _tcKey = 'inhausTruckCheck_' + new Date().toISOString().slice(0, 10);
+    localStorage.setItem(_tcKey, JSON.stringify(ctx._truckCheck));
+  }
 
   const c = ui().el('div', { className: 'screen' });
   c.appendChild(buildAppHeader());
@@ -645,6 +652,45 @@ export function renderTruckCheck() {
   // Progress counter
   const progressEl = ui().el('div', { className: 'truck-check-progress' }, countChecked() + ' of ' + totalItems() + ' items checked');
   card.appendChild(progressEl);
+  let continueBtn = null;
+  let continueHint = null;
+  let missingNotice = null;
+
+  function updateContinueState() {
+    const missing = missingRequiredItems();
+    const ready = missing.length === 0;
+    if (continueBtn) {
+      continueBtn.className = 'btn btn-full ' + (ready ? 'btn-primary' : 'btn-outline');
+      continueBtn.setAttribute('data-ready', ready ? 'true' : 'false');
+    }
+    if (continueHint) {
+      continueHint.className = 'truck-check-continue-hint ' + (ready ? 'ready' : 'blocked');
+      continueHint.textContent = ready ? 'Ready for intake' : missing.length + ' required item' + (missing.length === 1 ? '' : 's') + ' left';
+    }
+    if (ready && missingNotice) missingNotice.innerHTML = '';
+  }
+
+  function showMissingRequiredItems() {
+    const missing = missingRequiredItems();
+    if (!missing.length) return false;
+    const firstRow = card.querySelector('[data-truck-key="' + missing[0].key + '"]');
+    if (firstRow) {
+      firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstRow.classList.add('check-item-missing');
+      setTimeout(() => firstRow.classList.remove('check-item-missing'), 1800);
+    }
+    if (missingNotice) {
+      missingNotice.innerHTML = '';
+      missingNotice.appendChild(ui().el('strong', null, missing.length + ' required item' + (missing.length === 1 ? '' : 's') + ' left'));
+      missing.slice(0, 6).forEach(i => {
+        missingNotice.appendChild(ui().el('div', null, i.label));
+      });
+      if (missing.length > 6) {
+        missingNotice.appendChild(ui().el('div', null, '+' + (missing.length - 6) + ' more'));
+      }
+    }
+    return true;
+  }
 
   // Sections
   SECTIONS.forEach(section => {
@@ -656,17 +702,15 @@ export function renderTruckCheck() {
       const labelText = item.label + (item.asNeeded ? ' (as needed)' : !item.required ? ' (optional)' : '');
       const row = ui().el('div', {
         className: 'check-item' + (!item.required ? ' optional-item' : ''),
+        'data-truck-key': item.key,
         onClick: () => {
           ctx._truckCheck[item.key] = !ctx._truckCheck[item.key];
           box.className = 'check-box' + (ctx._truckCheck[item.key] ? ' checked' : '');
           box.textContent = ctx._truckCheck[item.key] ? '\u2713' : '';
-          // Persist truck check state so interruptions don’t lose progress
-          const _tcKey = 'inhausTruckCheck_' + new Date().toISOString().slice(0, 10);
-          localStorage.setItem(_tcKey, JSON.stringify(ctx._truckCheck));
+          persistTruckCheck();
           const checked = countChecked();
           progressEl.textContent = checked + ' of ' + totalItems() + ' items checked';
-          continueBtn.className = 'btn btn-full ' + (allRequiredChecked() ? 'btn-primary' : 'btn-disabled');
-          continueBtn.disabled = !allRequiredChecked();
+          updateContinueState();
         }
       });
       row.appendChild(box);
@@ -676,18 +720,22 @@ export function renderTruckCheck() {
   });
 
   // Continue button
-  const ready = allRequiredChecked();
-  const continueBtn = ui().el('button', {
-    className: 'btn btn-full ' + (ready ? 'btn-primary' : 'btn-disabled'),
-    disabled: !ready,
-    onClick: () => {
-      if (!allRequiredChecked()) return;
+  continueBtn = ui().el('button', {
+    type: 'button',
+    className: 'btn btn-full ' + (allRequiredChecked() ? 'btn-primary' : 'btn-outline'),
+    onClick: e => {
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      if (showMissingRequiredItems()) return;
       setScreen('intake');
       ctx.render();
     }
   }, 'Continue \u2192');
+  continueHint = ui().el('div', { className: 'truck-check-continue-hint' });
+  missingNotice = ui().el('div', { className: 'truck-check-missing-list' });
+  updateContinueState();
 
-  card.appendChild(ui().el('div', { style: 'margin-top: 1.5rem;' }, [continueBtn]));
+  card.appendChild(ui().el('div', { style: 'margin-top: 1.5rem;' }, [continueBtn, continueHint, missingNotice]));
   c.appendChild(card);
   ctx.root.appendChild(c);
 }

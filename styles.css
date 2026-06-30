@@ -109,6 +109,34 @@ body {
 .truck-check-reset-bar { padding: 8px 0 4px 0; }
 .truck-check-subtitle { color: var(--text-muted); margin: 4px 0 12px 0; font-size: 1.05rem; }
 .truck-check-progress { font-size: 1rem; font-weight: 600; color: var(--primary); background: var(--accent-light); padding: 8px 12px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
+.truck-check-continue-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-top: 6px;
+  text-align: center;
+}
+.truck-check-continue-hint.blocked { color: #92400e; }
+.truck-check-continue-hint.ready { color: #166534; }
+.truck-check-missing-list {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #7c2d12;
+  display: grid;
+  font-size: 0.82rem;
+  gap: 4px;
+  line-height: 1.25;
+  margin-top: 8px;
+  padding: 0;
+}
+.truck-check-missing-list:not(:empty) { padding: 10px 12px; }
+.truck-check-missing-list strong {
+  color: #92400e;
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
+}
 .btn-small { min-height: 48px; padding: 10px 18px; font-size: 1rem; }
 .btn-nav { min-width: 150px; font-size: 1.2rem; }
 .btn-home { min-width: auto; padding: 16px 20px; font-size: 1.4rem; }
@@ -303,6 +331,13 @@ body {
   min-height: 56px;
 }
 .check-item:last-child { border-bottom: none; }
+.check-item-missing {
+  background: #fff7ed;
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px #fed7aa inset;
+  padding-left: 8px;
+  padding-right: 8px;
+}
 .check-box {
   width: 36px; height: 36px; min-width: 36px;
   border: 3px solid var(--border); border-radius: 8px;
