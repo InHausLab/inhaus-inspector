@@ -343,13 +343,15 @@ export async function sendToGoogleScript(exportData) {
 // Fire-and-forget backup after each step completes.
 // Silent on failure - close-out export is still the authoritative save.
 let _checkpointFailCount = 0;
+let _lastCheckpointStepList = [];
 
 export async function checkpointToCloud(stepList) {
   const inspection = getInspection();
   if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+  if (Array.isArray(stepList)) _lastCheckpointStepList = stepList;
   setLastCheckpointAttemptAt(Date.now()); // Change 1
   try {
-    const exportData = buildExportJSON(stepList);
+    const exportData = buildExportJSON(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
     const payload = stripPhotosFromExport(exportData);
     payload._checkpoint = true;
     updateSyncStatus('syncing'); // Change 2

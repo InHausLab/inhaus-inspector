@@ -266,7 +266,7 @@ import { initScreens, render } from './screens.js';
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v123',
+      appVersion: 'v124',
       success: success
     };
   }
