@@ -1,7 +1,7 @@
 // InHaus Inspector - Shared Mutable State
 
 let _inspection = null;
-let _screen = 'home'; // home | truck-check | intake | precheck | step | review
+let _screen = 'home'; // home | truck-check | intake | precheck | step | review | photos
 let _syncStatus = 'local'; // local | synced | syncing | checkpoint | failed | offline | final-failed
 let _dirty = false;
 

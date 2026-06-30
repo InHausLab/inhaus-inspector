@@ -1,6 +1,6 @@
 // InHaus Inspector - Screen Rendering
 import { VISION_PROXY_URL } from './config.js';
-import { setInspection, getScreen, setScreen, getLastSaveText } from './state.js';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js';
 import { saveNow, scheduleSave } from './storage.js';
 import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js';
 import { checkpointToCloud, submitInspection } from './sync.js';
@@ -84,6 +84,81 @@ function collectInspectionIssues() {
   });
 
   return issues;
+}
+
+function visitScreenPhotos(insp, callback) {
+  const seen = new Set();
+  function walk(obj, path) {
+    if (!obj || typeof obj !== 'object' || seen.has(obj)) return;
+    seen.add(obj);
+    if (Array.isArray(obj)) {
+      if (obj.length && obj[0] && typeof obj[0].photoId === 'string') {
+        obj.forEach((photo, idx) => callback(photo, path + '[' + idx + ']'));
+      } else {
+        obj.forEach((item, idx) => walk(item, path + '[' + idx + ']'));
+      }
+      return;
+    }
+    Object.keys(obj).forEach(key => {
+      if (key === '_photoRetryQueue') return;
+      walk(obj[key], path ? path + '.' + key : key);
+    });
+  }
+  walk(insp, 'inspection');
+}
+
+function getStepNameFromPhotoPath(path) {
+  if (!ctx || !ctx.stepList || !path) return '';
+  const match = path.match(/stepData\.([^.[\]]+)/);
+  if (!match) return '';
+  const step = ctx.stepList.find(s => s.id === match[1]);
+  return step ? step.name : '';
+}
+
+function collectInspectionPhotoRefs() {
+  const refs = [];
+  if (!ctx || !ctx.inspection) return refs;
+  visitScreenPhotos(ctx.inspection, (photo, path) => {
+    if (!photo || !photo.photoId) return;
+    const stepName = photo.stepName || getStepNameFromPhotoPath(path);
+    refs.push({
+      photo,
+      path,
+      stepName,
+      title: photo.roomName || stepName || 'Inspection photo'
+    });
+  });
+  return refs;
+}
+
+function getPhotoPreviewSrc(photo) {
+  if (!photo) return '';
+  if (photo.thumbnailDataUrl) return photo.thumbnailDataUrl;
+  if (photo.dataUrl && photo.dataUrl !== '__uploaded__') return photo.dataUrl;
+  return '';
+}
+
+function getPhotoStatus(photo) {
+  const hasLocal = !!(photo && photo.dataUrl && photo.dataUrl !== '__uploaded__');
+  const hasDrive = !!(photo && (photo.driveUrl || photo.driveId));
+  const hasVault = !!(photo && photo._vaultSaved);
+  if (hasDrive && hasLocal) return { label: 'Drive + phone', tone: 'good' };
+  if (hasDrive) return { label: 'Drive', tone: 'good' };
+  if (hasLocal || hasVault) return { label: 'Waiting', tone: 'wait' };
+  return { label: 'Missing', tone: 'bad' };
+}
+
+function getCloudLabel() {
+  const lastCloud = getBestCloudSyncAt();
+  if (!lastCloud) return 'No backup yet';
+  return 'Last backup ' + new Date(lastCloud).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatPhotoTime(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function formatIssueList(issues) {
@@ -299,6 +374,7 @@ export function render() {
     case 'precheck': renderPrecheck(); break;
     case 'step': renderStep(); break;
     case 'review': renderReview(); break;
+    case 'photos': renderPhotos(); break;
   }
 }
 
@@ -1141,30 +1217,199 @@ export function renderStep() {
   }
 }
 
+// ── PHOTOS SCREEN ──────────────────────────────────────────
+export function renderPhotos() {
+  if (!ctx.inspection) {
+    setScreen('home');
+    ctx.render();
+    return;
+  }
+
+  const c = ui().el('div', { className: 'screen photos-screen' });
+  c.appendChild(buildAppHeader('Photos'));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
+
+  const topActions = ui().el('div', { className: 'photo-review-toolbar' });
+  topActions.appendChild(ui().el('button', {
+    className: 'btn btn-outline',
+    onClick: () => { setScreen('review'); ctx.render(); }
+  }, 'Back to Review'));
+  const rescueBtn = ui().el('button', {
+    className: 'btn btn-secondary',
+    onClick: async () => {
+      rescueBtn.disabled = true;
+      rescueBtn.textContent = 'Preparing...';
+      try {
+        const ok = window.exportLocalPhotoBackup ? await window.exportLocalPhotoBackup() : false;
+        rescueBtn.textContent = ok ? 'Backup Ready' : 'Rescue Photos';
+      } catch (err) {
+        alert('Photo rescue failed: ' + (err && err.message ? err.message : String(err)));
+        rescueBtn.textContent = 'Rescue Photos';
+      } finally {
+        rescueBtn.disabled = false;
+      }
+    }
+  }, 'Rescue Photos');
+  const cloudCheckBtn = ui().el('button', {
+    className: 'btn btn-primary',
+    onClick: async () => {
+      cloudCheckBtn.disabled = true;
+      cloudCheckBtn.textContent = 'Checking...';
+      const result = window.runCloudPreflight ? await window.runCloudPreflight() : { ok: false, message: 'Cloud check unavailable' };
+      cloudCheckBtn.textContent = result.ok ? 'Cloud Ready' : 'Cloud Failed';
+      if (!result.ok) alert('Cloud check failed: ' + (result.message || 'Unknown error'));
+      setTimeout(() => { cloudCheckBtn.textContent = 'Cloud Check'; cloudCheckBtn.disabled = false; }, 2500);
+      renderPhotoSummary();
+    }
+  }, 'Cloud Check');
+  topActions.appendChild(rescueBtn);
+  topActions.appendChild(cloudCheckBtn);
+  c.appendChild(topActions);
+
+  const summaryCard = ui().el('div', { className: 'card photo-review-summary' });
+  summaryCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Photo Status'));
+  const summaryBody = ui().el('div', { className: 'photo-health-grid' }, 'Checking...');
+  summaryCard.appendChild(summaryBody);
+  c.appendChild(summaryCard);
+
+  const list = ui().el('div', { className: 'photo-review-list' });
+  c.appendChild(list);
+
+  function statusPill(label, tone) {
+    return ui().el('span', { className: 'photo-status-pill photo-status-' + tone }, label);
+  }
+
+  function renderPhotoSummary() {
+    if (!window.getPhotoHealth) {
+      summaryBody.textContent = 'Photo check unavailable.';
+      return;
+    }
+    window.getPhotoHealth().then(h => {
+      summaryBody.innerHTML = '';
+      summaryBody.appendChild(statusPill(h.total + ' total', 'neutral'));
+      summaryBody.appendChild(statusPill(h.local + ' phone', 'good'));
+      summaryBody.appendChild(statusPill(h.drive + ' Drive', 'good'));
+      summaryBody.appendChild(statusPill(h.pending + ' waiting', h.pending ? 'wait' : 'good'));
+      summaryBody.appendChild(statusPill(h.missing + ' missing', h.missing ? 'bad' : 'good'));
+      if (h.vaultOnly > 0) summaryBody.appendChild(statusPill(h.vaultOnly + ' vault only', 'wait'));
+    }).catch(err => {
+      summaryBody.textContent = 'Photo check failed: ' + (err && err.message ? err.message : String(err));
+    });
+  }
+
+  function renderPhotoCard(ref, idx) {
+    const p = ref.photo;
+    const card = ui().el('div', { className: 'photo-review-card' });
+    const preview = getPhotoPreviewSrc(p);
+    const media = ui().el('div', { className: 'photo-review-media' });
+    if (preview) {
+      media.appendChild(ui().el('img', {
+        className: 'photo-review-img',
+        src: preview,
+        loading: 'lazy',
+        alt: 'Photo ' + (idx + 1)
+      }));
+    } else {
+      media.appendChild(ui().el('div', { className: 'photo-review-placeholder' }, p.driveUrl || p.driveId ? 'In Drive' : 'No preview'));
+    }
+    card.appendChild(media);
+
+    const body = ui().el('div', { className: 'photo-review-body' });
+    body.appendChild(ui().el('div', { className: 'photo-review-title' }, ref.title));
+    const meta = [ref.stepName && ref.stepName !== ref.title ? ref.stepName : '', formatPhotoTime(p.timestamp)].filter(Boolean).join(' | ');
+    if (meta) body.appendChild(ui().el('div', { className: 'photo-review-meta' }, meta));
+
+    const status = getPhotoStatus(p);
+    const statusRow = ui().el('div', { className: 'photo-status-row' });
+    statusRow.appendChild(statusPill(status.label, status.tone));
+    if (p._vaultSaved) statusRow.appendChild(statusPill('Vault', 'good'));
+    if (p.driveUrl || p.driveId) statusRow.appendChild(statusPill('Drive confirmed', 'good'));
+    if (p.dataUrl && p.dataUrl !== '__uploaded__') statusRow.appendChild(statusPill('Phone copy', 'good'));
+    body.appendChild(statusRow);
+
+    const cap = ui().el('textarea', {
+      className: 'photo-caption-input',
+      rows: 2,
+      placeholder: 'Caption'
+    });
+    cap.value = p.caption || '';
+    cap.addEventListener('input', () => {
+      p.caption = cap.value;
+      if (window.DB && window.DB.updatePhoto && p.photoId) {
+        window.DB.updatePhoto(p.photoId, { caption: p.caption, updatedAt: Date.now() });
+      }
+      scheduleSave();
+    });
+    body.appendChild(cap);
+
+    if (p.driveUrl) {
+      body.appendChild(ui().el('button', {
+        className: 'btn btn-small btn-outline photo-drive-btn',
+        onClick: () => window.open(p.driveUrl, '_blank')
+      }, 'Open Drive'));
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderPhotoList() {
+    const refs = collectInspectionPhotoRefs();
+    list.innerHTML = '';
+    if (!refs.length) {
+      list.appendChild(ui().el('div', { className: 'empty-msg' }, 'No photos yet'));
+      return;
+    }
+    refs.forEach((ref, idx) => list.appendChild(renderPhotoCard(ref, idx)));
+  }
+
+  renderPhotoSummary();
+  renderPhotoList();
+  if (window.hydrateInspectionPhotosFromVault) {
+    window.hydrateInspectionPhotosFromVault(ctx.inspection).then(result => {
+      if (result && result.recovered && getScreen() === 'photos') {
+        renderPhotoSummary();
+        renderPhotoList();
+      }
+    }).catch(() => {});
+  }
+
+  c.appendChild(ui().el('div', { className: 'bottom-nav' }, [
+    ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { setScreen('review'); ctx.render(); } }, 'Back to Review')
+  ]));
+
+  ctx.root.appendChild(c);
+  window.scrollTo(0, 0);
+}
+
 // ── REVIEW SCREEN ──────────────────────────────────────────
 export function renderReview() {
   const c = ui().el('div', { className: 'screen review-screen' });
   c.appendChild(buildAppHeader('Final Review'));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
   const reviewIssues = collectInspectionIssues();
+  if (!ctx.inspection._departureChecklist) ctx.inspection._departureChecklist = {};
+  const depData = ctx.inspection._departureChecklist;
+  const depItems = [
+    { key: 'downloadQtrak', label: 'Download Q-Trak data to computer' },
+    { key: 'shipSamples', label: 'Ship all lab samples' }
+  ];
 
-  // Status legend bar
-  const legendBar = ui().el('div', { style: 'background:#f0f7ee;border-radius:8px;padding:10px 14px;margin:0 0 8px;font-size:0.8rem;color:#4a5568;line-height:1.6;' });
-  legendBar.innerHTML = '<strong style="color:#2C3F16">Status guide:</strong>' +
-    ' <span style="background:#e8f5e9;padding:2px 6px;border-radius:4px;">Visited</span> = section opened during inspection.' +
-    ' <span style="background:#fef3c7;padding:2px 6px;border-radius:4px;">Not visited</span> = section was skipped.' +
-    ' Photos showing <strong>\u2601\ufe0f Uploaded to Drive</strong> have been synced to Google Drive - their local copy has been cleared to save storage.' +
-    ' A photo marked <strong>?</strong> or <em>Unreviewed</em> in a report means no caption was added - tap the photo here to add one.';
-  c.appendChild(legendBar);
-
-  const photoSafetyCard = ui().el('div', { className: 'card', id: 'photo-safety-card' });
-  photoSafetyCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Photo Safety'));
-  const photoSafetyBody = ui().el('div', { style: 'font-size:0.92rem;color:var(--text-muted);line-height:1.6;' }, 'Checking photo backup status...');
-  photoSafetyCard.appendChild(photoSafetyBody);
-  const photoSafetyActions = ui().el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;' });
+  const leaveCard = ui().el('div', { className: 'card leave-card', id: 'leave-status-card' });
+  leaveCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Can I Leave?'));
+  const leaveStatus = ui().el('div', { className: 'leave-status leave-wait' }, 'Checking...');
+  const leaveDetail = ui().el('div', { className: 'leave-detail' });
+  const leaveMetrics = ui().el('div', { className: 'leave-metrics' });
+  leaveCard.appendChild(leaveStatus);
+  leaveCard.appendChild(leaveDetail);
+  leaveCard.appendChild(leaveMetrics);
+  const leaveActions = ui().el('div', { className: 'leave-actions' });
+  const photosBtn = ui().el('button', {
+    className: 'btn btn-primary',
+    onClick: () => { setScreen('photos'); ctx.render(); }
+  }, 'Photos');
   const rescueBtn = ui().el('button', {
     className: 'btn btn-outline',
-    style: 'flex:1;min-width:150px;',
     onClick: async () => {
       rescueBtn.disabled = true;
       rescueBtn.textContent = 'Preparing...';
@@ -1181,7 +1426,6 @@ export function renderReview() {
   }, 'Rescue Photos');
   const cloudCheckBtn = ui().el('button', {
     className: 'btn btn-secondary',
-    style: 'flex:1;min-width:150px;',
     onClick: async () => {
       cloudCheckBtn.disabled = true;
       cloudCheckBtn.textContent = 'Checking...';
@@ -1189,46 +1433,75 @@ export function renderReview() {
       cloudCheckBtn.textContent = result.ok ? 'Cloud Ready' : 'Cloud Failed';
       if (!result.ok) alert('Cloud check failed: ' + (result.message || 'Unknown error'));
       setTimeout(() => { cloudCheckBtn.textContent = 'Cloud Check'; cloudCheckBtn.disabled = false; }, 2500);
-      refreshPhotoSafety();
+      refreshLeaveStatus();
     }
   }, 'Cloud Check');
-  photoSafetyActions.appendChild(rescueBtn);
-  photoSafetyActions.appendChild(cloudCheckBtn);
-  photoSafetyCard.appendChild(photoSafetyActions);
-  c.appendChild(photoSafetyCard);
+  leaveActions.appendChild(photosBtn);
+  leaveActions.appendChild(rescueBtn);
+  leaveActions.appendChild(cloudCheckBtn);
+  leaveCard.appendChild(leaveActions);
+  c.appendChild(leaveCard);
 
-  async function refreshPhotoSafety() {
-    if (!window.getPhotoHealth) {
-      photoSafetyBody.textContent = 'Photo safety check unavailable in this version.';
-      return;
-    }
-    try {
-      const h = await window.getPhotoHealth();
-      const color = h.missing > 0 ? '#b91c1c' : (h.pending > 0 ? '#b45309' : '#166534');
-      photoSafetyBody.innerHTML =
-        '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px;">' +
-          '<div><strong style="color:#2C3F16;font-size:1.25rem;">' + h.total + '</strong><br>Total photos</div>' +
-          '<div><strong style="color:#166534;font-size:1.25rem;">' + h.local + '</strong><br>On phone</div>' +
-          '<div><strong style="color:#166534;font-size:1.25rem;">' + h.drive + '</strong><br>In Drive</div>' +
-          '<div><strong style="color:' + color + ';font-size:1.25rem;">' + h.pending + '</strong><br>Waiting</div>' +
-        '</div>' +
-        (h.missing > 0
-          ? '<div style="color:#b91c1c;font-weight:800;">' + h.missing + ' photo' + (h.missing === 1 ? '' : 's') + ' missing local and Drive backup. Do not close the app.</div>'
-          : '<div style="color:#166534;font-weight:700;">No missing photos detected.</div>') +
-        (h.vaultOnly > 0 ? '<div style="color:#4b5563;margin-top:4px;">' + h.vaultOnly + ' rescue-only photo' + (h.vaultOnly === 1 ? '' : 's') + ' found in the vault.</div>' : '');
-    } catch (err) {
-      photoSafetyBody.textContent = 'Photo safety check failed: ' + (err && err.message ? err.message : String(err));
-    }
+  function leaveMetric(label, value, tone) {
+    return ui().el('div', { className: 'leave-metric leave-metric-' + tone }, [
+      ui().el('span', null, label),
+      ui().el('strong', null, value)
+    ]);
   }
-  refreshPhotoSafety();
+
+  async function refreshLeaveStatus() {
+    const departureDone = depItems.every(i => !!depData[i.key]);
+    const lastCloud = getBestCloudSyncAt();
+    const syncStatus = getSyncStatus();
+    let health = { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
+    let healthError = '';
+    if (window.getPhotoHealth) {
+      try {
+        health = await window.getPhotoHealth();
+      } catch (err) {
+        healthError = err && err.message ? err.message : String(err);
+      }
+    } else {
+      healthError = 'Photo check unavailable';
+    }
+
+    const blockers = [];
+    const warnings = [];
+    if (healthError) blockers.push('Photo check failed');
+    if (health.missing > 0) blockers.push(health.missing + ' missing photo' + (health.missing === 1 ? '' : 's'));
+    if (reviewIssues.length) blockers.push(reviewIssues.length + ' required item' + (reviewIssues.length === 1 ? '' : 's'));
+    if (!departureDone) blockers.push('Leave checklist open');
+    if (!lastCloud) blockers.push('No cloud backup yet');
+    if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' waiting for Drive');
+    if ((syncStatus === 'failed' || syncStatus === 'final-failed') && lastCloud) warnings.push('Cloud retry needed');
+
+    let tone = 'go';
+    let title = 'Safe to leave';
+    if (blockers.length) {
+      tone = 'stop';
+      title = 'Not yet';
+    } else if (warnings.length) {
+      tone = 'wait';
+      title = 'Almost ready';
+    }
+
+    leaveStatus.className = 'leave-status leave-' + tone;
+    leaveStatus.textContent = title;
+    leaveDetail.textContent = blockers.length ? blockers.join(' | ') : (warnings.length ? warnings.join(' | ') : 'Photos, backup, checklist, and required fields are clear.');
+    leaveMetrics.innerHTML = '';
+    leaveMetrics.appendChild(leaveMetric('Photos', health.missing ? health.missing + ' missing' : (health.pending ? health.pending + ' waiting' : health.total + ' safe'), health.missing ? 'bad' : (health.pending ? 'wait' : 'good')));
+    leaveMetrics.appendChild(leaveMetric('Cloud', getCloudLabel(), lastCloud ? ((syncStatus === 'failed' || syncStatus === 'final-failed') ? 'wait' : 'good') : 'bad'));
+    leaveMetrics.appendChild(leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good'));
+    leaveMetrics.appendChild(leaveMetric('Before leaving', departureDone ? 'Done' : 'Open', departureDone ? 'good' : 'bad'));
+    if (health.vaultOnly > 0) leaveMetrics.appendChild(leaveMetric('Rescue vault', String(health.vaultOnly), 'wait'));
+  }
+  refreshLeaveStatus();
+
+  const legendBar = ui().el('div', { className: 'review-guide' });
+  legendBar.innerHTML = '<strong>Status guide:</strong> Visited = opened. Not visited = skipped. Drive photos are already backed up.';
+  c.appendChild(legendBar);
 
   // ── 6a: Departure Checklist ──
-  if (!ctx.inspection._departureChecklist) ctx.inspection._departureChecklist = {};
-  const depData = ctx.inspection._departureChecklist;
-  const depItems = [
-    { key: 'downloadQtrak', label: 'Download Q-Trak data to computer' },
-    { key: 'shipSamples', label: 'Ship all lab samples' }
-  ];
   const depCard = ui().el('div', { className: 'card' });
   depCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Before You Leave'));
   const allInspBtn = ui().el('button', {
@@ -1248,6 +1521,7 @@ export function renderReview() {
     depCard.appendChild(ui().renderCheck(item.key, item.label, !!depData[item.key], v => {
       depData[item.key] = v;
       updateDepState();
+      refreshLeaveStatus();
     }));
   });
   c.appendChild(depCard);
@@ -1419,7 +1693,7 @@ export function renderReview() {
         const grid = ui().el('div', { className: 'review-photo-grid' });
         arr.forEach(p => {
           grid.appendChild(ui().el('div', { className: 'review-photo-item' }, [
-            ui().el('img', { src: p.dataUrl, className: 'review-photo-img' }),
+            ui().el('img', { src: getPhotoPreviewSrc(p), className: 'review-photo-img', loading: 'lazy' }),
             p.caption ? ui().el('div', { className: 'review-photo-caption' }, p.caption) : null
           ]));
         });
@@ -1523,8 +1797,9 @@ export function renderReview() {
 
       // Photo
       const spImg = document.createElement('img');
-      spImg.src = sp.dataUrl || '';
+      spImg.src = getPhotoPreviewSrc(sp);
       spImg.className = 'photo-img';
+      spImg.loading = 'lazy';
       spImg.alt = 'Spare ' + (i + 1);
       spCard.appendChild(spImg);
 

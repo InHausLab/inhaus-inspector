@@ -580,6 +580,147 @@ body {
   font-size: 0.85rem; padding: 6px 8px;
   color: var(--text-primary); font-style: normal;
 }
+.review-guide {
+  background: #eef5ec;
+  border-radius: 8px;
+  color: #475345;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+}
+.leave-card { border-left: 5px solid var(--accent); }
+.leave-status {
+  border-radius: 8px;
+  font-size: 1.55rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  padding: 14px 16px;
+}
+.leave-go { background: #e6f4ea; color: #14532d; }
+.leave-wait { background: #fef3c7; color: #92400e; }
+.leave-stop { background: #fee2e2; color: #991b1b; }
+.leave-detail {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+.leave-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.leave-metric {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 74px;
+  padding: 10px;
+}
+.leave-metric span {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+.leave-metric strong {
+  color: var(--text);
+  display: block;
+  font-size: 1rem;
+  line-height: 1.15;
+}
+.leave-metric-good { background: #f0f9f0; border-color: #cfe7d1; }
+.leave-metric-wait { background: #fffbeb; border-color: #f3d08a; }
+.leave-metric-bad { background: #fef2f2; border-color: #fecaca; }
+.leave-actions,
+.photo-review-toolbar {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin-top: 12px;
+}
+.photo-review-summary { margin-top: 8px; }
+.photo-health-grid,
+.photo-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.photo-status-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+.photo-status-good { background: #e6f4ea; color: #14532d; }
+.photo-status-wait { background: #fef3c7; color: #92400e; }
+.photo-status-bad { background: #fee2e2; color: #991b1b; }
+.photo-status-neutral { background: #eef2f7; color: #334155; }
+.photo-review-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 18px;
+}
+.photo-review-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.photo-review-media {
+  background: #eef2f7;
+  min-height: 180px;
+}
+.photo-review-img {
+  aspect-ratio: 4 / 3;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+.photo-review-placeholder {
+  align-items: center;
+  color: #64748b;
+  display: flex;
+  font-size: 1rem;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 180px;
+}
+.photo-review-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+.photo-review-title {
+  color: var(--primary);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.photo-review-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.photo-caption-input {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  min-height: 72px;
+  padding: 10px 12px;
+  resize: vertical;
+  width: 100%;
+}
+.photo-drive-btn { justify-self: start; }
 
 .info-row {
   display: flex; justify-content: space-between;
