@@ -2,8 +2,8 @@
 import { VISION_PROXY_URL } from './config.js';
 import { setInspection, getScreen, setScreen, getLastSaveText } from './state.js';
 import { saveNow, scheduleSave } from './storage.js';
-import { buildExportJSON, extractAllPhotosFromExport, stripPhotosFromExport } from './inspection.js';
-import { scriptFetch, updateSyncStatus, uploadPhotoImmediate, checkpointToCloud, submitInspection } from './sync.js';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js';
+import { checkpointToCloud, submitInspection } from './sync.js';
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js';
 import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js';
 
@@ -56,6 +56,38 @@ function renderFieldsIncrementally({ card, fields, data, onFieldChange, inspecti
   }
 
   requestAnimationFrame(frame);
+}
+
+function goToStep(idx) {
+  ctx.currentStepIdx = idx;
+  setScreen('step');
+  ctx.render();
+  window.scrollTo(0, 0);
+}
+
+function getStepReviewIssues(step) {
+  if (!ctx || !ctx.inspection || step.type === 'review') return [];
+  const data = (ctx.inspection.stepData && ctx.inspection.stepData[step.id]) || {};
+  if (!data._visited) return ['Section not visited'];
+  return validateStep(step, data);
+}
+
+function collectInspectionIssues() {
+  const issues = [];
+  if (!ctx || !ctx.stepList) return issues;
+
+  ctx.stepList.forEach((step, idx) => {
+    if (step.type === 'review') return;
+    getStepReviewIssues(step).forEach(message => {
+      issues.push({ step, stepIdx: idx, message });
+    });
+  });
+
+  return issues;
+}
+
+function formatIssueList(issues) {
+  return issues.map(issue => issue.step.name + ': ' + issue.message);
 }
 
 // ── Room Navigation Drawer ─────────────────────────────────
@@ -119,10 +151,8 @@ export function buildRoomDrawer() {
       scrollArea.appendChild(ui().el('div', {
         className: cls,
         onClick: () => {
-          ctx.currentStepIdx = sIdx;
           overlay.remove();
-          ctx.render();
-          window.scrollTo(0, 0);
+          goToStep(sIdx);
         }
       }, [
         ui().el('span', { className: 'room-item-name' }, displayName),
@@ -990,6 +1020,16 @@ export function renderStep() {
       ui().updateShowIf(card, data);
       // Change 3: Detect allSectionsComplete on post-assessment step
       if (step.type === 'post-assessment' && data.finalCheck && data.finalCheck.allSectionsComplete === true) {
+        const issues = collectInspectionIssues();
+        if (issues.length) {
+          data.finalCheck.allSectionsComplete = false;
+          scheduleSave();
+          alert('The following items are incomplete:\n\u2022 ' + formatIssueList(issues).join('\n\u2022 ') + '\n\nReview each flagged section before final sync.');
+          setScreen('review');
+          ctx.render();
+          window.scrollTo(0, 0);
+          return;
+        }
         if (ctx._finalSyncTriggeredId !== (ctx.inspection && ctx.inspection.inspectionId)) {
           ctx._finalSyncTriggeredId = ctx.inspection.inspectionId;
           ctx.triggerFinalSync();
@@ -1104,6 +1144,7 @@ export function renderReview() {
   const c = ui().el('div', { className: 'screen review-screen' });
   c.appendChild(buildAppHeader('Final Review'));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
+  const reviewIssues = collectInspectionIssues();
 
   // Status legend bar
   const legendBar = ui().el('div', { style: 'background:#f0f7ee;border-radius:8px;padding:10px 14px;margin:0 0 8px;font-size:0.8rem;color:#4a5568;line-height:1.6;' });
@@ -1216,20 +1257,59 @@ export function renderReview() {
   }
   c.appendChild(summariesCard);
 
+  if (ctx.inspection.status !== 'completed' && reviewIssues.length) {
+    const issuesByStep = new Map();
+    reviewIssues.forEach(issue => {
+      const existing = issuesByStep.get(issue.step.id);
+      if (existing) existing.messages.push(issue.message);
+      else issuesByStep.set(issue.step.id, {
+        step: issue.step,
+        stepIdx: issue.stepIdx,
+        messages: [issue.message]
+      });
+    });
+
+    const issueCard = ui().el('div', { className: 'card review-issues-card' });
+    issueCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Needs Review'));
+    issuesByStep.forEach(item => {
+      issueCard.appendChild(ui().el('button', {
+        type: 'button',
+        className: 'review-issue-btn',
+        onClick: () => goToStep(item.stepIdx)
+      }, [
+        ui().el('span', { className: 'review-issue-title' }, item.step.name),
+        ui().el('span', { className: 'review-issue-detail' }, item.messages.join(' • '))
+      ]));
+    });
+    c.appendChild(issueCard);
+  }
+
   ctx.stepList.forEach((step, idx) => {
     if (step.type === 'review') return;
     const data = (ctx.inspection.stepData && ctx.inspection.stepData[step.id]) || {};
     const visited = !!data._visited;
-    const sCard = ui().el('div', { className: 'card' + (!visited ? ' card-incomplete' : '') });
+    const stepIssues = getStepReviewIssues(step);
+    const statusText = !visited ? 'Not visited' : (stepIssues.length ? 'Needs review' : 'Visited');
+    const statusClass = !visited || stepIssues.length ? 'in-progress' : 'completed';
+    const sCard = ui().el('div', { className: 'card' + ((!visited || stepIssues.length) ? ' card-incomplete' : '') });
     sCard.appendChild(ui().el('div', { className: 'review-step-header' }, [
       ui().el('h3', { className: 'section-heading' }, [
         document.createTextNode(step.name + ' '),
-        ui().el('span', { className: 'badge ' + (visited ? 'completed' : 'in-progress') }, visited ? 'Visited' : 'Not visited')
+        ui().el('button', {
+          type: 'button',
+          className: 'badge review-status-badge ' + statusClass,
+          onClick: () => goToStep(idx)
+        }, statusText)
       ]),
-      ui().el('button', { className: 'btn btn-small btn-outline', onClick: () => { ctx.currentStepIdx = idx; setScreen('step'); ctx.render(); } }, 'Edit')
+      ui().el('button', { className: 'btn btn-small btn-outline', onClick: () => goToStep(idx) }, 'Edit')
     ]));
 
     const summary = ui().el('div', { className: 'review-summary' });
+    if (stepIssues.length) {
+      summary.appendChild(ui().el('div', { className: 'review-step-issues' }, stepIssues.map(issue =>
+        ui().el('div', { className: 'review-step-issue' }, issue)
+      )));
+    }
     const fieldGen = STEP_FIELDS[step.type];
     if (fieldGen && visited) {
       const fields = fieldGen();
@@ -1289,15 +1369,7 @@ export function renderReview() {
 
   if (ctx.inspection.status !== 'completed') {
     const submitBtn = ui().el('button', { className: 'btn btn-primary btn-full', onClick: () => {
-      const unvisited = ctx.stepList.filter(s => s.type !== 'review' && !(ctx.inspection.stepData && ctx.inspection.stepData[s.id] && ctx.inspection.stepData[s.id]._visited));
-      const atpData = (ctx.inspection.stepData && ctx.inspection.stepData['atp-kitchen']) || {};
-      const atpIssues = [];
-      if (!(atpData._atpBeforePhotos && atpData._atpBeforePhotos.length)) atpIssues.push('ATP Before photo missing');
-      if (!(atpData._atpAfterPhotos && atpData._atpAfterPhotos.length)) atpIssues.push('ATP After photo missing');
-      const allIssues = [
-        ...unvisited.map(s => 'Section not visited: ' + s.name),
-        ...atpIssues
-      ];
+      const allIssues = formatIssueList(collectInspectionIssues());
       if (allIssues.length) {
         const names = allIssues.join('\n\u2022 ');
         alert('The following items are incomplete:\n\u2022 ' + names + '\n\nPlease address these before marking as complete.');
@@ -1309,10 +1381,13 @@ export function renderReview() {
       ctx.inspection.endedAt = new Date().toISOString();
       ctx.inspection.completedAt = ctx.inspection.endedAt;
       const completeData = buildExportJSON(ctx.stepList);
-      saveNow().then(() => {
-        submitInspection(completeData).then(ok => {
-          if (!ok) { submitBtn.disabled = false; submitBtn.textContent = '\u2713 Submit Inspection'; }
-        });
+      saveNow().then(async () => {
+        const ok = await submitInspection(completeData);
+        if (!ok) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '\u2713 Submit Inspection';
+          return;
+        }
         setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); ctx.render();
       });
     }}, '\u2713 Submit Inspection');
@@ -1323,20 +1398,9 @@ export function renderReview() {
       reuploadBtn.textContent = 'Uploading\u2026 \u23f3';
       try {
         const reuploadData = buildExportJSON(ctx.stepList);
-        // Send main data first (no photos)
-        const mainPayload = stripPhotosFromExport(reuploadData);
-        await scriptFetch(mainPayload);
-        // Send photos one at a time to avoid payload size limits
         const allPhotos = extractAllPhotosFromExport(reuploadData);
-        for (let i = 0; i < allPhotos.length; i++) {
-          reuploadBtn.textContent = 'Uploading photo ' + (i + 1) + ' of ' + allPhotos.length + '\u2026';
-          await uploadPhotoImmediate(
-            { photoId: allPhotos[i].photoId, roomName: allPhotos[i].roomName, stepName: allPhotos[i].stepName, dataUrl: allPhotos[i].imageData, caption: allPhotos[i].caption || '' },
-            reuploadData.inspectionId,
-            reuploadData.clientName || '',
-            reuploadData.propertyAddress || ''
-          );
-        }
+        const ok = await submitInspection(reuploadData);
+        if (!ok) throw new Error('Drive did not confirm every photo upload.');
         reuploadBtn.textContent = '\u2713 Upload Complete (' + allPhotos.length + ' photos)';
       } catch(e) {
         reuploadBtn.disabled = false;

@@ -496,6 +496,17 @@ body {
 }
 .badge.in-progress, .in-progress { background: var(--warning-light); color: #92400e; }
 .badge.completed, .completed { background: var(--accent-light); color: var(--primary); }
+.review-status-badge {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+}
+.review-status-badge:focus-visible,
+.review-issue-btn:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
 
 /* ── Home Screen ─────────────────────────── */
 .inspection-list { margin-top: 24px; }
@@ -517,6 +528,44 @@ body {
   align-items: flex-start; gap: 12px;
 }
 .review-summary { font-size: 0.9rem; }
+.review-issues-card { border-left: 5px solid var(--warning); }
+.review-issue-btn {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: 1px solid #f3d08a;
+  background: #fffbeb;
+  color: #78350f;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.review-issue-title {
+  display: block;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.review-issue-detail {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.review-step-issues {
+  background: #fffbeb;
+  border: 1px solid #f3d08a;
+  border-radius: 8px;
+  color: #78350f;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.review-step-issue {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  padding: 2px 0;
+}
 .review-item { padding: 3px 0; }
 .review-item-label { font-weight: 700; color: var(--text-muted); }
 .review-photos-section { margin-top: 10px; }
@@ -1237,4 +1286,3 @@ body {
   -webkit-user-select: text;
   cursor: text;
 }
-

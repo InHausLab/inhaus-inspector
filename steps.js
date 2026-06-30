@@ -417,7 +417,7 @@ export function getKitchenAirFields() {
 
 export function getAdditionalRoomFields() {
   return [
-    text('roomName', 'Room Name'),
+    text('roomName', 'Room Name', { required: true }),
     textarea('reasonForInclusion', 'Reason for inclusion'),
     ...flirFields(),
     ...breezeFields(),
@@ -522,20 +522,6 @@ export function getDebriefFields() {
   ];
 }
 
-// ── Follow-Up Actions Needed helper ─────────────────────────
-export function postFollowUpFields() {
-  const items = [];
-  for (let i = 1; i <= 5; i++) {
-    if (i > 1) items.push(divider());
-    items.push(heading(`Follow-Up Action ${i}`));
-    items.push(text(`followUp_${i}_room`, 'Room', { placeholder: 'e.g. Primary Bedroom' }));
-    items.push(sel(`followUp_${i}_timeframe`, 'Re-check timeframe', ['1 month', '3 months', '6 months', '1 year', 'As needed']));
-    items.push(text(`followUp_${i}_whatToWatch`, 'What to watch for', { placeholder: 'e.g. Moisture return under sink, condensation on windows (tap \uD83C\uDF99 mic in keyboard)' }));
-    items.push(text(`followUp_${i}_photoRef`, 'Photo reference', { placeholder: 'e.g. Photo #023' }));
-  }
-  return items;
-}
-
 // ── Actions Taken / Assessment Observations helpers ────────
 export function postActionsTakenFields() {
   const items = [];
@@ -595,25 +581,6 @@ export function getPostAssessmentFields() {
       { key: 'allSamplesShipped', label: 'All samples shipped' },
       { key: 'assessmentComplete', label: 'Assessment marked Complete' }
     ]),
-    divider(),
-    heading('Tests Conducted \u2014 Confirm Each Test'),
-    info('Confirm each test run during this assessment and record how many samples were taken.'),
-    yesno('testRunBreeze', 'Breeze ET (mold) \u2014 conducted?'),
-    showIf(num('testRunBreezeCount', 'How many samples?'), 'testRunBreeze', 'Yes'),
-    yesno('testRunBoulderBlue', 'Boulder Blue (allergen) \u2014 conducted?'),
-    showIf(num('testRunBoulderBlueCount', 'How many?'), 'testRunBoulderBlue', 'Yes'),
-    yesno('testRunWaterPanel', 'Water Panel (SafeHome) \u2014 conducted?'),
-    showIf(num('testRunWaterPanelCount', 'How many?'), 'testRunWaterPanel', 'Yes'),
-    yesno('testRunPFAS', 'PFAS (Cyclopure) \u2014 conducted?'),
-    showIf(num('testRunPFASCount', 'How many?'), 'testRunPFAS', 'Yes'),
-    yesno('testRunMicroplastics', 'Microplastics (IEH) \u2014 conducted?'),
-    showIf(num('testRunMicroplasticsCount', 'How many?'), 'testRunMicroplastics', 'Yes'),
-    yesno('testRunRadon', 'Radon (Airthings) \u2014 conducted?'),
-    showIf(num('testRunRadonCount', 'How many?'), 'testRunRadon', 'Yes'),
-    yesno('testRunATP', 'ATP \u2014 conducted?'),
-    showIf(num('testRunATPCount', 'How many?'), 'testRunATP', 'Yes'),
-    divider(),
-
     divider(),
     heading('Actions Taken During Assessment'),
     info('Document what you physically did on-site (replaced filter, cleaned under sink, etc.). Each entry appears in the report. Specify the photo number for each callout.'),
@@ -762,12 +729,69 @@ export function validateEquipment(data) {
   return missing;
 }
 
-export function validateStep(stepDef) {
+function showIfMatches(field, data) {
+  if (!field.showIf) return true;
+  const dv = data[field.showIf.key];
+  const target = field.showIf.value;
+  return Array.isArray(target)
+    ? (Array.isArray(dv) ? target.some(t => dv.includes(t)) : target.includes(dv))
+    : (Array.isArray(dv) ? dv.includes(target) : dv === target);
+}
+
+function isBlank(value) {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
+
+function hasPhoto(data, key) {
+  const arr = data[key || '_photos'];
+  return Array.isArray(arr) && arr.length > 0;
+}
+
+function requiredLabel(field) {
+  return (field.label || field.stepName || field.key || 'Required field') + ' is required';
+}
+
+function collectRequiredIssues(fields, data, missing) {
+  for (const field of fields) {
+    if (!field || !showIfMatches(field, data)) continue;
+
+    if (field.type === 'collapsible-section') {
+      collectRequiredIssues(field.fields || [], data, missing);
+      continue;
+    }
+
+    if (!field.required) continue;
+
+    if (field.type === 'sample-id-scanner') {
+      if (isBlank(data[field.dataKey || field.key])) missing.push(requiredLabel(field));
+    } else if (field.type === 'photo') {
+      if (!hasPhoto(data, field.photoKey)) missing.push(requiredLabel(field));
+    } else if (isBlank(data[field.key])) {
+      missing.push(requiredLabel(field));
+    }
+  }
+}
+
+export function validateStep(stepDef, existingData) {
+  const data = existingData || getStepData(stepDef.id);
   if (stepDef.type === 'equipment') {
-    const data = getStepData(stepDef.id);
     return validateEquipment(data);
   }
-  return [];
+
+  const missing = [];
+  const fieldGen = STEP_FIELDS[stepDef.type];
+  if (fieldGen) collectRequiredIssues(fieldGen(), data, missing);
+
+  if (stepDef.type === 'atp-kitchen') {
+    if (!hasPhoto(data, '_atpBeforePhotos')) missing.push('ATP Before photo is required');
+    if (!hasPhoto(data, '_atpAfterPhotos')) missing.push('ATP After photo is required');
+  }
+
+  return missing;
 }
 
 // Returns non-blocking warnings (shown as toast but navigation still allowed)
