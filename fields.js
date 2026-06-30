@@ -110,7 +110,6 @@ export function observationFields() {
     textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments... (tap \uD83C\uDF99 mic in your iPhone keyboard, then read back and fix errors)' }),
     check('voiceReviewed', '\u2713 Voice-dictated notes reviewed and corrected'),
     divider(),
-    heading('Photos'),
     photo('Photos', '_photos', { mergePhotoKeys: ['_beforePhotos', '_afterPhotos'] })
   ];
 }

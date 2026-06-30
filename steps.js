@@ -392,13 +392,13 @@ export function getAtpKitchenFields() {
     num('atpPreRLU', 'Pre-test RLU reading', { unit: 'RLU' }),
     radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
     heading('Before Photo'),
-    { type: 'photo', stepName: 'ATP Before', photoKey: '_atpBeforePhotos' },
+    { type: 'photo', stepName: 'ATP Before', photoKey: '_atpBeforePhotos', hideLabel: true },
     divider(),
     yesno('atpCleaned', 'Surface cleaned with soap and water'),
     num('atpPostRLU', 'Post-test RLU reading', { unit: 'RLU' }),
     radio('atpPostStatus', 'Post-test status (Pass if below 100 RLU, Fail if 100 or more)', ['Pass', 'Fail']),
     heading('After Photo'),
-    { type: 'photo', stepName: 'ATP After', photoKey: '_atpAfterPhotos' },
+    { type: 'photo', stepName: 'ATP After', photoKey: '_atpAfterPhotos', hideLabel: true },
     textarea('notes', 'Notes')
   ];
 }

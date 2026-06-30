@@ -1095,10 +1095,13 @@
   }
 
   // ── Field: Photo Capture ───────────────────────────────────
-  function renderPhoto(photos, onUpdate, roomName, stepName, inspectionId) {
+  function renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, options) {
     if (!photos) photos = [];
+    const photoOptions = options || {};
     const section = el('div', { className: 'field-group photo-section' });
-    section.appendChild(el('label', { className: 'field-label' }, 'Photos'));
+    if (!photoOptions.hideLabel) {
+      section.appendChild(el('label', { className: 'field-label' }, photoOptions.label || 'Photos'));
+    }
 
     if (photos.length) {
       const grid = el('div', { className: 'photo-grid' });
@@ -1194,7 +1197,7 @@
               }
               photos.splice(idx, 1);
               onUpdate();
-              const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId);
+              const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions);
               section.replaceWith(newSection);
             }
           }
@@ -1206,7 +1209,7 @@
             e.stopPropagation();
             openAnnotationEditor(p, function() {
               onUpdate();
-              const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId);
+              const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions);
               section.replaceWith(newSection);
             });
           }
@@ -1255,7 +1258,7 @@
           await savePhotoRecordToVault(newPhoto, inspectionId);
           photos.push(newPhoto);
           onUpdate();
-          section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName, inspectionId));
+          section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions));
           // ⚡ Save to device camera roll immediately (user taps "Save Image" on share sheet)
           await saveToDevicePhotos(dataUrl, newPhoto.photoId);
           // ⚡ Upload immediately to Drive
@@ -2255,7 +2258,8 @@
           () => { changed(); },
           data.roomName || data._roomName || '',
           f.stepName || '',
-          data.inspectionId || (window.inspection && window.inspection.inspectionId) || ''
+          data.inspectionId || (window.inspection && window.inspection.inspectionId) || '',
+          { label: f.label || f.photoLabel || 'Photos', hideLabel: !!f.hideLabel }
         );
       }
       case 'timer':
