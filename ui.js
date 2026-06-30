@@ -1280,7 +1280,7 @@
     section.appendChild(fileInp);
     section.appendChild(libInp);
     const photoBtnRow = el('div', { className: 'photo-btn-row' });
-    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => fileInp.click() }, '\uD83D\uDCF7 Add Photos'));
+    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => fileInp.click() }, photos.length ? '\uD83D\uDCF7 Add Another' : '\uD83D\uDCF7 Add Photo'));
     photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => libInp.click() }, '\uD83D\uDCC1 From Library'));
     section.appendChild(photoBtnRow);
     return section;
@@ -2232,6 +2232,24 @@
       case 'photo': {
         const pk = f.photoKey || '_photos';
         if (!data[pk]) data[pk] = [];
+        if (Array.isArray(f.mergePhotoKeys)) {
+          let migrated = false;
+          const existingIds = new Set(data[pk].map(p => p && p.photoId).filter(Boolean));
+          f.mergePhotoKeys.forEach(aliasKey => {
+            const oldPhotos = Array.isArray(data[aliasKey]) ? data[aliasKey] : [];
+            oldPhotos.forEach(photo => {
+              if (!photo || !photo.photoId || existingIds.has(photo.photoId)) return;
+              data[pk].push(photo);
+              existingIds.add(photo.photoId);
+              migrated = true;
+            });
+            if (oldPhotos.length) {
+              data[aliasKey] = [];
+              migrated = true;
+            }
+          });
+          if (migrated) changed();
+        }
         return renderPhoto(
           data[pk],
           () => { changed(); },

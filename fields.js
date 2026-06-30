@@ -15,7 +15,9 @@ export function check(key, label) { return { key, type: 'check', label }; }
 export function checklist(key, label, items, opts) { return { key, type: 'checklist', label, items, ...opts }; }
 export function chips(key, label, options) { return { key, type: 'chips', label, options }; }
 export function reading(key, label, unit) { return { key, type: 'reading', label, unit }; }
-export function photo(stepName, photoKey) { return { type: 'photo', stepName, photoKey }; }
+export function photo(stepName, photoKey, options) {
+  return { type: 'photo', stepName, photoKey, ...(options || {}) };
+}
 export function timer(key, label, duration, opts) { return { key, type: 'timer', label, duration, ...opts }; }
 export function heading(label) { return { type: 'heading', label }; }
 export function collapsible(title, fields, opts) { return { type: 'collapsible-section', title, fields, defaultOpen: opts && opts.defaultOpen !== false }; }
@@ -109,8 +111,7 @@ export function observationFields() {
     check('voiceReviewed', '\u2713 Voice-dictated notes reviewed and corrected'),
     divider(),
     heading('Photos'),
-    photo('Before', '_beforePhotos'),
-    photo('After', '_afterPhotos')
+    photo('Photos', '_photos', { mergePhotoKeys: ['_beforePhotos', '_afterPhotos'] })
   ];
 }
 
