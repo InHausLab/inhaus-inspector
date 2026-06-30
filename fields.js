@@ -94,9 +94,8 @@ export function breezeFields(timerKey) {
 export function qtrakSection() {
   return [
     heading('Q-Trak 7585'),
-    text('qtrakLocation', 'Q-Trak reading location', { placeholder: 'e.g. Center of room, desk height, 3ft from window' }),
-    yesno('qtrakCaptured', 'Q-Trak reading captured?'),
-    showIf(text('qtrakRoomName', 'Q-Trak room name (as entered in device)', { placeholder: 'e.g. Bedroom 1 (match exactly what you typed on device)' }), 'qtrakCaptured', 'Yes')
+    text('qtrakLocation', 'Q-Trak room / reading location', { placeholder: 'e.g. TV room (match the Q-Trak device room name)' }),
+    yesno('qtrakCaptured', 'Q-Trak reading captured?')
   ];
 }
 
