@@ -191,8 +191,8 @@ import { initScreens, render } from './screens.js';
       alert('No inspection photo vault is available yet.');
       return false;
     }
-    await hydrateInspectionPhotosFromVault(insp);
-    const photos = await window.DB.getPhotosForInspection(insp.inspectionId);
+    await withTimeout(hydrateInspectionPhotosFromVault(insp), 15000, 'Photo recovery');
+    const photos = await withTimeout(window.DB.getPhotosForInspection(insp.inspectionId), 15000, 'Photo vault read');
     const withImages = photos.filter(function(p) { return p && p.dataUrl; });
     if (!withImages.length) {
       alert('No local photos found in the photo vault for this inspection.');
@@ -253,32 +253,50 @@ import { initScreens, render } from './screens.js';
   window.runCloudPreflight = runCloudPreflight;
   window.hydrateInspectionPhotosFromVault = hydrateInspectionPhotosFromVault;
 
+  function withTimeout(promise, ms, label) {
+    var timeoutId;
+    var timeout = new Promise(function(_, reject) {
+      timeoutId = setTimeout(function() {
+        reject(new Error((label || 'Operation') + ' timed out'));
+      }, ms);
+    });
+    return Promise.race([promise, timeout]).finally(function() {
+      clearTimeout(timeoutId);
+    });
+  }
+
   // ── Final Sync (Changes 3 & 4) ─────────────────────────────
   async function triggerFinalSync() {
     showFinalSyncOverlay('syncing');
-    await hydrateInspectionPhotosFromVault(inspection);
-    // Retry any individually-queued photos before the main sync
-    await retryFailedPhotos();
-
-    // ── PHOTO INTEGRITY GATE ──────────────────────────────────────
-    // Any photo with neither a driveUrl nor a local dataUrl is LOST.
-    // Block the sync and show a hard error so the inspector knows.
-    const audit = auditPhotos(inspection);
-    if (audit.lost.length > 0) {
-      var lostDesc = audit.lost.map(function(p) {
-        return (p.roomName || p.context) + (p.caption ? ' — ' + p.caption : '');
-      }).join('\n');
-      showFinalSyncOverlay('photo-error', {
-        lostPhotos: audit.lost,
-        lostDesc: lostDesc
-      });
-      return; // do NOT proceed with sync
-    }
-    // ───────────────────────────────────────────────────────
-
+    let exportData = null;
     try {
-      const exportData = buildExportJSON(stepList);
-      const success = await submitInspection(exportData);
+      await withTimeout(hydrateInspectionPhotosFromVault(inspection), 15000, 'Photo recovery');
+      // Retry any individually-queued photos before the main sync, but do not
+      // let a stuck single-photo request trap the final sync overlay forever.
+      try {
+        await withTimeout(retryFailedPhotos(), 45000, 'Photo retry');
+      } catch (retryErr) {
+        console.warn('Photo retry timed out before final sync:', retryErr);
+      }
+
+      // ── PHOTO INTEGRITY GATE ──────────────────────────────────────
+      // Any photo with neither a driveUrl nor a local dataUrl is LOST.
+      // Block the sync and show a hard error so the inspector knows.
+      const audit = auditPhotos(inspection);
+      if (audit.lost.length > 0) {
+        var lostDesc = audit.lost.map(function(p) {
+          return (p.roomName || p.context) + (p.caption ? ' — ' + p.caption : '');
+        }).join('\n');
+        showFinalSyncOverlay('photo-error', {
+          lostPhotos: audit.lost,
+          lostDesc: lostDesc
+        });
+        return; // do NOT proceed with sync
+      }
+      // ───────────────────────────────────────────────────────
+
+      exportData = buildExportJSON(stepList);
+      const success = await withTimeout(submitInspection(exportData), 90000, 'Final sync');
       const receipt = buildSyncReceipt(exportData, success);
       if (success) {
         setLastSuccessfulCloudSyncAt(Date.now());
@@ -291,7 +309,9 @@ import { initScreens, render } from './screens.js';
     } catch(e) {
       console.error('triggerFinalSync error:', e);
       updateSyncStatus('final-failed');
-      showFinalSyncOverlay('failed', null);
+      const failedReceipt = buildSyncReceipt(exportData || buildExportJSON(stepList), false);
+      failedReceipt.errorMessage = e && e.message ? e.message : String(e || 'Unknown error');
+      showFinalSyncOverlay('failed', failedReceipt);
     }
   }
 
@@ -313,9 +333,36 @@ import { initScreens, render } from './screens.js';
         '<strong>Photos pending upload:</strong> ' + r.photosExpected + '<br>' +
         '<strong>Photos already uploaded:</strong> ' + r.photosUploaded + '<br>' +
         (r.photosUnconfirmed > 0 ? '<span style="color:#ff6b6b;">\u26a0\ufe0f ' + r.photosUnconfirmed + ' photo' + (r.photosUnconfirmed === 1 ? '' : 's') + ' not confirmed in Drive \u2014 tap Retry</span><br>' : '') +
+        (r.errorMessage ? '<strong>Error:</strong> ' + escapeHtml(r.errorMessage) + '<br>' : '') +
         '<strong>Drive folder:</strong> ' + r.driveFolderId + '<br>' +
         '<strong>App version:</strong> ' + r.appVersion +
         '</div></div>';
+    }
+
+    function overlayButton(label, bg, color, onClick) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.style.cssText = 'background:' + bg + ';color:' + color + ';border:none;border-radius:10px;padding:14px 22px;font-size:0.95rem;font-weight:800;cursor:pointer;margin:6px;touch-action:manipulation;font-family:inherit;min-width:138px;';
+      btn.textContent = label;
+      btn.onclick = onClick;
+      return btn;
+    }
+
+    function rescueButton(bg, color) {
+      return overlayButton('Rescue Photos', bg, color, async function() {
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Preparing...';
+        try {
+          var ok = window.exportLocalPhotoBackup ? await window.exportLocalPhotoBackup() : false;
+          btn.textContent = ok ? 'Backup Ready' : 'Rescue Photos';
+        } catch (err) {
+          alert('Photo rescue failed: ' + (err && err.message ? err.message : String(err)));
+          btn.textContent = 'Rescue Photos';
+        } finally {
+          btn.disabled = false;
+        }
+      });
     }
 
     if (state === 'syncing') {
@@ -323,12 +370,18 @@ import { initScreens, render } from './screens.js';
       overlay.innerHTML = '<div style="font-size:2.5rem;margin-bottom:16px;">⏳</div>' +
         '<div style="color:#fff;font-size:1.3rem;font-weight:800;text-align:center;">Final sync in progress…</div>' +
         '<div style="color:#ccc;font-size:0.95rem;margin-top:8px;text-align:center;">Do not close the app</div>' +
-        '<div id="sync-timeout-msg" style="color:#aaa;font-size:0.85rem;margin-top:16px;text-align:center;display:none;">Taking longer than expected. <span onclick="document.getElementById(\"final-sync-overlay\").remove()" style="color:#f59e0b;text-decoration:underline;cursor:pointer;">Tap to dismiss and retry later.</span></div>';
-      // Show escape hatch after 60 seconds if still stuck
+        '<div id="sync-timeout-msg" style="color:#aaa;font-size:0.85rem;margin-top:16px;text-align:center;display:none;max-width:420px;">Taking longer than expected. You can keep waiting, or dismiss this screen and rescue the local photo backup.</div>' +
+        '<div id="sync-timeout-actions" style="display:none;flex-wrap:wrap;justify-content:center;margin-top:12px;width:100%;max-width:420px;"></div>';
+      var timeoutActions = overlay.querySelector('#sync-timeout-actions');
+      timeoutActions.appendChild(overlayButton('Dismiss to Review', '#fff', '#111827', function() { overlay.remove(); }));
+      timeoutActions.appendChild(rescueButton('#f59e0b', '#111827'));
+      // Show escape hatch after 45 seconds if still stuck
       setTimeout(function() {
         var msg = document.getElementById('sync-timeout-msg');
         if (msg) msg.style.display = 'block';
-      }, 60000);
+        var actions = document.getElementById('sync-timeout-actions');
+        if (actions) actions.style.display = 'flex';
+      }, 45000);
 
     } else if (state === 'success') {
       overlay.style.background = '#16a34a';
@@ -367,12 +420,12 @@ import { initScreens, render } from './screens.js';
         '<div style="font-size:1.4rem;font-weight:800;text-align:center;">Final sync FAILED</div>' +
         '<div style="color:#fca5a5;font-size:0.95rem;margin-top:6px;margin-bottom:4px;text-align:center;">Do NOT leave the app yet</div>' +
         receiptCard(receipt);
-      var retryBtn = document.createElement('button');
-      retryBtn.type = 'button';
-      retryBtn.style.cssText = 'background:#fff;color:#7f1d1d;border:none;border-radius:10px;padding:14px 36px;font-size:1rem;font-weight:800;cursor:pointer;margin-top:8px;touch-action:manipulation;font-family:inherit;';
-      retryBtn.textContent = 'Tap to Retry';
-      retryBtn.onclick = function() { overlay.remove(); triggerFinalSync(); };
-      overlay.appendChild(retryBtn);
+      var failedActions = document.createElement('div');
+      failedActions.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;width:100%;max-width:440px;margin-top:8px;';
+      failedActions.appendChild(overlayButton('Tap to Retry', '#fff', '#7f1d1d', function() { overlay.remove(); triggerFinalSync(); }));
+      failedActions.appendChild(rescueButton('#f59e0b', '#111827'));
+      failedActions.appendChild(overlayButton('Dismiss to Review', 'rgba(255,255,255,0.16)', '#fff', function() { overlay.remove(); }));
+      overlay.appendChild(failedActions);
     }
 
     document.body.appendChild(overlay);
@@ -417,7 +470,7 @@ import { initScreens, render } from './screens.js';
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v128',
+      appVersion: 'v129',
       success: success
     };
   }
