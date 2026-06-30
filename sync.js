@@ -3,7 +3,8 @@ import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js'
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
-         getLastCheckpointSucceededAt, setLastCheckpointSucceededAt } from './state.js';
+         getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
+         getBestCloudSyncAt } from './state.js';
 import { scheduleSave } from './storage.js';
 import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js';
 
@@ -159,7 +160,7 @@ export function updateSyncStatus(state, detail) {
     saveEl.style.color = COLORS[state] || '';
     if (state === 'failed') {
       saveEl.style.cursor = 'pointer';
-      saveEl.onclick = function() { checkpointToCloud(); updateSyncStatus('syncing'); };
+      saveEl.onclick = function() { updateSyncStatus('syncing'); checkpointToCloud(); };
     } else {
       saveEl.style.cursor = '';
       saveEl.onclick = null;
@@ -179,7 +180,7 @@ export function updateSyncStatus(state, detail) {
     banner.textContent = fullText;
     if (state === 'failed') {
       banner.style.cursor = 'pointer';
-      banner.onclick = function() { banner.remove(); checkpointToCloud(); updateSyncStatus('syncing'); };
+      banner.onclick = function() { banner.remove(); updateSyncStatus('syncing'); checkpointToCloud(); };
     } else {
       banner.style.cursor = 'default';
       banner.onclick = null;
@@ -347,7 +348,11 @@ let _lastCheckpointStepList = [];
 
 export async function checkpointToCloud(stepList) {
   const inspection = getInspection();
-  if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+  if (!inspection || !GOOGLE_SCRIPT_URL) return;
+  if (!navigator.onLine) {
+    updateSyncStatus('offline');
+    return;
+  }
   if (Array.isArray(stepList)) _lastCheckpointStepList = stepList;
   setLastCheckpointAttemptAt(Date.now()); // Change 1
   try {
@@ -357,18 +362,21 @@ export async function checkpointToCloud(stepList) {
     updateSyncStatus('syncing'); // Change 2
     await scriptFetch(payload);
     setLastCheckpointSucceededAt(Date.now()); // Change 1
+    scheduleSave();
     _checkpointFailCount = 0; // reset on success
     updateSyncStatus('checkpoint'); // Change 2
   } catch (e) {
     console.log('Checkpoint sync skipped:', e);
     _checkpointFailCount++;
-    updateSyncStatus('failed'); // Change 2
+    const errorMsg = e && e.message ? e.message : String(e || 'Unknown error');
+    updateSyncStatus('failed', errorMsg); // Change 2
     // After 3 consecutive failures show a modal — data is not backed up
     if (_checkpointFailCount >= 3) {
-      const lastOk = getLastCheckpointSucceededAt ? getLastCheckpointSucceededAt() : null;
+      const lastOk = getBestCloudSyncAt ? getBestCloudSyncAt() : null;
       const minAgo = lastOk ? Math.round((Date.now() - lastOk) / 60000) : null;
       const msg = 'Your inspection data is NOT being backed up to the cloud.\n\n' +
         (minAgo !== null ? 'Last successful backup: ' + minAgo + ' min ago.\n\n' : 'No successful backup yet.\n\n') +
+        'Last error: ' + errorMsg + '\n\n' +
         'Keep this app open and on screen. Do not force-close your browser.\n\nTap OK to retry.';
       if (confirm(msg)) { checkpointToCloud(stepList); }
     }

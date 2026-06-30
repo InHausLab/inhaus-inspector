@@ -1,6 +1,6 @@
 // InHaus Inspector - Main Application
 import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt } from './state.js';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt } from './state.js';
 import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js';
 import { buildExportJSON, extractAllPhotosFromExport, stripPhotosFromExport } from './inspection.js';
 import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js';
@@ -266,7 +266,7 @@ import { initScreens, render } from './screens.js';
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v124',
+      appVersion: 'v125',
       success: success
     };
   }
@@ -348,9 +348,9 @@ import { initScreens, render } from './screens.js';
       }
       // Change 5: time-based warning - not synced to Drive in 30+ min
       const THIRTY_MIN = 30 * 60 * 1000;
-      const notSynced = getLastSuccessfulCloudSyncAt() === null || (Date.now() - getLastSuccessfulCloudSyncAt()) > THIRTY_MIN;
+      const lastSync = getBestCloudSyncAt();
+      const notSynced = lastSync === null || (Date.now() - lastSync) > THIRTY_MIN;
       const wasDismissed = sessionStorage.getItem('syncWarnDismissed') === '1';
-      const lastSync = getLastSuccessfulCloudSyncAt();
       // Clear dismissed flag if a successful sync happened after dismissal
       if (wasDismissed && lastSync && lastSync > parseInt(sessionStorage.getItem('syncWarnDismissedAt')||'0')) {
         sessionStorage.removeItem('syncWarnDismissed');
@@ -403,7 +403,7 @@ import { initScreens, render } from './screens.js';
   // Change 2: Update "X min ago" text in sync status every 30s
   setInterval(() => {
     if (getSyncStatus() === 'local' || getSyncStatus() === 'synced') {
-      const bestSync = Math.max(getLastSuccessfulCloudSyncAt() || 0, getLastCheckpointSucceededAt() || 0);
+      const bestSync = getBestCloudSyncAt();
       if (bestSync) {
         updateSyncStatus(getSyncStatus());
       }
