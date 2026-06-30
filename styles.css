@@ -698,6 +698,114 @@ body {
 .photo-status-wait { background: #fef3c7; color: #92400e; }
 .photo-status-bad { background: #fee2e2; color: #991b1b; }
 .photo-status-neutral { background: #eef2f7; color: #334155; }
+
+.spare-assign-overlay {
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 9999;
+}
+.spare-assign-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-sizing: border-box;
+  max-height: calc(100dvh - 24px);
+  max-width: 480px;
+  overflow-y: auto;
+  padding: 16px 16px 28px;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.spare-assign-preview {
+  aspect-ratio: 16 / 9;
+  display: block;
+  margin-bottom: 12px;
+  max-height: 120px;
+  object-fit: cover;
+  width: 100%;
+  border-radius: 8px;
+}
+.spare-assign-title {
+  color: #1e293b;
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.spare-assign-subtitle {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+.spare-slot-picker {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.spare-slot-group-title {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+.spare-slot-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.spare-slot-grid-clear {
+  grid-template-columns: 1fr;
+}
+.spare-slot-choice {
+  align-items: center;
+  background: #fff;
+  border: 2px solid #d7ded2;
+  border-radius: 8px;
+  color: #23331f;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px 10px;
+  touch-action: manipulation;
+}
+.spare-slot-choice.selected {
+  background: #2d3b24;
+  border-color: #2d3b24;
+  color: #fff;
+}
+.spare-slot-unassigned {
+  color: #64748b;
+}
+.spare-slot-picker-compact {
+  gap: 8px;
+  margin-bottom: 0;
+}
+.spare-slot-picker-compact .spare-slot-group-title {
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.spare-slot-picker-compact .spare-slot-grid {
+  gap: 5px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.spare-slot-picker-compact .spare-slot-grid-clear {
+  grid-template-columns: 1fr;
+}
+.spare-slot-picker-compact .spare-slot-choice {
+  border-radius: 6px;
+  font-size: 0.78rem;
+  min-height: 34px;
+  padding: 5px 6px;
+}
 .photo-review-list {
   display: grid;
   gap: 12px;

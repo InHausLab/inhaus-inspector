@@ -14,6 +14,67 @@ function ui() { return window.UI; }
 let ctx = null;
 let _stepRenderJob = 0;
 
+const SPARE_SLOT_GROUPS = [
+  { title: 'Observation', prefix: 'obs_', count: 6 },
+  { title: 'Action Taken', prefix: 'actionTaken_', count: 6 },
+  { title: 'Follow-Up', prefix: 'followUp_', count: 5 }
+];
+
+function buildSpareSlotPicker(selectedValue, onSelect, opts) {
+  const options = opts || {};
+  let selected = selectedValue || '';
+  const wrap = document.createElement('div');
+  wrap.className = 'spare-slot-picker' + (options.compact ? ' spare-slot-picker-compact' : '');
+
+  function updateSelected() {
+    wrap.querySelectorAll('.spare-slot-choice').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.value === selected);
+    });
+  }
+
+  function addChoice(grid, value, label, extraClass) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'spare-slot-choice' + (extraClass ? ' ' + extraClass : '');
+    btn.dataset.value = value;
+    btn.textContent = label;
+    btn.onclick = () => {
+      selected = value;
+      updateSelected();
+      onSelect(value || null);
+    };
+    grid.appendChild(btn);
+  }
+
+  if (options.includeUnassigned) {
+    const clearGrid = document.createElement('div');
+    clearGrid.className = 'spare-slot-grid spare-slot-grid-clear';
+    addChoice(clearGrid, '', 'Unassigned', 'spare-slot-unassigned');
+    wrap.appendChild(clearGrid);
+  }
+
+  SPARE_SLOT_GROUPS.forEach(group => {
+    const groupWrap = document.createElement('div');
+    groupWrap.className = 'spare-slot-group';
+
+    const title = document.createElement('div');
+    title.className = 'spare-slot-group-title';
+    title.textContent = group.title;
+    groupWrap.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'spare-slot-grid';
+    for (let i = 1; i <= group.count; i++) {
+      addChoice(grid, group.prefix + i, String(i));
+    }
+    groupWrap.appendChild(grid);
+    wrap.appendChild(groupWrap);
+  });
+
+  updateSelected();
+  return wrap;
+}
+
 export function initScreens(context) {
   ctx = context;
 }
@@ -1052,44 +1113,29 @@ export function renderStep() {
           if (window.savePhotoToDevice) window.savePhotoToDevice(dataUrl, sp.photoId);
 
           // ── Quick-assign sheet ──────────────────────────────────
-          const SPARE_SLOTS_CAPTURE = [
-            ...Array.from({length:6}, (_,i) => ({ value: 'obs_' + (i+1),         label: 'Observation ' + (i+1) })),
-            ...Array.from({length:6}, (_,i) => ({ value: 'actionTaken_' + (i+1), label: 'Action Taken ' + (i+1) })),
-            ...Array.from({length:5}, (_,i) => ({ value: 'followUp_' + (i+1),    label: 'Follow-up ' + (i+1) }))
-          ];
-
+          let selectedSlot = '';
           const overlay = document.createElement('div');
-          overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+          overlay.className = 'spare-assign-overlay';
 
           const sheet = document.createElement('div');
-          sheet.style = 'background:#fff;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:480px;box-sizing:border-box;';
+          sheet.className = 'spare-assign-sheet';
 
           const preview = document.createElement('img');
           preview.src = dataUrl;
-          preview.style = 'width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:14px;';
+          preview.className = 'spare-assign-preview';
           sheet.appendChild(preview);
 
           const sheetTitle = document.createElement('div');
-          sheetTitle.style = 'font-size:1rem;font-weight:800;color:#1e293b;margin-bottom:4px;';
+          sheetTitle.className = 'spare-assign-title';
           sheetTitle.textContent = '📸 Assign spare photo';
           sheet.appendChild(sheetTitle);
 
           const sheetSub = document.createElement('div');
-          sheetSub.style = 'font-size:12px;color:#64748b;margin-bottom:14px;';
-          sheetSub.textContent = 'Pick a section now or skip — you can assign it later in Review.';
+          sheetSub.className = 'spare-assign-subtitle';
+          sheetSub.textContent = 'Tap a bucket, then save. You can also skip and assign it in Review.';
           sheet.appendChild(sheetSub);
 
-          const selEl = document.createElement('select');
-          selEl.style = 'width:100%;padding:12px;font-size:15px;font-family:inherit;border:2px solid #f59e0b;border-radius:8px;background:#fff;color:#1e293b;-webkit-appearance:none;appearance:none;margin-bottom:14px;box-sizing:border-box;';
-          const blankOpt2 = document.createElement('option');
-          blankOpt2.value = ''; blankOpt2.textContent = '— Skip for now —';
-          selEl.appendChild(blankOpt2);
-          SPARE_SLOTS_CAPTURE.forEach(slot => {
-            const opt = document.createElement('option');
-            opt.value = slot.value; opt.textContent = slot.label;
-            selEl.appendChild(opt);
-          });
-          sheet.appendChild(selEl);
+          sheet.appendChild(buildSpareSlotPicker('', value => { selectedSlot = value || ''; }));
 
           const capInput = document.createElement('input');
           capInput.type = 'text';
@@ -1105,11 +1151,11 @@ export function renderStep() {
           confirmBtn.textContent = 'Save';
           confirmBtn.style = 'flex:1;padding:14px;background:#f59e0b;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;touch-action:manipulation;';
           confirmBtn.onclick = () => {
-            if (selEl.value) sp.assignedSlot = selEl.value;
+            if (selectedSlot) sp.assignedSlot = selectedSlot;
             if (capInput.value.trim()) sp.caption = capInput.value.trim();
             saveNow();
             document.body.removeChild(overlay);
-            ui().showToast(selEl.value ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
+            ui().showToast(selectedSlot ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
           };
 
           const skipBtn = document.createElement('button');
@@ -1820,12 +1866,6 @@ export function renderReview() {
 
   // Spare Photos section in Review
   if (ctx.inspection.sparePhotos && ctx.inspection.sparePhotos.length) {
-    const SPARE_SLOTS = [
-      ...Array.from({length:6}, (_,i) => ({ value: 'obs_' + (i+1),        label: 'Observation ' + (i+1) })),
-      ...Array.from({length:6}, (_,i) => ({ value: 'actionTaken_' + (i+1), label: 'Action Taken ' + (i+1) })),
-      ...Array.from({length:5}, (_,i) => ({ value: 'followUp_' + (i+1),   label: 'Follow-up ' + (i+1) }))
-    ];
-
     const unassigned = ctx.inspection.sparePhotos.filter(sp => !sp.assignedSlot);
     const assigned   = ctx.inspection.sparePhotos.filter(sp =>  sp.assignedSlot);
 
@@ -1917,7 +1957,7 @@ export function renderReview() {
         spCard.appendChild(aiSpareBtn);
       }
 
-      // Section assignment dropdown
+      // Section assignment buttons
       const assignWrap = document.createElement('div');
       assignWrap.style = 'padding:8px 10px;border-top:1px solid #e5e7eb;background:#f8fafc;';
 
@@ -1926,34 +1966,17 @@ export function renderReview() {
       assignLabel.textContent = 'Assign to section';
       assignWrap.appendChild(assignLabel);
 
-      const sel = document.createElement('select');
-      sel.style = 'width:100%;padding:10px 12px;font-size:14px;font-family:inherit;border:2px solid ' + (sp.assignedSlot ? '#22c55e' : '#f59e0b') + ';border-radius:6px;background:#fff;color:#1e293b;-webkit-appearance:none;appearance:none;cursor:pointer;';
-
-      const blankOpt = document.createElement('option');
-      blankOpt.value = '';
-      blankOpt.textContent = '— Select section —';
-      sel.appendChild(blankOpt);
-
-      SPARE_SLOTS.forEach(slot => {
-        const opt = document.createElement('option');
-        opt.value = slot.value;
-        opt.textContent = slot.label;
-        if (sp.assignedSlot === slot.value) opt.selected = true;
-        sel.appendChild(opt);
-      });
-
-      sel.onchange = () => {
-        sp.assignedSlot = sel.value || null;
+      const picker = buildSpareSlotPicker(sp.assignedSlot || '', value => {
+        sp.assignedSlot = value || null;
         scheduleSave();
-        // Refresh the whole spare photos section so bucket counts update
         const container = document.getElementById('spare-photos-container');
         if (container) {
           container.parentNode.removeChild(container);
         }
         renderSpareSection();
-      };
+      }, { compact: true, includeUnassigned: true });
 
-      assignWrap.appendChild(sel);
+      assignWrap.appendChild(picker);
       spCard.appendChild(assignWrap);
       return spCard;
     }
