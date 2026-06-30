@@ -195,6 +195,61 @@
     });
   }
 
+  function imageVariant(dataUrl, maxSize, quality) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', quality || 0.65));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  function getInspectionIdForPhoto(fallbackId) {
+    return fallbackId || (window.inspection && window.inspection.inspectionId) || '';
+  }
+
+  async function savePhotoRecordToVault(photo, inspectionId) {
+    if (!photo || !photo.photoId || !photo.dataUrl || photo.dataUrl === '__uploaded__') return false;
+    if (!window.DB || !window.DB.savePhoto) return false;
+    const targetInspectionId = getInspectionIdForPhoto(inspectionId);
+    if (!targetInspectionId) return false;
+    try {
+      const thumbnailDataUrl = photo.thumbnailDataUrl || await imageVariant(photo.dataUrl, 420, 0.62);
+      photo.thumbnailDataUrl = thumbnailDataUrl;
+      await window.DB.savePhoto({
+        photoId: photo.photoId,
+        inspectionId: targetInspectionId,
+        roomName: photo.roomName || '',
+        stepName: photo.stepName || '',
+        caption: photo.caption || '',
+        timestamp: photo.timestamp || new Date().toISOString(),
+        dataUrl: photo.dataUrl,
+        thumbnailDataUrl: thumbnailDataUrl,
+        driveUrl: photo.driveUrl || '',
+        driveId: photo.driveId || '',
+        uploadState: photo.driveUrl || photo.driveId ? 'uploaded' : 'local'
+      });
+      photo._vaultSaved = true;
+      photo._vaultSavedAt = new Date().toISOString();
+      return true;
+    } catch (err) {
+      console.warn('Photo vault save failed:', err);
+      photo._vaultSaved = false;
+      photo._vaultError = err && err.message ? err.message : String(err);
+      return false;
+    }
+  }
+
   // ── Audio Alert ────────────────────────────────────────────
   function playAlert(prominent) {
     try {
@@ -994,7 +1049,7 @@
       if (!annotations.length) { overlay.remove(); return; }
       var canv = document.createElement('canvas');
       var baseImg = new Image();
-      baseImg.onload = function() {
+      baseImg.onload = async function() {
         canv.width = baseImg.naturalWidth;
         canv.height = baseImg.naturalHeight;
         var ctx = canv.getContext('2d');
@@ -1025,7 +1080,13 @@
         });
         if (!photo.originalDataUrl) photo.originalDataUrl = photo.dataUrl;
         photo.dataUrl = canv.toDataURL('image/jpeg', 0.85);
+        try {
+          photo.thumbnailDataUrl = await imageVariant(photo.dataUrl, 420, 0.62);
+        } catch (thumbErr) {
+          console.warn('Annotation thumbnail failed:', thumbErr);
+        }
         photo.annotations = JSON.parse(JSON.stringify(annotations));
+        savePhotoRecordToVault(photo);
         onSave();
         overlay.remove();
       };
@@ -1034,7 +1095,7 @@
   }
 
   // ── Field: Photo Capture ───────────────────────────────────
-  function renderPhoto(photos, onUpdate, roomName, stepName) {
+  function renderPhoto(photos, onUpdate, roomName, stepName, inspectionId) {
     if (!photos) photos = [];
     const section = el('div', { className: 'field-group photo-section' });
     section.appendChild(el('label', { className: 'field-label' }, 'Photos'));
@@ -1043,11 +1104,12 @@
       const grid = el('div', { className: 'photo-grid' });
       photos.forEach((p, idx) => {
         const card = el('div', { className: 'photo-card' });
-        if (p.dataUrl === '__uploaded__' || !p.dataUrl) {
+        var displayUrl = p.thumbnailDataUrl || p.dataUrl;
+        if (p.dataUrl === '__uploaded__' || !displayUrl) {
           const placeholder = el('div', { className: 'photo-img', style: 'display:flex;align-items:center;justify-content:center;background:#e8f5e9;color:#2e7d32;font-size:13px;font-weight:bold;min-height:120px;border-radius:6px;' }, '\u2601\ufe0f Uploaded to Drive');
           card.appendChild(placeholder);
         } else {
-          card.appendChild(lazyImage(p.dataUrl, 'photo-img', 'Photo ' + (idx + 1)));
+          card.appendChild(lazyImage(displayUrl, 'photo-img', 'Photo ' + (idx + 1)));
         }
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
 
@@ -1058,7 +1120,13 @@
         });
         capInp.value = p.caption || '';
         capInp.style.cssText = 'resize:none;min-height:54px;font-size:0.9rem;line-height:1.4;padding:8px;';
-        capInp.addEventListener('input', () => { p.caption = capInp.value; onUpdate(); });
+        capInp.addEventListener('input', () => {
+          p.caption = capInp.value;
+          if (window.DB && window.DB.updatePhoto && p.photoId) {
+            window.DB.updatePhoto(p.photoId, { caption: p.caption });
+          }
+          onUpdate();
+        });
         capRow.appendChild(capInp);
         card.appendChild(capRow);
 
@@ -1121,9 +1189,12 @@
           type: 'button', className: 'photo-del-btn',
           onClick: () => {
             if (confirm('Delete this photo?')) {
+              if (window.DB && window.DB.removePhoto && p.photoId) {
+                window.DB.removePhoto(p.photoId);
+              }
               photos.splice(idx, 1);
               onUpdate();
-              const newSection = renderPhoto(photos, onUpdate, roomName, stepName);
+              const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId);
               section.replaceWith(newSection);
             }
           }
@@ -1135,7 +1206,7 @@
             e.stopPropagation();
             openAnnotationEditor(p, function() {
               onUpdate();
-              const newSection = renderPhoto(photos, onUpdate, roomName, stepName);
+              const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId);
               section.replaceWith(newSection);
             });
           }
@@ -1174,15 +1245,17 @@
       for (const file of Array.from(files)) {
         try {
           const dataUrl = await compressImage(file);
+          const thumbnailDataUrl = await imageVariant(dataUrl, 420, 0.62);
           const newPhoto = {
             photoId: 'p-' + Math.random().toString(36).substr(2, 9),
             roomName: roomName || '', stepName: stepName || '',
-            timestamp: new Date().toISOString(), caption: '', dataUrl,
-            _uploaded: false
+            timestamp: new Date().toISOString(), caption: '', dataUrl, thumbnailDataUrl,
+            _uploaded: false, _vaultSaved: false
           };
+          await savePhotoRecordToVault(newPhoto, inspectionId);
           photos.push(newPhoto);
           onUpdate();
-          section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName));
+          section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName, inspectionId));
           // ⚡ Save to device camera roll immediately (user taps "Save Image" on share sheet)
           await saveToDevicePhotos(dataUrl, newPhoto.photoId);
           // ⚡ Upload immediately to Drive
@@ -2159,7 +2232,13 @@
       case 'photo': {
         const pk = f.photoKey || '_photos';
         if (!data[pk]) data[pk] = [];
-        return renderPhoto(data[pk], () => { changed(); }, data.roomName || data._roomName || '', f.stepName || '');
+        return renderPhoto(
+          data[pk],
+          () => { changed(); },
+          data.roomName || data._roomName || '',
+          f.stepName || '',
+          data.inspectionId || (window.inspection && window.inspection.inspectionId) || ''
+        );
       }
       case 'timer':
         return renderTimer(f.timerId || (f.key + '-' + (data._stepId || '')), f.label, f.duration, inspection, onSave);

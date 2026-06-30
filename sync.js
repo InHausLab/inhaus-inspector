@@ -107,6 +107,13 @@ function markConfirmedLocalPhotos(inspection, confirmedPhotos) {
     // when the file itself was saved, and photos are too important to discard.
     photo._uploadFailed = false;
     photo._uploadWarning = '';
+    if (window.DB && window.DB.updatePhoto) {
+      window.DB.updatePhoto(photo.photoId, {
+        driveUrl: confirmed.driveUrl,
+        driveId: confirmed.driveId,
+        uploadState: 'uploaded'
+      });
+    }
   });
   if (Array.isArray(inspection._photoRetryQueue)) {
     inspection._photoRetryQueue = inspection._photoRetryQueue.filter(function(photo) {
@@ -210,8 +217,23 @@ export function showUploadBanner(type, msg) {
 // for the review portal to display them. This is a known workaround - see issue tracker.
 export async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
   if (!GOOGLE_SCRIPT_URL || !inspectionId) return false;
-  if (!photo.dataUrl || photo.dataUrl === '__uploaded__') return !!(photo.driveUrl || photo.driveId);
-  const originalDataUrl = photo.dataUrl;
+  let originalDataUrl = photo.dataUrl;
+  if (!originalDataUrl || originalDataUrl === '__uploaded__') {
+    if (photo.photoId && window.DB && window.DB.getPhoto) {
+      try {
+        const vaulted = await window.DB.getPhoto(photo.photoId);
+        if (vaulted && vaulted.dataUrl) {
+          originalDataUrl = vaulted.dataUrl;
+          photo.dataUrl = originalDataUrl;
+          photo.thumbnailDataUrl = photo.thumbnailDataUrl || vaulted.thumbnailDataUrl || '';
+          photo._vaultRecovered = true;
+        }
+      } catch (vaultErr) {
+        console.warn('Photo vault lookup failed:', vaultErr);
+      }
+    }
+    if (!originalDataUrl || originalDataUrl === '__uploaded__') return !!(photo.driveUrl || photo.driveId);
+  }
 
   const payload = {
     photoUploadOnly: true,
@@ -243,6 +265,13 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
       photo.driveId  = returnedPhoto.driveId || '';
       photo._driveConfirmed = true;
       photo._uploaded = true;
+      if (window.DB && window.DB.updatePhoto) {
+        window.DB.updatePhoto(photo.photoId, {
+          driveUrl: photo.driveUrl,
+          driveId: photo.driveId,
+          uploadState: 'uploaded'
+        });
+      }
       scheduleSave();
       updateSyncStatus('checkpoint');
       return true;

@@ -718,7 +718,9 @@ export function renderIntake() {
         setScreen('precheck');
         ctx.startAutoSave();
         ctx.render();
-        saveNow();
+        saveNow().then(() => {
+          if (window.runCloudPreflight) window.runCloudPreflight();
+        });
       }
     }}, isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192')
   ]);
@@ -1154,6 +1156,71 @@ export function renderReview() {
     ' Photos showing <strong>\u2601\ufe0f Uploaded to Drive</strong> have been synced to Google Drive - their local copy has been cleared to save storage.' +
     ' A photo marked <strong>?</strong> or <em>Unreviewed</em> in a report means no caption was added - tap the photo here to add one.';
   c.appendChild(legendBar);
+
+  const photoSafetyCard = ui().el('div', { className: 'card', id: 'photo-safety-card' });
+  photoSafetyCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Photo Safety'));
+  const photoSafetyBody = ui().el('div', { style: 'font-size:0.92rem;color:var(--text-muted);line-height:1.6;' }, 'Checking photo backup status...');
+  photoSafetyCard.appendChild(photoSafetyBody);
+  const photoSafetyActions = ui().el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;' });
+  const rescueBtn = ui().el('button', {
+    className: 'btn btn-outline',
+    style: 'flex:1;min-width:150px;',
+    onClick: async () => {
+      rescueBtn.disabled = true;
+      rescueBtn.textContent = 'Preparing...';
+      try {
+        const ok = window.exportLocalPhotoBackup ? await window.exportLocalPhotoBackup() : false;
+        rescueBtn.textContent = ok ? 'Backup Ready' : 'Rescue Photos';
+      } catch (err) {
+        alert('Photo rescue failed: ' + (err && err.message ? err.message : String(err)));
+        rescueBtn.textContent = 'Rescue Photos';
+      } finally {
+        rescueBtn.disabled = false;
+      }
+    }
+  }, 'Rescue Photos');
+  const cloudCheckBtn = ui().el('button', {
+    className: 'btn btn-secondary',
+    style: 'flex:1;min-width:150px;',
+    onClick: async () => {
+      cloudCheckBtn.disabled = true;
+      cloudCheckBtn.textContent = 'Checking...';
+      const result = window.runCloudPreflight ? await window.runCloudPreflight() : { ok: false, message: 'Cloud check unavailable' };
+      cloudCheckBtn.textContent = result.ok ? 'Cloud Ready' : 'Cloud Failed';
+      if (!result.ok) alert('Cloud check failed: ' + (result.message || 'Unknown error'));
+      setTimeout(() => { cloudCheckBtn.textContent = 'Cloud Check'; cloudCheckBtn.disabled = false; }, 2500);
+      refreshPhotoSafety();
+    }
+  }, 'Cloud Check');
+  photoSafetyActions.appendChild(rescueBtn);
+  photoSafetyActions.appendChild(cloudCheckBtn);
+  photoSafetyCard.appendChild(photoSafetyActions);
+  c.appendChild(photoSafetyCard);
+
+  async function refreshPhotoSafety() {
+    if (!window.getPhotoHealth) {
+      photoSafetyBody.textContent = 'Photo safety check unavailable in this version.';
+      return;
+    }
+    try {
+      const h = await window.getPhotoHealth();
+      const color = h.missing > 0 ? '#b91c1c' : (h.pending > 0 ? '#b45309' : '#166534');
+      photoSafetyBody.innerHTML =
+        '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px;">' +
+          '<div><strong style="color:#2C3F16;font-size:1.25rem;">' + h.total + '</strong><br>Total photos</div>' +
+          '<div><strong style="color:#166534;font-size:1.25rem;">' + h.local + '</strong><br>On phone</div>' +
+          '<div><strong style="color:#166534;font-size:1.25rem;">' + h.drive + '</strong><br>In Drive</div>' +
+          '<div><strong style="color:' + color + ';font-size:1.25rem;">' + h.pending + '</strong><br>Waiting</div>' +
+        '</div>' +
+        (h.missing > 0
+          ? '<div style="color:#b91c1c;font-weight:800;">' + h.missing + ' photo' + (h.missing === 1 ? '' : 's') + ' missing local and Drive backup. Do not close the app.</div>'
+          : '<div style="color:#166534;font-weight:700;">No missing photos detected.</div>') +
+        (h.vaultOnly > 0 ? '<div style="color:#4b5563;margin-top:4px;">' + h.vaultOnly + ' rescue-only photo' + (h.vaultOnly === 1 ? '' : 's') + ' found in the vault.</div>' : '');
+    } catch (err) {
+      photoSafetyBody.textContent = 'Photo safety check failed: ' + (err && err.message ? err.message : String(err));
+    }
+  }
+  refreshPhotoSafety();
 
   // ── 6a: Departure Checklist ──
   if (!ctx.inspection._departureChecklist) ctx.inspection._departureChecklist = {};

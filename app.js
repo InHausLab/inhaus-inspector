@@ -2,7 +2,7 @@
 import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js';
 import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt } from './state.js';
 import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js';
-import { buildExportJSON, extractAllPhotosFromExport, stripPhotosFromExport } from './inspection.js';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js';
 import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js';
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js';
 import { initScreens, render } from './screens.js';
@@ -83,9 +83,180 @@ import { initScreens, render } from './screens.js';
   // sendToGoogleScript, checkpointToCloud, submitInspection → moved to sync.js
   window.uploadPhotoImmediate = uploadPhotoImmediate;
 
+  function visitInspectionPhotos(insp, callback) {
+    const seen = new Set();
+    function walk(obj, path) {
+      if (!obj || typeof obj !== 'object' || seen.has(obj)) return;
+      seen.add(obj);
+      if (Array.isArray(obj)) {
+        if (obj.length && obj[0] && typeof obj[0].photoId === 'string') {
+          obj.forEach(function(photo, idx) { callback(photo, path + '[' + idx + ']'); });
+        } else {
+          obj.forEach(function(item, idx) { walk(item, path + '[' + idx + ']'); });
+        }
+        return;
+      }
+      Object.keys(obj).forEach(function(key) {
+        if (key === '_photoRetryQueue') return;
+        walk(obj[key], path ? path + '.' + key : key);
+      });
+    }
+    walk(insp, 'inspection');
+  }
+
+  async function hydrateInspectionPhotosFromVault(insp) {
+    if (!insp || !window.DB || !window.DB.getPhoto) return { recovered: 0, vaulted: 0 };
+    let recovered = 0;
+    let vaulted = 0;
+    let changed = false;
+    const photos = [];
+    visitInspectionPhotos(insp, function(photo) { if (photo && photo.photoId) photos.push(photo); });
+    for (const photo of photos) {
+      try {
+        const vaultedPhoto = await window.DB.getPhoto(photo.photoId);
+        if (vaultedPhoto) {
+          vaulted++;
+          if ((!photo.dataUrl || photo.dataUrl === '__uploaded__') && !photo.driveUrl && vaultedPhoto.dataUrl) {
+            photo.dataUrl = vaultedPhoto.dataUrl;
+            recovered++;
+            changed = true;
+          }
+          if (!photo.thumbnailDataUrl && vaultedPhoto.thumbnailDataUrl) { photo.thumbnailDataUrl = vaultedPhoto.thumbnailDataUrl; changed = true; }
+          if (!photo.driveUrl && vaultedPhoto.driveUrl) { photo.driveUrl = vaultedPhoto.driveUrl; changed = true; }
+          if (!photo.driveId && vaultedPhoto.driveId) { photo.driveId = vaultedPhoto.driveId; changed = true; }
+          photo._vaultSaved = !!vaultedPhoto.dataUrl;
+        } else if (photo.dataUrl && photo.dataUrl !== '__uploaded__' && window.DB.savePhoto) {
+          await window.DB.savePhoto({
+            photoId: photo.photoId,
+            inspectionId: insp.inspectionId,
+            roomName: photo.roomName || '',
+            stepName: photo.stepName || '',
+            caption: photo.caption || '',
+            timestamp: photo.timestamp || new Date().toISOString(),
+            dataUrl: photo.dataUrl,
+            thumbnailDataUrl: photo.thumbnailDataUrl || '',
+            driveUrl: photo.driveUrl || '',
+            driveId: photo.driveId || '',
+            uploadState: photo.driveUrl || photo.driveId ? 'uploaded' : 'local'
+          });
+          photo._vaultSaved = true;
+          changed = true;
+          vaulted++;
+        }
+      } catch (err) {
+        console.warn('Photo vault hydrate failed:', err);
+      }
+    }
+    if (changed) scheduleSave();
+    return { recovered, vaulted };
+  }
+
+  async function getPhotoHealth() {
+    const insp = inspection || getInspection();
+    if (!insp) return { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
+    await hydrateInspectionPhotosFromVault(insp);
+    const vaultPhotos = window.DB && window.DB.getPhotosForInspection
+      ? await window.DB.getPhotosForInspection(insp.inspectionId)
+      : [];
+    const vaultMap = new Map(vaultPhotos.map(function(p) { return [p.photoId, p]; }));
+    const seen = new Set();
+    const result = { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
+    visitInspectionPhotos(insp, function(photo) {
+      if (!photo || !photo.photoId) return;
+      seen.add(photo.photoId);
+      result.total++;
+      const vaultedPhoto = vaultMap.get(photo.photoId);
+      const hasLocal = !!((photo.dataUrl && photo.dataUrl !== '__uploaded__') || (vaultedPhoto && vaultedPhoto.dataUrl));
+      const hasDrive = !!(photo.driveUrl || photo.driveId || (vaultedPhoto && (vaultedPhoto.driveUrl || vaultedPhoto.driveId)));
+      if (hasLocal) result.local++;
+      if (hasDrive) result.drive++;
+      if (!hasDrive && hasLocal) result.pending++;
+      if (!hasDrive && !hasLocal) result.missing++;
+    });
+    vaultPhotos.forEach(function(p) {
+      if (p && p.photoId && !seen.has(p.photoId) && p.dataUrl) result.vaultOnly++;
+    });
+    return result;
+  }
+
+  function escapeHtml(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
+  }
+
+  async function exportLocalPhotoBackup() {
+    const insp = inspection || getInspection();
+    if (!insp || !window.DB || !window.DB.getPhotosForInspection) {
+      alert('No inspection photo vault is available yet.');
+      return false;
+    }
+    await hydrateInspectionPhotosFromVault(insp);
+    const photos = await window.DB.getPhotosForInspection(insp.inspectionId);
+    const withImages = photos.filter(function(p) { return p && p.dataUrl; });
+    if (!withImages.length) {
+      alert('No local photos found in the photo vault for this inspection.');
+      return false;
+    }
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>InHaus Photo Backup</title>' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:18px;background:#f7f7f4;color:#20311d}.photo{break-inside:avoid;background:white;border:1px solid #dde5d8;border-radius:8px;padding:12px;margin:0 0 14px}img{max-width:100%;height:auto;border-radius:6px}.meta{font-size:13px;color:#51614b;line-height:1.5}</style></head><body>' +
+      '<h1>InHaus Photo Backup</h1><p>Inspection: ' + escapeHtml(insp.inspectionId) + '<br>Address: ' + escapeHtml(insp.propertyAddress || '') + '<br>Saved: ' + escapeHtml(new Date().toLocaleString()) + '</p>' +
+      withImages.map(function(p, idx) {
+        return '<div class="photo"><h2>Photo ' + (idx + 1) + '</h2><div class="meta">' +
+          'Room: ' + escapeHtml(p.roomName || '') + '<br>Step: ' + escapeHtml(p.stepName || '') + '<br>Caption: ' + escapeHtml(p.caption || '') + '<br>Taken: ' + escapeHtml(p.timestamp || '') +
+          '</div><p><a download="inhaus-' + escapeHtml(p.photoId) + '.jpg" href="' + p.dataUrl + '">Download this photo</a></p><img src="' + p.dataUrl + '"></div>';
+      }).join('') + '</body></html>';
+    const blob = new Blob([html], { type: 'text/html' });
+    const filename = 'inhaus-photo-backup-' + insp.inspectionId + '.html';
+    const file = new File([blob], filename, { type: 'text/html' });
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'InHaus Photo Backup' });
+        return true;
+      }
+    } catch (shareErr) {
+      if (shareErr && shareErr.name === 'AbortError') return false;
+      console.warn('Photo backup share failed:', shareErr);
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    return true;
+  }
+
+  async function runCloudPreflight() {
+    const insp = inspection || getInspection();
+    if (!insp || !GOOGLE_SCRIPT_URL) return { ok: false, message: 'No active inspection' };
+    try {
+      updateSyncStatus('syncing', 'cloud check');
+      const exportData = buildExportJSON(stepList);
+      const payload = stripPhotosFromExport(exportData);
+      payload._checkpoint = true;
+      payload._preflight = true;
+      await scriptFetch(payload);
+      setLastCheckpointSucceededAt(Date.now());
+      scheduleSave();
+      updateSyncStatus('checkpoint', 'cloud ready');
+      return { ok: true };
+    } catch (err) {
+      const message = err && err.message ? err.message : String(err);
+      updateSyncStatus('failed', message);
+      return { ok: false, message };
+    }
+  }
+
+  window.getPhotoHealth = getPhotoHealth;
+  window.exportLocalPhotoBackup = exportLocalPhotoBackup;
+  window.runCloudPreflight = runCloudPreflight;
+  window.hydrateInspectionPhotosFromVault = hydrateInspectionPhotosFromVault;
+
   // ── Final Sync (Changes 3 & 4) ─────────────────────────────
   async function triggerFinalSync() {
     showFinalSyncOverlay('syncing');
+    await hydrateInspectionPhotosFromVault(inspection);
     // Retry any individually-queued photos before the main sync
     await retryFailedPhotos();
 
@@ -215,58 +386,38 @@ import { initScreens, render } from './screens.js';
   function auditPhotos(insp) {
     const lost = [];
     const pending = []; // have dataUrl but not yet uploaded
-    function checkArr(arr, context) {
-      if (!Array.isArray(arr)) return;
-      arr.forEach(function(p) {
-        if (!p || !p.photoId) return;
-        const hasDrive = p.driveUrl && p.driveUrl.length > 0;
-        const hasLocal = p.dataUrl && p.dataUrl !== '__uploaded__';
-        if (!hasDrive && !hasLocal) {
-          lost.push({ photoId: p.photoId, context, caption: p.caption || '', roomName: p.roomName || '' });
-        } else if (!hasDrive && hasLocal) {
-          pending.push({ photoId: p.photoId, context });
-        }
-      });
-    }
-    if (insp && insp.stepData) {
-      Object.entries(insp.stepData).forEach(function([stepId, stepData]) {
-        Object.values(stepData || {}).forEach(function(v) {
-          if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
-            checkArr(v, stepId);
-          }
-        });
-      });
-    }
-    if (insp && insp.sparePhotos) checkArr(insp.sparePhotos, 'spare');
+    visitInspectionPhotos(insp, function(p, context) {
+      if (!p || !p.photoId) return;
+      const hasDrive = p.driveUrl && p.driveUrl.length > 0;
+      const hasLocal = p.dataUrl && p.dataUrl !== '__uploaded__';
+      if (!hasDrive && !hasLocal) {
+        lost.push({ photoId: p.photoId, context, caption: p.caption || '', roomName: p.roomName || '' });
+      } else if (!hasDrive && hasLocal) {
+        pending.push({ photoId: p.photoId, context });
+      }
+    });
     return { lost, pending };
   }
 
   // Change 4: Final sync receipt
   function buildSyncReceipt(exportData, success) {
-    var allPhotos = extractAllPhotosFromExport(exportData);
+    var photosExpected = 0;
     var photosUploaded = 0;
-    if (inspection && inspection.stepData) {
-      Object.values(inspection.stepData).forEach(function(stepData) {
-        Object.values(stepData).forEach(function(v) {
-          if (Array.isArray(v) && v.length && v[0] && typeof v[0].photoId === 'string') {
-            photosUploaded += v.filter(function(p) { return p._uploaded === true || p.dataUrl === '__uploaded__'; }).length;
-          }
-        });
-      });
-    }
-    if (inspection && inspection.sparePhotos) {
-      photosUploaded += inspection.sparePhotos.filter(function(p) { return p._uploaded === true || p.dataUrl === '__uploaded__'; }).length;
-    }
+    if (inspection) visitInspectionPhotos(inspection, function(p) {
+      if (!p || !p.photoId) return;
+      photosExpected++;
+      if (p._uploaded === true || p.dataUrl === '__uploaded__' || p.driveUrl || p.driveId) photosUploaded++;
+    });
     var photosUnconfirmed = inspection ? (inspection._photoRetryQueue || []).filter(function(p) { return p.dataUrl && p.dataUrl !== '__uploaded__'; }).length : 0;
     return {
       inspectionId: (exportData && exportData.inspectionId) || (inspection && inspection.inspectionId),
       timestamp: new Date().toLocaleString('en-US', { timeZone: 'America/Denver' }),
       roomCount: (exportData && exportData.rooms ? exportData.rooms.length : 0),
-      photosExpected: allPhotos.length,
+      photosExpected: photosExpected,
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
       driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v125',
+      appVersion: 'v126',
       success: success
     };
   }
