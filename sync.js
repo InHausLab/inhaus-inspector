@@ -102,7 +102,8 @@ function markConfirmedLocalPhotos(inspection, confirmedPhotos) {
     photo.driveId = confirmed.driveId;
     photo._driveConfirmed = true;
     photo._uploaded = true;
-    photo.dataUrl = '__uploaded__';
+    // Keep the local image copy. Workspace Drive sharing can be restricted even
+    // when the file itself was saved, and photos are too important to discard.
     photo._uploadFailed = false;
     photo._uploadWarning = '';
   });
@@ -236,12 +237,11 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
     const confirmedDriveUrl = getPhotoDriveLink(returnedPhoto);
 
     if (result && result.photosUploaded > 0 && confirmedDriveUrl) {
-      // SAFE TO CLEAR: Drive confirmed receipt AND returned a retrievable URL
+      // Drive confirmed receipt. Keep the local copy in case Drive sharing is restricted.
       photo.driveUrl = confirmedDriveUrl;
       photo.driveId  = returnedPhoto.driveId || '';
       photo._driveConfirmed = true;
       photo._uploaded = true;
-      photo.dataUrl = '__uploaded__'; // only cleared AFTER driveUrl is stored
       scheduleSave();
       updateSyncStatus('checkpoint');
       return true;
