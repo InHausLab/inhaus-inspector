@@ -2,10 +2,15 @@ const REPORT_REVIEW_API_URL = 'https://script.google.com/macros/s/AKfycbxh6xtKg3
 const REPORT_BRIDGE_API_URL = 'https://script.google.com/macros/s/AKfycbxmOMfSGaz9sDHxAKBjNXtJ44MLdusXRe-GOrV6nGH0Iw0tciFg1Wkw-02hB-dQglAbgQ/exec';
 const ACCESS_TOKEN_STORAGE_KEY = 'inhaus-report-access-token';
 const DEFAULT_REPORT_ID = 'INH-20260428-DKNSOB';
+const REPORT_CREDIT = 'Credit: Prepared by InHaus Lab from inspector-submitted field data and review notes.';
+const REPORT_DISCLAIMER = 'Internal draft for report preparation. Final client-facing reports require review against source inspection data, lab results, and client-specific scope notes.';
 
 const els = {};
 let knownInspections = [];
 let currentInspection = null;
+let bootstrapRun = 0;
+let loadRun = 0;
+let listWarning = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   els.form = document.getElementById('report-search-form');
@@ -16,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   els.status = document.getElementById('report-status');
   els.output = document.getElementById('report-output');
   els.printBtn = document.getElementById('print-btn');
+  els.copyBtn = document.getElementById('copy-link-btn');
 
   els.form.addEventListener('submit', event => {
     event.preventDefault();
@@ -41,21 +47,29 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   els.printBtn.addEventListener('click', () => window.print());
+  els.copyBtn.addEventListener('click', copyCurrentReportLink);
+  els.output.addEventListener('click', handleOutputAction);
 
   bootstrap();
 });
 
 async function bootstrap() {
+  const run = ++bootstrapRun;
   renderAccessState();
-  const params = new URLSearchParams(window.location.search);
-  const requestedId = normalizeId(params.get('id') || '');
+  const requestedId = readRequestedId();
 
   setStatus('Loading known inspections...');
   try {
     knownInspections = await loadInspectionList();
+    if (run !== bootstrapRun) return;
     populatePicker(knownInspections);
-    setStatus(knownInspections.length ? `${knownInspections.length} inspections available.` : 'Loading default report...');
+    if (listWarning) {
+      setStatus(listWarning, 'warning');
+    } else {
+      setStatus(knownInspections.length ? `${knownInspections.length} inspections available.` : 'Loading default report...');
+    }
   } catch (err) {
+    if (run !== bootstrapRun) return;
     populatePicker([]);
     setStatus(`Inspection list unavailable. Loading default report. ${err.message}`, true);
   }
@@ -70,6 +84,17 @@ async function bootstrap() {
 
 function normalizeId(value) {
   return String(value || '').trim().toUpperCase();
+}
+
+function readRequestedId() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeId(
+    params.get('id') ||
+    params.get('inspectionId') ||
+    params.get('inspection') ||
+    params.get('report') ||
+    window.location.hash.replace(/^#/, '')
+  );
 }
 
 function getAccessToken() {
@@ -98,6 +123,7 @@ async function apiFetch(endpoint, params) {
 }
 
 async function loadInspectionList() {
+  listWarning = '';
   const token = getAccessToken();
   let liveError = null;
   if (token) {
@@ -113,6 +139,7 @@ async function loadInspectionList() {
     const response = await fetch('./api/list.json?t=' + Date.now());
     if (!response.ok) throw new Error('Static inspection list not found');
     const data = await response.json();
+    if (liveError) listWarning = `Live inspection list unavailable (${liveError.message}). Showing static report samples.`;
     return data.inspections || [];
   } catch (err) {
     if (liveError) throw new Error(`Live inspection list unavailable. ${liveError.message}`);
@@ -184,19 +211,67 @@ function option(value, label) {
 }
 
 async function loadAndRender(id) {
-  setStatus(`Loading ${id}...`);
-  els.output.innerHTML = `<div class="empty-report"><div class="loading-spinner"></div><div class="empty-report-copy">Building report...</div></div>`;
+  const requestedId = normalizeId(id);
+  if (!requestedId) {
+    renderReportUnavailable('', new Error('Enter an inspection ID to load a report.'));
+    return;
+  }
+
+  const run = ++loadRun;
+  setStatus(`Loading ${requestedId}...`);
+  renderLoadingState(requestedId);
   try {
-    const inspection = await loadInspectionById(id);
+    const inspection = await loadInspectionById(requestedId);
+    if (run !== loadRun) return;
     currentInspection = normalizeInspection(inspection);
     renderReport(currentInspection);
-    setStatus(`Loaded ${currentInspection.inspectionId}.`);
-    history.replaceState(null, '', `report.html?id=${encodeURIComponent(currentInspection.inspectionId)}`);
+    setStatus(listWarning ? `${listWarning} Loaded ${currentInspection.inspectionId}.` : `Loaded ${currentInspection.inspectionId}.`, listWarning ? 'warning' : undefined);
+    history.replaceState(null, '', getDirectReportPath(currentInspection.inspectionId));
   } catch (err) {
+    if (run !== loadRun) return;
     currentInspection = null;
-    els.output.innerHTML = `<div class="empty-report"><div class="empty-report-title">Report unavailable</div><div class="empty-report-copy">${escapeHTML(err.message)}</div></div>`;
-    setStatus(err.message, true);
+    renderReportUnavailable(requestedId, err);
+    setStatus(`${requestedId}: ${err.message}`, true);
   }
+}
+
+function renderLoadingState(id) {
+  els.output.innerHTML = '';
+  const empty = div('empty-report');
+  const wrap = div('');
+  wrap.appendChild(div('loading-spinner'));
+  wrap.appendChild(textEl('div', 'empty-report-title', `Loading ${id}`));
+  wrap.appendChild(textEl('div', 'empty-report-copy', 'Building the report preview.'));
+  empty.appendChild(wrap);
+  els.output.appendChild(empty);
+}
+
+function renderReportUnavailable(id, err) {
+  els.output.innerHTML = '';
+  const empty = div('empty-report');
+  const wrap = div('');
+  wrap.appendChild(textEl('div', 'empty-report-title', id ? `Report unavailable: ${id}` : 'Report unavailable'));
+  wrap.appendChild(textEl('div', 'empty-report-copy', err.message || 'The report could not be loaded.'));
+
+  const actions = div('empty-report-actions');
+  const retry = document.createElement('button');
+  retry.className = 'btn btn-open';
+  retry.type = 'button';
+  retry.dataset.reportAction = 'retry';
+  retry.textContent = 'Retry';
+  retry.disabled = !id;
+  actions.appendChild(retry);
+
+  const sample = document.createElement('button');
+  sample.className = 'btn btn-secondary';
+  sample.type = 'button';
+  sample.dataset.reportAction = 'sample';
+  sample.textContent = 'Load Sample';
+  actions.appendChild(sample);
+
+  wrap.appendChild(actions);
+  empty.appendChild(wrap);
+  els.output.appendChild(empty);
 }
 
 function normalizeInspection(raw) {
@@ -266,6 +341,7 @@ function renderReport(insp) {
   doc.appendChild(renderListSection('Assessment Observations', 'Notable conditions for report building.', observations));
   doc.appendChild(renderListSection('Recommended Follow-Up', 'Suggested client re-checks or next steps.', followUps));
   doc.appendChild(renderPhotoAppendix(photos));
+  doc.appendChild(renderReportFooter(insp));
   els.output.appendChild(doc);
 }
 
@@ -466,6 +542,51 @@ function renderPhotoAppendix(photos) {
   });
   section.appendChild(grid);
   return section;
+}
+
+function renderReportFooter(insp) {
+  const footer = document.createElement('footer');
+  footer.className = 'report-footer';
+  footer.appendChild(textEl('div', 'report-footer-credit', REPORT_CREDIT));
+  footer.appendChild(textEl('p', 'report-footer-disclaimer', REPORT_DISCLAIMER));
+  footer.appendChild(textEl('div', 'report-footer-meta', `Inspection ${insp.inspectionId} - Generated ${formatDateTime(new Date())}`));
+  return footer;
+}
+
+async function copyCurrentReportLink() {
+  const id = currentInspection ? currentInspection.inspectionId : normalizeId(els.input.value) || DEFAULT_REPORT_ID;
+  const link = getDirectReportUrl(id);
+  try {
+    if (!navigator.clipboard || !window.isSecureContext) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(link);
+    setStatus(`Copied direct link for ${id}.`);
+  } catch (err) {
+    setStatus(`Direct link for ${id}: ${link}`);
+  }
+}
+
+function handleOutputAction(event) {
+  if (!(event.target instanceof Element)) return;
+  const btn = event.target.closest('[data-report-action]');
+  if (!btn) return;
+  if (btn.dataset.reportAction === 'sample') {
+    els.input.value = DEFAULT_REPORT_ID;
+    els.picker.value = DEFAULT_REPORT_ID;
+    loadAndRender(DEFAULT_REPORT_ID);
+  }
+  if (btn.dataset.reportAction === 'retry') {
+    const id = normalizeId(els.input.value);
+    if (id) loadAndRender(id);
+  }
+}
+
+function getDirectReportPath(id) {
+  return `report.html?id=${encodeURIComponent(normalizeId(id))}`;
+}
+
+function getDirectReportUrl(id) {
+  const url = new URL(getDirectReportPath(id), window.location.href);
+  return url.toString();
 }
 
 function reportSection(title, number) {
@@ -713,9 +834,22 @@ function formatDate(value) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not recorded';
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
 function setStatus(message, isError) {
   els.status.textContent = message || '';
-  els.status.classList.toggle('error', !!isError);
+  els.status.classList.toggle('error', isError === true || isError === 'error');
+  els.status.classList.toggle('warning', isError === 'warning');
 }
 
 function div(className) {
