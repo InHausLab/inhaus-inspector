@@ -318,6 +318,10 @@ textarea:focus {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.field-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .check-row {
   display: flex;
   align-items: center;
@@ -337,6 +341,11 @@ textarea:focus {
   font-size: .84rem;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.task-check {
+  align-self: end;
+  margin-bottom: 12px;
 }
 
 .gate-pill {
@@ -378,6 +387,28 @@ textarea:focus {
   font-size: .82rem;
   font-weight: 800;
   padding: 10px 12px;
+}
+
+.stage-help {
+  display: grid;
+  gap: 6px;
+  margin: -2px 0 12px;
+}
+
+.stage-line {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-size: .78rem;
+  padding: 8px 10px;
+}
+
+.stage-line.active {
+  border-color: var(--green);
+  background: var(--ok-bg);
+  color: var(--green);
+  font-weight: 800;
 }
 
 .gate-item {
@@ -518,6 +549,7 @@ textarea:focus {
   }
 
   .field-grid.two,
+  .field-grid.three,
   .failure-row {
     grid-template-columns: 1fr;
   }

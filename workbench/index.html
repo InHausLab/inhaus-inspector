@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hans Operating Workbench</title>
-  <link rel="stylesheet" href="workbench.css?v=20260701-1">
+  <link rel="stylesheet" href="workbench.css?v=20260701-2">
 </head>
 <body>
   <header class="app-bar">
@@ -72,6 +72,20 @@
               <input id="verificationSteps" name="verificationSteps" type="number" min="0" max="99" inputmode="numeric">
             </label>
           </div>
+          <div class="field-grid three">
+            <label>
+              <span>Minutes stuck</span>
+              <input id="stuckMinutes" name="stuckMinutes" type="number" min="0" max="999" inputmode="numeric">
+            </label>
+            <label>
+              <span>Context tokens used</span>
+              <input id="contextTokens" name="contextTokens" type="number" min="0" max="999999" inputmode="numeric">
+            </label>
+            <label class="check-row task-check">
+              <input id="newTopic" name="newTopic" type="checkbox">
+              <span>New topic in current session</span>
+            </label>
+          </div>
           <label>
             <span>Expected evidence</span>
             <textarea id="expectedEvidence" name="expectedEvidence" rows="3"></textarea>
@@ -111,7 +125,7 @@
             </label>
             <label class="check-row">
               <input id="requiresVisibility" name="requiresVisibility" type="checkbox">
-              <span>Requires phone/browser visibility</span>
+              <span>Requires phone/browser visibility Hans cannot verify</span>
             </label>
           </div>
           <label>
@@ -119,6 +133,37 @@
             <textarea id="visibilityPlan" name="visibilityPlan" rows="2"></textarea>
           </label>
           <div id="gate-list" class="gate-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Handoff Context</h2>
+            <span class="gate-pill">Canonical</span>
+          </div>
+          <label>
+            <span>Do not break</span>
+            <textarea id="doNotBreak" name="doNotBreak" rows="2"></textarea>
+          </label>
+          <div class="field-grid two">
+            <label>
+              <span>Accounts / access</span>
+              <textarea id="accounts" name="accounts" rows="2"></textarea>
+            </label>
+            <label>
+              <span>Current state</span>
+              <textarea id="currentState" name="currentState" rows="2"></textarea>
+            </label>
+          </div>
+          <div class="field-grid two">
+            <label>
+              <span>Exact changes needed</span>
+              <textarea id="exactChanges" name="exactChanges" rows="2"></textarea>
+            </label>
+            <label>
+              <span>Rollback plan</span>
+              <textarea id="rollbackPlan" name="rollbackPlan" rows="2"></textarea>
+            </label>
+          </div>
         </section>
 
         <section class="panel">
@@ -147,18 +192,35 @@
             <span id="done-state" class="gate-pill">Not done</span>
           </div>
           <label>
-            <span>Verification label</span>
+            <span>Protocol stage</span>
             <select id="verificationLabel" name="verificationLabel">
-              <option value="">Select label...</option>
+              <option value="">Select stage...</option>
+              <option>DIAGNOSED</option>
+              <option>PATCHED</option>
+              <option>VERIFIED</option>
+              <option>DEPLOYED</option>
+              <option>MONITORED</option>
+            </select>
+          </label>
+          <div id="stage-help" class="stage-help"></div>
+          <label>
+            <span>Final closeout label</span>
+            <select id="finalLabel" name="finalLabel">
+              <option value="">Select final label...</option>
               <option>VERIFIED</option>
               <option>PARTIALLY VERIFIED</option>
-              <option>UNVERIFIED</option>
-              <option>CHANGE APPLIED</option>
+              <option>CHANGE APPLIED NOT VERIFIED</option>
+              <option>BLOCKED</option>
+              <option>STOPPED AFTER 3 FAILURES</option>
             </select>
           </label>
           <label>
             <span>Evidence</span>
             <textarea id="evidence" name="evidence" rows="4" placeholder="Command output, URL checked, screenshot note, commit hash, or direct observation."></textarea>
+          </label>
+          <label>
+            <span>Final response draft / pre-send scan</span>
+            <textarea id="finalResponse" name="finalResponse" rows="4" placeholder="Paste the final response here, or use the generated Final output."></textarea>
           </label>
           <label>
             <span>Notes / caveats</span>
@@ -189,6 +251,6 @@
     </aside>
   </main>
 
-  <script src="workbench.js?v=20260701-1"></script>
+  <script src="workbench.js?v=20260701-2"></script>
 </body>
 </html>

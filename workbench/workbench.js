@@ -1,7 +1,49 @@
-const STORAGE_KEY = 'hans-workbench-v0';
-const SESSION_WARNING_MINUTES = 90;
-const SESSION_HARD_MINUTES = 180;
+const STORAGE_KEY = 'hans-workbench-v1';
+const LEGACY_STORAGE_KEY = 'hans-workbench-v0';
+const STUCK_WARNING_MINUTES = 30;
+const TOKEN_WARNING_COUNT = 80000;
+const TOKEN_HARD_COUNT = 120000;
+const FAILURE_PLAN_COUNT = 2;
 const FAILURE_STOP_COUNT = 3;
+const EM_DASH = '\u2014';
+
+const PROTOCOL_STAGES = [
+  {
+    label: 'DIAGNOSED',
+    description: 'Root cause is identified with evidence. No patch or fix claim yet.'
+  },
+  {
+    label: 'PATCHED',
+    description: 'A change was made. Verification is still required before claiming success.'
+  },
+  {
+    label: 'VERIFIED',
+    description: 'Evidence proves the intended behavior works in the checked environment.'
+  },
+  {
+    label: 'DEPLOYED',
+    description: 'The verified change is live in the target environment.'
+  },
+  {
+    label: 'MONITORED',
+    description: 'Post-deploy observation or follow-up confirmed no regression.'
+  }
+];
+
+const REQUIRED_FINAL_LABELS = [
+  'VERIFIED',
+  'PARTIALLY VERIFIED',
+  'CHANGE APPLIED NOT VERIFIED',
+  'BLOCKED',
+  'STOPPED AFTER 3 FAILURES'
+];
+
+const EVIDENCE_REQUIRED_STAGES = ['PATCHED', 'VERIFIED', 'DEPLOYED', 'MONITORED'];
+const EVIDENCE_REQUIRED_FINAL_LABELS = [
+  'VERIFIED',
+  'PARTIALLY VERIFIED',
+  'CHANGE APPLIED NOT VERIFIED'
+];
 
 const fields = {};
 let state = loadState();
@@ -23,6 +65,9 @@ function bindFields() {
     'objective',
     'mode',
     'verificationSteps',
+    'stuckMinutes',
+    'contextTokens',
+    'newTopic',
     'expectedEvidence',
     'liveSystem',
     'delegationDecision',
@@ -30,9 +75,16 @@ function bindFields() {
     'urlsVerified',
     'requiresVisibility',
     'visibilityPlan',
+    'doNotBreak',
+    'accounts',
+    'currentState',
+    'exactChanges',
+    'rollbackPlan',
     'staleMemory',
     'verificationLabel',
+    'finalLabel',
     'evidence',
+    'finalResponse',
     'notes'
   ].forEach(id => fields[id] = document.getElementById(id));
 }
@@ -63,7 +115,7 @@ function bindEvents() {
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
       activeOutput = btn.dataset.output;
-      document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab === btn));
+      updateActiveTab();
       renderOutput();
     });
   });
@@ -76,11 +128,12 @@ function bindEvents() {
 
 function loadState() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '{}';
+    const parsed = JSON.parse(raw);
     return {
       sessionStartedAt: parsed.sessionStartedAt || new Date().toISOString(),
       selectedId: parsed.selectedId || '',
-      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : []
+      tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : []
     };
   } catch (err) {
     return { sessionStartedAt: new Date().toISOString(), selectedId: '', tasks: [] };
@@ -106,12 +159,16 @@ function seedTask() {
     liveSystem: true,
     expectedEvidence: 'Working endpoint response, verified report link, and exact evidence before claiming fixed.',
     verificationSteps: 4,
-    delegationDecision: 'Codex recommended'
+    delegationDecision: 'Codex recommended',
+    verificationLabel: 'DIAGNOSED',
+    finalLabel: 'BLOCKED',
+    doNotBreak: 'Do not change the field inspector workflow while working on report-viewer auth.',
+    currentState: 'Workbench v1 should create a handoff before live-system execution.'
   };
 }
 
 function createTask(overrides = {}) {
-  const task = {
+  const task = normalizeTask({
     id: makeId(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -119,26 +176,97 @@ function createTask(overrides = {}) {
     objective: '',
     owner: 'Hans',
     mode: 'Think',
-    liveSystem: false,
-    expectedEvidence: '',
     verificationSteps: 0,
+    stuckMinutes: 0,
+    contextTokens: 0,
+    newTopic: false,
+    expectedEvidence: '',
+    liveSystem: false,
     delegationDecision: 'Not assessed',
     urlText: '',
     urlsVerified: false,
     requiresVisibility: false,
     visibilityPlan: '',
+    doNotBreak: '',
+    accounts: '',
+    currentState: '',
+    exactChanges: '',
+    rollbackPlan: '',
     failures: [],
     staleMemory: '',
     verificationLabel: '',
+    finalLabel: '',
     evidence: '',
+    finalResponse: '',
     notes: '',
     done: false,
     ...overrides
-  };
+  });
   state.tasks.unshift(task);
   state.selectedId = task.id;
   saveState();
   return task;
+}
+
+function normalizeTask(task) {
+  const normalized = {
+    id: task.id || makeId(),
+    createdAt: task.createdAt || new Date().toISOString(),
+    updatedAt: task.updatedAt || new Date().toISOString(),
+    title: task.title || '',
+    objective: task.objective || '',
+    owner: task.owner || 'Hans',
+    mode: task.mode || 'Think',
+    verificationSteps: Number(task.verificationSteps || 0),
+    stuckMinutes: Number(task.stuckMinutes || 0),
+    contextTokens: Number(task.contextTokens || 0),
+    newTopic: Boolean(task.newTopic),
+    expectedEvidence: task.expectedEvidence || '',
+    liveSystem: Boolean(task.liveSystem),
+    delegationDecision: task.delegationDecision || 'Not assessed',
+    urlText: task.urlText || '',
+    urlsVerified: Boolean(task.urlsVerified),
+    requiresVisibility: Boolean(task.requiresVisibility),
+    visibilityPlan: task.visibilityPlan || '',
+    doNotBreak: task.doNotBreak || '',
+    accounts: task.accounts || '',
+    currentState: task.currentState || '',
+    exactChanges: task.exactChanges || '',
+    rollbackPlan: task.rollbackPlan || '',
+    failures: Array.isArray(task.failures) ? task.failures : [],
+    staleMemory: task.staleMemory || '',
+    verificationLabel: task.verificationLabel || '',
+    finalLabel: task.finalLabel || '',
+    evidence: task.evidence || '',
+    finalResponse: task.finalResponse || '',
+    notes: task.notes || '',
+    done: Boolean(task.done)
+  };
+
+  if (!PROTOCOL_STAGES.some(stage => stage.label === normalized.verificationLabel)) {
+    const oldLabel = String(task.verificationLabel || '');
+    if (oldLabel === 'CHANGE APPLIED') {
+      normalized.verificationLabel = 'PATCHED';
+      normalized.finalLabel = normalized.finalLabel || 'CHANGE APPLIED NOT VERIFIED';
+    } else if (oldLabel === 'PARTIALLY VERIFIED') {
+      normalized.verificationLabel = 'VERIFIED';
+      normalized.finalLabel = normalized.finalLabel || 'PARTIALLY VERIFIED';
+    } else if (oldLabel === 'UNVERIFIED') {
+      normalized.verificationLabel = 'DIAGNOSED';
+      normalized.finalLabel = normalized.finalLabel || 'BLOCKED';
+    } else if (oldLabel === 'VERIFIED') {
+      normalized.verificationLabel = 'VERIFIED';
+      normalized.finalLabel = normalized.finalLabel || 'VERIFIED';
+    } else {
+      normalized.verificationLabel = '';
+    }
+  }
+
+  if (!REQUIRED_FINAL_LABELS.includes(normalized.finalLabel)) {
+    normalized.finalLabel = '';
+  }
+
+  return normalized;
 }
 
 function makeId() {
@@ -155,9 +283,17 @@ function updateTaskFromField(key, field) {
   if (field.type === 'checkbox') task[key] = field.checked;
   else if (field.type === 'number') task[key] = Number(field.value || 0);
   else task[key] = field.value;
+
+  if (key === 'requiresVisibility' && field.checked) {
+    activeOutput = 'handoff';
+    if (task.delegationDecision === 'Not assessed') task.delegationDecision = 'Codex recommended';
+    if (task.mode !== 'Delegate') task.mode = 'Delegate';
+  }
+
   task.updatedAt = new Date().toISOString();
   task.done = false;
   saveState();
+  renderForm();
   renderDerived();
 }
 
@@ -169,6 +305,7 @@ function addFailure() {
   task.failures.push({ at: new Date().toISOString(), note });
   task.updatedAt = new Date().toISOString();
   task.done = false;
+  if (task.failures.length >= FAILURE_STOP_COUNT) task.finalLabel = 'STOPPED AFTER 3 FAILURES';
   input.value = '';
   saveState();
   render();
@@ -178,6 +315,7 @@ function resetFailures() {
   const task = currentTask();
   if (!task) return;
   task.failures = [];
+  if (task.finalLabel === 'STOPPED AFTER 3 FAILURES') task.finalLabel = '';
   task.updatedAt = new Date().toISOString();
   task.done = false;
   saveState();
@@ -224,7 +362,8 @@ function renderTaskList() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'task-item' + (task.id === state.selectedId ? ' active' : '');
-    btn.innerHTML = `<strong>${escapeHTML(task.title || 'Untitled task')}</strong><span>${escapeHTML(task.verificationLabel || 'No label')} / ${task.done ? 'Done' : 'Open'}</span>`;
+    const label = task.finalLabel || task.verificationLabel || 'No label';
+    btn.innerHTML = `<strong>${escapeHTML(task.title || 'Untitled task')}</strong><span>${escapeHTML(label)} / ${task.done ? 'Done' : 'Open'}</span>`;
     btn.addEventListener('click', () => {
       state.selectedId = task.id;
       saveState();
@@ -247,29 +386,47 @@ function renderDerived() {
   const task = currentTask();
   if (!task) return;
   const gate = evaluateTask(task);
-  document.getElementById('delegation-nudge').hidden = !task.liveSystem;
+  const nudge = document.getElementById('delegation-nudge');
+  nudge.hidden = !task.liveSystem && !task.requiresVisibility;
+  nudge.textContent = task.requiresVisibility
+    ? 'Phone/browser visibility requires Codex handoff before any attempt.'
+    : 'Should this be delegated to Codex?';
+  renderStageHelp(task);
   renderGates(gate);
   renderFailures(task);
   renderDoneState(task, gate);
   renderTaskList();
+  updateActiveTab();
   renderOutput();
+  renderSession();
 }
 
 function renderSession() {
   const panel = document.getElementById('session-panel');
+  const task = currentTask();
   const elapsed = elapsedMinutes();
+  const tokens = Number(task && task.contextTokens || 0);
+  const stuck = Number(task && task.stuckMinutes || 0);
   let className = 'gate-pill ok';
   let label = 'Session clear';
   let copy = `${elapsed} minutes since session reset.`;
-  if (elapsed >= SESSION_HARD_MINUTES) {
+
+  if (tokens >= TOKEN_HARD_COUNT) {
     className = 'gate-pill blocked';
-    label = 'Context debt high';
-    copy = 'Force a handoff or end-of-session summary before starting more execution work.';
-  } else if (elapsed >= SESSION_WARNING_MINUTES) {
+    label = '120K context stop';
+    copy = task && task.newTopic
+      ? 'Hard stop on new topics. Start a clean session before continuing.'
+      : '120K context threshold reached. Do not start new topics here.';
+  } else if (tokens >= TOKEN_WARNING_COUNT) {
     className = 'gate-pill warn';
-    label = 'Context debt rising';
-    copy = 'Prefer a clean handoff before live-system work or multi-step verification.';
+    label = '80K context warning';
+    copy = 'Prepare a handoff or end-of-session summary before more execution work.';
+  } else if (stuck >= STUCK_WARNING_MINUTES) {
+    className = 'gate-pill warn';
+    label = '30-minute stuck flag';
+    copy = 'Stop momentum, diagnose, and hand off or ask before another blind attempt.';
   }
+
   panel.innerHTML = `
     <div class="status-title">
       <strong>Session guard</strong>
@@ -292,6 +449,7 @@ function evaluateTask(task) {
   const hasEvidence = Boolean(String(task.evidence || '').trim());
   const hasUrls = /https?:\/\//i.test(task.urlText || '');
   const failureCount = task.failures.length;
+  const scan = scanFinalOutput(task);
 
   if (!task.title.trim()) blocks.push('Task title is required.');
   else oks.push('Task title exists.');
@@ -299,37 +457,61 @@ function evaluateTask(task) {
   if (!task.objective.trim()) warnings.push('Objective is empty.');
   else oks.push('Objective exists.');
 
-  if (!task.verificationLabel) blocks.push('Verification label is required before done.');
-  else oks.push(`Verification label selected: ${task.verificationLabel}.`);
+  if (!task.verificationLabel) blocks.push('Protocol stage is required before closeout.');
+  else oks.push(`Protocol stage selected: ${task.verificationLabel}.`);
 
-  if (task.verificationLabel === 'VERIFIED' && !hasEvidence) {
-    blocks.push('VERIFIED requires evidence text, link, command output, or observation.');
+  if (!task.finalLabel) blocks.push('Final closeout label is required before closeout.');
+  else oks.push(`Final closeout label selected: ${task.finalLabel}.`);
+
+  if (EVIDENCE_REQUIRED_STAGES.includes(task.verificationLabel) && !hasEvidence) {
+    blocks.push(`${task.verificationLabel} requires evidence before closeout.`);
   }
 
-  if (task.verificationLabel === 'CHANGE APPLIED' && !hasEvidence) {
-    blocks.push('CHANGE APPLIED requires evidence of the change.');
+  if (EVIDENCE_REQUIRED_FINAL_LABELS.includes(task.finalLabel) && !hasEvidence) {
+    blocks.push(`${task.finalLabel} requires evidence before closeout.`);
   }
 
-  if (hasUrls && !task.urlsVerified && ['VERIFIED', 'CHANGE APPLIED'].includes(task.verificationLabel)) {
+  if (task.finalLabel === 'STOPPED AFTER 3 FAILURES' && failureCount < FAILURE_STOP_COUNT) {
+    blocks.push('STOPPED AFTER 3 FAILURES requires three recorded failures.');
+  }
+
+  if (failureCount >= FAILURE_PLAN_COUNT && failureCount < FAILURE_STOP_COUNT) {
+    warnings.push('Two failures reached. Announce diagnosis and plan before another attempt.');
+  }
+
+  if (failureCount >= FAILURE_STOP_COUNT) {
+    if (task.finalLabel !== 'STOPPED AFTER 3 FAILURES') {
+      blocks.push('Three-failure stop reached. Use STOPPED AFTER 3 FAILURES and hand off.');
+    } else {
+      oks.push('Three-failure stop label is active.');
+    }
+    blocks.push('STOPPED AFTER 3 FAILURES. Hard block further execution and hand off.');
+  }
+
+  if (task.requiresVisibility) {
+    blocks.push('Phone/browser visibility requires immediate Codex handoff before any attempt.');
+  }
+
+  if (hasUrls && !task.urlsVerified && ['VERIFIED', 'DEPLOYED', 'MONITORED'].includes(task.verificationLabel)) {
     blocks.push('URLs are present but not marked verified.');
   } else if (hasUrls && !task.urlsVerified) {
     warnings.push('URLs are present and not marked verified.');
   }
 
-  if (task.requiresVisibility && !task.visibilityPlan.trim() && ['VERIFIED', 'CHANGE APPLIED'].includes(task.verificationLabel)) {
-    blocks.push('Phone/browser visibility is required, but no verification plan is recorded.');
-  } else if (task.requiresVisibility && !task.visibilityPlan.trim()) {
-    warnings.push('Phone/browser visibility required.');
-  }
-
-  if (failureCount >= FAILURE_STOP_COUNT && ['VERIFIED', 'CHANGE APPLIED'].includes(task.verificationLabel)) {
-    blocks.push('Three-failure stop reached. Do not claim verified until reset or handed off.');
-  } else if (failureCount >= FAILURE_STOP_COUNT) {
-    warnings.push('Three-failure stop reached. Handoff recommended.');
-  }
-
   if (Number(task.verificationSteps || 0) > 3) {
     warnings.push('More than 3 verification/tool steps expected. Codex/subagent recommended.');
+  }
+
+  if (Number(task.stuckMinutes || 0) >= STUCK_WARNING_MINUTES && !['BLOCKED', 'STOPPED AFTER 3 FAILURES'].includes(task.finalLabel)) {
+    blocks.push('30-minute stuck rule reached. Use BLOCKED or hand off before more execution.');
+  }
+
+  if (Number(task.contextTokens || 0) >= TOKEN_HARD_COUNT && task.newTopic) {
+    blocks.push('120K context threshold reached. Hard stop on new topics.');
+  } else if (Number(task.contextTokens || 0) >= TOKEN_HARD_COUNT) {
+    warnings.push('120K context threshold reached. Do not start new topics here.');
+  } else if (Number(task.contextTokens || 0) >= TOKEN_WARNING_COUNT) {
+    warnings.push('80K context warning. Prepare handoff or summary.');
   }
 
   if (task.liveSystem && task.delegationDecision === 'Not assessed') {
@@ -344,6 +526,10 @@ function evaluateTask(task) {
     warnings.push('Stale-memory correction is recorded. Create/update memory note after task.');
   }
 
+  scan.blocks.forEach(item => blocks.push(item));
+  scan.warnings.forEach(item => warnings.push(item));
+  scan.oks.forEach(item => oks.push(item));
+
   if (!blocks.length && !warnings.length) oks.push('No active gate warnings.');
 
   return {
@@ -353,6 +539,72 @@ function evaluateTask(task) {
     canComplete: blocks.length === 0,
     status: blocks.length ? 'blocked' : warnings.length ? 'warn' : 'ok'
   };
+}
+
+function scanFinalOutput(task) {
+  const blocks = [];
+  const warnings = [];
+  const oks = [];
+  const hasEvidence = Boolean(String(task.evidence || '').trim());
+  const draft = getFinalDraft(task);
+  const trimmed = draft.trim();
+  const lower = draft.toLowerCase();
+
+  if (!trimmed) {
+    blocks.push('Final response draft or generated final output is required.');
+    return { blocks, warnings, oks };
+  }
+
+  if (/\bhonest(?:ly)?\b/i.test(draft)) {
+    blocks.push('Final response scan failed: "honest" / "honestly" is banned.');
+  }
+
+  if (draft.includes(EM_DASH)) {
+    warnings.push('Final response scan warning: em dash detected.');
+  }
+
+  if (/\bfixed\b/i.test(draft) && !hasEvidence) {
+    blocks.push('Final response scan failed: "fixed" appears without evidence.');
+  }
+
+  if (/\b(working|deployed|resolved|complete)\b/i.test(draft) && !hasEvidence) {
+    blocks.push('Final response scan failed: success claim appears without evidence.');
+  }
+
+  if (['BLOCKED', 'STOPPED AFTER 3 FAILURES'].includes(task.finalLabel) && /\b(fixed|working|deployed|verified|resolved|complete)\b/i.test(lower)) {
+    blocks.push('Final response scan failed: blocked/stopped response contains success language.');
+  }
+
+  if (task.finalLabel === 'CHANGE APPLIED NOT VERIFIED' && /\b(working|deployed|resolved)\b/i.test(lower)) {
+    blocks.push('Final response scan failed: unverified change cannot claim working/deployed/resolved.');
+  }
+
+  if (task.finalLabel && !endsWithSelectedFinalLabel(trimmed, task.finalLabel)) {
+    blocks.push('Final response must end with the selected closeout label.');
+  } else if (task.finalLabel) {
+    oks.push('Final response ends with selected closeout label.');
+  }
+
+  return { blocks, warnings, oks };
+}
+
+function getFinalDraft(task) {
+  return String(task.finalResponse || makeFinalTemplate(task) || '');
+}
+
+function endsWithSelectedFinalLabel(text, selectedLabel) {
+  return REQUIRED_FINAL_LABELS.includes(selectedLabel) && text.endsWith(selectedLabel);
+}
+
+function renderStageHelp(task) {
+  const help = document.getElementById('stage-help');
+  help.innerHTML = '';
+  PROTOCOL_STAGES.forEach(stage => {
+    const row = document.createElement('div');
+    row.className = 'stage-line' + (task.verificationLabel === stage.label ? ' active' : '');
+    row.textContent = `${stage.label}: ${stage.description}`;
+    help.appendChild(row);
+  });
 }
 
 function renderGates(gate) {
@@ -378,7 +630,7 @@ function renderFailures(task) {
   const count = document.getElementById('failure-count');
   const total = task.failures.length;
   count.textContent = `${total} failure${total === 1 ? '' : 's'}`;
-  count.className = 'gate-pill ' + (total >= FAILURE_STOP_COUNT ? 'blocked' : total ? 'warn' : 'ok');
+  count.className = 'gate-pill ' + (total >= FAILURE_STOP_COUNT ? 'blocked' : total >= FAILURE_PLAN_COUNT ? 'warn' : total ? 'warn' : 'ok');
 
   const log = document.getElementById('failure-log');
   log.innerHTML = '';
@@ -398,6 +650,10 @@ function renderDoneState(task, gate) {
   document.getElementById('mark-done-btn').disabled = !gate.canComplete;
 }
 
+function updateActiveTab() {
+  document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.output === activeOutput));
+}
+
 function renderOutput() {
   const output = document.getElementById('output-text');
   const task = currentTask();
@@ -412,53 +668,71 @@ function renderOutput() {
 }
 
 function makeHandoff(task) {
-  const gate = evaluateTask(task);
   return [
     '# Codex Handoff Brief',
     '',
-    `Task: ${task.title || 'Untitled task'}`,
+    '## Problem',
+    task.objective || task.title || '[missing]',
+    '',
+    '## Do Not Break',
+    task.doNotBreak || '[missing]',
+    '',
+    '## Accounts / Access',
+    task.accounts || '[none recorded]',
+    '',
+    '## Current State',
+    task.currentState || task.notes || '[missing]',
+    '',
+    '## Exact Changes Needed',
+    task.exactChanges || '[missing]',
+    '',
+    '## Verification Steps',
+    makeVerificationSteps(task),
+    '',
+    '## Rollback',
+    task.rollbackPlan || '[missing]',
+    '',
+    '## Attempt History',
+    makeAttemptHistory(task),
+    '',
+    '## Protocol State',
     `Owner: ${task.owner}`,
     `Mode: ${task.mode}`,
     `Live system: ${task.liveSystem ? 'Yes' : 'No'}`,
-    `Delegation decision: ${task.delegationDecision}`,
-    '',
-    'Objective:',
-    task.objective || '[missing]',
-    '',
-    'Expected evidence:',
-    task.expectedEvidence || '[missing]',
-    '',
-    `Verification steps expected: ${task.verificationSteps || 0}`,
-    `Verification label: ${task.verificationLabel || '[not selected]'}`,
-    '',
-    'Current evidence:',
-    task.evidence || '[none yet]',
-    '',
-    'Gate status:',
-    ...formatGateLines(gate),
-    '',
-    'Failures:',
-    task.failures.length ? task.failures.map((f, i) => `${i + 1}. ${f.note}`).join('\n') : 'None recorded.',
-    '',
-    'Constraints:',
-    '- Do not claim verified without evidence.',
-    '- Stop after three repeated failures and hand back a brief.',
-    '- Verify any URL before sending it.',
-    '- Use phone/browser proof when visibility is required.',
-    '',
-    'Notes / caveats:',
-    task.notes || '[none]'
+    `Phone/browser handoff required: ${task.requiresVisibility ? 'Yes' : 'No'}`,
+    `Protocol stage: ${task.verificationLabel || '[not selected]'}`,
+    `Final label: ${task.finalLabel || '[not selected]'}`,
+    `Evidence: ${task.evidence || '[none yet]'}`
   ].join('\n');
 }
 
+function makeVerificationSteps(task) {
+  const lines = [];
+  lines.push(task.expectedEvidence || '[expected evidence missing]');
+  lines.push(`Expected verification/tool steps: ${task.verificationSteps || 0}`);
+  if (task.urlText) lines.push(`URLs to verify before sending: ${task.urlText}`);
+  if (task.visibilityPlan) lines.push(`Visibility plan: ${task.visibilityPlan}`);
+  return lines.join('\n');
+}
+
+function makeAttemptHistory(task) {
+  if (!task.failures.length) return 'No failed attempts recorded.';
+  return task.failures.map((failure, index) => `${index + 1}. ${failure.note} (${formatDateTime(failure.at)})`).join('\n');
+}
+
 function makeFinalTemplate(task) {
-  return [
-    `${task.verificationLabel || 'UNVERIFIED'}: ${task.title || 'Untitled task'}`,
+  const label = task.finalLabel || 'BLOCKED';
+  const lines = [
+    `${label}: ${task.title || 'Untitled task'}`,
     '',
+    `Protocol stage: ${task.verificationLabel || '[not selected]'}`,
     task.evidence ? `Evidence: ${task.evidence}` : 'Evidence: [none recorded]',
     task.notes ? `Caveats: ${task.notes}` : 'Caveats: [none recorded]',
-    task.done ? 'Status: Done in Workbench.' : 'Status: Not marked done in Workbench.'
-  ].join('\n');
+    task.done ? 'Workbench status: Done.' : 'Workbench status: Not marked done.',
+    '',
+    label
+  ];
+  return lines.join('\n');
 }
 
 function makeSessionSummary() {
@@ -475,7 +749,11 @@ function makeSessionSummary() {
     `Open: ${open}`,
     '',
     'Current task:',
-    active ? `${active.title || 'Untitled task'} / ${active.verificationLabel || 'No label'} / ${active.done ? 'Done' : 'Open'}` : 'None',
+    active ? `${active.title || 'Untitled task'} / ${active.verificationLabel || 'No stage'} / ${active.finalLabel || 'No final label'} / ${active.done ? 'Done' : 'Open'}` : 'None',
+    '',
+    'Context flags:',
+    active ? `Stuck minutes: ${active.stuckMinutes || 0}` : 'Stuck minutes: 0',
+    active ? `Context tokens: ${active.contextTokens || 0}` : 'Context tokens: 0',
     '',
     'Open tasks:',
     ...state.tasks.filter(task => !task.done).map(task => `- ${task.title || 'Untitled task'} (${task.owner}, ${task.mode})`)
@@ -493,14 +771,6 @@ function makeMemoryCorrection(task) {
     'Evidence:',
     task.evidence || '[none recorded]'
   ].join('\n');
-}
-
-function formatGateLines(gate) {
-  const lines = [];
-  if (gate.blocks.length) gate.blocks.forEach(item => lines.push(`BLOCKED: ${item}`));
-  if (gate.warnings.length) gate.warnings.forEach(item => lines.push(`WARN: ${item}`));
-  if (!gate.blocks.length && !gate.warnings.length) lines.push('CLEAR: No active blockers.');
-  return lines;
 }
 
 async function copyOutput() {
