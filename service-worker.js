@@ -77,7 +77,9 @@ self.addEventListener('fetch', event => {
     url.pathname === '/reports' ||
     url.pathname.startsWith('/reports/') ||
     url.pathname === '/workbench' ||
-    url.pathname.startsWith('/workbench/');
+    url.pathname.startsWith('/workbench/') ||
+    url.pathname === '/readiness' ||
+    url.pathname.startsWith('/readiness/');
   if (url.origin === self.location.origin && bypassStandaloneRoute) return;
 
   // Cache-first for everything else (app shell)

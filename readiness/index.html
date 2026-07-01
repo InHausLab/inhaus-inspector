@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Readiness Console</title>
+  <link rel="stylesheet" href="readiness.css?v=20260701-1">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/readiness">
+      <span class="brand-mark">OC</span>
+      <span>OpenClaw Readiness</span>
+    </a>
+    <div class="topbar-meta">
+      <span id="protocol-version">Protocol: Workbench v1</span>
+      <span id="last-run">Not run</span>
+    </div>
+    <button id="run-checks" class="bar-btn" type="button">Run Checks</button>
+    <button id="copy-report" class="bar-btn secondary" type="button">Copy Report</button>
+  </header>
+
+  <main class="layout">
+    <section class="hero-status">
+      <div>
+        <p class="eyebrow">Add-user gate</p>
+        <h1 id="readiness-title">Not Assessed</h1>
+        <p id="readiness-copy">Run the checks and record manual evidence before another user relies on the system.</p>
+      </div>
+      <div class="score-box">
+        <span id="score-value">0%</span>
+        <span id="score-label">ready</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Live Checks</h2>
+          <span id="auto-summary" class="pill neutral">0 checks</span>
+        </div>
+        <div id="auto-checks" class="check-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Manual Gates</h2>
+          <span id="manual-summary" class="pill neutral">0 required</span>
+        </div>
+        <div id="manual-gates" class="manual-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Failure Drills</h2>
+          <span id="drill-summary" class="pill neutral">0 drills</span>
+        </div>
+        <div id="failure-drills" class="manual-list"></div>
+      </section>
+
+      <section class="panel output-panel">
+        <div class="panel-heading">
+          <h2>Readiness Report</h2>
+          <span id="save-state" class="save-state">Saved</span>
+        </div>
+        <textarea id="readiness-report" class="report-output" readonly></textarea>
+      </section>
+    </section>
+  </main>
+
+  <script src="readiness.js?v=20260701-1"></script>
+</body>
+</html>
