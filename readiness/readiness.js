@@ -4,6 +4,9 @@ const WARN = 'warn';
 const FAIL = 'fail';
 const BLOCKED = 'blocked';
 const UNCHECKED = 'unchecked';
+const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxmOMfSGaz9sDHxAKBjNXtJ44MLdusXRe-GOrV6nGH0Iw0tciFg1Wkw-02hB-dQglAbgQ/exec';
+const REVIEW_ACCESS_TOKEN = 'InHaus2026';
+const SAMPLE_INSPECTION_ID = 'INH-20260428-DKNSOB';
 
 const autoChecks = [
   {
@@ -51,6 +54,31 @@ const autoChecks = [
     critical: true
   },
   {
+    id: 'apps-script-review-list',
+    title: 'Apps Script review list',
+    detail: 'Live v37 bridge returns the review inventory with the portal access token.',
+    path: bridgeUrl({ action: 'list', token: REVIEW_ACCESS_TOKEN }),
+    timeoutMs: 10000,
+    expect: text => {
+      const parsed = JSON.parse(text);
+      return parsed.status === 'ok' && parsed.count >= 4 && Array.isArray(parsed.inspections);
+    },
+    critical: true
+  },
+  {
+    id: 'apps-script-report-detail',
+    title: 'Apps Script report detail',
+    detail: 'Live v37 bridge returns a full inspection payload for the sample report.',
+    path: bridgeUrl({ action: 'get', id: SAMPLE_INSPECTION_ID, token: REVIEW_ACCESS_TOKEN }),
+    timeoutMs: 10000,
+    expect: text => {
+      const parsed = JSON.parse(text);
+      const inspection = parsed.inspection || {};
+      return parsed.status === 'ok' && inspection.inspectionId === SAMPLE_INSPECTION_ID;
+    },
+    critical: true
+  },
+  {
     id: 'config-script',
     title: 'Inspector config',
     detail: 'Client config script is present with Google Script URL and sync secret keys.',
@@ -83,8 +111,8 @@ const manualGates = [
   },
   {
     id: 'apps-script',
-    title: 'Apps Script v36',
-    detail: 'List/getReview or safe sync smoke test has evidence from the live endpoint.',
+    title: 'Apps Script v37',
+    detail: 'Live list/get and safe sync smoke test have evidence from the authoritative bridge.',
     required: true
   },
   {
@@ -296,7 +324,7 @@ async function runChecks() {
 
 async function runOneCheck(check) {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 5000);
+  const timer = window.setTimeout(() => controller.abort(), check.timeoutMs || 5000);
   try {
     const response = await fetch(check.path, { cache: 'no-store', signal: controller.signal });
     if (!response.ok) {
@@ -314,6 +342,12 @@ async function runOneCheck(check) {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function bridgeUrl(params) {
+  const url = new URL(LIVE_BRIDGE_URL);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  return url.toString();
 }
 
 function renderSummary() {

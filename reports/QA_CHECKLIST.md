@@ -16,7 +16,7 @@ Use this before sending a report-viewer link to Hans, Tanner, or an inspector.
 - Confirm the report shows cover, executive summary, property snapshot, systems/environment, room findings, testing/samples, actions, observations, follow-up, and photo appendix.
 - Confirm the photo appendix shows image cards and no broken-image icons.
 - Use the Copy Link button and confirm the copied URL or status message includes `?id=INH-20260428-DKNSOB`.
-- Enter the known portal code and confirm the viewer warns if the live list is unauthorized while still loading the static sample.
+- Enter the known portal code and confirm the viewer loads the live inspection list without an unauthorized warning.
 - Use Print / Save as PDF and confirm the loader controls are hidden from the PDF.
 - Check a phone-width viewport for no horizontal scrolling.
 
@@ -30,12 +30,12 @@ Use this before sending a report-viewer link to Hans, Tanner, or an inspector.
 
 ## Endpoint Map
 
-- `REPORT_REVIEW_API_URL` is intended for `action=list` and `action=get`, but the deployed endpoint currently returns unauthorized with the known portal access codes tested.
-- `REPORT_BRIDGE_API_URL` is the current bridge endpoint used as a fallback for `action=getReview`. It returned `status: ok` for the sample review overlay when called with the sync secret.
-- `REPORT_BRIDGE_API_URL` did not return a live inspection list or full inspection payload for the tested `list` and `get` query shapes.
+- `REPORT_REVIEW_API_URL` points to the v37 bridge endpoint and supports `action=list` and `action=get` with the portal access token.
+- `REPORT_BRIDGE_API_URL` points to the same authoritative bridge and remains the fallback for `action=getReview`.
+- The v37 bridge returned `status: ok`, `count: 4` for `action=list`, and returned the full `INH-20260428-DKNSOB` inspection for `action=get`.
 - The viewer falls back to static JSON under `/reports/api/` so the public sample can render without entering a portal code.
 - Live tokens should stay out of links. Use session storage through the access-code field for any live review access.
-- Before relying on live review data, confirm which Apps Script deployment is authoritative and which token is supposed to unlock `list` and `get`.
+- The authoritative Apps Script deployment is `AKfycbxmOMfSGaz9sDHxAKBjNXtJ44MLdusXRe-GOrV6nGH0Iw0tciFg1Wkw-02hB-dQglAbgQ` unless a newer verified handoff says otherwise.
 
 ## Current Safe Behavior
 
