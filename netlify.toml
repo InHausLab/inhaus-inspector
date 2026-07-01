@@ -1,9 +1,27 @@
 [build]
   publish = "."
 
+[[redirects]]
+  from = "/reports"
+  to = "/reports/report.html"
+  status = 302
+
+[[redirects]]
+  from = "/reports/"
+  to = "/reports/report.html"
+  status = 302
+
 [[headers]]
   for = "/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/reports/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-Robots-Tag = "noindex, nofollow"

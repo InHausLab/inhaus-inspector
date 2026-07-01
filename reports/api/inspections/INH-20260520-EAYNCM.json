@@ -1,0 +1,95 @@
+{
+  "status": "ok",
+  "inspection": {
+    "inspectionId": "INH-20260520-EAYNCM",
+    "propertyAddress": "369 Hillcrest Dr",
+    "inspectorName": "David Kline",
+    "inspectionDate": "2026-05-20",
+    "clientName": "David Kline",
+    "numberOfLevels": "3+",
+    "numberOfBedrooms": "1",
+    "numberOfBathrooms": "1",
+    "waterSource": "Municipal",
+    "waterSourceDescription": "",
+    "residenceType": "",
+    "yearBuilt": "",
+    "squareFootage": "",
+    "basement": "",
+    "carpetedRooms": "",
+    "fireplace": "",
+    "pets": "",
+    "smokingVaping": "",
+    "stoveType": "",
+    "wifiNetwork": "Jo’s wifi",
+    "clientConcerns": "",
+    "occupancyDuringInspection": "",
+    "weatherConditions": "",
+    "knownProblemAreas": "",
+    "startedAt": "2026-05-20T01:14:15.702Z",
+    "endedAt": null,
+    "status": "in-progress",
+    "preAssessmentChecklist": {
+      "preAssessment": {}
+    },
+    "arrivalSetup": {
+      "assessmentStartTime": "19:15",
+      "utilityRoomLevel": "Basement ",
+      "homeownerGreeted": true,
+      "tarpPlaced": true,
+      "equipmentUnloaded": true,
+      "equipmentTidy": true,
+      "boulderBlueTestLocation": "Kitchen",
+      "boulderBlueStartTime": "19:16"
+    },
+    "deviceSetup": {
+      "pfasSetup": "Yes"
+    },
+    "exteriorAssessment": {
+      "exteriorGuidance": {},
+      "exteriorPhotos": {}
+    },
+    "radonSetup": {},
+    "rooms": [
+      {
+        "roomName": "Office",
+        "type": "room-test",
+        "level": "lowest",
+        "stepId": "lowest-room-0",
+        "flirGuidance": {},
+        "roomType": "Office",
+        "breezeDone": "Yes"
+      },
+      {
+        "roomName": "Bedroom 1",
+        "type": "bedroom",
+        "level": "upper",
+        "stepId": "bedroom-0",
+        "flirGuidance": {},
+        "flirDone": "Yes"
+      },
+      {
+        "roomName": "Bathroom 1",
+        "type": "bathroom",
+        "level": "upper",
+        "stepId": "bathroom-0"
+      }
+    ],
+    "utilityRoom": {
+      "ventilationType": {}
+    },
+    "wrapUp": {},
+    "customerDebrief": {},
+    "postAssessment": {},
+    "completedAt": null,
+    "ventilationReadable": "",
+    "windowsOpen": "",
+    "appliancesCondition": "",
+    "roomsWithDampness": 0,
+    "roomsWithMustySmell": 0,
+    "roomSummaries": {},
+    "_checkpoint": true,
+    "id": "INH-20260520-EAYNCM",
+    "photos": [],
+    "photoCount": 0
+  }
+}

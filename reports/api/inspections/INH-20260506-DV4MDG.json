@@ -1,0 +1,443 @@
+{
+  "status": "ok",
+  "inspection": {
+    "inspectionId": "INH-20260506-DV4MDG",
+    "clientName": "Sunshine Ranch",
+    "propertyAddress": "369 Hillcrest Dr (Sunshine Ranch)",
+    "inspectorName": "David Kline",
+    "inspectionDate": "2026-05-06",
+    "residenceType": "Single-Family Home",
+    "yearBuilt": "2004",
+    "squareFootage": "11,000",
+    "numberOfBedrooms": "5",
+    "numberOfBathrooms": "6+",
+    "numberOfLevels": "3+",
+    "basement": "No",
+    "carpetedRooms": "6+",
+    "waterSource": "Well",
+    "stoveType": "Range",
+    "fireplace": "Gas",
+    "pets": "No",
+    "smokingVaping": "No",
+    "clientConcerns": "Sulfur water odor overall odor in home. ",
+    "weatherConditions": "Snowing",
+    "occupancyDuringInspection": "Occupied - Passive",
+    "windowsOpen": "No",
+    "cleaningFrequency": "2-4 week",
+    "appliancesCondition": "Good",
+    "roomsWithDampness": "3",
+    "roomsWithMustySmell": "0",
+    "startedAt": "2026-05-06T15:39:50.472Z",
+    "endedAt": "2026-05-07T02:14:21.394Z",
+    "status": "completed",
+    "utilityRoom": {
+      "heatingType": "Other (specify)",
+      "acType": "Central AC",
+      "ventilationType": "Bathroom Exhaust Fan(s), HRV, ERV, ventNone, ventNotSure",
+      "filterSize": "NA",
+      "filterRating": "NA",
+      "radonMitigationPresent": "Native",
+      "waterFiltrationPresent": "Carbon filter",
+      "waterSofteningPresent": "Softener",
+      "waterSoftType": "NA"
+    },
+    "rooms": [
+      {
+        "roomName": "Lowest Level — Room 1",
+        "type": "room-test",
+        "level": "lowest",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "East Kids Room",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [
+          "Water staining"
+        ],
+        "notes": "",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Nanny’s Room",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Nicks Room",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Nicks Room",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Caitlyn’s Room",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "East Kids En-suite bathroom ",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Nanny’s En-suite Bathroom ",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Primary ",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [
+          "Visible mold"
+        ],
+        "notes": "Air sample and swab sample were taken in areas of concerned will will look in attic and take spare photos",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Bathroom 4",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Laundry powder room",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Bathroom 6",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Main Living Area",
+        "type": "living-area",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": [
+          {
+            "caption": "Boulder Blue Primary Bedroom",
+            "driveUrl": "https://drive.google.com/thumbnail?id=19MfJNPjPU18Eut2fum-FD-4zNZ6BbHPE&sz=w1600",
+            "imageData": null
+          },
+          {
+            "caption": "Boulder Blue",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1qGyuaOcMX9IU0ceezOzE2pxw8_4JBD__&sz=w1600",
+            "imageData": null
+          },
+          {
+            "caption": "PFAS Sample 1",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1m299Z5N--XM_AtbvHhpjOqmyadH4AdTp&sz=w1600",
+            "imageData": null
+          },
+          {
+            "caption": "PFAS Sample 2",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1GFc_rMAHW-upxdG7fZBxkOovuGoMPttn&sz=w1600",
+            "imageData": null
+          },
+          {
+            "caption": "Boulder Blue — Second Floor Primary Bedroom",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1Ch-9kkZIMf81YoZw-SLKZSEl2iK7PMnG&sz=w1600",
+            "imageData": null
+          },
+          {
+            "caption": "Microplastics",
+            "driveUrl": "https://drive.google.com/thumbnail?id=12vddJ_BP-TrNfHhEY1NqGLnXRMGMOq9f&sz=w800",
+            "imageData": null
+          },
+          {
+            "caption": "Spare Photo 45",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1aJluhlcfHFchlM4yEyJrV4DIP4qtOvOk&sz=w1600",
+            "imageData": null
+          },
+          {
+            "caption": "Spare Photo 23",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1rNtp1OMVnwfTjyCpp0HhrxTy68IzmruA&sz=w1600",
+            "imageData": null
+          }
+        ]
+      },
+      {
+        "roomName": "Kitchen Inspection",
+        "type": "kitchen-appliance",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Water Samples",
+        "type": "water-sample",
+        "level": "main",
+        "observations": [],
+        "notes": "Many of the water samples were done at an earlier date",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "ATP Testing",
+        "type": "atp-kitchen",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Kitchen Air Testing",
+        "type": "kitchen-air",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Lower guest bathroom ",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Lower guest",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "Yes",
+        "photos": []
+      },
+      {
+        "roomName": "Nicks Bathroom ",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [
+          "Water staining"
+        ],
+        "notes": "",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "Yes",
+        "photos": []
+      },
+      {
+        "roomName": "His Office",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Additional Room 5",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      }
+    ],
+    "reviewStatus": "Needs Review",
+    "id": "INH-20260506-DV4MDG",
+    "photos": [
+      {
+        "photoId": "ph_12_00",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Boulder Blue Primary Bedroom",
+        "driveUrl": "https://drive.google.com/thumbnail?id=19MfJNPjPU18Eut2fum-FD-4zNZ6BbHPE&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "19MfJNPjPU18Eut2fum-FD-4zNZ6BbHPE"
+      },
+      {
+        "photoId": "ph_12_01",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Boulder Blue",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1qGyuaOcMX9IU0ceezOzE2pxw8_4JBD__&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "1qGyuaOcMX9IU0ceezOzE2pxw8_4JBD__"
+      },
+      {
+        "photoId": "ph_12_02",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "PFAS Sample 1",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1m299Z5N--XM_AtbvHhpjOqmyadH4AdTp&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "1m299Z5N--XM_AtbvHhpjOqmyadH4AdTp"
+      },
+      {
+        "photoId": "ph_12_03",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "PFAS Sample 2",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1GFc_rMAHW-upxdG7fZBxkOovuGoMPttn&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "1GFc_rMAHW-upxdG7fZBxkOovuGoMPttn"
+      },
+      {
+        "photoId": "ph_12_04",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Boulder Blue — Second Floor Primary Bedroom",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1Ch-9kkZIMf81YoZw-SLKZSEl2iK7PMnG&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "1Ch-9kkZIMf81YoZw-SLKZSEl2iK7PMnG"
+      },
+      {
+        "photoId": "ph_12_05",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Microplastics",
+        "driveUrl": "https://drive.google.com/thumbnail?id=12vddJ_BP-TrNfHhEY1NqGLnXRMGMOq9f&sz=w800",
+        "timestamp": "",
+        "included": null,
+        "driveId": "12vddJ_BP-TrNfHhEY1NqGLnXRMGMOq9f"
+      },
+      {
+        "photoId": "ph_12_06",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Spare Photo 45",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1aJluhlcfHFchlM4yEyJrV4DIP4qtOvOk&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "1aJluhlcfHFchlM4yEyJrV4DIP4qtOvOk"
+      },
+      {
+        "photoId": "ph_12_07",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Spare Photo 23",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1rNtp1OMVnwfTjyCpp0HhrxTy68IzmruA&sz=w1600",
+        "timestamp": "",
+        "included": null,
+        "driveId": "1rNtp1OMVnwfTjyCpp0HhrxTy68IzmruA"
+      }
+    ],
+    "photoCount": 8
+  }
+}

@@ -1,0 +1,451 @@
+{
+  "status": "ok",
+  "inspection": {
+    "inspectionId": "INH-20260422-C7KYGW",
+    "clientName": "Ryan Marshall",
+    "propertyAddress": "301 Cemetery Rd, Basalt",
+    "inspectorName": "Dave",
+    "inspectionDate": "2026-04-22",
+    "residenceType": "Single-Family Home",
+    "yearBuilt": "1993",
+    "squareFootage": "2600",
+    "numberOfBedrooms": "3",
+    "numberOfBathrooms": "3",
+    "numberOfLevels": "3+",
+    "basement": "Yes - Finished",
+    "carpetedRooms": "0",
+    "waterSource": "Municipal",
+    "stoveType": "Gas",
+    "fireplace": "Gas",
+    "pets": "No",
+    "smokingVaping": "No",
+    "clientConcerns": "",
+    "weatherConditions": "",
+    "occupancyDuringInspection": "",
+    "windowsOpen": "",
+    "cleaningFrequency": "",
+    "appliancesCondition": "Good (3-10 years)",
+    "roomsWithDampness": "1",
+    "roomsWithMustySmell": "0",
+    "startedAt": "2026-04-22T15:54:05.098Z",
+    "endedAt": "2026-04-22T22:30:09.341Z",
+    "status": "completed",
+    "utilityRoom": {
+      "heatingType": "Natural Gas Furnace",
+      "acType": "Central AC",
+      "ventilationType": "Bathroom Exhaust Fan(s)",
+      "filterSize": "20 x 25 x 1",
+      "filterRating": "11",
+      "radonMitigationPresent": "Yes",
+      "waterFiltrationPresent": "No",
+      "waterSofteningPresent": "No",
+      "airFiltrationPresent": "No"
+    },
+    "rooms": [
+      {
+        "roomName": "Basement Rec Room",
+        "type": "room-test",
+        "level": "lowest",
+        "observations": [
+          "Active leak, Plumbing issue"
+        ],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Basement Office",
+        "type": "room-test",
+        "level": "lowest",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": [
+          {
+            "caption": "FLIR image, nothing of note",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1H3LL1dMjB99xSKbVwqaumPc1IYV_3vig&sz=w1600",
+            "timestamp": "2026-04-22T22:01:04.157Z"
+          }
+        ]
+      },
+      {
+        "roomName": "Primary bedroom",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Guest bedroom",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Kids Room",
+        "type": "bedroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "Boulder blue test was taken in this room",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "Yes",
+        "photos": []
+      },
+      {
+        "roomName": "Basement Bathroom ",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "Homeowner indicated there was a leak when upstairs area was remodeled area was repaired and no active leaking was visibly present",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Primary Bathroom ",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [
+          "Poor ventilation"
+        ],
+        "notes": "",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": [
+          {
+            "caption": "A zoomed out photo of vinyl feeling away of showers around",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1-P-oUiO9CQva8UtvzJbfua_XP9Z1hoCC&sz=w1600",
+            "timestamp": "2026-04-22T16:50:54.752Z"
+          },
+          {
+            "caption": "Orange areas show heat.  There is more heat than typical there indicating loss of insulation in the area",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1dfvdeFTuwn5GUebk2rZ3ZLSkQXeSHNd0&sz=w1600",
+            "timestamp": "2026-04-22T22:26:57.050Z"
+          }
+        ]
+      },
+      {
+        "roomName": "Second Floor Hallway Bathroom ",
+        "type": "bathroom",
+        "level": "rooms",
+        "observations": [],
+        "notes": "Toilet is loose When tested active leaking was not present however there is a water stain in the back between the toilet and the wall",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Main Living Area",
+        "type": "living-area",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": [
+          {
+            "caption": "Gas fireplace, one",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1jQ-dFdW23H682q_TNRRV5r3xrKlilmKT&sz=w1600",
+            "timestamp": "2026-04-22T17:23:13.078Z"
+          }
+        ]
+      },
+      {
+        "roomName": "Kitchen Inspection",
+        "type": "kitchen-appliance",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": [
+          {
+            "caption": "Dirty Filter",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1WWT9NyINwAyeCK_noYUs0Pl7Clqfy8r6&sz=w1600",
+            "timestamp": "2026-04-22T17:15:13.939Z"
+          },
+          {
+            "caption": "Dishwasher filter after it was cleaned",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1TNsZSc04_skzvwQYZBsC-ycv3dvGyKhF&sz=w1600",
+            "timestamp": "2026-04-22T17:18:40.395Z"
+          },
+          {
+            "caption": "Kitchen faucet is loose allowing water to get under and into the cabinet",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1NhGj_lx-XTyatLHiV18FP50ViShiHCeK&sz=w1600",
+            "timestamp": "2026-04-22T17:19:31.599Z"
+          },
+          {
+            "caption": "Caulking is deteriorated around Undermount sink",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1p3Oi1-pCZn1nl3eo9iyJrM7Wqwm6SajY&sz=w1600",
+            "timestamp": "2026-04-22T17:19:58.086Z"
+          },
+          {
+            "caption": "Active leak was not visible under sink",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1VvZ1EXhUmPSe7nmhcnBkjFf-9qHW7A-K&sz=w1600",
+            "timestamp": "2026-04-22T17:20:30.266Z"
+          },
+          {
+            "caption": "There is dirt and debris underneath range and refrigerator removing appliances and cleaning them underneath them on a semi annual basis is recommended",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1rhnkPj0DMjjZegqJmwhRkYWQIHGs_oET&sz=w1600",
+            "timestamp": "2026-04-22T17:41:08.047Z"
+          },
+          {
+            "caption": "Dirt and debris underneath refrigerator",
+            "driveUrl": "https://drive.google.com/thumbnail?id=14fNB9ybFWC1HOPWPa6c0PjEF_JEMJYLC&sz=w1600",
+            "timestamp": "2026-04-22T17:42:04.596Z"
+          },
+          {
+            "caption": "Cleaning oven vent screens can allow more air to move recommended to clean semi annually",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1WGW--VQ_1YEpAqi2XzPDD6tFU3GoRPxV&sz=w1600",
+            "timestamp": "2026-04-22T17:47:21.715Z"
+          }
+        ]
+      },
+      {
+        "roomName": "Water Samples",
+        "type": "water-sample",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "ATP Testing",
+        "type": "atp-kitchen",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "",
+        "flirConcerns": "",
+        "photos": [
+          {
+            "caption": "",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1bTCur1Yz_DaFDNzRbIw9bRQsWixSyBNB&sz=w1600",
+            "timestamp": "2026-04-22T17:45:45.040Z"
+          },
+          {
+            "caption": "After number",
+            "driveUrl": "https://drive.google.com/thumbnail?id=1TIuASOhKLNMNc1UHDGC3cOSYIJ6bIAKd&sz=w1600",
+            "timestamp": "2026-04-22T17:46:20.255Z"
+          }
+        ]
+      },
+      {
+        "roomName": "Kitchen Air Testing",
+        "type": "kitchen-air",
+        "level": "main",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "Yes",
+        "sporeTrapId": "",
+        "flirDone": "No",
+        "flirConcerns": "",
+        "photos": []
+      },
+      {
+        "roomName": "Laundry room",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "No",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      },
+      {
+        "roomName": "Powder Room",
+        "type": "additional-room",
+        "level": "supplementary",
+        "observations": [],
+        "notes": "",
+        "breezeDone": "",
+        "sporeTrapId": "",
+        "flirDone": "Yes",
+        "flirConcerns": "No",
+        "photos": []
+      }
+    ],
+    "reviewStatus": "Needs Review",
+    "id": "INH-20260422-C7KYGW",
+    "photos": [
+      {
+        "photoId": "ph_06_00",
+        "roomName": "Primary Bathroom ",
+        "stepName": "bathroom",
+        "caption": "A zoomed out photo of vinyl feeling away of showers around",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1-P-oUiO9CQva8UtvzJbfua_XP9Z1hoCC&sz=w1600",
+        "timestamp": "2026-04-22T16:50:54.752Z",
+        "included": null,
+        "driveId": "1-P-oUiO9CQva8UtvzJbfua_XP9Z1hoCC"
+      },
+      {
+        "photoId": "ph_09_00",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Dirty Filter",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1WWT9NyINwAyeCK_noYUs0Pl7Clqfy8r6&sz=w1600",
+        "timestamp": "2026-04-22T17:15:13.939Z",
+        "included": null,
+        "driveId": "1WWT9NyINwAyeCK_noYUs0Pl7Clqfy8r6"
+      },
+      {
+        "photoId": "ph_09_01",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Dishwasher filter after it was cleaned",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1TNsZSc04_skzvwQYZBsC-ycv3dvGyKhF&sz=w1600",
+        "timestamp": "2026-04-22T17:18:40.395Z",
+        "included": null,
+        "driveId": "1TNsZSc04_skzvwQYZBsC-ycv3dvGyKhF"
+      },
+      {
+        "photoId": "ph_09_02",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Kitchen faucet is loose allowing water to get under and into the cabinet",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1NhGj_lx-XTyatLHiV18FP50ViShiHCeK&sz=w1600",
+        "timestamp": "2026-04-22T17:19:31.599Z",
+        "included": null,
+        "driveId": "1NhGj_lx-XTyatLHiV18FP50ViShiHCeK"
+      },
+      {
+        "photoId": "ph_09_03",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Caulking is deteriorated around Undermount sink",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1p3Oi1-pCZn1nl3eo9iyJrM7Wqwm6SajY&sz=w1600",
+        "timestamp": "2026-04-22T17:19:58.086Z",
+        "included": null,
+        "driveId": "1p3Oi1-pCZn1nl3eo9iyJrM7Wqwm6SajY"
+      },
+      {
+        "photoId": "ph_09_04",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Active leak was not visible under sink",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1VvZ1EXhUmPSe7nmhcnBkjFf-9qHW7A-K&sz=w1600",
+        "timestamp": "2026-04-22T17:20:30.266Z",
+        "included": null,
+        "driveId": "1VvZ1EXhUmPSe7nmhcnBkjFf-9qHW7A-K"
+      },
+      {
+        "photoId": "ph_08_00",
+        "roomName": "Main Living Area",
+        "stepName": "living-area",
+        "caption": "Gas fireplace, one",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1jQ-dFdW23H682q_TNRRV5r3xrKlilmKT&sz=w1600",
+        "timestamp": "2026-04-22T17:23:13.078Z",
+        "included": null,
+        "driveId": "1jQ-dFdW23H682q_TNRRV5r3xrKlilmKT"
+      },
+      {
+        "photoId": "ph_09_05",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "There is dirt and debris underneath range and refrigerator removing appliances and cleaning them underneath them on a semi annual basis is recommended",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1rhnkPj0DMjjZegqJmwhRkYWQIHGs_oET&sz=w1600",
+        "timestamp": "2026-04-22T17:41:08.047Z",
+        "included": null,
+        "driveId": "1rhnkPj0DMjjZegqJmwhRkYWQIHGs_oET"
+      },
+      {
+        "photoId": "ph_09_06",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Dirt and debris underneath refrigerator",
+        "driveUrl": "https://drive.google.com/thumbnail?id=14fNB9ybFWC1HOPWPa6c0PjEF_JEMJYLC&sz=w1600",
+        "timestamp": "2026-04-22T17:42:04.596Z",
+        "included": null,
+        "driveId": "14fNB9ybFWC1HOPWPa6c0PjEF_JEMJYLC"
+      },
+      {
+        "photoId": "ph_11_00",
+        "roomName": "ATP Testing",
+        "stepName": "atp-kitchen",
+        "caption": "",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1bTCur1Yz_DaFDNzRbIw9bRQsWixSyBNB&sz=w1600",
+        "timestamp": "2026-04-22T17:45:45.040Z",
+        "included": null,
+        "driveId": "1bTCur1Yz_DaFDNzRbIw9bRQsWixSyBNB"
+      },
+      {
+        "photoId": "ph_11_01",
+        "roomName": "ATP Testing",
+        "stepName": "atp-kitchen",
+        "caption": "After number",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1TIuASOhKLNMNc1UHDGC3cOSYIJ6bIAKd&sz=w1600",
+        "timestamp": "2026-04-22T17:46:20.255Z",
+        "included": null,
+        "driveId": "1TIuASOhKLNMNc1UHDGC3cOSYIJ6bIAKd"
+      },
+      {
+        "photoId": "ph_09_07",
+        "roomName": "Kitchen Inspection",
+        "stepName": "kitchen-appliance",
+        "caption": "Cleaning oven vent screens can allow more air to move recommended to clean semi annually",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1WGW--VQ_1YEpAqi2XzPDD6tFU3GoRPxV&sz=w1600",
+        "timestamp": "2026-04-22T17:47:21.715Z",
+        "included": null,
+        "driveId": "1WGW--VQ_1YEpAqi2XzPDD6tFU3GoRPxV"
+      },
+      {
+        "photoId": "ph_01_00",
+        "roomName": "Basement Office",
+        "stepName": "room-test",
+        "caption": "FLIR image, nothing of note",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1H3LL1dMjB99xSKbVwqaumPc1IYV_3vig&sz=w1600",
+        "timestamp": "2026-04-22T22:01:04.157Z",
+        "included": null,
+        "driveId": "1H3LL1dMjB99xSKbVwqaumPc1IYV_3vig"
+      },
+      {
+        "photoId": "ph_06_01",
+        "roomName": "Primary Bathroom ",
+        "stepName": "bathroom",
+        "caption": "Orange areas show heat.  There is more heat than typical there indicating loss of insulation in the area",
+        "driveUrl": "https://drive.google.com/thumbnail?id=1dfvdeFTuwn5GUebk2rZ3ZLSkQXeSHNd0&sz=w1600",
+        "timestamp": "2026-04-22T22:26:57.050Z",
+        "included": null,
+        "driveId": "1dfvdeFTuwn5GUebk2rZ3ZLSkQXeSHNd0"
+      }
+    ],
+    "photoCount": 14
+  }
+}

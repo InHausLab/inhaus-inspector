@@ -1,4 +1,4 @@
-// InHaus Inspector Service Worker v135
+// InHaus Inspector Service Worker v136
 // Safe iOS Safari implementation - June 28 2026
 //
 // Rules:
@@ -9,7 +9,7 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v135';
+const CACHE_NAME = 'inhaus-v136';
 
 const APP_SHELL = [
   '/',
@@ -71,6 +71,9 @@ self.addEventListener('fetch', event => {
 
   // Never cache Google services
   if (request.url.includes('google')) return;
+
+  const url = new URL(request.url);
+  if (url.origin === self.location.origin && url.pathname.startsWith('/reports/')) return;
 
   // Cache-first for everything else (app shell)
   event.respondWith(

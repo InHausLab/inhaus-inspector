@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InHaus Lab - Report Viewer</title>
+  <link rel="stylesheet" href="report.css?v=20260630-4">
+</head>
+<body>
+  <nav class="nav-bar report-nav">
+    <a href="report.html" class="nav-logo">
+      <div class="logo-icon">IL</div>
+      InHaus Lab
+    </a>
+    <div class="nav-divider"></div>
+    <span class="nav-title">Report Viewer</span>
+    <div class="nav-spacer"></div>
+    <button id="print-btn" class="report-icon-btn" type="button" title="Print or save PDF" aria-label="Print or save PDF">
+      <span aria-hidden="true">Print</span>
+    </button>
+  </nav>
+
+  <main class="report-shell">
+    <section class="report-loader" aria-labelledby="viewer-title">
+      <div>
+        <h1 id="viewer-title">Report Viewer</h1>
+        <p>Enter an inspection ID or select a known inspection to render the report package.</p>
+        <form id="access-code-form" class="report-access">
+          <label for="access-code-input">Access code</label>
+          <div class="report-access-row">
+            <input id="access-code-input" type="password" autocomplete="current-password" placeholder="Portal code">
+            <button class="btn btn-secondary" type="submit">Unlock</button>
+          </div>
+        </form>
+      </div>
+      <form id="report-search-form" class="report-search">
+        <label for="inspection-id-input">Inspection ID</label>
+        <div class="report-search-row">
+          <input id="inspection-id-input" type="text" autocomplete="off" placeholder="INH-20260428-DKNSOB">
+          <button class="btn btn-open" type="submit">Load Report</button>
+        </div>
+      </form>
+      <div class="report-picker-wrap">
+        <label for="inspection-picker">Available inspections</label>
+        <select id="inspection-picker">
+          <option value="">Loading inspections...</option>
+        </select>
+      </div>
+      <div id="report-status" class="report-status" role="status"></div>
+    </section>
+
+    <section id="report-output" class="report-output" aria-live="polite">
+      <div class="empty-report">
+        <div class="empty-report-title">No report loaded</div>
+        <div class="empty-report-copy">Load an inspection to preview the report structure Tanner will use.</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="report.js?v=20260630-4"></script>
+</body>
+</html>
