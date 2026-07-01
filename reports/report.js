@@ -1,6 +1,7 @@
 const REPORT_REVIEW_API_URL = 'https://script.google.com/macros/s/AKfycbxh6xtKg3FKjoHzi6jbJ_8RmjIgihgvcgeG8jGrFWweGcD3iwjV9voLVj0cmy5VeczuPw/exec';
 const REPORT_BRIDGE_API_URL = 'https://script.google.com/macros/s/AKfycbxmOMfSGaz9sDHxAKBjNXtJ44MLdusXRe-GOrV6nGH0Iw0tciFg1Wkw-02hB-dQglAbgQ/exec';
 const ACCESS_TOKEN_STORAGE_KEY = 'inhaus-report-access-token';
+const DEFAULT_REPORT_ID = 'INH-20260428-DKNSOB';
 
 const els = {};
 let knownInspections = [];
@@ -46,21 +47,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function bootstrap() {
   renderAccessState();
+  const params = new URLSearchParams(window.location.search);
+  const requestedId = normalizeId(params.get('id') || '');
+
   setStatus('Loading known inspections...');
   try {
     knownInspections = await loadInspectionList();
     populatePicker(knownInspections);
-    setStatus(knownInspections.length ? `${knownInspections.length} inspections available.` : 'Enter an inspection ID to load a report.');
+    setStatus(knownInspections.length ? `${knownInspections.length} inspections available.` : 'Loading default report...');
   } catch (err) {
     populatePicker([]);
-    setStatus(`Inspection list unavailable. Enter an ID manually. ${err.message}`, true);
+    setStatus(`Inspection list unavailable. Loading default report. ${err.message}`, true);
   }
 
-  const params = new URLSearchParams(window.location.search);
-  const id = normalizeId(params.get('id') || '');
-  if (id) {
-    els.input.value = id;
-    loadAndRender(id);
+  const idToLoad = requestedId || pickDefaultInspectionId(knownInspections) || DEFAULT_REPORT_ID;
+  if (idToLoad) {
+    els.input.value = idToLoad;
+    els.picker.value = idToLoad;
+    loadAndRender(idToLoad);
   }
 }
 
@@ -75,6 +79,12 @@ function getAccessToken() {
 function renderAccessState() {
   if (!els.accessInput) return;
   els.accessInput.placeholder = getAccessToken() ? 'Access code saved for this tab' : 'Portal code';
+}
+
+function pickDefaultInspectionId(inspections) {
+  const preferred = inspections.find(item => normalizeId(item.id || item.inspectionId) === DEFAULT_REPORT_ID);
+  const selected = preferred || inspections[0];
+  return normalizeId(selected && (selected.id || selected.inspectionId));
 }
 
 async function apiFetch(endpoint, params) {
@@ -156,7 +166,7 @@ async function loadStaticInspectionById(id) {
 function populatePicker(inspections) {
   els.picker.innerHTML = '';
   if (!inspections.length) {
-    els.picker.appendChild(option('', 'No static inspections found'));
+    els.picker.appendChild(option('', 'No inspections found'));
     return;
   }
   els.picker.appendChild(option('', 'Select inspection...'));
