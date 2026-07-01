@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hans Operating Workbench</title>
+  <link rel="stylesheet" href="workbench.css?v=20260701-1">
+</head>
+<body>
+  <header class="app-bar">
+    <a class="brand" href="/workbench">
+      <span class="brand-mark">HW</span>
+      <span>Hans Workbench</span>
+    </a>
+    <div class="bar-spacer"></div>
+    <button id="new-task-btn" class="bar-btn" type="button">New Task</button>
+    <button id="reset-session-btn" class="bar-btn ghost" type="button">Reset Session</button>
+  </header>
+
+  <main class="workspace">
+    <aside class="task-rail" aria-label="Task list">
+      <section class="rail-section">
+        <div class="rail-heading">
+          <h1>Tasks</h1>
+          <span id="task-count">0</span>
+        </div>
+        <div id="task-list" class="task-list"></div>
+      </section>
+    </aside>
+
+    <section class="work-surface" aria-label="Task workbench">
+      <section id="session-panel" class="status-band"></section>
+
+      <form id="task-form" class="task-form">
+        <section class="panel main-panel">
+          <div class="panel-heading">
+            <h2>Task Card</h2>
+            <span id="save-state" class="save-state">Saved</span>
+          </div>
+          <div class="field-grid two">
+            <label>
+              <span>Task title</span>
+              <input id="title" name="title" type="text" autocomplete="off">
+            </label>
+            <label>
+              <span>Owner</span>
+              <select id="owner" name="owner">
+                <option>Hans</option>
+                <option>Codex</option>
+                <option>Tanner</option>
+                <option>Allie</option>
+                <option>Other</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            <span>Objective</span>
+            <textarea id="objective" name="objective" rows="3"></textarea>
+          </label>
+          <div class="field-grid two">
+            <label>
+              <span>Mode</span>
+              <select id="mode" name="mode">
+                <option>Think</option>
+                <option>Verify</option>
+                <option>Execute</option>
+                <option>Delegate</option>
+              </select>
+            </label>
+            <label>
+              <span>Verification steps expected</span>
+              <input id="verificationSteps" name="verificationSteps" type="number" min="0" max="99" inputmode="numeric">
+            </label>
+          </div>
+          <label>
+            <span>Expected evidence</span>
+            <textarea id="expectedEvidence" name="expectedEvidence" rows="3"></textarea>
+          </label>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Protocol Gates</h2>
+            <span id="gate-result" class="gate-pill">Open</span>
+          </div>
+          <div class="field-grid two">
+            <label class="check-row">
+              <input id="liveSystem" name="liveSystem" type="checkbox">
+              <span>Live system involved</span>
+            </label>
+            <label>
+              <span>Delegation decision</span>
+              <select id="delegationDecision" name="delegationDecision">
+                <option>Not assessed</option>
+                <option>Keep with Hans</option>
+                <option>Codex recommended</option>
+                <option>Delegated to Codex</option>
+                <option>Subagent recommended</option>
+              </select>
+            </label>
+          </div>
+          <div id="delegation-nudge" class="inline-nudge" hidden>Should this be delegated to Codex?</div>
+          <label>
+            <span>URLs that may be sent or claimed working</span>
+            <textarea id="urlText" name="urlText" rows="2" placeholder="https://..."></textarea>
+          </label>
+          <div class="field-grid two">
+            <label class="check-row">
+              <input id="urlsVerified" name="urlsVerified" type="checkbox">
+              <span>URLs verified before sending</span>
+            </label>
+            <label class="check-row">
+              <input id="requiresVisibility" name="requiresVisibility" type="checkbox">
+              <span>Requires phone/browser visibility</span>
+            </label>
+          </div>
+          <label>
+            <span>Phone/browser verification plan</span>
+            <textarea id="visibilityPlan" name="visibilityPlan" rows="2"></textarea>
+          </label>
+          <div id="gate-list" class="gate-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Failure Guardrails</h2>
+            <span id="failure-count" class="gate-pill">0 failures</span>
+          </div>
+          <div class="failure-row">
+            <label>
+              <span>Failure note</span>
+              <input id="failure-note" type="text" autocomplete="off" placeholder="What failed?">
+            </label>
+            <button id="add-failure-btn" class="btn secondary" type="button">Add Failure</button>
+            <button id="reset-failures-btn" class="btn ghost" type="button">Reset</button>
+          </div>
+          <div id="failure-log" class="failure-log"></div>
+          <label>
+            <span>Stale memory correction</span>
+            <textarea id="staleMemory" name="staleMemory" rows="2"></textarea>
+          </label>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Evidence And Closeout</h2>
+            <span id="done-state" class="gate-pill">Not done</span>
+          </div>
+          <label>
+            <span>Verification label</span>
+            <select id="verificationLabel" name="verificationLabel">
+              <option value="">Select label...</option>
+              <option>VERIFIED</option>
+              <option>PARTIALLY VERIFIED</option>
+              <option>UNVERIFIED</option>
+              <option>CHANGE APPLIED</option>
+            </select>
+          </label>
+          <label>
+            <span>Evidence</span>
+            <textarea id="evidence" name="evidence" rows="4" placeholder="Command output, URL checked, screenshot note, commit hash, or direct observation."></textarea>
+          </label>
+          <label>
+            <span>Notes / caveats</span>
+            <textarea id="notes" name="notes" rows="3"></textarea>
+          </label>
+          <div class="action-row">
+            <button id="mark-done-btn" class="btn primary" type="button">Mark Done</button>
+            <button id="reopen-btn" class="btn ghost" type="button">Reopen</button>
+          </div>
+        </section>
+      </form>
+    </section>
+
+    <aside class="output-rail" aria-label="Generated outputs">
+      <section class="panel output-panel">
+        <div class="panel-heading">
+          <h2>Outputs</h2>
+          <button id="copy-output-btn" class="mini-btn" type="button">Copy</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Output type">
+          <button class="tab active" type="button" data-output="handoff">Handoff</button>
+          <button class="tab" type="button" data-output="final">Final</button>
+          <button class="tab" type="button" data-output="summary">Session</button>
+          <button class="tab" type="button" data-output="memory">Memory</button>
+        </div>
+        <textarea id="output-text" class="output-text" readonly></textarea>
+      </section>
+    </aside>
+  </main>
+
+  <script src="workbench.js?v=20260701-1"></script>
+</body>
+</html>

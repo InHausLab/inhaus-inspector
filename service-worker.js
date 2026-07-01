@@ -73,7 +73,12 @@ self.addEventListener('fetch', event => {
   if (request.url.includes('google')) return;
 
   const url = new URL(request.url);
-  if (url.origin === self.location.origin && url.pathname.startsWith('/reports/')) return;
+  const bypassStandaloneRoute =
+    url.pathname === '/reports' ||
+    url.pathname.startsWith('/reports/') ||
+    url.pathname === '/workbench' ||
+    url.pathname.startsWith('/workbench/');
+  if (url.origin === self.location.origin && bypassStandaloneRoute) return;
 
   // Cache-first for everything else (app shell)
   event.respondWith(

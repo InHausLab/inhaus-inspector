@@ -11,6 +11,16 @@
   to = "/reports/report.html"
   status = 302
 
+[[redirects]]
+  from = "/workbench"
+  to = "/workbench/index.html"
+  status = 302
+
+[[redirects]]
+  from = "/workbench/"
+  to = "/workbench/index.html"
+  status = 302
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -20,6 +30,14 @@
 
 [[headers]]
   for = "/reports/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/workbench/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
     X-Frame-Options = "DENY"
