@@ -295,8 +295,10 @@ async function runChecks() {
 }
 
 async function runOneCheck(check) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(check.path, { cache: 'no-store' });
+    const response = await fetch(check.path, { cache: 'no-store', signal: controller.signal });
     if (!response.ok) {
       return { status: check.critical ? FAIL : WARN, message: `HTTP ${response.status} from ${check.path}` };
     }
@@ -307,7 +309,10 @@ async function runOneCheck(check) {
       message: ok ? `Passed: ${check.path}` : `Loaded but expected signal was missing: ${check.path}`
     };
   } catch (err) {
-    return { status: check.critical ? FAIL : WARN, message: err.message || 'Check failed.' };
+    const message = err.name === 'AbortError' ? `Timed out checking ${check.path}` : err.message || 'Check failed.';
+    return { status: check.critical ? FAIL : WARN, message };
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
