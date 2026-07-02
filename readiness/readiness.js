@@ -4,7 +4,7 @@ const WARN = 'warn';
 const FAIL = 'fail';
 const BLOCKED = 'blocked';
 const UNCHECKED = 'unchecked';
-const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbx6VWKm-smdwpiZbzVIk8VGLV7V7p0Zbq1X4DE3YMe9bjH-zxkfRH_aznYCp08LzEhBLw/exec';
+const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxmOMfSGaz9sDHxAKBjNXtJ44MLdusXRe-GOrV6nGH0Iw0tciFg1Wkw-02hB-dQglAbgQ/exec';
 const REVIEW_ACCESS_TOKEN = 'InHaus2026';
 const SAMPLE_INSPECTION_ID = 'INH-20260428-DKNSOB';
 
