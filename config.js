@@ -2,7 +2,7 @@
 
 // ── Google Drive Export Config ─────────────────────────────
 // Google Apps Script web app URL
-export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6VWKm-smdwpiZbzVIk8VGLV7V7p0Zbq1X4DE3YMe9bjH-zxkfRH_aznYCp08LzEhBLw/exec'; // v37 — verified July 1 2026
+export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6VWKm-smdwpiZbzVIk8VGLV7V7p0Zbq1X4DE3YMe9bjH-zxkfRH_aznYCp08LzEhBLw/exec'; // v37 — verified July 3 2026 (v38 attempt failed auth, abandoned)
 
 // ── Sync secret ────────────────────────────────────────────
 // Frontend token only - not a true secret. Must match SYNC_SECRET in Apps Script Properties.
@@ -15,7 +15,7 @@ export const LEGACY_SYNC_SECRET = 'ihl-sync-2026';
 // Shared Drive folder ID where per-assessment subfolders should be created.
 // Find it in the URL when browsing the Shared Drive in Google Drive:
 //   https://drive.google.com/drive/u/0/folders/[FOLDER_ID_HERE]
-export const SHARED_DRIVE_FOLDER_ID = ''; // e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms'
+export const SHARED_DRIVE_FOLDER_ID = '11A2EXgQSFo4BAh3aYlJpHxqZKsfwe06l'; // Assessments/ folder in Products & Services Shared Drive — verified from Apps Script July 3 2026
 
 // ── AI Vision Proxy Config ──────────────────────────────────
 export const VISION_PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
