@@ -1838,7 +1838,12 @@ export function renderReview() {
         const reuploadData = buildExportJSON(ctx.stepList);
         const allPhotos = extractAllPhotosFromExport(reuploadData);
         const ok = await submitInspection(reuploadData);
-        if (!ok) throw new Error('Drive did not confirm every photo upload.');
+        if (!ok) {
+          throw new Error(
+            (ctx.inspection && ctx.inspection._lastFinalSyncError) ||
+            'Drive did not confirm every photo upload.'
+          );
+        }
         reuploadBtn.textContent = '\u2713 Upload Complete (' + allPhotos.length + ' photos)';
       } catch(e) {
         reuploadBtn.disabled = false;
