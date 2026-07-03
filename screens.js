@@ -1191,7 +1191,10 @@ export function renderStep() {
       scheduleSave();
       ui().updateShowIf(card, data);
       // Change 3: Detect allSectionsComplete on post-assessment step
-      if (step.type === 'post-assessment' && data.finalCheck && data.finalCheck.allSectionsComplete === true) {
+      if (step.type === 'post-assessment' && data.finalCheck &&
+          data.finalCheck.allSectionsComplete === true &&
+          data.finalCheck.allPhotosUploaded === true &&
+          data.finalCheck.assessmentComplete === true) {
         const issues = collectInspectionIssues();
         if (issues.length) {
           data.finalCheck.allSectionsComplete = false;
