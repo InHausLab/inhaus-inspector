@@ -11,6 +11,7 @@ import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } fr
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
 let _workingSyncSecret = null;
+const PHOTO_UPLOAD_BATCH_SIZE = 3;
 
 function getSyncSecretsToTry() {
   const secrets = [];
@@ -63,6 +64,88 @@ function getPhotoDriveLink(photo) {
   return photo.driveUrl || driveUrlFromId(photo.driveId);
 }
 
+function driveFolderUrlFromId(folderId) {
+  return folderId ? 'https://drive.google.com/drive/folders/' + encodeURIComponent(folderId) : '';
+}
+
+function payloadFingerprint(payload) {
+  let text = '';
+  try {
+    text = JSON.stringify(payload || {});
+  } catch (err) {
+    text = String(Date.now());
+  }
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  return text.length + ':' + (hash >>> 0).toString(36);
+}
+
+function getKnownDriveFolderId(inspection, exportData) {
+  return (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
+    (exportData && (exportData.driveFolderId || exportData.folderId)) ||
+    '';
+}
+
+function getKnownDriveFolderUrl(inspection, exportData) {
+  return (inspection && (inspection._driveFolderUrl || inspection.driveFolderUrl || inspection.folderUrl)) ||
+    (exportData && (exportData.driveFolderUrl || exportData.folderUrl)) ||
+    driveFolderUrlFromId(getKnownDriveFolderId(inspection, exportData));
+}
+
+function rememberDriveResult(result, fingerprint, source) {
+  const inspection = getInspection();
+  if (!inspection || !result) return;
+  const folderId = result.folderId || result.driveFolderId || '';
+  const folderUrl = result.folderUrl || result.driveFolderUrl || driveFolderUrlFromId(folderId);
+  if (folderId) {
+    inspection._driveFolderId = folderId;
+    inspection.driveFolderId = folderId;
+  }
+  if (folderUrl) {
+    inspection._driveFolderUrl = folderUrl;
+    inspection.driveFolderUrl = folderUrl;
+  }
+  if (result.spreadsheetId) inspection._spreadsheetId = result.spreadsheetId;
+  if (result.spreadsheetUrl) inspection._spreadsheetUrl = result.spreadsheetUrl;
+  if (fingerprint) inspection._lastMainPayloadFingerprint = fingerprint;
+  inspection._dataSyncedToDrive = true;
+  inspection._driveMetadataSource = source || inspection._driveMetadataSource || 'sync';
+  inspection._driveMetadataUpdatedAt = new Date().toISOString();
+  scheduleSave();
+}
+
+async function recoverDriveMetadataFromReviewApi(inspectionId, fingerprint) {
+  if (!GOOGLE_SCRIPT_URL || !inspectionId) return false;
+  const inspection = getInspection();
+  if (getKnownDriveFolderId(inspection)) return true;
+
+  try {
+    const url = new URL(GOOGLE_SCRIPT_URL);
+    url.searchParams.set('action', 'get');
+    url.searchParams.set('id', inspectionId);
+    url.searchParams.set('token', String(inspectionId).toLowerCase());
+    const resp = await fetch(url.toString(), { method: 'GET', cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data || data.status === 'error') throw new Error((data && data.message) || 'review lookup failed');
+    const remote = data.inspection || {};
+    const folderId = remote.folderId || remote.driveFolderId || remote.drive_folder_id || '';
+    if (!folderId) return false;
+    rememberDriveResult({
+      folderId: folderId,
+      folderUrl: remote.folderUrl || remote.assessmentFolderUrl || driveFolderUrlFromId(folderId),
+      spreadsheetId: remote.spreadsheetId || '',
+      spreadsheetUrl: remote.spreadsheetUrl || ''
+    }, fingerprint, 'review-api');
+    return true;
+  } catch (err) {
+    console.warn('Existing Drive folder lookup failed:', err);
+    return false;
+  }
+}
+
 function getConfirmedPhotoMap(uploadResult, requestedPhotos) {
   const confirmed = new Map();
   const returnedPhotos = Array.isArray(uploadResult && uploadResult.photos) ? uploadResult.photos : [];
@@ -77,6 +160,26 @@ function getConfirmedPhotoMap(uploadResult, requestedPhotos) {
     }
   });
   return confirmed;
+}
+
+function getLocalPhotoMap(inspection) {
+  const map = new Map();
+  visitLocalInspectionPhotos(inspection, function(photo) {
+    if (photo && photo.photoId && !map.has(photo.photoId)) map.set(photo.photoId, photo);
+  });
+  return map;
+}
+
+function queueUnconfirmedLocalPhotos(inspection, exportedPhotos, warning) {
+  if (!inspection || !Array.isArray(exportedPhotos) || !exportedPhotos.length) return;
+  const localPhotos = getLocalPhotoMap(inspection);
+  exportedPhotos.forEach(function(exportedPhoto) {
+    const localPhoto = exportedPhoto && exportedPhoto.photoId ? localPhotos.get(exportedPhoto.photoId) : null;
+    if (!localPhoto) return;
+    localPhoto._uploadFailed = true;
+    localPhoto._uploadWarning = warning || 'not_confirmed';
+    addToPhotoRetryQueue(localPhoto);
+  });
 }
 
 function visitLocalInspectionPhotos(inspection, callback) {
@@ -217,6 +320,8 @@ export function showUploadBanner(type, msg) {
 // for the review portal to display them. This is a known workaround - see issue tracker.
 export async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
   if (!GOOGLE_SCRIPT_URL || !inspectionId) return false;
+  const inspection = getInspection();
+  const knownFolderId = getKnownDriveFolderId(inspection);
   let originalDataUrl = photo.dataUrl;
   if (!originalDataUrl || originalDataUrl === '__uploaded__') {
     if (photo.photoId && window.DB && window.DB.getPhoto) {
@@ -240,6 +345,9 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
     inspectionId: inspectionId,
     clientName: clientName || '',
     propertyAddress: propertyAddress || '',
+    folderId: knownFolderId,
+    driveFolderId: knownFolderId,
+    folderUrl: getKnownDriveFolderUrl(inspection),
     photos: [{
       photoId: photo.photoId || '',
       roomName: photo.roomName || '',
@@ -256,6 +364,7 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
 
   try {
     const result = await doUpload();
+    rememberDriveResult(result, inspection && inspection._lastMainPayloadFingerprint, 'photo-upload');
     const returnedPhoto = result && result.photos && result.photos[0];
     const confirmedDriveUrl = getPhotoDriveLink(returnedPhoto);
 
@@ -336,25 +445,85 @@ export async function sendToGoogleScript(exportData) {
   const inspection = getInspection();
   // Always strip photos from main payload - send data first, then photos separately
   const mainPayload = stripPhotosFromExport(exportData);
+  const mainPayloadFingerprint = payloadFingerprint(mainPayload);
   const allPhotos = extractAllPhotosFromExport(exportData);
   const photosToUpload = allPhotos.filter(photoNeedsUpload);
 
-  await scriptFetch(mainPayload);
+  if (photosToUpload.length > 0) {
+    await recoverDriveMetadataFromReviewApi(exportData.inspectionId, mainPayloadFingerprint);
+  }
+
+  const knownFolderId = getKnownDriveFolderId(inspection, exportData);
+  const canReuseExistingDataSync = !!(
+    inspection &&
+    inspection._dataSyncedToDrive &&
+    knownFolderId &&
+    inspection._lastMainPayloadFingerprint === mainPayloadFingerprint
+  );
+
+  if (!canReuseExistingDataSync) {
+    const mainResult = await scriptFetch(mainPayload);
+    rememberDriveResult(mainResult, mainPayloadFingerprint, 'main-sync');
+  }
 
   if (photosToUpload.length > 0) {
-    const photoPayload = {
-      photoUploadOnly: true,
-      inspectionId: exportData.inspectionId,
-      clientName: exportData.clientName,
-      propertyAddress: exportData.propertyAddress,
-      photos: photosToUpload
-    };
     showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
-    const photoResult = await scriptFetch(photoPayload);
-    const confirmedPhotos = getConfirmedPhotoMap(photoResult, photosToUpload);
-    const missingPhotos = photosToUpload.filter(function(photo) {
-      return !photo.photoId || !confirmedPhotos.has(photo.photoId);
-    });
+    let confirmedCount = 0;
+    const missingPhotos = [];
+    for (let start = 0; start < photosToUpload.length; start += PHOTO_UPLOAD_BATCH_SIZE) {
+      const batch = photosToUpload.slice(start, start + PHOTO_UPLOAD_BATCH_SIZE);
+      const end = start + batch.length;
+      updateSyncStatus('syncing', 'photos ' + end + '/' + photosToUpload.length);
+      showUploadBanner(
+        'pending',
+        'Uploading photos ' + (start + 1) + '-' + end + ' of ' + photosToUpload.length + '\u2026'
+      );
+
+      const batchFolderId = getKnownDriveFolderId(inspection, exportData);
+      const photoPayload = {
+        photoUploadOnly: true,
+        inspectionId: exportData.inspectionId,
+        clientName: exportData.clientName,
+        propertyAddress: exportData.propertyAddress,
+        folderId: batchFolderId,
+        driveFolderId: batchFolderId,
+        folderUrl: getKnownDriveFolderUrl(inspection, exportData),
+        photos: batch
+      };
+
+      let photoResult;
+      try {
+        photoResult = await scriptFetch(photoPayload);
+      } catch (err) {
+        const remaining = photosToUpload.slice(start);
+        queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
+        throw new Error(
+          'Photo upload failed after confirming ' +
+          confirmedCount +
+          ' of ' + photosToUpload.length + ' photos: ' +
+          (err && err.message ? err.message : String(err))
+        );
+      }
+
+      rememberDriveResult(photoResult, mainPayloadFingerprint, 'photo-upload');
+      const confirmedPhotos = getConfirmedPhotoMap(photoResult, batch);
+      if (confirmedPhotos.size > 0 && inspection) {
+        markConfirmedLocalPhotos(inspection, confirmedPhotos);
+        confirmedCount += confirmedPhotos.size;
+        scheduleSave();
+      }
+
+      const batchMissing = batch.filter(function(photo) {
+        return !photo.photoId || !confirmedPhotos.has(photo.photoId);
+      });
+      if (batchMissing.length > 0) {
+        queueUnconfirmedLocalPhotos(inspection, batchMissing, 'not_confirmed_in_drive');
+        missingPhotos.push.apply(missingPhotos, batchMissing);
+      }
+
+      await new Promise(function(resolve) { setTimeout(resolve, 150); });
+    }
+
     if (missingPhotos.length > 0) {
       throw new Error(
         'Photo upload incomplete: confirmed ' +
@@ -362,10 +531,7 @@ export async function sendToGoogleScript(exportData) {
         ' of ' + photosToUpload.length + ' photos in Drive'
       );
     }
-    if (inspection) {
-      markConfirmedLocalPhotos(inspection, confirmedPhotos);
-      scheduleSave();
-    }
+    if (inspection) scheduleSave();
   }
 }
 
@@ -420,6 +586,11 @@ export async function submitInspection(exportData) {
     await sendToGoogleScript(exportData);
     await DB.removeFromQueue(exportData.inspectionId);
     setLastSuccessfulCloudSyncAt(Date.now()); // Change 1
+    const inspection = getInspection();
+    if (inspection) {
+      inspection._lastFinalSyncError = '';
+      scheduleSave();
+    }
     updateSyncStatus('synced'); // Change 2
     showUploadBanner('success', '\u2713 Saved to Google Drive');
     // Auto-disable Dev Mode after successful final sync
@@ -430,6 +601,11 @@ export async function submitInspection(exportData) {
     return true;
   } catch (e) {
     console.log('Upload failed, queuing for retry:', e);
+    const inspection = getInspection();
+    if (inspection) {
+      inspection._lastFinalSyncError = e && e.message ? e.message : String(e || 'Unknown upload error');
+      scheduleSave();
+    }
     await DB.queueUpload(exportData);
     updateSyncStatus('final-failed'); // Change 2
     showUploadBanner('pending', 'Saved locally \u2014 will upload when online');

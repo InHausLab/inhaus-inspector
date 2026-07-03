@@ -271,13 +271,7 @@ import { initScreens, render } from './screens.js';
     let exportData = null;
     try {
       await withTimeout(hydrateInspectionPhotosFromVault(inspection), 15000, 'Photo recovery');
-      // Retry any individually-queued photos before the main sync, but do not
-      // let a stuck single-photo request trap the final sync overlay forever.
-      try {
-        await withTimeout(retryFailedPhotos(), 45000, 'Photo retry');
-      } catch (retryErr) {
-        console.warn('Photo retry timed out before final sync:', retryErr);
-      }
+      // Final sync owns photo upload so it can avoid overlapping retry jobs.
 
       // ── PHOTO INTEGRITY GATE ──────────────────────────────────────
       // Any photo with neither a driveUrl nor a local dataUrl is LOST.
@@ -296,7 +290,7 @@ import { initScreens, render } from './screens.js';
       // ───────────────────────────────────────────────────────
 
       exportData = buildExportJSON(stepList);
-      const success = await withTimeout(submitInspection(exportData), 90000, 'Final sync');
+      const success = await withTimeout(submitInspection(exportData), 600000, 'Final sync');
       const receipt = buildSyncReceipt(exportData, success);
       if (success) {
         setLastSuccessfulCloudSyncAt(Date.now());
@@ -330,8 +324,8 @@ import { initScreens, render } from './screens.js';
         '<strong>ID:</strong> ' + (r.inspectionId || '-') + '<br>' +
         '<strong>Time:</strong> ' + r.timestamp + '<br>' +
         '<strong>Rooms:</strong> ' + r.roomCount + '<br>' +
-        '<strong>Photos pending upload:</strong> ' + r.photosExpected + '<br>' +
-        '<strong>Photos already uploaded:</strong> ' + r.photosUploaded + '<br>' +
+        '<strong>Photos total:</strong> ' + r.photosExpected + '<br>' +
+        '<strong>Photos confirmed in Drive:</strong> ' + r.photosUploaded + '<br>' +
         (r.photosUnconfirmed > 0 ? '<span style="color:#ff6b6b;">\u26a0\ufe0f ' + r.photosUnconfirmed + ' photo' + (r.photosUnconfirmed === 1 ? '' : 's') + ' not confirmed in Drive \u2014 tap Retry</span><br>' : '') +
         (r.errorMessage ? '<strong>Error:</strong> ' + escapeHtml(r.errorMessage) + '<br>' : '') +
         '<strong>Drive folder:</strong> ' + r.driveFolderId + '<br>' +
@@ -456,12 +450,23 @@ import { initScreens, render } from './screens.js';
   function buildSyncReceipt(exportData, success) {
     var photosExpected = 0;
     var photosUploaded = 0;
+    var pendingPhotoIds = new Set();
     if (inspection) visitInspectionPhotos(inspection, function(p) {
       if (!p || !p.photoId) return;
       photosExpected++;
-      if (p._uploaded === true || p.dataUrl === '__uploaded__' || p.driveUrl || p.driveId) photosUploaded++;
+      var hasDrive = !!(p._driveConfirmed === true || p.driveUrl || p.driveId);
+      var hasLocal = !!((p.dataUrl && p.dataUrl !== '__uploaded__') || p._vaultSaved);
+      if (hasDrive) photosUploaded++;
+      else if (hasLocal) pendingPhotoIds.add(p.photoId);
     });
-    var photosUnconfirmed = inspection ? (inspection._photoRetryQueue || []).filter(function(p) { return p.dataUrl && p.dataUrl !== '__uploaded__'; }).length : 0;
+    if (inspection) {
+      (inspection._photoRetryQueue || []).forEach(function(p) {
+        if (p && p.photoId && !p.driveUrl && !p.driveId && p.dataUrl && p.dataUrl !== '__uploaded__') {
+          pendingPhotoIds.add(p.photoId);
+        }
+      });
+    }
+    var photosUnconfirmed = pendingPhotoIds.size;
     return {
       inspectionId: (exportData && exportData.inspectionId) || (inspection && inspection.inspectionId),
       timestamp: new Date().toLocaleString('en-US', { timeZone: 'America/Denver' }),
@@ -469,8 +474,11 @@ import { initScreens, render } from './screens.js';
       photosExpected: photosExpected,
       photosUploaded: photosUploaded,
       photosUnconfirmed: photosUnconfirmed,
-      driveFolderId: (exportData && exportData.driveFolderId) || 'pending',
-      appVersion: 'v136',
+      driveFolderId: (exportData && (exportData.driveFolderId || exportData.folderId)) ||
+        (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
+        'pending',
+      errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
+      appVersion: 'v137',
       success: success
     };
   }
