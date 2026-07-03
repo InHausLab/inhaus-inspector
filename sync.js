@@ -52,7 +52,8 @@ export async function scriptFetch(payload) {
 }
 
 function photoNeedsUpload(photo) {
-  return !!(photo && photo.imageData && photo.imageData !== '__uploaded__' && !getPhotoDriveLink(photo));
+  const imageData = photo && (photo.imageData || photo.dataUrl || '');
+  return !!(imageData && imageData !== '__uploaded__' && !getPhotoDriveLink(photo));
 }
 
 function driveUrlFromId(driveId) {
@@ -160,6 +161,12 @@ function getConfirmedPhotoMap(uploadResult, requestedPhotos) {
     }
   });
   return confirmed;
+}
+
+function normalizePhotoForUpload(photo) {
+  if (!photo) return photo;
+  const imageData = photo.imageData || photo.dataUrl || '';
+  return Object.assign({}, photo, { imageData: imageData });
 }
 
 function getLocalPhotoMap(inspection) {
@@ -471,7 +478,9 @@ export async function sendToGoogleScript(exportData) {
     let confirmedCount = 0;
     const missingPhotos = [];
     for (let start = 0; start < photosToUpload.length; start += PHOTO_UPLOAD_BATCH_SIZE) {
-      const batch = photosToUpload.slice(start, start + PHOTO_UPLOAD_BATCH_SIZE);
+      const batch = photosToUpload
+        .slice(start, start + PHOTO_UPLOAD_BATCH_SIZE)
+        .map(normalizePhotoForUpload);
       const end = start + batch.length;
       updateSyncStatus('syncing', 'photos ' + end + '/' + photosToUpload.length);
       showUploadBanner(

@@ -6,12 +6,13 @@ export function extractAllPhotosFromExport(exportData) {
   const photos = [];
   function pickPhoto(p, fallbackRoomName) {
     // Include already-uploaded photos (they have driveUrl but dataUrl cleared)
-    const hasData = p.imageData && p.imageData !== '__uploaded__';
-    const hasDrive = p.driveUrl;
+    const imageData = p.imageData || p.dataUrl || '';
+    const hasData = imageData && imageData !== '__uploaded__';
+    const hasDrive = p.driveUrl || p.driveId;
     if (!hasData && !hasDrive) return null;
     return {
       photoId: p.photoId || '',
-      imageData: hasData ? p.imageData : '',
+      imageData: hasData ? imageData : '',
       caption: p.caption || '',
       roomName: p.roomName || fallbackRoomName || '',
       stepName: p.stepName || '',
