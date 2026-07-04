@@ -89,6 +89,47 @@ function getKnownDriveFolderId(inspection, exportData) {
     '';
 }
 
+function addUniqueLookupKey(keys, value) {
+  const key = String(value || '').trim();
+  if (key && !keys.includes(key)) keys.push(key);
+}
+
+function getClientLastName(fullName) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
+function getPhotoFolderLookupKeys(inspection, exportData) {
+  const keys = [];
+  addUniqueLookupKey(keys, inspection && inspection._photoFolderLookupId);
+  addUniqueLookupKey(keys, exportData && exportData.inspectionId);
+  addUniqueLookupKey(keys, exportData && exportData.propertyAddress);
+  addUniqueLookupKey(keys, getClientLastName(exportData && exportData.clientName));
+  addUniqueLookupKey(keys, exportData && exportData.clientName);
+  return keys;
+}
+
+function isInspectionFolderNotFoundError(err) {
+  const message = err && err.message ? err.message : String(err || '');
+  return /Inspection folder not found/i.test(message);
+}
+
+async function uploadPhotoBatchWithFolderFallback(basePayload, lookupKeys) {
+  let lastFolderError = null;
+  const keys = lookupKeys.length ? lookupKeys : [basePayload.inspectionId];
+  for (const lookupKey of keys) {
+    try {
+      const payload = Object.assign({}, basePayload, { inspectionId: lookupKey });
+      const result = await scriptFetch(payload);
+      return { result: result, lookupKey: lookupKey };
+    } catch (err) {
+      if (!isInspectionFolderNotFoundError(err)) throw err;
+      lastFolderError = err;
+    }
+  }
+  throw lastFolderError || new Error('Inspection folder not found');
+}
+
 function getKnownDriveFolderUrl(inspection, exportData) {
   return (inspection && (inspection._driveFolderUrl || inspection.driveFolderUrl || inspection.folderUrl)) ||
     (exportData && (exportData.driveFolderUrl || exportData.folderUrl)) ||
@@ -477,6 +518,7 @@ export async function sendToGoogleScript(exportData) {
     showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
     let confirmedCount = 0;
     const missingPhotos = [];
+    let workingPhotoFolderLookupId = inspection && inspection._photoFolderLookupId;
     for (let start = 0; start < photosToUpload.length; start += PHOTO_UPLOAD_BATCH_SIZE) {
       const batch = photosToUpload
         .slice(start, start + PHOTO_UPLOAD_BATCH_SIZE)
@@ -492,6 +534,7 @@ export async function sendToGoogleScript(exportData) {
       const photoPayload = {
         photoUploadOnly: true,
         inspectionId: exportData.inspectionId,
+        sourceInspectionId: exportData.inspectionId,
         clientName: exportData.clientName,
         propertyAddress: exportData.propertyAddress,
         folderId: batchFolderId,
@@ -499,10 +542,23 @@ export async function sendToGoogleScript(exportData) {
         folderUrl: getKnownDriveFolderUrl(inspection, exportData),
         photos: batch
       };
+      const folderLookupKeys = getPhotoFolderLookupKeys(inspection, exportData);
+      if (workingPhotoFolderLookupId) {
+        folderLookupKeys.sort(function(a, b) {
+          if (a === workingPhotoFolderLookupId) return -1;
+          if (b === workingPhotoFolderLookupId) return 1;
+          return 0;
+        });
+      }
 
       let photoResult;
       try {
-        photoResult = await scriptFetch(photoPayload);
+        const uploadResult = await uploadPhotoBatchWithFolderFallback(photoPayload, folderLookupKeys);
+        photoResult = uploadResult.result;
+        workingPhotoFolderLookupId = uploadResult.lookupKey;
+        if (inspection && workingPhotoFolderLookupId && workingPhotoFolderLookupId !== exportData.inspectionId) {
+          inspection._photoFolderLookupId = workingPhotoFolderLookupId;
+        }
       } catch (err) {
         const remaining = photosToUpload.slice(start);
         queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
