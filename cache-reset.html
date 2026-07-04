@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2D3B24">
+  <title>InHaus Cache Reset</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --green: #22351d;
+      --cream: #fff4c8;
+      --line: #d9e3d4;
+      --muted: #64705f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #f7f7f2;
+      color: var(--green);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(100%, 520px);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(24, 39, 20, 0.12);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+    p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.45;
+    }
+    .status {
+      margin: 18px 0;
+      padding: 14px;
+      border-radius: 8px;
+      background: var(--cream);
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 8px;
+      background: var(--green);
+      color: #fff;
+      padding: 16px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    small {
+      display: block;
+      margin-top: 14px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Refreshing InHaus</h1>
+    <p>This clears only the app shell cache and service worker. It does not clear IndexedDB, photos, inspections, or Safari data.</p>
+    <div class="status" id="status">Starting cache reset...</div>
+    <button id="openLatest" type="button">Open Latest App</button>
+    <small>If it does not move automatically, tap the button once.</small>
+  </main>
+  <script>
+    (function() {
+      var LATEST_VERSION = '145';
+      var statusEl = document.getElementById('status');
+      var openButton = document.getElementById('openLatest');
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function latestUrl() {
+        var url = new URL('index.html', window.location.href);
+        url.searchParams.set('v', LATEST_VERSION);
+        url.searchParams.set('fresh', String(Date.now()));
+        return url.toString();
+      }
+
+      async function resetAppShell() {
+        setStatus('Keeping photos safe. Removing old app cache...');
+
+        if ('serviceWorker' in navigator) {
+          var registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(function(reg) {
+            return reg.unregister();
+          }));
+        }
+
+        if ('caches' in window) {
+          var names = await caches.keys();
+          await Promise.all(names.map(function(name) {
+            if (name.indexOf('inhaus') === 0 || name.indexOf('InHaus') === 0) {
+              return caches.delete(name);
+            }
+            return Promise.resolve(false);
+          }));
+        }
+
+        try {
+          localStorage.setItem('inhausCacheResetAt', new Date().toISOString());
+        } catch (err) {}
+
+        setStatus('Cache reset complete. Opening v145...');
+        setTimeout(function() {
+          window.location.replace(latestUrl());
+        }, 700);
+      }
+
+      openButton.addEventListener('click', function() {
+        window.location.href = latestUrl();
+      });
+
+      resetAppShell().catch(function(err) {
+        console.warn('Cache reset failed:', err);
+        setStatus('Could not reset automatically. Tap Open Latest App.');
+      });
+    })();
+  </script>
+</body>
+</html>

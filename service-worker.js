@@ -1,4 +1,4 @@
-// InHaus Inspector Service Worker v144
+// InHaus Inspector Service Worker v145
 // Safe iOS Safari implementation - June 28 2026
 //
 // Rules:
@@ -9,22 +9,23 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v144';
+const CACHE_NAME = 'inhaus-v145';
 
 const APP_SHELL = [
   './',
   './index.html',
-  './app.js?v=144',
-  './screens.js?v=144',
-  './sync.js?v=144',
-  './ui.js?v=144',
-  './steps.js?v=144',
-  './config.js?v=144',
-  './storage.js?v=144',
-  './fields.js?v=144',
-  './inspection.js?v=144',
-  './db.js?v=144',
-  './state.js?v=144',
+  './cache-reset.html',
+  './app.js?v=145',
+  './screens.js?v=145',
+  './sync.js?v=145',
+  './ui.js?v=145',
+  './steps.js?v=145',
+  './config.js?v=145',
+  './storage.js?v=145',
+  './fields.js?v=145',
+  './inspection.js?v=145',
+  './db.js?v=145',
+  './state.js?v=145',
   './styles.css',
   './manifest.json',
 ];
@@ -81,6 +82,25 @@ self.addEventListener('fetch', event => {
     url.pathname === '/readiness' ||
     url.pathname.startsWith('/readiness/');
   if (url.origin === self.location.origin && bypassStandaloneRoute) return;
+
+  if (
+    url.pathname.endsWith('/cache-reset.html') ||
+    url.pathname.endsWith('/index.html') ||
+    request.mode === 'navigate' ||
+    request.destination === 'document'
+  ) {
+    event.respondWith(
+      fetch(new Request(request, { cache: 'no-store' }))
+        .then(response => {
+          if (!response || response.status !== 200 || response.type !== 'basic') return response;
+          const toCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
+          return response;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
 
   // Cache-first for everything else (app shell)
   event.respondWith(
