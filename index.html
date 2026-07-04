@@ -18,7 +18,7 @@
     // Service worker registration - safe iOS Safari pattern
     // NO skipWaiting (causes Safari freeze), YES clients.claim in activate
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js', {
+      navigator.serviceWorker.register('./service-worker.js', {
         updateViaCache: 'none' // bypass GitHub Pages caching of sw.js
       }).then(reg => {
         reg.addEventListener('updatefound', () => {
@@ -38,10 +38,10 @@
       });
     }
   </script>
-  <script src="db.js"></script>
-  <script src="ui.js"></script>
-  <script type="module" src="app.js"></script>
-  <div style="position:fixed;top:8px;right:10px;background:#6b7280;color:#fff;font-size:10px;padding:2px 7px;border-radius:999px;z-index:9999;pointer-events:none;opacity:0.6;"id="version-badge">v140</div>
+  <script src="db.js?v=141"></script>
+  <script src="ui.js?v=141"></script>
+  <script type="module" src="app.js?v=141"></script>
+  <div style="position:fixed;top:8px;right:10px;background:#6b7280;color:#fff;font-size:10px;padding:2px 7px;border-radius:999px;z-index:9999;pointer-events:none;opacity:0.6;"id="version-badge">v141</div>
 </body>
 </html>
 <!-- Mon Jun 29 17:24:47 MDT 2026 -->

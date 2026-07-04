@@ -1,11 +1,11 @@
 // InHaus Inspector - Screen Rendering
-import { VISION_PROXY_URL } from './config.js';
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js';
-import { saveNow, scheduleSave } from './storage.js';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js';
-import { checkpointToCloud, submitInspection } from './sync.js';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js';
-import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js';
+import { VISION_PROXY_URL } from './config.js?v=141';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=141';
+import { saveNow, scheduleSave } from './storage.js?v=141';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=141';
+import { checkpointToCloud, submitInspection } from './sync.js?v=141';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=141';
+import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=141';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }

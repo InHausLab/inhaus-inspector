@@ -1,12 +1,12 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=141';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js';
-import { scheduleSave } from './storage.js';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js';
+         getBestCloudSyncAt } from './state.js?v=141';
+import { scheduleSave } from './storage.js?v=141';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=141';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -391,6 +391,7 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
   const payload = {
     photoUploadOnly: true,
     inspectionId: inspectionId,
+    sourceInspectionId: inspectionId,
     clientName: clientName || '',
     propertyAddress: propertyAddress || '',
     folderId: knownFolderId,
@@ -407,7 +408,18 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
   };
 
   async function doUpload() {
-    return scriptFetch(payload);
+    const uploadResult = await uploadPhotoBatchWithFolderFallback(
+      payload,
+      getPhotoFolderLookupKeys(inspection, {
+        inspectionId: inspectionId,
+        clientName: clientName || '',
+        propertyAddress: propertyAddress || ''
+      })
+    );
+    if (inspection && uploadResult.lookupKey && uploadResult.lookupKey !== inspectionId) {
+      inspection._photoFolderLookupId = uploadResult.lookupKey;
+    }
+    return uploadResult.result;
   }
 
   try {
