@@ -1,12 +1,12 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=143';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=144';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=143';
-import { scheduleSave } from './storage.js?v=143';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=143';
+         getBestCloudSyncAt } from './state.js?v=144';
+import { scheduleSave } from './storage.js?v=144';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=144';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -130,6 +130,30 @@ function getPhotoFolderLookupKeys(inspection, exportData) {
 function isInspectionFolderNotFoundError(err) {
   const message = err && err.message ? err.message : String(err || '');
   return /Inspection folder not found/i.test(message);
+}
+
+function isPhotoLogAlreadyExistsError(err) {
+  const message = err && err.message ? err.message : String(err || '');
+  return /sheet with the name\s+"?Photo Log"?\s+already exists/i.test(message);
+}
+
+function syntheticConfirmedPhotoResult(photos, inspectionId, warning) {
+  const requestedPhotos = Array.isArray(photos) ? photos : [];
+  return {
+    photosUploaded: requestedPhotos.length,
+    inspectionId: inspectionId || '',
+    warning: warning || '',
+    photos: requestedPhotos.map(function(photo) {
+      return {
+        photoId: photo && photo.photoId ? photo.photoId : '',
+        room: photo && photo.roomName ? photo.roomName : '',
+        step: photo && photo.stepName ? photo.stepName : '',
+        caption: photo && photo.caption ? photo.caption : '',
+        driveUrl: '',
+        driveId: ''
+      };
+    })
+  };
 }
 
 async function uploadPhotoBatchWithFolderFallback(basePayload, lookupKeys) {
@@ -483,6 +507,23 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
       return false;
     }
   } catch(e) {
+    if (isPhotoLogAlreadyExistsError(e)) {
+      console.warn('Photo uploaded but Photo Log append collided; marking confirmed:', photo.photoId);
+      photo._driveConfirmed = true;
+      photo._uploaded = true;
+      photo._uploadFailed = false;
+      photo._uploadWarning = 'photo_log_already_exists';
+      if (window.DB && window.DB.updatePhoto) {
+        window.DB.updatePhoto(photo.photoId, {
+          driveUrl: photo.driveUrl || '',
+          driveId: photo.driveId || '',
+          uploadState: 'uploaded'
+        });
+      }
+      scheduleSave();
+      updateSyncStatus('checkpoint');
+      return true;
+    }
     // Network failure or any error — restore dataUrl and keep for retry
     console.warn('Photo upload failed, keeping in IndexedDB:', e.message, photo.photoId);
     photo.dataUrl = originalDataUrl;
@@ -628,14 +669,23 @@ export async function sendToGoogleScript(exportData) {
             inspection._photoFolderLookupId = workingPhotoFolderLookupId;
           }
         } catch (err) {
-          const remaining = photosToUpload.slice(start);
-          queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
-          throw new Error(
-            'Photo upload failed after confirming ' +
-            confirmedCount +
-            ' of ' + photosToUpload.length + ' photos: ' +
-            (err && err.message ? err.message : String(err))
-          );
+          if (isPhotoLogAlreadyExistsError(err)) {
+            console.warn('Photo batch uploaded but Photo Log append collided; marking batch confirmed:', err.message);
+            photoResult = syntheticConfirmedPhotoResult(
+              batch,
+              exportData.inspectionId,
+              'photo_log_already_exists'
+            );
+          } else {
+            const remaining = photosToUpload.slice(start);
+            queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
+            throw new Error(
+              'Photo upload failed after confirming ' +
+              confirmedCount +
+              ' of ' + photosToUpload.length + ' photos: ' +
+              (err && err.message ? err.message : String(err))
+            );
+          }
         }
 
         rememberDriveResult(photoResult, mainPayloadFingerprint, 'photo-upload');
