@@ -1259,16 +1259,8 @@
           photos.push(newPhoto);
           onUpdate();
           section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions));
-          // ⚡ Save to device camera roll immediately (user taps "Save Image" on share sheet)
-          await saveToDevicePhotos(dataUrl, newPhoto.photoId);
-          // ⚡ Upload immediately to Drive
-          if (window.uploadPhotoImmediate && window.inspection && window.inspection.inspectionId) {
-            window.uploadPhotoImmediate(
-              newPhoto,
-              window.inspection.inspectionId,
-              window.inspection.clientName || '',
-              window.inspection.propertyAddress || ''
-            );
+          if (window.queuePhotoForBackgroundUpload) {
+            window.queuePhotoForBackgroundUpload(newPhoto);
           }
         } catch (err) { console.error('Photo error:', err); }
       }

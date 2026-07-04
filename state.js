@@ -21,6 +21,7 @@ function loadSyncTimestampsFromInspection(inspection) {
 export function getInspection() { return _inspection; }
 export function setInspection(v) {
   _inspection = v;
+  if (typeof window !== 'undefined') window.inspection = v;
   loadSyncTimestampsFromInspection(v);
 }
 

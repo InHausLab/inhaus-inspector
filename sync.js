@@ -1,17 +1,22 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=141';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=142';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=141';
-import { scheduleSave } from './storage.js?v=141';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=141';
+         getBestCloudSyncAt } from './state.js?v=142';
+import { scheduleSave } from './storage.js?v=142';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=142';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
 let _workingSyncSecret = null;
 const PHOTO_UPLOAD_BATCH_SIZE = 3;
+const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
+let _photoRetryTimer = null;
+let _photoRetryDueAt = 0;
+let _photoRetryInProgress = false;
+let _bulkPhotoUploadInProgress = false;
 
 function getSyncSecretsToTry() {
   const secrets = [];
@@ -476,26 +481,57 @@ export function addToPhotoRetryQueue(photo) {
   const already = inspection._photoRetryQueue.find(function(p) { return p.photoId === photo.photoId; });
   if (!already) inspection._photoRetryQueue.push(photo);
   scheduleSave();
+  schedulePhotoRetry(60000);
 }
 
-export async function retryFailedPhotos() {
+export function queuePhotoForBackgroundUpload(photo) {
+  addToPhotoRetryQueue(photo);
+  schedulePhotoRetry(1000);
+}
+
+export function schedulePhotoRetry(delayMs) {
+  const dueAt = Date.now() + Math.max(0, delayMs || 0);
+  if (_photoRetryTimer && _photoRetryDueAt <= dueAt) return;
+  if (_photoRetryTimer) clearTimeout(_photoRetryTimer);
+  _photoRetryDueAt = dueAt;
+  _photoRetryTimer = setTimeout(function() {
+    _photoRetryTimer = null;
+    _photoRetryDueAt = 0;
+    retryFailedPhotos({ limit: PHOTO_BACKGROUND_RETRY_LIMIT, quiet: true });
+  }, Math.max(0, dueAt - Date.now()));
+}
+
+export async function retryFailedPhotos(options) {
+  const opts = options || {};
   const inspection = getInspection();
   if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+  if (_photoRetryInProgress || _bulkPhotoUploadInProgress) return;
   const queue = (inspection._photoRetryQueue || []).filter(function(p) { return p.dataUrl && p.dataUrl !== '__uploaded__'; });
   if (!queue.length) return;
 
-  updateSyncStatus('syncing');
+  _photoRetryInProgress = true;
+  const limit = Number.isFinite(opts.limit) ? opts.limit : queue.length;
+  const batch = queue.slice(0, Math.max(1, limit));
+  if (!opts.quiet) updateSyncStatus('syncing');
   let confirmed = 0;
-  for (const photo of queue) {
-    try {
-      await uploadPhotoImmediate(photo, inspection.inspectionId, inspection.clientName, inspection.propertyAddress);
-      if (photo._driveConfirmed) {
-        inspection._photoRetryQueue = (inspection._photoRetryQueue || []).filter(function(p) { return p.photoId !== photo.photoId; });
-        confirmed++;
-      }
-    } catch(e) { /* keep in queue */ }
+  try {
+    for (const photo of batch) {
+      try {
+        await uploadPhotoImmediate(photo, inspection.inspectionId, inspection.clientName, inspection.propertyAddress);
+        if (photo._driveConfirmed) {
+          inspection._photoRetryQueue = (inspection._photoRetryQueue || []).filter(function(p) { return p.photoId !== photo.photoId; });
+          confirmed++;
+        }
+      } catch(e) { /* keep in queue */ }
+    }
+  } finally {
+    _photoRetryInProgress = false;
   }
-  if (confirmed > 0) scheduleSave();
+  if (confirmed > 0) {
+    scheduleSave();
+    updateSyncStatus('checkpoint', 'photos +' + confirmed);
+  }
+  if ((inspection._photoRetryQueue || []).length > 0) schedulePhotoRetry(60000);
 }
 
 // NOTE: Photos are uploaded to Drive as private files.
@@ -531,74 +567,79 @@ export async function sendToGoogleScript(exportData) {
     let confirmedCount = 0;
     const missingPhotos = [];
     let workingPhotoFolderLookupId = inspection && inspection._photoFolderLookupId;
-    for (let start = 0; start < photosToUpload.length; start += PHOTO_UPLOAD_BATCH_SIZE) {
-      const batch = photosToUpload
-        .slice(start, start + PHOTO_UPLOAD_BATCH_SIZE)
-        .map(normalizePhotoForUpload);
-      const end = start + batch.length;
-      updateSyncStatus('syncing', 'photos ' + end + '/' + photosToUpload.length);
-      showUploadBanner(
-        'pending',
-        'Uploading photos ' + (start + 1) + '-' + end + ' of ' + photosToUpload.length + '\u2026'
-      );
-
-      const batchFolderId = getKnownDriveFolderId(inspection, exportData);
-      const photoPayload = {
-        photoUploadOnly: true,
-        inspectionId: exportData.inspectionId,
-        sourceInspectionId: exportData.inspectionId,
-        clientName: exportData.clientName,
-        propertyAddress: exportData.propertyAddress,
-        folderId: batchFolderId,
-        driveFolderId: batchFolderId,
-        folderUrl: getKnownDriveFolderUrl(inspection, exportData),
-        photos: batch
-      };
-      const folderLookupKeys = getPhotoFolderLookupKeys(inspection, exportData);
-      if (workingPhotoFolderLookupId) {
-        folderLookupKeys.sort(function(a, b) {
-          if (a === workingPhotoFolderLookupId) return -1;
-          if (b === workingPhotoFolderLookupId) return 1;
-          return 0;
-        });
-      }
-
-      let photoResult;
-      try {
-        const uploadResult = await uploadPhotoBatchWithFolderFallback(photoPayload, folderLookupKeys);
-        photoResult = uploadResult.result;
-        workingPhotoFolderLookupId = uploadResult.lookupKey;
-        if (inspection && workingPhotoFolderLookupId && workingPhotoFolderLookupId !== exportData.inspectionId) {
-          inspection._photoFolderLookupId = workingPhotoFolderLookupId;
-        }
-      } catch (err) {
-        const remaining = photosToUpload.slice(start);
-        queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
-        throw new Error(
-          'Photo upload failed after confirming ' +
-          confirmedCount +
-          ' of ' + photosToUpload.length + ' photos: ' +
-          (err && err.message ? err.message : String(err))
+    _bulkPhotoUploadInProgress = true;
+    try {
+      for (let start = 0; start < photosToUpload.length; start += PHOTO_UPLOAD_BATCH_SIZE) {
+        const batch = photosToUpload
+          .slice(start, start + PHOTO_UPLOAD_BATCH_SIZE)
+          .map(normalizePhotoForUpload);
+        const end = start + batch.length;
+        updateSyncStatus('syncing', 'photos ' + end + '/' + photosToUpload.length);
+        showUploadBanner(
+          'pending',
+          'Uploading photos ' + (start + 1) + '-' + end + ' of ' + photosToUpload.length + '\u2026'
         );
-      }
 
-      rememberDriveResult(photoResult, mainPayloadFingerprint, 'photo-upload');
-      const confirmedPhotos = getConfirmedPhotoMap(photoResult, batch);
-      if (confirmedPhotos.size > 0 && inspection) {
-        markConfirmedLocalPhotos(inspection, confirmedPhotos);
-        confirmedCount += confirmedPhotos.size;
-        scheduleSave();
-      }
+        const batchFolderId = getKnownDriveFolderId(inspection, exportData);
+        const photoPayload = {
+          photoUploadOnly: true,
+          inspectionId: exportData.inspectionId,
+          sourceInspectionId: exportData.inspectionId,
+          clientName: exportData.clientName,
+          propertyAddress: exportData.propertyAddress,
+          folderId: batchFolderId,
+          driveFolderId: batchFolderId,
+          folderUrl: getKnownDriveFolderUrl(inspection, exportData),
+          photos: batch
+        };
+        const folderLookupKeys = getPhotoFolderLookupKeys(inspection, exportData);
+        if (workingPhotoFolderLookupId) {
+          folderLookupKeys.sort(function(a, b) {
+            if (a === workingPhotoFolderLookupId) return -1;
+            if (b === workingPhotoFolderLookupId) return 1;
+            return 0;
+          });
+        }
 
-      const batchMissing = batch.filter(function(photo) {
-        return !photo.photoId || !confirmedPhotos.has(photo.photoId);
-      });
-      if (batchMissing.length > 0) {
-        queueUnconfirmedLocalPhotos(inspection, batchMissing, 'not_confirmed_in_drive');
-        missingPhotos.push.apply(missingPhotos, batchMissing);
-      }
+        let photoResult;
+        try {
+          const uploadResult = await uploadPhotoBatchWithFolderFallback(photoPayload, folderLookupKeys);
+          photoResult = uploadResult.result;
+          workingPhotoFolderLookupId = uploadResult.lookupKey;
+          if (inspection && workingPhotoFolderLookupId && workingPhotoFolderLookupId !== exportData.inspectionId) {
+            inspection._photoFolderLookupId = workingPhotoFolderLookupId;
+          }
+        } catch (err) {
+          const remaining = photosToUpload.slice(start);
+          queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
+          throw new Error(
+            'Photo upload failed after confirming ' +
+            confirmedCount +
+            ' of ' + photosToUpload.length + ' photos: ' +
+            (err && err.message ? err.message : String(err))
+          );
+        }
 
-      await new Promise(function(resolve) { setTimeout(resolve, 150); });
+        rememberDriveResult(photoResult, mainPayloadFingerprint, 'photo-upload');
+        const confirmedPhotos = getConfirmedPhotoMap(photoResult, batch);
+        if (confirmedPhotos.size > 0 && inspection) {
+          markConfirmedLocalPhotos(inspection, confirmedPhotos);
+          confirmedCount += confirmedPhotos.size;
+          scheduleSave();
+        }
+
+        const batchMissing = batch.filter(function(photo) {
+          return !photo.photoId || !confirmedPhotos.has(photo.photoId);
+        });
+        if (batchMissing.length > 0) {
+          queueUnconfirmedLocalPhotos(inspection, batchMissing, 'not_confirmed_in_drive');
+          missingPhotos.push.apply(missingPhotos, batchMissing);
+        }
+
+        await new Promise(function(resolve) { setTimeout(resolve, 150); });
+      }
+    } finally {
+      _bulkPhotoUploadInProgress = false;
     }
 
     if (missingPhotos.length > 0) {
@@ -632,11 +673,14 @@ export async function checkpointToCloud(stepList) {
     const payload = stripPhotosFromExport(exportData);
     payload._checkpoint = true;
     updateSyncStatus('syncing'); // Change 2
-    await scriptFetch(payload);
+    const result = await scriptFetch(payload);
+    rememberDriveResult(result, payloadFingerprint(payload), 'checkpoint');
     setLastCheckpointSucceededAt(Date.now()); // Change 1
     scheduleSave();
     _checkpointFailCount = 0; // reset on success
     updateSyncStatus('checkpoint'); // Change 2
+    schedulePhotoRetry(1000);
+    return true;
   } catch (e) {
     console.log('Checkpoint sync skipped:', e);
     _checkpointFailCount++;
@@ -652,6 +696,7 @@ export async function checkpointToCloud(stepList) {
         'Keep this app open and on screen. Do not force-close your browser.\n\nTap OK to retry.';
       if (confirm(msg)) { checkpointToCloud(stepList); }
     }
+    return false;
   }
 }
 
