@@ -1,12 +1,12 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=142';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=143';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=142';
-import { scheduleSave } from './storage.js?v=142';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=142';
+         getBestCloudSyncAt } from './state.js?v=143';
+import { scheduleSave } from './storage.js?v=143';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=143';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -57,8 +57,10 @@ export async function scriptFetch(payload) {
 }
 
 function photoNeedsUpload(photo) {
-  const imageData = photo && (photo.imageData || photo.dataUrl || '');
-  return !!(imageData && imageData !== '__uploaded__' && !getPhotoDriveLink(photo));
+  if (!photo) return false;
+  if (photo._driveConfirmed === true || photo._uploaded === true || getPhotoDriveLink(photo)) return false;
+  const imageData = photo.imageData || photo.dataUrl || '';
+  return !!(imageData && imageData !== '__uploaded__');
 }
 
 function driveUrlFromId(driveId) {
@@ -68,6 +70,17 @@ function driveUrlFromId(driveId) {
 function getPhotoDriveLink(photo) {
   if (!photo) return '';
   return photo.driveUrl || driveUrlFromId(photo.driveId);
+}
+
+function getUploadedCount(uploadResult) {
+  const raw = uploadResult && (
+    uploadResult.photosUploaded ||
+    uploadResult.uploaded ||
+    uploadResult.uploadedCount ||
+    uploadResult.count
+  );
+  const count = Number(raw);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 }
 
 function driveFolderUrlFromId(folderId) {
@@ -206,6 +219,18 @@ function getConfirmedPhotoMap(uploadResult, requestedPhotos) {
       });
     }
   });
+  const uploadedCount = Math.min(getUploadedCount(uploadResult), (requestedPhotos || []).length);
+  for (let idx = 0; idx < uploadedCount; idx++) {
+    const returnedPhoto = returnedPhotos[idx] || {};
+    const requestedPhoto = requestedPhotos && requestedPhotos[idx];
+    const photoId = (returnedPhoto && returnedPhoto.photoId) || (requestedPhoto && requestedPhoto.photoId);
+    if (photoId && !confirmed.has(photoId)) {
+      confirmed.set(photoId, {
+        driveUrl: getPhotoDriveLink(returnedPhoto) || '',
+        driveId: (returnedPhoto && returnedPhoto.driveId) || ''
+      });
+    }
+  }
   return confirmed;
 }
 
@@ -255,8 +280,8 @@ function markConfirmedLocalPhotos(inspection, confirmedPhotos) {
   visitLocalInspectionPhotos(inspection, function(photo) {
     if (!photo || !photo.photoId || !confirmedPhotos.has(photo.photoId)) return;
     const confirmed = confirmedPhotos.get(photo.photoId);
-    photo.driveUrl = confirmed.driveUrl;
-    photo.driveId = confirmed.driveId;
+    if (confirmed.driveUrl) photo.driveUrl = confirmed.driveUrl;
+    if (confirmed.driveId) photo.driveId = confirmed.driveId;
     photo._driveConfirmed = true;
     photo._uploaded = true;
     // Keep the local image copy. Workspace Drive sharing can be restricted even
@@ -265,8 +290,8 @@ function markConfirmedLocalPhotos(inspection, confirmedPhotos) {
     photo._uploadWarning = '';
     if (window.DB && window.DB.updatePhoto) {
       window.DB.updatePhoto(photo.photoId, {
-        driveUrl: confirmed.driveUrl,
-        driveId: confirmed.driveId,
+        driveUrl: photo.driveUrl || '',
+        driveId: photo.driveId || '',
         uploadState: 'uploaded'
       });
     }
@@ -432,31 +457,24 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
     rememberDriveResult(result, inspection && inspection._lastMainPayloadFingerprint, 'photo-upload');
     const returnedPhoto = result && result.photos && result.photos[0];
     const confirmedDriveUrl = getPhotoDriveLink(returnedPhoto);
+    const uploadedCount = getUploadedCount(result);
 
-    if (result && result.photosUploaded > 0 && confirmedDriveUrl) {
+    if (uploadedCount > 0) {
       // Drive confirmed receipt. Keep the local copy in case Drive sharing is restricted.
-      photo.driveUrl = confirmedDriveUrl;
-      photo.driveId  = returnedPhoto.driveId || '';
+      if (confirmedDriveUrl) photo.driveUrl = confirmedDriveUrl;
+      if (returnedPhoto && returnedPhoto.driveId) photo.driveId = returnedPhoto.driveId;
       photo._driveConfirmed = true;
       photo._uploaded = true;
       if (window.DB && window.DB.updatePhoto) {
         window.DB.updatePhoto(photo.photoId, {
-          driveUrl: photo.driveUrl,
-          driveId: photo.driveId,
+          driveUrl: photo.driveUrl || '',
+          driveId: photo.driveId || '',
           uploadState: 'uploaded'
         });
       }
       scheduleSave();
       updateSyncStatus('checkpoint');
       return true;
-    } else if (result && result.photosUploaded > 0 && !confirmedDriveUrl) {
-      // Drive uploaded but didn't return a URL — keep dataUrl, mark for investigation
-      // Photo is safe on device until we can confirm it's retrievable
-      console.warn('Photo uploaded but no driveUrl returned — retaining local copy', photo.photoId);
-      photo._uploadFailed = true;
-      photo._uploadWarning = 'no_drive_url';
-      addToPhotoRetryQueue(photo);
-      return false;
     } else {
       // Drive returned OK but 0 photos — keep for retry
       console.warn('Photo upload returned 0 — keeping in IndexedDB for retry', photo.photoId);
@@ -506,7 +524,7 @@ export async function retryFailedPhotos(options) {
   const inspection = getInspection();
   if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
   if (_photoRetryInProgress || _bulkPhotoUploadInProgress) return;
-  const queue = (inspection._photoRetryQueue || []).filter(function(p) { return p.dataUrl && p.dataUrl !== '__uploaded__'; });
+  const queue = (inspection._photoRetryQueue || []).filter(photoNeedsUpload);
   if (!queue.length) return;
 
   _photoRetryInProgress = true;
