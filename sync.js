@@ -1,5 +1,6 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET } from './config.js?v=145';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=145';
+import { uploadPhotoToSupabase } from './supabase-photos.js?v=147';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
@@ -442,6 +443,12 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
     if (!originalDataUrl || originalDataUrl === '__uploaded__') return !!(photo.driveUrl || photo.driveId);
   }
 
+  // Phase 2: route photos straight to Supabase Storage as binary, bypassing the
+  // base64 → Apps Script → Drive path entirely. Flag-gated; off by default.
+  if (USE_SUPABASE_PHOTOS) {
+    return await storePhotoInSupabase(photo, inspectionId, originalDataUrl);
+  }
+
   const payload = {
     photoUploadOnly: true,
     inspectionId: inspectionId,
@@ -533,6 +540,39 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
   }
 }
 
+// Phase 2 photo path: upload one photo to Supabase and update local state to
+// match the existing UI's expectations. Sets _driveConfirmed so the current
+// final-submit/receipt UI counts it as "safe" without touching screens.js yet.
+async function storePhotoInSupabase(photo, inspectionId, originalDataUrl) {
+  try {
+    const { storagePath } = await uploadPhotoToSupabase({
+      photoId: photo.photoId,
+      inspectionId: inspectionId,
+      dataUrl: originalDataUrl,
+      roomName: photo.roomName || '',
+      stepName: photo.stepName || '',
+      caption: photo.caption || ''
+    });
+    photo.storagePath = storagePath;
+    photo._storedConfirmed = true;
+    photo._driveConfirmed = true; // bridge: existing UI treats this as "confirmed/safe"
+    photo._uploaded = true;
+    photo._uploadFailed = false;
+    if (window.DB && window.DB.updatePhoto) {
+      window.DB.updatePhoto(photo.photoId, { storagePath: storagePath, uploadState: 'stored' });
+    }
+    scheduleSave();
+    updateSyncStatus('checkpoint');
+    return true;
+  } catch (e) {
+    console.warn('Supabase photo upload failed, keeping local for retry:', e && e.message, photo.photoId);
+    photo.dataUrl = originalDataUrl;
+    photo._uploadFailed = true;
+    addToPhotoRetryQueue(photo);
+    return false;
+  }
+}
+
 export function addToPhotoRetryQueue(photo) {
   const inspection = getInspection();
   if (!inspection) return;
@@ -593,6 +633,36 @@ export async function retryFailedPhotos(options) {
   if ((inspection._photoRetryQueue || []).length > 0) schedulePhotoRetry(60000);
 }
 
+// Phase 2 final-submit path: ensure every photo is stored in Supabase (upload any
+// not yet confirmed). Replaces the Apps Script batch/folder-lookup loop. Final
+// submit becomes a receipt — photos mostly upload on capture; this flushes the rest.
+async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
+  const localMap = getLocalPhotoMap(inspection);
+  showUploadBanner('pending', 'Saving ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '…');
+  let confirmed = 0;
+  const failed = [];
+  for (let i = 0; i < photosToUpload.length; i++) {
+    const exported = photosToUpload[i];
+    // Upload the live inspection photo object (so its confirmed flags + vault persist).
+    const photo = (exported && exported.photoId && localMap.get(exported.photoId)) || exported;
+    updateSyncStatus('syncing', 'photos ' + (i + 1) + '/' + photosToUpload.length);
+    showUploadBanner('pending', 'Saving photo ' + (i + 1) + ' of ' + photosToUpload.length + '…');
+    let ok = false;
+    try {
+      ok = await uploadPhotoImmediate(photo, exportData.inspectionId, exportData.clientName, exportData.propertyAddress);
+    } catch (e) {
+      ok = false;
+    }
+    if (ok) confirmed++; else failed.push(exported);
+  }
+  if (inspection) scheduleSave();
+  if (failed.length > 0) {
+    queueUnconfirmedLocalPhotos(inspection, failed, 'supabase_upload_failed');
+    throw new Error('Photo upload incomplete: saved ' + confirmed + ' of ' + photosToUpload.length + ' photos to Supabase');
+  }
+  showUploadBanner('success', 'All ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + ' saved');
+}
+
 // NOTE: Photos are uploaded to Drive as private files.
 // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
 // for the review portal to display them. This is a known workaround - see issue tracker.
@@ -604,7 +674,7 @@ export async function sendToGoogleScript(exportData) {
   const allPhotos = extractAllPhotosFromExport(exportData);
   const photosToUpload = allPhotos.filter(photoNeedsUpload);
 
-  if (photosToUpload.length > 0) {
+  if (photosToUpload.length > 0 && !USE_SUPABASE_PHOTOS) {
     await recoverDriveMetadataFromReviewApi(exportData.inspectionId, mainPayloadFingerprint);
   }
 
@@ -621,7 +691,9 @@ export async function sendToGoogleScript(exportData) {
     rememberDriveResult(mainResult, mainPayloadFingerprint, 'main-sync');
   }
 
-  if (photosToUpload.length > 0) {
+  if (photosToUpload.length > 0 && USE_SUPABASE_PHOTOS) {
+    await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
+  } else if (photosToUpload.length > 0) {
     showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
     let confirmedCount = 0;
     const missingPhotos = [];
