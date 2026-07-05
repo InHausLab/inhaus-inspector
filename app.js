@@ -152,6 +152,14 @@ import { initScreens, render } from './screens.js?v=145';
     return { recovered, vaulted };
   }
 
+  // A photo is "safely uploaded" if it's confirmed in Supabase (storagePath /
+  // _driveConfirmed / vault uploadState) OR in Google Drive (driveUrl/driveId).
+  function photoIsUploaded(p, vaulted) {
+    return !!(p && (p._driveConfirmed === true || p._uploaded === true || p.driveUrl || p.driveId || p.storagePath)) ||
+           !!(vaulted && (vaulted.driveUrl || vaulted.driveId || vaulted.storagePath ||
+              vaulted.uploadState === 'stored' || vaulted.uploadState === 'uploaded'));
+  }
+
   async function getPhotoHealth() {
     const insp = inspection || getInspection();
     if (!insp) return { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
@@ -168,7 +176,7 @@ import { initScreens, render } from './screens.js?v=145';
       result.total++;
       const vaultedPhoto = vaultMap.get(photo.photoId);
       const hasLocal = !!((photo.dataUrl && photo.dataUrl !== '__uploaded__') || (vaultedPhoto && vaultedPhoto.dataUrl));
-      const hasDrive = !!(photo.driveUrl || photo.driveId || (vaultedPhoto && (vaultedPhoto.driveUrl || vaultedPhoto.driveId)));
+      const hasDrive = photoIsUploaded(photo, vaultedPhoto);
       if (hasLocal) result.local++;
       if (hasDrive) result.drive++;
       if (!hasDrive && hasLocal) result.pending++;
@@ -326,8 +334,8 @@ import { initScreens, render } from './screens.js?v=145';
         '<strong>Time:</strong> ' + r.timestamp + '<br>' +
         '<strong>Rooms:</strong> ' + r.roomCount + '<br>' +
         '<strong>Photos total:</strong> ' + r.photosExpected + '<br>' +
-        '<strong>Photos confirmed in Drive:</strong> ' + r.photosUploaded + '<br>' +
-        (r.photosUnconfirmed > 0 ? '<span style="color:#ff6b6b;">\u26a0\ufe0f ' + r.photosUnconfirmed + ' photo' + (r.photosUnconfirmed === 1 ? '' : 's') + ' not confirmed in Drive \u2014 tap Retry</span><br>' : '') +
+        '<strong>Photos confirmed in cloud:</strong> ' + r.photosUploaded + '<br>' +
+        (r.photosUnconfirmed > 0 ? '<span style="color:#ff6b6b;">\u26a0\ufe0f ' + r.photosUnconfirmed + ' photo' + (r.photosUnconfirmed === 1 ? '' : 's') + ' not confirmed \u2014 tap Retry</span><br>' : '') +
         (r.errorMessage ? '<strong>Error:</strong> ' + escapeHtml(r.errorMessage) + '<br>' : '') +
         '<strong>Drive folder:</strong> ' + r.driveFolderId + '<br>' +
         '<strong>App version:</strong> ' + r.appVersion +
@@ -436,7 +444,7 @@ import { initScreens, render } from './screens.js?v=145';
     const pending = []; // have dataUrl but not yet uploaded
     visitInspectionPhotos(insp, function(p, context) {
       if (!p || !p.photoId) return;
-      const hasDrive = p.driveUrl && p.driveUrl.length > 0;
+      const hasDrive = photoIsUploaded(p);
       const hasLocal = p.dataUrl && p.dataUrl !== '__uploaded__';
       if (!hasDrive && !hasLocal) {
         lost.push({ photoId: p.photoId, context, caption: p.caption || '', roomName: p.roomName || '' });
@@ -455,14 +463,14 @@ import { initScreens, render } from './screens.js?v=145';
     if (inspection) visitInspectionPhotos(inspection, function(p) {
       if (!p || !p.photoId) return;
       photosExpected++;
-      var hasDrive = !!(p._driveConfirmed === true || p.driveUrl || p.driveId);
+      var hasDrive = photoIsUploaded(p);
       var hasLocal = !!((p.dataUrl && p.dataUrl !== '__uploaded__') || p._vaultSaved);
       if (hasDrive) photosUploaded++;
       else if (hasLocal) pendingPhotoIds.add(p.photoId);
     });
     if (inspection) {
       (inspection._photoRetryQueue || []).forEach(function(p) {
-        if (p && p.photoId && !p.driveUrl && !p.driveId && p.dataUrl && p.dataUrl !== '__uploaded__') {
+        if (p && p.photoId && !photoIsUploaded(p) && p.dataUrl && p.dataUrl !== '__uploaded__') {
           pendingPhotoIds.add(p.photoId);
         }
       });
