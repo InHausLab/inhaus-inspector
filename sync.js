@@ -637,40 +637,70 @@ export async function retryFailedPhotos(options) {
 // not yet confirmed). Replaces the Apps Script batch/folder-lookup loop. Final
 // submit becomes a receipt — photos mostly upload on capture; this flushes the rest.
 async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
+  const inspectionId = exportData.inspectionId;
   const localMap = getLocalPhotoMap(inspection);
-  showUploadBanner('pending', 'Saving ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '…');
-  let confirmed = 0;
-  const failed = [];
+
+  // Build the upload set from the export AND the photo vault. Pixels can live ONLY
+  // in the vault (e.g. after an iOS local-save hiccup) where the export misses them,
+  // so the vault is the source of truth for "every photo that still needs uploading".
+  const byId = new Map();
+  (photosToUpload || []).forEach(p => { if (p && p.photoId) byId.set(p.photoId, p); });
+  const vaultState = new Map();
+  try {
+    if (window.DB && window.DB.getPhotosForInspection) {
+      const vault = await window.DB.getPhotosForInspection(inspectionId);
+      vault.forEach(v => {
+        if (!v || !v.photoId) return;
+        vaultState.set(v.photoId, v.uploadState || '');
+        const hasPixels = v.dataUrl && v.dataUrl !== '__uploaded__';
+        if (byId.has(v.photoId)) {
+          const ex = byId.get(v.photoId);
+          if (!ex.imageData && !ex.dataUrl && hasPixels) ex.imageData = v.dataUrl;
+        } else if (hasPixels && v.uploadState !== 'stored' && v.uploadState !== 'uploaded') {
+          byId.set(v.photoId, { photoId: v.photoId, imageData: v.dataUrl, roomName: v.roomName || '', stepName: v.stepName || '', caption: v.caption || '' });
+        }
+      });
+    }
+  } catch (e) { /* vault read is best-effort */ }
+
+  const all = Array.from(byId.values());
   const confirmedMap = new Map();
-  for (let i = 0; i < photosToUpload.length; i++) {
-    const exported = photosToUpload[i];
-    // Upload the live inspection photo object (so its confirmed flags + vault persist).
-    const photo = (exported && exported.photoId && localMap.get(exported.photoId)) || exported;
-    // Export photos carry pixels in `imageData`; uploadPhotoImmediate reads `dataUrl`.
-    // Guarantee pixels are present so no photo is silently skipped at final flush.
-    if ((!photo.dataUrl || photo.dataUrl === '__uploaded__') && exported && exported.imageData) {
+  const failed = [];
+  let confirmed = 0;
+  let attempted = 0;
+  for (let i = 0; i < all.length; i++) {
+    const exported = all[i];
+    const vs = vaultState.get(exported.photoId);
+    // Already stored in Supabase — count it, don't re-upload (avoids duplicate rows).
+    if (vs === 'stored' || vs === 'uploaded' || (exported && (exported._driveConfirmed || exported.storagePath))) {
+      confirmed++;
+      if (exported.photoId) confirmedMap.set(exported.photoId, { driveId: '' });
+      continue;
+    }
+    const live = exported.photoId ? localMap.get(exported.photoId) : null;
+    const photo = live || exported;
+    // uploadPhotoImmediate reads `dataUrl`; export/vault photos carry pixels in `imageData`.
+    if ((!photo.dataUrl || photo.dataUrl === '__uploaded__') && exported.imageData) {
       photo.dataUrl = exported.imageData;
     }
-    updateSyncStatus('syncing', 'photos ' + (i + 1) + '/' + photosToUpload.length);
-    showUploadBanner('pending', 'Saving photo ' + (i + 1) + ' of ' + photosToUpload.length + '…');
+    attempted++;
+    updateSyncStatus('syncing', 'photos ' + attempted);
+    showUploadBanner('pending', 'Saving photo ' + attempted + '…');
     let ok = false;
     try {
-      ok = await uploadPhotoImmediate(photo, exportData.inspectionId, exportData.clientName, exportData.propertyAddress);
-    } catch (e) {
-      ok = false;
-    }
-    if (ok) { confirmed++; if (exported && exported.photoId) confirmedMap.set(exported.photoId, { driveId: '' }); }
+      ok = await uploadPhotoImmediate(photo, inspectionId, exportData.clientName, exportData.propertyAddress);
+    } catch (e) { ok = false; }
+    if (ok) { confirmed++; if (exported.photoId) confirmedMap.set(exported.photoId, { driveId: '' }); }
     else failed.push(exported);
   }
-  // Mark every confirmed photo across all live copies + the vault so the receipt
-  // and completion state reflect the true Supabase-confirmed count.
+  // Mark confirmed across all live copies + the vault so the receipt is accurate.
   if (confirmedMap.size > 0 && inspection) markConfirmedLocalPhotos(inspection, confirmedMap);
   if (inspection) scheduleSave();
   if (failed.length > 0) {
     queueUnconfirmedLocalPhotos(inspection, failed, 'supabase_upload_failed');
-    throw new Error('Photo upload incomplete: saved ' + confirmed + ' of ' + photosToUpload.length + ' photos to Supabase');
+    throw new Error('Photo upload incomplete: saved ' + confirmed + ' of ' + all.length + ' photos to Supabase');
   }
-  showUploadBanner('success', 'All ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + ' saved');
+  if (all.length > 0) showUploadBanner('success', 'All ' + all.length + ' photo' + (all.length === 1 ? '' : 's') + ' saved');
 }
 
 // NOTE: Photos are uploaded to Drive as private files.
@@ -701,7 +731,9 @@ export async function sendToGoogleScript(exportData) {
     rememberDriveResult(mainResult, mainPayloadFingerprint, 'main-sync');
   }
 
-  if (photosToUpload.length > 0 && USE_SUPABASE_PHOTOS) {
+  if (USE_SUPABASE_PHOTOS) {
+    // Always run — the flush pulls from the vault too, so it catches photos whose
+    // pixels never made it into the export.
     await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
   } else if (photosToUpload.length > 0) {
     showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
