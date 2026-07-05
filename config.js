@@ -19,3 +19,16 @@ export const SHARED_DRIVE_FOLDER_ID = '11A2EXgQSFo4BAh3aYlJpHxqZKsfwe06l'; // As
 
 // ── AI Vision Proxy Config ──────────────────────────────────
 export const VISION_PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+
+// ── Supabase Photo Storage (Phase 2 photo pipeline) ─────────
+// Direct binary photo upload, replacing the base64 → Apps Script → Drive path.
+// Fill these in from your Supabase project (Settings → API). The anon key is
+// safe in frontend code — it is public by design and protected by row-level
+// security policies on the bucket and tables.
+export const SUPABASE_URL = 'https://kvpaqvieacccojkkxqul.supabase.co'; // inhaus-lab project
+export const SUPABASE_ANON_KEY = 'sb_publishable_UjaZpTZPwPfGTdA0aW7QoA_zb8HyshW'; // publishable key — safe in browser
+export const SUPABASE_BUCKET = 'inspection-photos';
+
+// Feature flag. Keep false until Supabase is configured and tested, then flip
+// to true to route photos through Supabase instead of Apps Script/Drive.
+export const USE_SUPABASE_PHOTOS = true;
