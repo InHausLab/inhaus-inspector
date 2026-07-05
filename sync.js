@@ -641,10 +641,16 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   showUploadBanner('pending', 'Saving ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '…');
   let confirmed = 0;
   const failed = [];
+  const confirmedMap = new Map();
   for (let i = 0; i < photosToUpload.length; i++) {
     const exported = photosToUpload[i];
     // Upload the live inspection photo object (so its confirmed flags + vault persist).
     const photo = (exported && exported.photoId && localMap.get(exported.photoId)) || exported;
+    // Export photos carry pixels in `imageData`; uploadPhotoImmediate reads `dataUrl`.
+    // Guarantee pixels are present so no photo is silently skipped at final flush.
+    if ((!photo.dataUrl || photo.dataUrl === '__uploaded__') && exported && exported.imageData) {
+      photo.dataUrl = exported.imageData;
+    }
     updateSyncStatus('syncing', 'photos ' + (i + 1) + '/' + photosToUpload.length);
     showUploadBanner('pending', 'Saving photo ' + (i + 1) + ' of ' + photosToUpload.length + '…');
     let ok = false;
@@ -653,8 +659,12 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
     } catch (e) {
       ok = false;
     }
-    if (ok) confirmed++; else failed.push(exported);
+    if (ok) { confirmed++; if (exported && exported.photoId) confirmedMap.set(exported.photoId, { driveId: '' }); }
+    else failed.push(exported);
   }
+  // Mark every confirmed photo across all live copies + the vault so the receipt
+  // and completion state reflect the true Supabase-confirmed count.
+  if (confirmedMap.size > 0 && inspection) markConfirmedLocalPhotos(inspection, confirmedMap);
   if (inspection) scheduleSave();
   if (failed.length > 0) {
     queueUnconfirmedLocalPhotos(inspection, failed, 'supabase_upload_failed');
