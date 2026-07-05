@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v146 |
+| App version | v146 (staging: feat/supabase-photo-pipeline, not yet merged) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v50 — see URL below |
@@ -19,18 +19,150 @@ This file is the authoritative record of every significant change, decision, bug
 | Repo | /Users/hans/inhaus-update/ |
 | Review portal | https://inhauslab.github.io/inhaus-review/ (token: InHaus2026) |
 | AI proxy | https://inhaus-vision-proxy.mjordanjay.workers.dev (Cloudflare Worker) |
-| Known open bug | `photoNeedsUpload()` checks `photo.imageData` but photos stored as `photo.dataUrl` — Codex has diagnosis |
+| Known open bug | `photoNeedsUpload()` checks `photo.imageData` but photos stored as `photo.dataUrl` — superseded by Supabase migration (branch feat/supabase-photo-pipeline) which fixes this at the root |
+| Branch (staging) | feat/supabase-photo-pipeline · draft PR #2 · deploy-preview-2--inhaus-inspector.netlify.app |
+| Supabase project | inhaus-lab · ref kvpaqvieacccojkkxqul |
+| Supabase bucket | inspection-photos (private) |
+| Staging table | inspector_photo_uploads |
+| Feature flag | USE_SUPABASE_PHOTOS (config.js) |
+| Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
+| Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## Engineering Record: Photo Pipeline Migration to Supabase
+**Date:** July 5, 2026  
+**Branch:** feat/supabase-photo-pipeline · draft PR #2  
+**State:** Validated on device (staging only). Production untouched. Not merged.
+
+### 1. The Problem
+
+The app captured inspection data reliably and synced form data to Google Sheets fine. The photo pipeline was the failure point. Photos traveled as base64 text → Google Apps Script web app → Google Drive. Every symptom traced back to that one path:
+
+- **Slow:** base64 is ~33% larger than binary; the phone did CPU-heavy compression; Apps Script decoded each image, created a Drive file, changed sharing, and wrote a Photo Log sheet row — serially, in batches of 3. 40+ photos stranded the inspector at the end of a job.
+- **Unreliable:** recurring `Service Spreadsheets failed`, `Photo Log already exists`, and batch-of-3 all-or-nothing failures. A sheet-write hiccup failed the whole photo batch even after files reached Drive.
+- **Duplicate Drive folders:** the folder-lookup matched on inspection ID inside folder names (which never contained it), so every retry created a new folder — one real incident produced 178 duplicate folders for a single inspection.
+- **False confidence / silent loss:** the app could report "complete" while photos were missing.
+- **Hard ceiling:** Apps Script execution/quota limits could never support 100+ concurrent inspectors regardless of patching.
+
+**Decision:** Do not rewrite the app. Replace only the photo transport (Option B). Everything else works.
+
+### 2. Old Architecture (photos)
+
+Capture (`ui.js` `compressImage`, max 1200px, JPEG q≈0.65, <~680KB) → stored as a data-URL in the live inspection object and in a separate IndexedDB `photoVault` store → at final sync, photos stripped from the main payload, then sent separately as base64 JSON POSTs (`photoUploadOnly:true`) to Apps Script → Apps Script decodes, `createFile` in the inspection's Drive folder, `setSharing(ANYONE_WITH_LINK)`, appends a Photo Log row → app marks photos confirmed from the response.
+
+### 3. New Architecture (photos)
+
+Capture & compression unchanged. Then:
+
+1. On capture, the compressed JPEG is converted to a binary Blob and POSTed directly to Supabase Storage at `<inspectionId>/<photoId>.jpg`. Photo metadata is inserted into an app-owned table. This happens per photo, in the background, the moment it's taken.
+2. **Idempotent:** the object path is deterministic per photo, so a retry overwrites/no-ops. Supabase's "already exists" response is treated as success.
+3. **Final Submit** is a receipt, not the upload event. It flushes any photo not yet stored — sourced from the `photoVault` (the reliable pixel store), so a photo whose live copy was lost still uploads.
+4. Form data still syncs to Apps Script / Google Sheets, unchanged. Only photos moved.
+5. Photos are kept locally until Supabase confirms; the `photoVault` + a localStorage shadow remain as safety nets.
+
+### 4. Supabase Backend (what was added)
+
+All in the company's existing `inhaus-lab` project (owned by Tanner). **Strictly add-only — zero changes to any existing table, column, index, policy, function, or data.**
+
+| Object | Detail |
+|--------|--------|
+| `inspection-photos` | Private storage bucket. Layout: one folder per inspection, one object per photo — `<inspectionId>/<photoId>.jpg`. |
+| `inspector_photo_uploads` | App-owned staging table for photo metadata: `id`, `photo_id`, `inspection_id`, `room_name`, `step_name`, `caption`, `slot`, `bucket`, `storage_path`, `source_system`, `created_at`. Deliberately separate from Tanner's `ihl_photos` — a clean handoff point for him to reconcile. |
+| RLS policies | Permissive insert (and update on the bucket) for the anon role on the table and bucket-scoped on `storage.objects`; grants to match. No public read of real data. |
+| Temp read policy | `temp anon read tbl` / `temp anon read bkt` — added only to verify uploads by API during testing. **To be dropped before go-live.** |
+
+**Auth:** The browser uses the project's publishable (anon) key (public by design; lives in `config.js`). Direct REST/Storage calls must stay simple — no `x-upsert`, no `return=representation` — because those need a SELECT policy that was intentionally not granted. See bugs #1/#2.
+
+### 5. Tanner's Existing Schema (discovered, untouched)
+
+The project already contained a complete, well-designed backend schema (Tanner's): `organizations`, `ihl_users` (4 rows), `customers`, `homes`, `ihl_assessments`, `ihl_assessment_files` (has `drive_file_id` + `drive_url` — built for Drive mirroring), `ihl_photos` (18 columns incl. `inspection_id`, `photo_id`, `room_name`, `slot`, `drive_url`, `source_system` default `'apps_script'`, `raw_jsonb`, uuid), `ihl_lab_results`, `ihl_air_quality_rooms`, `ihl_sync_runs` (209 rows from dormant n8n automations). Data tables were empty.
+
+Two facts constrained integration and are flagged for Tanner:
+
+- `ihl_photos` has no `storage_path` column (only `drive_url`) — the schema was designed around Drive-as-store. We uploaded binaries to Supabase Storage and recorded paths in the staging table instead of guessing at his schema.
+- `ihl_photos.inspection_id` is a foreign key to `ihl_assessments.inspection_id` — a photo row needs a parent assessment row first. Writing directly into `ihl_photos` means also writing assessments; the staging table avoids that entanglement until Tanner decides the reconciliation.
+
+### 6. Application Code Changes
+
+Branch `feat/supabase-photo-pipeline`. Behind flag `USE_SUPABASE_PHOTOS` — on in the branch, off in main/production.
+
+| File | Change |
+|------|--------|
+| `config.js` | Added `SUPABASE_URL`, `SUPABASE_ANON_KEY` (publishable), `SUPABASE_BUCKET`, and the `USE_SUPABASE_PHOTOS` flag. |
+| `supabase-photos.js` | **New file.** Dependency-free upload client. `uploadPhotoToSupabase()`: data-URL→Blob, deterministic storage path, binary POST to Storage, best-effort metadata insert, "already exists" (409-in-body) treated as success. |
+| `sync.js` | `uploadPhotoImmediate()` branches to `storePhotoInSupabase()` when the flag is on. New `uploadPhotosViaSupabase()` is the final-submit flush — vault-driven: merges the export set with the `photoVault`, uploads anything not yet stored, skips already-stored (no dup uploads), marks confirmations. `sendToGoogleScript()` gated so the Supabase flush always runs and the old Apps Script batch loop is bypassed. |
+| `app.js` | New shared `photoIsUploaded()` that recognizes Supabase confirmation (`storagePath` / `_driveConfirmed` / vault `uploadState 'stored'`) — used in `getPhotoHealth()`, `auditPhotos()`, and the sync receipt. Receipt copy "in Drive" → "in cloud". |
+| `screens.js` | Photo status pills + the "Can I Leave?" readiness counter now recognize Supabase; relabeled "Drive" → "Cloud"/"upload". |
+
+### 7. Bugs Found & Fixed During Testing
+
+All caught on staging, never in production.
+
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | RLS mechanics: the publishable key resolves to the anon role, but `x-upsert` and `return=representation` silently require a SELECT policy — uploads failed with a misleading "row-level security" error. | Use plain calls (no upsert / no representation); insert-only policies. Confirmed the whole thing works with the anon key. |
+| 2 | "Already exists" retry mis-handled: Supabase Storage returns HTTP 400 with a body of `{"statusCode":"409","Duplicate"}` — code checked `res.status`, so retries looked like failures. | Inspect the response body; treat duplicate as success (idempotent). |
+| 3 | Final-flush pixel-field mismatch: the export emits photos with pixels in `imageData`, but the flush read `dataUrl` — photos not in the live cache were silently skipped (the "3 of 7 not confirmed" symptom). | Map `imageData`→`dataUrl` before upload. |
+| 4 | Vault-only pixels stranded: photos whose image data lived only in the `photoVault` (e.g. after an iOS local-save hiccup) were absent from the export entirely, so no re-upload could ever reach them. | Rewrote the flush to read the vault directly, merge with the export, and upload anything not yet stored. |
+| 5 | App-wide mislabel: status/health/receipt checks judged a photo "uploaded" only if it had a Google Drive link — so Supabase photos showed as "waiting for Drive" everywhere, even ones safely stored. | Shared `photoIsUploaded()` that recognizes Supabase; relabeled copy. |
+
+### 8. Testing & Validation
+
+- **API level:** curl round-trips proving the anon key can upload to the bucket (200) and insert metadata (201).
+- **Browser module level:** the real `supabase-photos.js` uploading a browser-generated JPEG, including the idempotent-retry path.
+- **Local full-flow:** a captured photo driven through the app's actual `uploadPhotoImmediate` path → confirmed in Supabase, vault flipped to `stored`.
+- **Staging on real iPhone — run A** (INH-20260705-Q970DG): 7 photos; 4 auto-uploaded during the walkthrough; app correctly caught 3 unconfirmed and offered retry. This run surfaced bugs #3–#5. (Those 3 photos were unrecoverable — their image data never survived an iOS "Save failed" glitch mid-inspection; a one-off, not a pipeline bug.)
+- **Staging on real iPhone — run B** (INH-20260705-P11PU1), after fixes: a full fresh inspection — 5 photos auto-uploaded, Submit showed "safe to leave" with zero unconfirmed, all 5 verified in Supabase. Clean end-to-end pass.
+
+### 9. Deployment State
+
+- **Production** (the 5 inspectors' app) serves from `main`: GitHub Pages (inhauslab.github.io/inhaus-inspector) plus Netlify and Vercel. Not touched. Flag is off there.
+- This work lives on branch `feat/supabase-photo-pipeline`, draft PR #2, deployed only to the Netlify deploy preview at `deploy-preview-2--inhaus-inspector.netlify.app` — the isolated URL used for the iPhone tests.
+- Not merged. App version not yet bumped (needed so the service-worker cache picks up new code on the phones at go-live).
+
+### 10. What Remains Before Production
+
+| # | Item | Notes |
+|---|------|-------|
+| 1 | Drive mirror (next build) | Server-side job (likely the existing Cloudflare Worker) that copies stored photos into Google Drive after the inspector leaves — so office staff keep the Drive view. Can write into Tanner's `ihl_assessment_files.drive_url` or a Drive folder. Until built, the Drive view is empty for new inspections. |
+| 2 | Security hardening | Move writes behind the Worker with short-lived signed URLs (service-role held server-side) so the public key isn't write-capable. Needed before wide rollout beyond the pilot. |
+| 3 | Cleanup | Delete test data (bucket folders `browsertest/`, `__validation__/`, `vaulttest-*/`, `flushfix-insp/`; test inspections Q970DG, 0AKB8I, P11PU1; duplicate rows in `inspector_photo_uploads`) and drop the temporary read policy. |
+| 4 | Go-live (business call) | Bump version, merge to main, deploy to GitHub Pages/Netlify. Decision: ship now (photos reliable immediately, Drive view waits for #1) vs. build the mirror first. |
+| 5 | Tanner reconciliation | Fold `inspector_photo_uploads` into `ihl_photos` in his preferred shape (mind the missing `storage_path` column and the assessment FK). |
+| 6 | Retire Apps Script photo path | After go-live, remove the base64 photo upload code from the Apps Script bridge entirely. Eventually migrate form-data/Sheets too. |
+
+### 11. Known Issues & Risks
+
+- **iOS storage:** iOS Safari can fail local IndexedDB writes ("Save failed" banner) — most often in a Private tab or with strict privacy settings. Pre-existing and separate from the photo upload, but can prevent a photo's pixels from ever being saved (cause of the 3 unrecoverable photos in run A). Worth hardening.
+- **Dup metadata rows:** No unique constraint on `photo_id` in `inspector_photo_uploads`, so retries created duplicate metadata rows. Cosmetic (storage objects are idempotent) — address with a unique index or during Tanner's fold-in.
+- **Public write:** The publishable key can currently write to the bucket + staging table. Acceptable for the pilot; addressed by remaining item #2.
+- **3 deployments:** GitHub Pages, Netlify, and Vercel all deploy from `main`. This caused a real incident earlier (fixing one while the phone loaded another). Recommend consolidating to one before go-live.
+
+### 12. Reference / Identifiers
+
+| Item | Value |
+|------|-------|
+| GitHub repo | InHausLab/inhaus-inspector |
+| Work branch | feat/supabase-photo-pipeline · draft PR #2 |
+| Staging URL | deploy-preview-2--inhaus-inspector.netlify.app |
+| Production URL | inhauslab.github.io/inhaus-inspector (+ Netlify, Vercel) |
+| Supabase project | inhaus-lab · ref kvpaqvieacccojkkxqul |
+| Bucket | inspection-photos (private) |
+| Staging table | inspector_photo_uploads |
+| Feature flag | USE_SUPABASE_PHOTOS (config.js) |
+| Files changed | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
+| Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+| Companion docs on file | app-overview-for-hans, tanner-update, supabase-changelog-for-tanner (SQL), original architecture brief |
 
 ---
 
 ## Known Bugs / Open Issues
 
-### CRITICAL: Photo Upload Filter Mismatch (July 3 2026)
-- **Symptom:** 42 photos from a real inspection never uploaded to Drive
-- **Root cause:** `photoNeedsUpload()` filter checks `photo.imageData` but photos are stored as `photo.dataUrl`
-- **Status:** Codex has diagnosis, fix not yet confirmed deployed
-- **What happened:** Endpoint, token, and folder ID all checked out. Nobody read the filter function. Classic wrong-field check.
-- **Rule:** Before any "sync is working" declaration, trace the COMPLETE path: storage format → extraction → filter → payload → Drive confirmation.
+### Photo Upload Filter Mismatch — SUPERSEDED (July 3 2026 bug, fixed in Supabase branch)
+- **Original symptom:** 42 photos from a real inspection never uploaded to Drive
+- **Original root cause:** `photoNeedsUpload()` filter checked `photo.imageData` but photos were stored as `photo.dataUrl`
+- **Status:** The Supabase photo pipeline (feat/supabase-photo-pipeline) rewrites the upload path entirely and fixes this at the root. Bug is superseded once the branch merges.
 
 ### GitHub Pages Broken (ongoing)
 - Commits go to `main` branch. GitHub Pages is configured to read `gh-pages` branch.
