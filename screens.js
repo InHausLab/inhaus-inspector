@@ -201,10 +201,10 @@ function getPhotoPreviewSrc(photo) {
 
 function getPhotoStatus(photo) {
   const hasLocal = !!(photo && photo.dataUrl && photo.dataUrl !== '__uploaded__');
-  const hasDrive = !!(photo && (photo.driveUrl || photo.driveId));
+  const hasDrive = !!(photo && (photo._driveConfirmed === true || photo._uploaded === true || photo.driveUrl || photo.driveId || photo.storagePath));
   const hasVault = !!(photo && photo._vaultSaved);
-  if (hasDrive && hasLocal) return { label: 'Drive + phone', tone: 'good' };
-  if (hasDrive) return { label: 'Drive', tone: 'good' };
+  if (hasDrive && hasLocal) return { label: 'Cloud + phone', tone: 'good' };
+  if (hasDrive) return { label: 'Cloud', tone: 'good' };
   if (hasLocal || hasVault) return { label: 'Waiting', tone: 'wait' };
   return { label: 'Missing', tone: 'bad' };
 }
@@ -1407,7 +1407,7 @@ export function renderPhotos() {
         alt: 'Photo ' + (idx + 1)
       }));
     } else {
-      media.appendChild(ui().el('div', { className: 'photo-review-placeholder' }, p.driveUrl || p.driveId ? 'In Drive' : 'No preview'));
+      media.appendChild(ui().el('div', { className: 'photo-review-placeholder' }, (p.driveUrl || p.driveId || p.storagePath || p._driveConfirmed) ? 'In cloud' : 'No preview'));
     }
     card.appendChild(media);
 
@@ -1420,7 +1420,7 @@ export function renderPhotos() {
     const statusRow = ui().el('div', { className: 'photo-status-row' });
     statusRow.appendChild(statusPill(status.label, status.tone));
     if (p._vaultSaved) statusRow.appendChild(statusPill('Vault', 'good'));
-    if (p.driveUrl || p.driveId) statusRow.appendChild(statusPill('Drive confirmed', 'good'));
+    if (p.driveUrl || p.driveId || p.storagePath || p._driveConfirmed) statusRow.appendChild(statusPill('Cloud confirmed', 'good'));
     if (p.dataUrl && p.dataUrl !== '__uploaded__') statusRow.appendChild(statusPill('Phone copy', 'good'));
     body.appendChild(statusRow);
 
@@ -1569,7 +1569,7 @@ export function renderReview() {
     if (reviewIssues.length) blockers.push(reviewIssues.length + ' required item' + (reviewIssues.length === 1 ? '' : 's'));
     if (!departureDone) blockers.push('Leave checklist open');
     if (!lastCloud) blockers.push('No cloud backup yet');
-    if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' waiting for Drive');
+    if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' waiting to upload');
     if ((syncStatus === 'failed' || syncStatus === 'final-failed') && lastCloud) warnings.push('Cloud retry needed');
 
     let tone = 'go';
@@ -1847,10 +1847,10 @@ export function renderReview() {
         reuploadBtn.textContent = '\u2713 Upload Complete (' + allPhotos.length + ' photos)';
       } catch(e) {
         reuploadBtn.disabled = false;
-        reuploadBtn.textContent = '\u21ba Re-upload to Drive';
+        reuploadBtn.textContent = '\u21ba Re-upload photos';
         alert('Upload failed: ' + e.message);
       }
-    }}, '\u21ba Re-upload to Drive');
+    }}, '\u21ba Re-upload photos');
     actCard.appendChild(ui().el('div', { className: 'completed-banner' }, [
       ui().el('strong', null, '\u2713 Inspection Complete'),
       ui().el('p', null, 'Completed: ' + ui().fmtDate(ctx.inspection.endedAt)),
