@@ -21,7 +21,7 @@ Do not merge to main until every BLOCKING item is checked off.
   - Move photo uploads behind the Cloudflare Worker so the publishable anon key is not write-capable from the browser
   - Service-role key stays server-side only; browser gets short-lived signed URLs
   - _Owner: Hans (build) + Matt (go/no-go)_
-  - _Note: Agreed as blocking, not optional (confirmed July 8 2026)_
+  - _Note: Agreed as blocking, not optional (Tanner, #ai-council thread, 2026-07-08 10:36 MDT)_
 
 ### Verification
 
