@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facu Lavino — Marketing & Ads Work Review | InHaus Lab</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0F1B2D;
+    --card: #1E293B;
+    --card2: #162032;
+    --teal: #2DD4BF;
+    --teal-dim: rgba(45,212,191,0.15);
+    --teal-border: rgba(45,212,191,0.35);
+    --white: #FFFFFF;
+    --muted: #94A3B8;
+    --slate: #CBD5E1;
+    --danger: #F87171;
+    --success: #34D399;
+    --warn: #FBBF24;
+    --border: rgba(255,255,255,0.07);
+  }
+
+  body {
+    background: var(--navy);
+    color: var(--white);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  /* ─── LAYOUT ────────────────────────────────────── */
+  .page { max-width: 1100px; margin: 0 auto; padding: 48px 28px 80px; }
+
+  /* ─── HEADER ────────────────────────────────────── */
+  .report-header {
+    border-bottom: 2px solid var(--teal-border);
+    padding-bottom: 36px;
+    margin-bottom: 56px;
+  }
+  .logo-lockup {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .logo-mark {
+    width: 44px; height: 44px;
+    background: var(--teal);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 20px; color: var(--navy);
+    letter-spacing: -1px;
+    flex-shrink: 0;
+  }
+  .logo-text { font-size: 22px; font-weight: 700; color: var(--white); letter-spacing: 0.5px; }
+  .logo-text span { color: var(--teal); }
+  .logo-tagline { font-size: 11px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
+
+  .report-title { font-size: 36px; font-weight: 800; line-height: 1.2; letter-spacing: -0.5px; }
+  .report-title span { color: var(--teal); }
+  .report-subtitle {
+    margin-top: 10px; font-size: 15px; color: var(--muted);
+    display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+  }
+  .report-subtitle .dot { color: var(--teal); }
+  .report-badge {
+    display: inline-block;
+    background: var(--teal-dim);
+    border: 1px solid var(--teal-border);
+    color: var(--teal);
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px; border-radius: 4px;
+  }
+
+  /* ─── SECTION HEADERS ───────────────────────────── */
+  .section { margin-bottom: 64px; }
+  .section-label {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 28px;
+  }
+  .section-num {
+    background: var(--teal);
+    color: var(--navy);
+    font-size: 11px; font-weight: 900; letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 10px; border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .section-title { font-size: 22px; font-weight: 700; }
+  .section-rule { flex: 1; height: 1px; background: var(--border); }
+
+  /* ─── CARDS ─────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .card-left { border-left: 3px solid var(--teal); }
+  .card-grid { display: grid; gap: 16px; }
+  .card-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .card-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+  @media (max-width: 700px) {
+    .card-grid-2, .card-grid-3, .card-grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* ─── STAT CARDS ─────────────────────────────────── */
+  .stat-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 12px;
+    padding: 20px 22px;
+    flex: 1; min-width: 130px;
+  }
+  .stat-num { font-size: 32px; font-weight: 800; color: var(--teal); line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .stat-sub { font-size: 12px; color: var(--slate); margin-top: 4px; }
+
+  /* ─── CALLOUT BOXES ─────────────────────────────── */
+  .callout {
+    background: var(--teal-dim);
+    border: 1px solid var(--teal-border);
+    border-left: 4px solid var(--teal);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  .callout-label {
+    font-size: 10px; font-weight: 700; color: var(--teal);
+    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .callout p { font-size: 14px; color: var(--slate); }
+  .callout strong { color: var(--white); }
+
+  blockquote.pullquote {
+    background: var(--card);
+    border-left: 5px solid var(--teal);
+    border-radius: 0 12px 12px 0;
+    padding: 20px 24px;
+    margin: 20px 0;
+    font-size: 18px;
+    font-style: italic;
+    color: var(--slate);
+    line-height: 1.5;
+  }
+  blockquote.pullquote em { color: var(--teal); font-style: normal; font-weight: 600; }
+
+  /* ─── HORIZONTAL BAR CHART ──────────────────────── */
+  .bar-chart { margin: 20px 0; }
+  .bar-chart-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; font-weight: 600; }
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .bar-label { font-size: 13px; color: var(--slate); min-width: 160px; text-align: right; }
+  .bar-label-left { font-size: 13px; color: var(--slate); width: 160px; flex-shrink: 0; }
+  .bar-track { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 26px; position: relative; overflow: hidden; }
+  .bar-fill {
+    height: 100%; background: linear-gradient(90deg, var(--teal), rgba(45,212,191,0.7));
+    border-radius: 4px; transition: width 0.3s;
+    display: flex; align-items: center;
+  }
+  .bar-fill.winner { background: linear-gradient(90deg, var(--teal), #5eead4); }
+  .bar-value { font-size: 12px; font-weight: 700; color: var(--navy); padding-left: 8px; white-space: nowrap; }
+  .bar-value-out { font-size: 12px; font-weight: 600; color: var(--muted); padding-left: 8px; }
+
+  /* ─── TIMELINE ──────────────────────────────────── */
+  .timeline { position: relative; padding: 0 20px; }
+  .timeline-spine {
+    position: absolute;
+    top: 24px; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--teal-border), var(--teal), var(--teal-border));
+    border-radius: 2px;
+  }
+  .timeline-nodes { display: flex; justify-content: space-between; position: relative; gap: 8px; }
+  .timeline-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .tl-dot {
+    width: 16px; height: 16px;
+    background: var(--teal);
+    border: 3px solid var(--navy);
+    border-radius: 50%;
+    z-index: 1;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(45,212,191,0.5);
+  }
+  .tl-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    text-align: center;
+    width: 100%;
+    margin-top: 14px;
+  }
+  .tl-date { color: var(--teal); font-weight: 700; font-size: 11px; margin-bottom: 4px; letter-spacing: 0.5px; }
+  .tl-desc { color: var(--slate); line-height: 1.4; }
+
+  /* ─── TABLE ─────────────────────────────────────── */
+  .styled-table { width: 100%; border-collapse: collapse; }
+  .styled-table th {
+    text-align: left; padding: 10px 14px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .styled-table td {
+    padding: 12px 14px;
+    font-size: 14px; color: var(--slate);
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .styled-table tr:last-child td { border-bottom: none; }
+  .styled-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .score-bar-track { background: rgba(255,255,255,0.07); border-radius: 4px; height: 8px; width: 120px; }
+  .score-bar-fill { background: var(--teal); border-radius: 4px; height: 100%; }
+  .badge-sell { background: rgba(52,211,153,0.15); color: var(--success); border: 1px solid rgba(52,211,153,0.3); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .badge-bundle { background: rgba(251,191,36,0.1); color: var(--warn); border: 1px solid rgba(251,191,36,0.25); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .badge-free { background: rgba(148,163,184,0.1); color: var(--muted); border: 1px solid rgba(148,163,184,0.2); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+
+  /* ─── PACKAGE CARDS ─────────────────────────────── */
+  .pkg-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .pkg-card.featured { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 8px 24px rgba(45,212,191,0.12); }
+  .pkg-name { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .pkg-price { font-size: 28px; font-weight: 800; color: var(--teal); line-height: 1; margin: 8px 0; }
+  .pkg-desc { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .pkg-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; margin-top: 6px; }
+  .pkg-tag.green { background: rgba(52,211,153,0.12); color: var(--success); }
+  .pkg-tag.teal { background: var(--teal-dim); color: var(--teal); }
+  .pkg-tag.gold { background: rgba(251,191,36,0.1); color: var(--warn); }
+
+  /* ─── EMAIL FLOW ─────────────────────────────────── */
+  .flow-layer { margin-bottom: 28px; }
+  .flow-layer-title { font-size: 11px; font-weight: 700; color: var(--teal); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 14px; }
+  .flow-boxes { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+  .flow-box {
+    background: var(--card);
+    border: 1px solid var(--teal-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px; color: var(--slate);
+    text-align: center;
+    min-width: 80px;
+    line-height: 1.3;
+  }
+  .flow-box.start { border-color: var(--teal); color: var(--teal); font-weight: 700; }
+  .flow-arrow {
+    color: var(--teal);
+    font-size: 16px;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+
+  /* ─── WHAT WORKED / DIDN'T ──────────────────────── */
+  .verdict-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .verdict-grid { grid-template-columns: 1fr; } }
+  .verdict-col { background: var(--card); border-radius: 12px; padding: 24px; border: 1px solid var(--border); }
+  .verdict-col.worked { border-top: 3px solid var(--success); }
+  .verdict-col.didnt { border-top: 3px solid var(--danger); }
+  .verdict-header { font-size: 14px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .verdict-header.worked { color: var(--success); }
+  .verdict-header.didnt { color: var(--danger); }
+  .verdict-item { display: flex; gap: 10px; margin-bottom: 10px; font-size: 13px; color: var(--slate); line-height: 1.5; }
+  .verdict-item::before { content: '•'; flex-shrink: 0; }
+  .verdict-col.worked .verdict-item::before { color: var(--success); }
+  .verdict-col.didnt .verdict-item::before { color: var(--danger); }
+
+  /* ─── CHECKLIST ──────────────────────────────────── */
+  .checklist { list-style: none; }
+  .checklist li {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px; color: var(--slate);
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-box {
+    width: 20px; height: 20px;
+    border: 2px solid var(--muted);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ─── MESSAGING ANGLE CARDS ─────────────────────── */
+  .angle-card {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    border-left: 3px solid var(--teal);
+  }
+  .angle-card-title { font-size: 13px; font-weight: 800; color: var(--teal); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .angle-card-text { font-size: 13px; color: var(--slate); font-style: italic; }
+
+  /* ─── GENDER BREAKDOWN ───────────────────────────── */
+  .gender-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+  .gender-card {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    flex: 1; min-width: 180px;
+  }
+  .gender-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700; }
+  .gender-bars { display: flex; gap: 8px; height: 60px; align-items: flex-end; }
+  .gender-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .gender-bar { width: 100%; border-radius: 4px 4px 0 0; }
+  .gender-bar.female { background: var(--teal); }
+  .gender-bar.male { background: rgba(45,212,191,0.35); }
+  .gender-pct { font-size: 11px; font-weight: 700; }
+  .gender-pct.female { color: var(--teal); }
+  .gender-pct.male { color: var(--muted); }
+  .gender-lbl { font-size: 10px; color: var(--muted); }
+
+  /* ─── SEO TABLE ──────────────────────────────────── */
+  .seo-progress { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
+  .seo-metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    flex: 1; min-width: 150px;
+    text-align: center;
+  }
+  .seo-metric-val { font-size: 28px; font-weight: 800; color: var(--teal); }
+  .seo-metric-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+
+  /* ─── FOOTER ─────────────────────────────────────── */
+  .report-footer {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    margin-top: 64px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer-left { font-size: 12px; color: var(--muted); }
+  .footer-right {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--danger);
+    text-transform: uppercase;
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.2);
+    padding: 4px 12px; border-radius: 4px;
+  }
+
+  /* ─── SMALL HELPERS ──────────────────────────────── */
+  .text-teal { color: var(--teal); }
+  .text-muted { color: var(--muted); }
+  .text-slate { color: var(--slate); }
+  .fw-700 { font-weight: 700; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-8 { margin-bottom: 8px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-24 { margin-top: 24px; }
+  .kura-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .kura-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    flex: 1; min-width: 140px;
+  }
+  .kura-val { font-size: 26px; font-weight: 800; color: var(--teal); }
+  .kura-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+  .kura-sub { font-size: 12px; color: var(--slate); margin-top: 4px; }
+
+  .open-gap {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--slate);
+  }
+  .open-gap:last-child { border-bottom: none; }
+  .gap-icon { color: var(--danger); flex-shrink: 0; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════ HEADER -->
+  <header class="report-header">
+    <div class="logo-lockup">
+      <div class="logo-mark">IH</div>
+      <div>
+        <div class="logo-text">InHaus <span>Lab</span></div>
+        <div class="logo-tagline">Home Environmental Intelligence</div>
+      </div>
+      <div style="margin-left: auto;">
+        <span class="report-badge">Internal Report</span>
+      </div>
+    </div>
+    <h1 class="report-title"><span>Facu Lavino</span> — Marketing &amp; Ads Work Review</h1>
+    <div class="report-subtitle">
+      <span>10 Months of Work</span>
+      <span class="dot">◆</span>
+      <span>Sept 2025 – May 2026</span>
+      <span class="dot">◆</span>
+      <span>Compiled July 8, 2026</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════ SECTION 1: TIMELINE -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Campaign Timeline</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-spine"></div>
+      <div class="timeline-nodes">
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">Oct–Nov 2025</div>
+            <div class="tl-desc">Google Ads v1 + Google Tag + Kura email campaign</div>
+          </div>
+        </div>
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">Nov–Dec 2025</div>
+            <div class="tl-desc">Atidiv SEO contract negotiation. Google Ads STOPPED.</div>
+          </div>
+        </div>
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">Dec 2025–Mar 2026</div>
+            <div class="tl-desc">Atidiv SEO/content engagement (3 months, ~$2,700/mo)</div>
+          </div>
+        </div>
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">Feb 2026</div>
+            <div class="tl-desc">Meta / Instagram campaign launched — 102 leads generated</div>
+          </div>
+        </div>
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">Mar 2026</div>
+            <div class="tl-desc">Atidiv paused. Facu steps back.</div>
+          </div>
+        </div>
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">Apr 2026</div>
+            <div class="tl-desc">Full email lifecycle system written (Sequences A + C)</div>
+          </div>
+        </div>
+        <div class="timeline-node">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <div class="tl-date">May 2026</div>
+            <div class="tl-desc">Final email (address on website for SEO)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 2: GOOGLE ADS -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Google Ads Results</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="stat-row mb-16">
+      <div class="stat-card">
+        <div class="stat-num">$2,000</div>
+        <div class="stat-label">Total Spent</div>
+        <div class="stat-sub">17-day campaign</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">423</div>
+        <div class="stat-label">Clicks</div>
+        <div class="stat-sub">Across all categories</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">$4.80</div>
+        <div class="stat-label">Avg CPC</div>
+        <div class="stat-sub">Very competitive rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color: var(--danger);">0</div>
+        <div class="stat-label">Conversions</div>
+        <div class="stat-sub">No conversion mechanism</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">&lt;40%</div>
+        <div class="stat-label">Budget Used</div>
+        <div class="stat-sub">$300/day budget</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+      <div class="card">
+        <div class="bar-chart">
+          <div class="bar-chart-title">Click-Through Rate by Category</div>
+
+          <div class="bar-row">
+            <div class="bar-label-left">Air Quality</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 100%;">
+                <span class="bar-value">14%</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Mold</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 78.5%;">
+                <span class="bar-value">11%</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Radon</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 57%;">
+                <span class="bar-value">8%</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Water</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 50%;">
+                <span class="bar-value">7%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="bar-chart">
+          <div class="bar-chart-title">Click Volume by Category</div>
+          <div class="bar-row">
+            <div class="bar-label-left">Radon</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 100%;">
+                <span class="bar-value">~200 clicks</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Air Quality</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 50%;">
+                <span class="bar-value">~100 clicks</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Water</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 30%;">
+                <span class="bar-value">~60 clicks</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Mold</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 30%;">
+                <span class="bar-value">~60 clicks</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-left">Home Score</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: 0.5%;">
+              </div>
+              <span class="bar-value-out" style="position:absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size:11px; color: var(--muted);">1 click</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout mt-16">
+      <div class="callout-label">⚡ Key Insight</div>
+      <p><strong>Traffic is cheap at $4.80/click.</strong> The problem was no conversion mechanism on the site.</p>
+    </div>
+
+    <div class="callout" style="margin-top: 12px; border-left-color: var(--warn); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.06);">
+      <div class="callout-label" style="color: var(--warn);">📢 Ad Copy Learning</div>
+      <p><strong>6 of 7 top-performing ads included price.</strong> Price in copy = winner.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 3: META / INSTAGRAM -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">03</span>
+      <h2 class="section-title">Meta / Instagram Campaign</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="stat-row mb-16">
+      <div class="stat-card">
+        <div class="stat-num">106</div>
+        <div class="stat-label">Total Leads</div>
+        <div class="stat-sub">102 standard + 4 quiz</div>
+      </div>
+      <div class="stat-card" style="border-top-color: var(--success);">
+        <div class="stat-num" style="color: var(--success);">1</div>
+        <div class="stat-label">Already Booked</div>
+        <div class="stat-sub">Cindy Winters</div>
+      </div>
+    </div>
+
+    <div class="card mb-16">
+      <div class="bar-chart">
+        <div class="bar-chart-title">Leads by Creative / Sequence</div>
+
+        <div class="bar-row">
+          <div class="bar-label-left">Water (tap water health)</div>
+          <div class="bar-track">
+            <div class="bar-fill winner" style="width: 100%;">
+              <span class="bar-value">43 leads</span>
+            </div>
+          </div>
+          <div style="font-size:11px; color: var(--success); font-weight: 700; white-space: nowrap;">PROVEN WINNER</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label-left">Beauty (dry skin/frizzy hair)</div>
+          <div class="bar-track">
+            <div class="bar-fill winner" style="width: 55.8%;">
+              <span class="bar-value">24 leads</span>
+            </div>
+          </div>
+          <div style="font-size:11px; color: var(--success); font-weight: 700; white-space: nowrap;">PROVEN WINNER</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label-left">Radon (invisible threats)</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: 51.1%;">
+              <span class="bar-value">22 leads</span>
+            </div>
+          </div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label-left">General</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: 14%;">
+              <span class="bar-value">6 leads</span>
+            </div>
+          </div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label-left">Quiz</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: 9.3%;">
+              <span class="bar-value">4 leads</span>
+            </div>
+          </div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label-left">Data / Biohacker</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: 9.3%;">
+              <span class="bar-value">~4 leads</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gender breakdown -->
+    <div style="margin: 20px 0;">
+      <div style="font-size:13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Gender Breakdown</div>
+      <div class="gender-row">
+        <div class="gender-card">
+          <div class="gender-title">Overall Campaign</div>
+          <div class="gender-bars">
+            <div class="gender-bar-wrap">
+              <div class="gender-bar female" style="height: 67%;"></div>
+              <div class="gender-pct female">67%</div>
+              <div class="gender-lbl">Female</div>
+            </div>
+            <div class="gender-bar-wrap">
+              <div class="gender-bar male" style="height: 29%;"></div>
+              <div class="gender-pct male">29%</div>
+              <div class="gender-lbl">Male</div>
+            </div>
+          </div>
+        </div>
+        <div class="gender-card">
+          <div class="gender-title">Beauty Sequence</div>
+          <div class="gender-bars">
+            <div class="gender-bar-wrap">
+              <div class="gender-bar female" style="height: 100%;"></div>
+              <div class="gender-pct female">100%</div>
+              <div class="gender-lbl">Female</div>
+            </div>
+            <div class="gender-bar-wrap">
+              <div class="gender-bar male" style="height: 0%;"></div>
+              <div class="gender-pct male">0%</div>
+              <div class="gender-lbl">Male</div>
+            </div>
+          </div>
+        </div>
+        <div class="gender-card">
+          <div class="gender-title">Water Sequence</div>
+          <div class="gender-bars">
+            <div class="gender-bar-wrap">
+              <div class="gender-bar female" style="height: 56%;"></div>
+              <div class="gender-pct female">56%</div>
+              <div class="gender-lbl">Female</div>
+            </div>
+            <div class="gender-bar-wrap">
+              <div class="gender-bar male" style="height: 44%;"></div>
+              <div class="gender-pct male">44%</div>
+              <div class="gender-lbl">Male</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <blockquote class="pullquote">
+      "You're not selling testing. You're selling <em>closure of a blind spot</em> for people who've already closed every other one."
+    </blockquote>
+
+    <!-- Messaging angle cards -->
+    <div style="font-size:13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 12px;">Messaging Angles</div>
+    <div class="card-grid card-grid-2">
+      <div class="angle-card">
+        <div class="angle-card-title">🧬 Biohacker</div>
+        <div class="angle-card-text">"Environmental toxins undermine every other health investment"</div>
+      </div>
+      <div class="angle-card">
+        <div class="angle-card-title">👨‍👩‍👧 Family</div>
+        <div class="angle-card-text">"Kids drink more water and breathe more air relative to body size"</div>
+      </div>
+      <div class="angle-card">
+        <div class="angle-card-title">💄 Beauty</div>
+        <div class="angle-card-text">"No serum fixes a water quality problem"</div>
+      </div>
+      <div class="angle-card">
+        <div class="angle-card-title">🏠 Home</div>
+        <div class="angle-card-text">"A home inspection tells you if it works. InHaus tells you if it's healthy."</div>
+      </div>
+    </div>
+
+    <div class="callout mt-16" style="border-left-color: var(--danger); border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.06);">
+      <div class="callout-label" style="color: var(--danger);">⚠ Email Gap</div>
+      <p><strong>E1 sent to all sequences.</strong> E2–E5 (~32 emails) were never written. Leads were left without follow-up.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 4: PRICING -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">04</span>
+      <h2 class="section-title">Pricing Framework</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <!-- Standalone tests table -->
+    <div class="card mb-16">
+      <div style="font-size:13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;">Standalone Test Scoring</div>
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Test Category</th>
+            <th>Composite Score</th>
+            <th>Score Visual</th>
+            <th>Decision</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600; color: var(--white);">Water Quality</td>
+            <td style="color: var(--teal); font-weight: 700;">6.35</td>
+            <td><div class="score-bar-track"><div class="score-bar-fill" style="width: 100%;"></div></div></td>
+            <td><span class="badge-sell">✅ SELL</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; color: var(--white);">Mold &amp; Particles</td>
+            <td style="color: var(--teal); font-weight: 700;">6.30</td>
+            <td><div class="score-bar-track"><div class="score-bar-fill" style="width: 99.2%;"></div></div></td>
+            <td><span class="badge-bundle">Bundle only</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; color: var(--white);">Radon</td>
+            <td style="color: var(--teal); font-weight: 700;">5.80</td>
+            <td><div class="score-bar-track"><div class="score-bar-fill" style="width: 91.3%;"></div></div></td>
+            <td><span class="badge-bundle">Bundle only</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; color: var(--white);">Air Quality</td>
+            <td style="color: var(--teal); font-weight: 700;">5.75</td>
+            <td><div class="score-bar-track"><div class="score-bar-fill" style="width: 90.5%;"></div></div></td>
+            <td><span class="badge-bundle">Bundle only</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; color: var(--white);">Allergens</td>
+            <td style="color: var(--teal); font-weight: 700;">5.60</td>
+            <td><div class="score-bar-track"><div class="score-bar-fill" style="width: 88.2%;"></div></div></td>
+            <td><span class="badge-bundle">Bundle only</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; color: var(--white);">Surface Contaminants</td>
+            <td style="color: var(--muted); font-weight: 700;">4.70</td>
+            <td><div class="score-bar-track"><div class="score-bar-fill" style="width: 74%; background: var(--muted);"></div></div></td>
+            <td><span class="badge-free">🆓 FREE</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Package cards -->
+    <div style="font-size:13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;">Package Offers</div>
+    <div class="card-grid card-grid-4">
+      <div class="pkg-card">
+        <div class="pkg-name">Full Home Assessment</div>
+        <div class="pkg-price">$1,500</div>
+        <div class="pkg-desc">All 6 categories included</div>
+        <div class="pkg-tag green">30%+ savings</div>
+      </div>
+      <div class="pkg-card">
+        <div class="pkg-name">Respiratory Package</div>
+        <div class="pkg-price">$695</div>
+        <div class="pkg-desc">Air + Mold + Allergens</div>
+        <div class="pkg-tag gold">17% savings</div>
+      </div>
+      <div class="pkg-card featured">
+        <div class="pkg-name">Radon + Air</div>
+        <div class="pkg-price">$395</div>
+        <div class="pkg-desc">#1 Lead Offer — Highest detection rate</div>
+        <div class="pkg-tag teal">⭐ Recommended Entry</div>
+      </div>
+      <div class="pkg-card">
+        <div class="pkg-name">Water Quality</div>
+        <div class="pkg-price">$395</div>
+        <div class="pkg-desc">194 parameters — PFAS, lead, bacteria</div>
+        <div class="pkg-tag green">Proven demand</div>
+      </div>
+    </div>
+
+    <div class="callout mt-16">
+      <div class="callout-label">💡 Lead Offer Recommendation</div>
+      <p><strong>Radon + Air at $395 is the recommended entry offer.</strong> 40%+ detection rate. No direct competitor. Clear cancer prevention hook.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 5: SEO -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">05</span>
+      <h2 class="section-title">SEO — Atidiv Engagement</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <!-- SEO deliverables metrics -->
+    <div class="seo-progress">
+      <div class="seo-metric-card">
+        <div class="seo-metric-val">48K+</div>
+        <div class="seo-metric-lbl">Words Published</div>
+      </div>
+      <div class="seo-metric-card">
+        <div class="seo-metric-val">60+</div>
+        <div class="seo-metric-lbl">Blog Posts</div>
+      </div>
+      <div class="seo-metric-card">
+        <div class="seo-metric-val">153</div>
+        <div class="seo-metric-lbl">Backlinks Built</div>
+      </div>
+      <div class="seo-metric-card">
+        <div class="seo-metric-val">60</div>
+        <div class="seo-metric-lbl">Hyperlocal Citations</div>
+      </div>
+      <div class="seo-metric-card">
+        <div class="seo-metric-val">2</div>
+        <div class="seo-metric-lbl">GBP Profiles Verified</div>
+      </div>
+      <div class="seo-metric-card">
+        <div class="seo-metric-val">1→10</div>
+        <div class="seo-metric-lbl">Domain Authority</div>
+      </div>
+    </div>
+
+    <!-- Progression table -->
+    <div class="card mt-16">
+      <div style="font-size:13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;">Weekly Progression</div>
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Organic Sessions</th>
+            <th>Top 10 Rankings</th>
+            <th>Domain Authority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Jan 2–8</td>
+            <td>27</td>
+            <td>0</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>Jan 9–15</td>
+            <td style="color: var(--teal); font-weight: 700;">98 <span style="font-size:10px; color: var(--muted);">(PEAK)</span></td>
+            <td>0</td>
+            <td>3</td>
+          </tr>
+          <tr>
+            <td>Jan 30–Feb 5</td>
+            <td>70</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
+          <tr>
+            <td>Feb 6–12</td>
+            <td>56</td>
+            <td>1</td>
+            <td>10</td>
+          </tr>
+          <tr>
+            <td>Feb 13–19</td>
+            <td>37</td>
+            <td>4</td>
+            <td>10</td>
+          </tr>
+          <tr>
+            <td>Feb 27–Mar 5</td>
+            <td>58</td>
+            <td>5</td>
+            <td>10</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top: 14px; padding: 10px 14px; background: rgba(248,113,113,0.07); border-radius: 6px; font-size: 13px; color: var(--danger);">
+        <strong>Target:</strong> <span style="color: var(--slate);">6,000 organic sessions/week by April 2026. Never reached.</span>
+      </div>
+    </div>
+
+    <div class="callout mt-16" style="border-left-color: var(--muted); border-color: rgba(148,163,184,0.25); background: rgba(148,163,184,0.05);">
+      <div class="callout-label" style="color: var(--muted);">Why Paused</div>
+      <p>"The business and site aren't mature enough yet for SEO to convert into traffic."</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 6: KURA -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">06</span>
+      <h2 class="section-title">Kura Home Partnership</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="kura-row">
+      <div class="kura-card">
+        <div class="kura-val">$9.1M</div>
+        <div class="kura-lbl">All-Time Revenue</div>
+      </div>
+      <div class="kura-card">
+        <div class="kura-val">12,476</div>
+        <div class="kura-lbl">Total Clients</div>
+      </div>
+      <div class="kura-card">
+        <div class="kura-val">468</div>
+        <div class="kura-lbl">Active Recurring (2025)</div>
+      </div>
+      <div class="kura-card" style="border-top: 3px solid var(--teal);">
+        <div class="kura-val">319</div>
+        <div class="kura-lbl">Churned Clients</div>
+        <div class="kura-sub">Full addresses = InHaus target list</div>
+      </div>
+      <div class="kura-card" style="border-top: 3px solid var(--danger);">
+        <div class="kura-val" style="color: var(--danger);">−1</div>
+        <div class="kura-lbl">Net New Recurring (2025)</div>
+      </div>
+    </div>
+
+    <div class="callout" style="border-left-color: var(--warn); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.05);">
+      <div class="callout-label" style="color: var(--warn);">Email Campaign Result</div>
+      <p><strong>27% open rate.</strong> 0 conversions. Wrong offer — not wrong execution.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 7: EMAIL SYSTEM -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">07</span>
+      <h2 class="section-title">Email Lifecycle System</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <!-- Layer 1 -->
+    <div class="flow-layer">
+      <div class="flow-layer-title">Layer 1 — Lead Nurture Sequence</div>
+      <div class="flow-boxes">
+        <div class="flow-box start">Ad Click</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">Lead captured</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">E1: Mirror entry point</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="border-color: rgba(248,113,113,0.5); color: var(--danger);">E2: Real MN data</div>
+        <div class="flow-arrow" style="color: var(--danger);">→</div>
+        <div class="flow-box" style="border-color: rgba(248,113,113,0.5); color: var(--danger);">E3: Kill DIY objection</div>
+        <div class="flow-arrow" style="color: var(--danger);">→</div>
+        <div class="flow-box" style="border-color: rgba(248,113,113,0.5); color: var(--danger);">E4: $200 credit</div>
+        <div class="flow-arrow" style="color: var(--danger);">→</div>
+        <div class="flow-box" style="border-color: rgba(248,113,113,0.5); color: var(--danger);">E5: Last chance</div>
+      </div>
+      <div style="font-size:11px; color: var(--danger); margin-top: 8px; font-weight: 600;">⚠ E2–E5 never written — leads left hanging after E1</div>
+    </div>
+
+    <!-- Layer 2 -->
+    <div class="flow-layer">
+      <div class="flow-layer-title">Layer 2 — Post-Booking Sequence</div>
+      <div class="flow-boxes" style="gap: 0;">
+        <div class="flow-box start" style="font-size:11px;">Books assessment</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Confirm + SMS</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">What we'll test</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Prep checklist</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Day-before SMS</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Morning-of email</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Inspector on way SMS</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Thank you</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Report ready</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Progressive updates</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Follow-up + referral</div>
+      </div>
+    </div>
+
+    <!-- Layer 3 -->
+    <div class="flow-layer">
+      <div class="flow-layer-title">Layer 3 — Post-Consultation Sequence</div>
+      <div class="flow-boxes">
+        <div class="flow-box start" style="font-size:11px;">Books Calendly</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Confirmation</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Matt intro</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Report preview</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">Day before</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box" style="font-size:11px;">T-2 hours</div>
+      </div>
+    </div>
+
+    <!-- Open gaps -->
+    <div class="card card-left mt-16">
+      <div style="font-size:13px; font-weight: 700; color: var(--danger); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Open Gaps</div>
+      <div class="open-gap">
+        <span class="gap-icon">✗</span>
+        <span>E2–E5 never written for lead sequences (~32 emails total)</span>
+      </div>
+      <div class="open-gap">
+        <span class="gap-icon">✗</span>
+        <span>Lab results validation form not built</span>
+      </div>
+      <div class="open-gap">
+        <span class="gap-icon">✗</span>
+        <span>Case studies not verified as real IHL cases</span>
+      </div>
+      <div class="open-gap">
+        <span class="gap-icon">✗</span>
+        <span>Client portal for report delivery not built</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 8: WHAT WORKED -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">08</span>
+      <h2 class="section-title">What Worked / What Didn't</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="verdict-grid">
+      <div class="verdict-col worked">
+        <div class="verdict-header worked">✅ What Worked</div>
+        <div class="verdict-item">$4.80 CPC — traffic is affordable</div>
+        <div class="verdict-item">CTR proves search intent is real (Air Quality 14%, Radon 8%)</div>
+        <div class="verdict-item">Price in ad copy outperformed no-price 6:1</div>
+        <div class="verdict-item">Meta positioning strategy is genuinely strong and reusable</div>
+        <div class="verdict-item">102 real leads generated from Meta campaign</div>
+        <div class="verdict-item">Water and Beauty creatives proven winners</div>
+        <div class="verdict-item">Pricing framework is solid and done</div>
+        <div class="verdict-item">Email system architecture is well-designed</div>
+      </div>
+      <div class="verdict-col didnt">
+        <div class="verdict-header didnt">❌ What Didn't Work</div>
+        <div class="verdict-item">Website couldn't convert any traffic (no CTA, no reviews, no case studies)</div>
+        <div class="verdict-item">Kura email: 0 conversions (wrong offer, not wrong execution)</div>
+        <div class="verdict-item">SEO: 12+ month play — site lacked authority signals</div>
+        <div class="verdict-item">"Home Health Score" has essentially zero search volume — pure education sell</div>
+        <div class="verdict-item">E2–E5 emails never written — leads left hanging</div>
+        <div class="verdict-item">Blog photos completely wrong (literal lab shots vs. aspirational lifestyle)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECTION 9: PRE-ADS CHECKLIST -->
+  <section class="section">
+    <div class="section-label">
+      <span class="section-num">09</span>
+      <h2 class="section-title">Before Ads Work — Prerequisite Checklist</h2>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="callout mb-16" style="border-left-color: var(--warn); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.06);">
+      <div class="callout-label" style="color: var(--warn);">Facu's Explicit Requirements</div>
+      <p>These items must exist before paid ads can convert. This is not a suggested list — it's a prerequisite gate.</p>
+    </div>
+
+    <div class="card">
+      <ul class="checklist">
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">Real client reviews on GBP + website</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">Social proof is the primary trust signal for a new service category</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">Leadership / team page with credentials</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">People need to know who is testing their home</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">3 verified case studies live</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">He wrote them — they need to be published and verified as real IHL cases</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">Social media presence established and active</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">Leads check social before booking; ghost accounts kill trust</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">Privacy Policy, T&C, contact with physical address</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">Required for Meta ads and for basic legitimacy signals</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">Lifestyle photography (aspirational, not literal)</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">Lab shots repel; family-in-healthy-home images convert</div>
+          </div>
+        </li>
+        <li>
+          <div class="check-box"></div>
+          <div>
+            <div style="font-weight: 600; color: var(--white);">Working conversion mechanism — quiz OR lead magnet</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">"Contact us" is not a conversion mechanism. Must collect email before asking for booking.</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ FOOTER -->
+  <footer class="report-footer">
+    <div class="footer-left">
+      <div style="font-weight: 700; color: var(--white); margin-bottom: 4px;">InHaus Lab</div>
+      <div>Facu Lavino — Marketing &amp; Ads Work Review &nbsp;·&nbsp; Compiled July 8, 2026</div>
+    </div>
+    <div class="footer-right">Confidential — Internal Use Only</div>
+  </footer>
+
+</div>
+</body>
+</html>
