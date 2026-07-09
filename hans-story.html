@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hans — An AI Built for Real Work</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111827;
+    --bg3: #1a2035;
+    --card: #1e2740;
+    --border: #2a3450;
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(10,14,26,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    height: 56px;
+    gap: 4px;
+    overflow-x: auto;
+  }
+
+  nav a {
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  nav a:hover { background: var(--bg3); color: var(--text); }
+  nav .logo { font-weight: 800; color: var(--accent); margin-right: 12px; font-size: 15px; flex-shrink: 0; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 100px 40px 80px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.15) 0%, transparent 70%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232a3450' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(59,130,246,0.15);
+    border: 1px solid rgba(59,130,246,0.3);
+    color: var(--accent);
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 32px;
+    letter-spacing: 0.5px;
+  }
+
+  .hero h1 {
+    font-size: clamp(40px, 6vw, 80px);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero h1 span {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: clamp(16px, 2vw, 20px);
+    color: var(--text2);
+    max-width: 680px;
+    margin: 0 auto 48px;
+    line-height: 1.7;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .hero-stat { text-align: center; }
+  .hero-stat .num {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: block;
+  }
+  .hero-stat .label { font-size: 13px; color: var(--text3); font-weight: 500; margin-top: 4px; }
+
+  /* SECTIONS */
+  section {
+    padding: 100px 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 20px;
+  }
+
+  .section-intro {
+    font-size: 18px;
+    color: var(--text2);
+    line-height: 1.7;
+    max-width: 700px;
+    margin-bottom: 56px;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+
+  .card-icon {
+    font-size: 32px;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .card p { color: var(--text2); font-size: 15px; line-height: 1.6; }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2), var(--accent3));
+    border-radius: 2px;
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 40px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 8px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .timeline-date {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .timeline-item h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .timeline-item p { color: var(--text2); font-size: 15px; line-height: 1.6; }
+
+  /* PILLS / TAGS */
+  .tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 3px;
+  }
+  .tag-blue { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+  .tag-purple { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
+  .tag-green { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+  .tag-amber { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+  .tag-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+
+  /* STACK TABLE */
+  .stack-table { width: 100%; border-collapse: collapse; }
+  .stack-table th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    border-bottom: 2px solid var(--border);
+  }
+  .stack-table td {
+    padding: 14px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+    vertical-align: top;
+  }
+  .stack-table td:first-child { color: var(--text); font-weight: 600; }
+  .stack-table tr:hover td { background: rgba(59,130,246,0.04); }
+
+  /* CALLOUT */
+  .callout {
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 24px 0;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .callout-blue { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); }
+  .callout-green { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); }
+  .callout-amber { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }
+  .callout-red { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); }
+  .callout-icon { font-size: 22px; flex-shrink: 0; line-height: 1.4; }
+  .callout p { font-size: 15px; color: var(--text2); line-height: 1.6; }
+  .callout p strong { color: var(--text); }
+
+  /* MONEY CARD */
+  .money-card {
+    background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(59,130,246,0.08));
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 16px;
+    padding: 36px;
+    text-align: center;
+    margin: 32px 0;
+  }
+  .money-card .amount {
+    font-size: 64px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #34d399, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: block;
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+  .money-card p { color: var(--text2); font-size: 16px; }
+
+  /* CODE */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg3);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #a78bfa;
+  }
+
+  pre {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.7;
+    margin: 24px 0;
+  }
+
+  /* DIVIDER */
+  .section-divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+    margin: 0;
+  }
+
+  /* HIGHLIGHT BLOCK */
+  .highlight-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 12px 12px 0;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+  .highlight-block.green { border-left-color: var(--accent3); }
+  .highlight-block.amber { border-left-color: var(--accent4); }
+  .highlight-block.red { border-left-color: var(--accent5); }
+  .highlight-block p { color: var(--text2); font-size: 15px; line-height: 1.6; }
+  .highlight-block p strong { color: var(--text); }
+
+  /* EMPLOYEE CARD */
+  .emp-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .emp-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .emp-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .emp-card .role { font-size: 12px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .emp-card p { color: var(--text2); font-size: 14px; line-height: 1.5; }
+
+  /* MISTAKE CARD */
+  .mistake-card {
+    background: rgba(239,68,68,0.05);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .mistake-card h3 { font-size: 16px; font-weight: 700; color: #f87171; margin-bottom: 8px; }
+  .mistake-card p { color: var(--text2); font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
+  .lesson {
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: #34d399;
+  }
+  .lesson strong { color: #6ee7b7; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 60px 40px;
+    color: var(--text3);
+    font-size: 14px;
+    border-top: 1px solid var(--border);
+  }
+  footer strong { color: var(--text2); }
+
+  /* SCROLL FADE */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-up {
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    nav { padding: 0 16px; }
+    section { padding: 60px 20px; }
+    .hero { padding: 80px 20px 60px; }
+    .hero-stats { gap: 24px; }
+    pre { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="logo">🛠️ Hans</span>
+  <a href="#what-is-hans">What Is This?</a>
+  <a href="#origin">Origin</a>
+  <a href="#evolution">Evolution</a>
+  <a href="#roles">Roles Replaced</a>
+  <a href="#builds">Major Builds</a>
+  <a href="#savings">ROI</a>
+  <a href="#mistakes">Mistakes</a>
+  <a href="#stack">Tech Stack</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero" id="top">
+  <div class="hero-badge">🤖 A real AI system built for a real business</div>
+  <h1>Meet <span>Hans</span>.<br>A one-person AI team.</h1>
+  <p>Hans is an always-on AI assistant running on a Mac mini in a home office. Built from scratch in about four weeks by a non-engineer. This is the story of what got built, how, and what it cost.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <span class="num">~$0</span>
+      <div class="label">Engineering fees paid</div>
+    </div>
+    <div class="hero-stat">
+      <span class="num">4 wks</span>
+      <div class="label">From idea to production</div>
+    </div>
+    <div class="hero-stat">
+      <span class="num">v146</span>
+      <div class="label">Current app version</div>
+    </div>
+    <div class="hero-stat">
+      <span class="num">$200–300</span>
+      <div class="label">Monthly AI spend</div>
+    </div>
+  </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- SECTION 1: WHAT IS HANS -->
+<section id="what-is-hans">
+  <div class="section-label">01 — The Basics</div>
+  <h2>What exactly is Hans?</h2>
+  <p class="section-intro">Hans is not a chatbot you visit on a website. Hans is a persistent, always-running AI agent installed on dedicated hardware — like hiring an employee who never clocks out, never forgets, and costs a few hundred dollars a month.</p>
+
+  <div class="callout callout-blue">
+    <div class="callout-icon">💡</div>
+    <p><strong>The core idea:</strong> Instead of asking an AI a question and getting a one-time answer, Hans has memory, tools, ongoing tasks, and access to real systems. He can read and write files, search the web, send Slack messages, run code, check email, manage a calendar, and execute background jobs on a schedule — all while maintaining context about the business across sessions.</p>
+  </div>
+
+  <div class="grid-2" style="margin-top: 40px;">
+    <div class="card">
+      <span class="card-icon">💬</span>
+      <h3>What most people think AI is</h3>
+      <p>A chat window. You ask something, it answers. Session ends, everything is forgotten. No connection to your real tools or data. No follow-through.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent);">
+      <span class="card-icon">🛠️</span>
+      <h3>What Hans actually is</h3>
+      <p>A persistent agent with memory, tools, and system access. He can send emails, write code, check on projects, set reminders, manage files, coordinate with team members via Slack, and wake up at 3 AM to run a scheduled task — then report back in the morning.</p>
+    </div>
+  </div>
+
+  <div style="margin-top: 48px;">
+    <h3 style="font-size: 20px; margin-bottom: 20px;">Right now, Hans is running on:</h3>
+    <div class="grid-3">
+      <div class="card">
+        <span class="card-icon">🖥️</span>
+        <h3>A Mac mini</h3>
+        <p>Apple Silicon, always on, sitting in a home office. Not a cloud server — real dedicated hardware. This is important for reliability and cost.</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🌐</span>
+        <h3>OpenClaw</h3>
+        <p>The software framework that runs the AI agent. Think of it like an operating system for AI — it handles memory, tools, scheduling, and routing messages to the right AI model.</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🧠</span>
+        <h3>Claude (Anthropic)</h3>
+        <p>The AI model that powers Hans's reasoning. Claude reads the context and memory files, then decides what to do and how to respond. Hans can switch models for different tasks.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 2: ORIGIN STORY -->
+<section id="origin">
+  <div class="section-label">02 — Origin Story</div>
+  <h2>How it started</h2>
+  <p class="section-intro">March 2026. A founder running a home inspection startup in Aspen, Colorado decided to try building an AI agent instead of hiring an engineer. No prior AI engineering experience. Just curiosity and a Mac mini.</p>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-date">Week 1 — March 26–30, 2026</div>
+      <h3>Started from zero</h3>
+      <p>First prompt: "help me build an OpenClaw-style local agent system on my Mac Mini." Built Hans's file system, identity, and workflows. Installed the OpenClaw framework via Homebrew. Set up Google Cloud APIs for Gmail, Calendar, and Drive. Connected Claude as the reasoning model. Then — from a <strong>single conversation with Claude Code</strong> — built an entire field inspection PWA (Progressive Web App) with 275+ data capture points, offline capability, and iPad support. Deployed to GitHub Pages the same day.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">Week 2 — April 2–4, 2026</div>
+      <h3>Moved to dedicated hardware</h3>
+      <p>Migrated Hans from a laptop to a dedicated Mac mini. SSH key authentication, Tailscale networking, auto-login, firewall config. The inspector app went live for real testing. A field inspector (David) started using it. Apps Script was wired to auto-export to Google Drive.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">Week 3 — April 5–11, 2026</div>
+      <h3>Business intelligence layer</h3>
+      <p>Built a 24-month revenue model. Designed the report automation pipeline: Google Sheet scoring → AI narrative → client report. Wrote a style guide by rewriting every section of a real Aspen inspection report side-by-side. Did a full competitive analysis — confirmed no one else combines a full test suite (air, water, mold, radon, allergens) with a scored report.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">April 17, 2026</div>
+      <h3>Presented to investors</h3>
+      <p>Pitched Guild Capital with a full investor deck. One of the talking points: "We built a live production PWA, an autonomous AI agent on dedicated hardware, a scoring engine, a 24-month financial model, complete documentation, a competitive analysis — all with $0 in engineering fees. Built entirely through conversation with AI."</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">May–July 2026</div>
+      <h3>Evolved into a full business OS</h3>
+      <p>Hans evolved from a personal assistant into the operating system for an entire small company. Added Slack integration (team members can message Hans directly), built an inspector management system, a client review portal, a readiness console, a photo upload pipeline, and much more. The inspector app hit version 146.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 3: EVOLUTION -->
+<section id="evolution">
+  <div class="section-label">03 — The Evolution</div>
+  <h2>How Hans evolved</h2>
+  <p class="section-intro">Hans didn't arrive as a finished product. He grew through real use, real failures, and real problems that needed solving. This is what that progression looks like.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="tag tag-blue" style="margin-bottom: 12px;">Phase 1: Personal Assistant</div>
+      <h3>The chatbot phase</h3>
+      <p>Hans started as a smart question-answering tool. Matt would ask questions, Hans would research and answer. Calendar checks, email drafting, web searches. Useful but not yet transformative. Think: very powerful Google with memory.</p>
+    </div>
+    <div class="card">
+      <div class="tag tag-purple" style="margin-bottom: 12px;">Phase 2: Builder</div>
+      <h3>The engineering phase</h3>
+      <p>Hans shifted from answering to building. Writing real code deployed to real systems. The inspector app v1 → v100+. Google Apps Script. A client review portal. A scoring engine. Hans was now the engineering team.</p>
+    </div>
+    <div class="card">
+      <div class="tag tag-green" style="margin-bottom: 12px;">Phase 3: Business OS</div>
+      <h3>The operations phase</h3>
+      <p>Hans became infrastructure. Team members (Tanner, Allie) can message Hans on Slack. Automated daily summaries. Scheduled background jobs. Memory that persists across sessions. Hans is no longer a tool — he's a team member.</p>
+    </div>
+    <div class="card">
+      <div class="tag tag-amber" style="margin-bottom: 12px;">Phase 4: AI Council</div>
+      <h3>The coordination phase</h3>
+      <p>Hans now coordinates with GPT (OpenAI's agent) in a shared Slack channel called #ai-council. Two AI systems collaborating on business problems, with Hans as the primary operator and GPT as a second opinion. A small company where the "team" includes multiple AI systems.</p>
+    </div>
+  </div>
+
+  <div class="callout callout-blue" style="margin-top: 40px;">
+    <div class="callout-icon">🔑</div>
+    <p><strong>The key insight about evolution:</strong> Each phase happened because a real problem hit a wall. The inspector app wasn't in a roadmap — it got built because the field inspector needed a way to capture data offline. The Slack integration happened because team members were messaging Matt instead of being able to ask Hans directly. Real problems drove every expansion.</p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 4: UNIQUE USES -->
+<section id="unique-uses">
+  <div class="section-label">04 — Unique Applications</div>
+  <h2>The unusual ways Hans is used</h2>
+  <p class="section-intro">Most people use AI for writing help or answering questions. The way Hans is deployed goes significantly beyond that. Here are the genuinely unusual patterns.</p>
+
+  <div class="grid-2" style="margin-bottom: 32px;">
+    <div class="card">
+      <span class="card-icon">📖</span>
+      <h3>Persistent Memory Across Sessions</h3>
+      <p>Hans maintains structured memory files that persist between conversations. Client details, project decisions, error patterns, team preferences — all written to disk. When Matt comes back a week later, Hans knows exactly where things stand. This is not how most people use AI.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🤝</span>
+      <h3>Team-Facing Agent</h3>
+      <p>Tanner (operations) and Allie (growth) can message Hans directly on Slack. Hans runs as a restricted agent for them — he can answer questions, look things up, and coordinate, but can't access sensitive context. One AI, two usage modes depending on who's asking.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">⏰</span>
+      <h3>Scheduled Background Jobs</h3>
+      <p>Hans runs cron jobs — scheduled tasks that fire automatically. Daily summaries, reminder checks, context preservation. Hans can spawn isolated subagents that work in the background and report back. He works while Matt sleeps.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">📋</span>
+      <h3>Protocol Enforcement</h3>
+      <p>Hans has built-in operating rules that prevent bad patterns. Three-failure hard stop (never make a fourth attempt). Session length monitoring. Banned words scanned in every reply. The AI enforces its own quality controls — the guardrails are in the files Hans reads at startup.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🔁</span>
+      <h3>Reliability Fallback</h3>
+      <p>The Mac mini runs a watchdog script. If OpenClaw crashes, it restarts within minutes. If the main internet tunnel goes down, a Hetzner server in Germany monitors and activates a backup tunnel automatically. Hans has uptime infrastructure like a production service.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🤖 + 🤖</span>
+      <h3>AI-to-AI Collaboration</h3>
+      <p>In the #ai-council Slack channel, Hans and GPT communicate directly. One AI asks another AI for a second opinion on business problems. Hans coordinates these sessions, sets the agenda, and synthesizes the output. This is genuinely novel territory.</p>
+    </div>
+  </div>
+
+  <div class="highlight-block">
+    <p><strong>The "heartbeat" system:</strong> Hans runs a periodic check-in called a heartbeat. It's a scheduled job that fires every 30 minutes or so. Hans checks a file called HEARTBEAT.md — if there are any checks listed there, he runs them (email scan, calendar check, etc.) and only reaches out if something needs attention. Most heartbeats are silent. This is how Hans stays useful without being annoying.</p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 5: ROLES REPLACED -->
+<section id="roles">
+  <div class="section-label">05 — The Roles</div>
+  <h2>What Hans replaces (or prevents hiring)</h2>
+  <p class="section-intro">The honest answer: Hans doesn't perfectly replace any human role. But he covers enough of several roles that the business hasn't needed to hire them. Here's the breakdown.</p>
+
+  <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 40px;">
+    <div class="emp-card">
+      <div class="emp-icon" style="background: rgba(59,130,246,0.15);">👩‍💻</div>
+      <div>
+        <h3>Software Engineer / Full-Stack Developer</h3>
+        <div class="role">Closest replacement</div>
+        <p>The entire inspector app — v1 through v146 — was built by AI. No engineer was hired. Hans (via Claude Code and Codex handoffs) wrote the PWA, the Apps Script backend, the review portal, the photo pipeline, the readiness console. Estimated market rate: $150–200K/yr. Total paid: $0.</p>
+      </div>
+    </div>
+    <div class="emp-card">
+      <div class="emp-icon" style="background: rgba(139,92,246,0.15);">📊</div>
+      <div>
+        <h3>Operations Coordinator / Chief of Staff</h3>
+        <div class="role">Strong replacement</div>
+        <p>Hans tracks open items, maintains project ledgers, writes daily summaries, coordinates between Matt and the team, flags when things are overdue, and maintains durable records across all active projects. This is the core of what a COO or CoS does at a 5-person company.</p>
+      </div>
+    </div>
+    <div class="emp-card">
+      <div class="emp-icon" style="background: rgba(16,185,129,0.15);">✍️</div>
+      <div>
+        <h3>Copywriter / Content Strategist</h3>
+        <div class="role">Partial replacement</div>
+        <p>Client emails, investor updates, inspection reports, marketing copy, Slack messages to team — Hans drafts all of it. Matt reviews and approves. For a small company, this is hours a day saved.</p>
+      </div>
+    </div>
+    <div class="emp-card">
+      <div class="emp-icon" style="background: rgba(245,158,11,0.15);">🔬</div>
+      <div>
+        <h3>Research Analyst</h3>
+        <div class="role">Strong replacement</div>
+        <p>Competitive analysis, pricing research, market sizing, technical audits — Hans does all of this. The competitive analysis that confirmed "nobody else combines a full test suite with scored reports" took one session and influenced the pitch deck.</p>
+      </div>
+    </div>
+    <div class="emp-card">
+      <div class="emp-icon" style="background: rgba(239,68,68,0.15);">🔧</div>
+      <div>
+        <h3>DevOps / Systems Admin</h3>
+        <div class="role">Partial replacement</div>
+        <p>Hans manages the infrastructure config, monitors uptime, writes the watchdog scripts, manages the Cloudflare tunnel, and knows the SSH keys and Tailscale network. A real DevOps hire would do more, but Hans handles the basics that would otherwise need someone on call.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-amber">
+    <div class="callout-icon">⚠️</div>
+    <p><strong>What Hans cannot replace:</strong> Anything that requires being physically present, using a real phone browser, or authenticating as a human with a real account. Deploying a Google Apps Script update requires clicking through Google's browser UI — Hans cannot do this. Verifying something on an iPhone requires an iPhone. These are real limits and important to understand.</p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 6: MAJOR BUILDS -->
+<section id="builds">
+  <div class="section-label">06 — Engineering Builds</div>
+  <h2>What got built</h2>
+  <p class="section-intro">Here's a catalog of significant engineering work produced through AI — every item below was shipped to production and used in the real business.</p>
+
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <div class="card" style="border-left: 3px solid var(--accent);">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">📱</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-green">LIVE</span>
+            <span class="tag tag-blue">v146</span>
+            <span class="tag tag-blue">PWA</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">InHaus Inspector App</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">A full Progressive Web App for field home inspectors. Works offline (critical for basements and rural properties). 275+ data capture fields. Camera integration with triple-redundancy photo storage. AI-powered HVAC scanner and room summary via Claude. Inspector performance scoring (0–100, letter grades, pay clock, streak bonuses). Built from a single conversation in Week 1. Now at v146 after months of iteration.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border-left: 3px solid var(--accent2);">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">🗄️</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-green">LIVE</span>
+            <span class="tag tag-purple">v50</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">Google Apps Script Backend Bridge</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">A serverless backend that receives inspection data from the field app and orchestrates Drive folder creation, Google Sheets logging, email alerts, and Supabase writes. No servers. Runs on Google's infrastructure. Version 50 as of July 2026. Built and iterated entirely by AI.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border-left: 3px solid var(--accent3);">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">👁️</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-green">LIVE</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">Client Review Portal</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">A web portal for reviewing completed inspections. 9-section report view, photo gallery, reviewer notes. Real inspections load from the live API. Direct links via URL params. Auto-loads sample data. Built after the prior Replit-based viewer was lost. Deployed and verified in one session.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border-left: 3px solid var(--accent4);">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">☁️</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-amber">STAGING</span>
+            <span class="tag tag-blue">Supabase</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">Supabase Photo Pipeline</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">A full replacement for the Apps Script photo upload path. Photos go from the inspector's iPhone → Supabase Storage (PostgreSQL backend) → verified and available. Solves the hard quota ceiling that Apps Script had. Feature-flagged (off by default), verified on real iPhone, 5 photos confirmed. Go-live pending final checklist.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border-left: 3px solid #06b6d4;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">🔴</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-green">LIVE</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">Readiness Console + Operating Workbench</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">Two internal tools built for Hans to self-monitor. The Readiness Console auto-checks 7 system endpoints and gates on manual evidence for critical systems. Gives a computed "Ready / Caution / Do Not Add Users" verdict. The Workbench enforces the operating protocol: stages, failure tracking, banned word scanning, context flags.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border-left: 3px solid #ec4899;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">🔌</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-green">LIVE</span>
+            <span class="tag tag-blue">Cloudflare Workers</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">AI Feature Proxy + Auto-Failover System</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">A Cloudflare Worker that proxies Claude API calls from the inspector app (keeps the API key off the client). Separately: an auto-failover system running on a Hetzner VPS that monitors the primary Cloudflare tunnel and activates a backup if it goes down — all within 5 minutes, automated.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border-left: 3px solid #a855f7;">
+      <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <span style="font-size: 28px; flex-shrink: 0;">💬</span>
+        <div>
+          <div style="margin-bottom: 8px;">
+            <span class="tag tag-green">LIVE</span>
+            <span class="tag tag-purple">Slack</span>
+          </div>
+          <h3 style="margin-bottom: 8px;">Slack Integration + AI Council</h3>
+          <p style="color: var(--text2); font-size: 15px; line-height: 1.6;">Hans runs as a bot in the company Slack. Team members (Tanner, Allie) can DM Hans directly. Hans operates under a restricted tool set in that context — no personal memory access, no code execution. Separately, the #ai-council channel is where Hans and GPT-4 coordinate and collaborate on business problems.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 7: SAVINGS / ROI -->
+<section id="savings">
+  <div class="section-label">07 — Return on Investment</div>
+  <h2>What this has saved</h2>
+  <p class="section-intro">Real money. Real hours. Here's a grounded breakdown of what it would have cost to do this the traditional way.</p>
+
+  <div class="money-card">
+    <span class="amount">$300K+</span>
+    <p>Estimated value of engineering, operations, research, and copywriting work produced — based on market rates for the equivalent roles over the same period.</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Engineering work</h3>
+      <p style="margin-top: 12px; color: var(--text2);">
+        A senior full-stack engineer at $150K–200K/yr, running for 4 months of equivalent output. The inspector app alone (v1→v146) represents hundreds of hours of engineering. At even $100/hr for a contractor, that's <strong style="color: var(--text);">$50K–100K+</strong>.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Operations / coordination</h3>
+      <p style="margin-top: 12px; color: var(--text2);">
+        A part-time operations coordinator at $50–70K/yr. Hans handles project tracking, summarizing, flagging, coordinating. Call it <strong style="color: var(--text);">$20K–30K</strong> annualized value.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Research & analysis</h3>
+      <p style="margin-top: 12px; color: var(--text2);">
+        Competitive analysis, market research, pricing research, technical audits — these are $200–500/hr consulting tasks. Hans has done dozens of these. Rough value: <strong style="color: var(--text);">$10K–20K</strong>.
+      </p>
+    </div>
+    <div class="card">
+      <h3>What it actually costs</h3>
+      <p style="margin-top: 12px; color: var(--text2);">
+        OpenClaw: $0 (open source). Mac mini: existing hardware. AI model costs (Claude API): <strong style="color: var(--text);">$200–300/month</strong>. That's it. One subscription at the price of a gym membership.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout callout-green" style="margin-top: 40px;">
+    <div class="callout-icon">✅</div>
+    <p><strong>The honest framing:</strong> Hans didn't replace a team of engineers — he meant no team of engineers was ever needed. The business launched with a production-grade field app, a backend, a review portal, and AI features in the product itself, all before a single full-time hire in tech. That's the real story. The capital went to growing the business, not building the infrastructure.</p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 8: MISTAKES -->
+<section id="mistakes">
+  <div class="section-label">08 — Lessons Learned</div>
+  <h2>What went wrong</h2>
+  <p class="section-intro">This isn't a success story with no footnotes. There were real failures, some costly in time, some embarrassing, some that almost damaged the business. They're worth understanding.</p>
+
+  <div class="mistake-card">
+    <h3>🔴 The Photo Upload Disaster</h3>
+    <p>Hans confirmed the inspection system was "ready." A real inspection happened. 42 photos from that inspection never uploaded to the client review portal. The upload filter code checked <code>photo.imageData</code> but photos were actually stored as <code>photo.dataUrl</code> — a one-field mismatch that was invisible until real data hit real code.</p>
+    <div class="lesson"><strong>Lesson:</strong> Never sign off on a data pipeline without tracing the complete path from how data is stored → how it's extracted → how it's filtered → how it's sent → how it's confirmed. "The API is working" is not the same as "data is arriving."</div>
+  </div>
+
+  <div class="mistake-card">
+    <h3>🔴 The Apps Script Hour Loop</h3>
+    <p>Hans sent Matt in circles for over an hour trying to redeploy a Google Apps Script update. What Hans should have said in the first 30 seconds: Apps Script deployments require a human to click through Google's browser UI. It cannot be automated. Instead, Hans kept trying variations until Matt was frustrated and time was wasted.</p>
+    <div class="lesson"><strong>Lesson:</strong> State tool constraints and human-required steps before attempting anything. Never burn time on something fundamentally impossible with the tools available.</div>
+  </div>
+
+  <div class="mistake-card">
+    <h3>🟠 Stale Location Facts in Heartbeats</h3>
+    <p>Heartbeat messages kept saying "Matt is in France" for weeks after he returned to Colorado. The AI was reading old memory facts and treating them as current. Location and availability facts were never flagged as expiring.</p>
+    <div class="lesson"><strong>Lesson:</strong> Volatile facts (location, availability, what's "currently" happening) need expiry dates. Memory is only as good as the process for invalidating outdated entries.</div>
+  </div>
+
+  <div class="mistake-card">
+    <h3>🟠 Session Length Bloat</h3>
+    <p>One session ran to 145,000 tokens — well past the point where context degradation was visible. Decisions made late in that session were influenced by incomplete context. A hard rule now exists: flag at 80K tokens, stop new topics at 120K.</p>
+    <div class="lesson"><strong>Lesson:</strong> AI models have context windows. Long sessions don't just "slow down" — they degrade in quality as early context falls off. Enforce session length limits proactively, not after the damage is done.</div>
+  </div>
+
+  <div class="mistake-card">
+    <h3>🟡 The Gateway Token Incident</h3>
+    <p>A configuration change caused a token mismatch that knocked out all remote access paths simultaneously — Tailscale was down, the Cloudflare tunnel was down, and Wi-Fi isolation blocked the LAN. Matt had to physically plug in a monitor to fix it. Total downtime: several hours.</p>
+    <div class="lesson"><strong>Lesson:</strong> Before any infrastructure change, verify you have a recovery path that doesn't depend on the thing you're changing. Never lock all doors at once.</div>
+  </div>
+
+  <div class="mistake-card">
+    <h3>🟡 Fact Regression in Drafts</h3>
+    <p>When Hans revised a document, he would sometimes regenerate content from scratch instead of making targeted edits. This reintroduced errors that had already been corrected. The rule now: patch, never regenerate. Every edit must be surgical on the existing file.</p>
+    <div class="lesson"><strong>Lesson:</strong> AI has a tendency to "rephrase everything" when asked to revise. Force it to make targeted edits to existing content rather than rewriting from a blank slate.</div>
+  </div>
+
+  <div class="callout callout-blue" style="margin-top: 32px;">
+    <div class="callout-icon">📚</div>
+    <p><strong>The meta-lesson:</strong> Every failure above got documented — in MEMORY.md, in CORRECTIONS.md, in AGENTS.md. The AI reads these files at the start of every session. Lessons compound. What went wrong in March doesn't happen again in July because it's written down and enforced. That's the actual advantage of a persistent agent over a stateless chatbot.</p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- SECTION 9: TECH STACK -->
+<section id="stack">
+  <div class="section-label">09 — Tech Stack</div>
+  <h2>The full technology stack</h2>
+  <p class="section-intro">A walkthrough of every technology layer running right now. Designed to be understandable even if you've never touched a command line.</p>
+
+  <div style="margin-bottom: 48px;">
+    <h3 style="font-size: 20px; margin-bottom: 24px; color: var(--text2);">System Architecture</h3>
+    <pre>
+┌──────────────────────────────────────────────────────────────────┐
+│                      FIELD / CLIENT SIDE                         │
+│                                                                  │
+│   Inspector App (PWA)          Client Review Portal              │
+│   inhaus-inspector.netlify.app  inhauslab.github.io/review/     │
+│   - Offline-first (IndexedDB)   - Token-protected               │
+│   - AI: HVAC + room summary     - Photo gallery                 │
+│   - Works on iPhone/iPad        - 9-section report view         │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │ POST JSON (inspection data)
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              GOOGLE APPS SCRIPT BRIDGE (v50)                     │
+│   - Creates Drive folders    - Writes Google Sheets              │
+│   - Email alerts on error    - Posts to Supabase                │
+│   - Free, no servers         - 6-minute execution limit ⚠️       │
+└────────────┬─────────────────────────────┬───────────────────────┘
+             │                             │
+             ▼                             ▼
+┌─────────────────────┐       ┌────────────────────────────────────┐
+│   Google Drive       │       │   Supabase (PostgreSQL)            │
+│   - Photos stored   │       │   10 tables, RLS enabled           │
+│   - Review index    │       │   Photo pipeline: staging branch   │
+│   - Shared Drive    │       │   inhaus-lab project               │
+└─────────────────────┘       └────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                        AI / EDGE LAYER                           │
+│                                                                  │
+│   Cloudflare Worker                Hans (OpenClaw)               │
+│   - Proxies Claude API calls       - Mac mini (Apple Silicon)    │
+│   - Origin-restricted              - Always-on                   │
+│   - Keeps API key off client       - Cloudflare Tunnel           │
+│                                    - Tailscale backup            │
+│                                    - Slack bot for team          │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                     INFRASTRUCTURE                               │
+│   Mac mini (primary) ──── Cloudflare Tunnel ──── hans.inhauslab.com
+│        │                                                         │
+│        └─── Tailscale VPN ──── SSH access from anywhere         │
+│                                                                  │
+│   Hetzner VPS (Germany)                                          │
+│   - Monitors primary tunnel                                      │
+│   - Activates backup tunnel if primary down (&lt;5 min failover)    │
+│   - OpenClaw running as redundant backup                         │
+└──────────────────────────────────────────────────────────────────┘</pre>
+  </div>
+
+  <h3 style="font-size: 20px; margin-bottom: 20px; color: var(--text2);">Component Reference</h3>
+
+  <div style="overflow-x: auto;">
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>What it is</th>
+          <th>Why it was chosen</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Mac mini (Apple Silicon)</td>
+          <td>Always-on local server. The physical computer Hans runs on.</td>
+          <td>Cheap to run, reliable, powerful enough for AI workloads, already owned.</td>
+          <td>Hardware (owned)</td>
+        </tr>
+        <tr>
+          <td>OpenClaw</td>
+          <td>AI agent framework. Manages memory, tools, sessions, scheduling.</td>
+          <td>Purpose-built for persistent AI agents with real tool access and memory.</td>
+          <td>Free (open source)</td>
+        </tr>
+        <tr>
+          <td>Claude (Anthropic)</td>
+          <td>The AI reasoning model. The "brain" that reads context and makes decisions.</td>
+          <td>Best-in-class for long context, reasoning, code, and following complex instructions.</td>
+          <td>$200–300/mo (API)</td>
+        </tr>
+        <tr>
+          <td>Inspector App (PWA)</td>
+          <td>Field data capture tool for inspectors. Runs in a browser, installs on iPhone.</td>
+          <td>No App Store, no Xcode, no maintenance. Works offline. Deploy via GitHub Pages.</td>
+          <td>Free (GitHub Pages)</td>
+        </tr>
+        <tr>
+          <td>Google Apps Script</td>
+          <td>Serverless backend. Receives data, writes Drive/Sheets, sends alerts.</td>
+          <td>Free, tight Google Workspace integration, no server to manage.</td>
+          <td>Free (Google)</td>
+        </tr>
+        <tr>
+          <td>Google Drive + Sheets</td>
+          <td>Primary data store. Photos, inspection data, review index.</td>
+          <td>Human-accessible, free at this scale, integrates with the rest of Google.</td>
+          <td>~Free (Workspace)</td>
+        </tr>
+        <tr>
+          <td>Supabase</td>
+          <td>PostgreSQL database. Future canonical data store for structured inspection data.</td>
+          <td>Open source, generous free tier, built-in auth, RLS, edge functions, storage.</td>
+          <td>Pro plan (~$25/mo)</td>
+        </tr>
+        <tr>
+          <td>Netlify</td>
+          <td>Hosting for the inspector app. Auto-deploys on GitHub push.</td>
+          <td>GitHub Pages had a deployment issue; Netlify is more reliable and still free.</td>
+          <td>Free</td>
+        </tr>
+        <tr>
+          <td>Cloudflare Tunnel</td>
+          <td>Exposes the Mac mini to the public internet without port forwarding.</td>
+          <td>Secure, free, requires no router config, handles HTTPS automatically.</td>
+          <td>Free</td>
+        </tr>
+        <tr>
+          <td>Cloudflare Worker</td>
+          <td>Edge function that proxies Claude API calls from the inspector app.</td>
+          <td>Keeps API keys off the client. Runs globally on Cloudflare's edge network.</td>
+          <td>Free tier</td>
+        </tr>
+        <tr>
+          <td>Tailscale</td>
+          <td>VPN mesh network. Secure SSH access to the Mac mini from anywhere.</td>
+          <td>Zero-config, works through firewalls, free for small teams.</td>
+          <td>Free</td>
+        </tr>
+        <tr>
+          <td>Hetzner VPS</td>
+          <td>Backup server in Germany. Runs failover monitoring and backup OpenClaw.</td>
+          <td>Cheap ($5–10/mo), gives geographic redundancy, runs the failover script.</td>
+          <td>~$10/mo</td>
+        </tr>
+        <tr>
+          <td>GitHub (InHausLab org)</td>
+          <td>Code hosting, deployment, workspace backup, version control.</td>
+          <td>Free for public repos. GitHub Pages for free static hosting. Standard choice.</td>
+          <td>Free</td>
+        </tr>
+        <tr>
+          <td>Slack</td>
+          <td>Team communication. Hans runs as a bot here for team-facing interactions.</td>
+          <td>Already the team communication tool. Hans integrates rather than adding another surface.</td>
+          <td>Existing subscription</td>
+        </tr>
+        <tr>
+          <td>Backblaze</td>
+          <td>Continuous cloud backup of the entire Mac mini.</td>
+          <td>Already running. Cheap. Insurance against hardware failure.</td>
+          <td>~$9/mo</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-blue" style="margin-top: 40px;">
+    <div class="callout-icon">💰</div>
+    <p><strong>Total monthly infrastructure cost:</strong> Roughly <strong>$250–350/month all-in.</strong> That's the AI API costs (Claude), Supabase Pro, Hetzner, and Backblaze. Everything else — hosting, networking, CI/CD, version control — is free. For what this replaces in human labor, the ROI is somewhere between 50x and 200x depending on how you count it.</p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- CLOSING -->
+<section id="takeaways">
+  <div class="section-label">10 — Takeaways</div>
+  <h2>What this means for you</h2>
+  <p class="section-intro">If you're learning about AI and wondering what's actually possible, here are the honest takeaways from this real-world experiment.</p>
+
+  <div class="grid-3">
+    <div class="card" style="border-color: var(--accent3);">
+      <span class="card-icon">🏗️</span>
+      <h3>AI can build real software</h3>
+      <p>Not toys. Not demos. A production app used by real inspectors on real jobs, iterated 146 times. The bottleneck is no longer whether AI can write code — it's whether you know what to build and how to verify it works.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent);">
+      <span class="card-icon">🧠</span>
+      <h3>Memory is the multiplier</h3>
+      <p>A stateless chatbot is a powerful tool. An agent with persistent memory and access to real systems is something closer to a colleague. The memory architecture — what gets saved, when, and how it's loaded back — is what separates Hans from a chat window.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent2);">
+      <span class="card-icon">🚧</span>
+      <h3>Limits are real and important</h3>
+      <p>Hans can't click through a browser as a human. He can't verify what he can't see. He can't make judgment calls that require being physically present. Understanding where the edge of capability is — and designing your workflow around that edge — is the actual skill.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">📋</span>
+      <h3>Systems beat prompts</h3>
+      <p>The one-sentence prompt is overhyped. What makes Hans reliable is the system around him: MEMORY.md, CORRECTIONS.md, AGENTS.md, protocol enforcement, session rules. The files Hans reads at startup are as important as the AI model itself.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">⏩</span>
+      <h3>Speed of iteration</h3>
+      <p>Going from idea to deployed v1 in a weekend is genuinely new. The question is no longer "can we build this?" but "what should we build?" That's a fundamentally different problem — and a better problem to have.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🎓</span>
+      <h3>The skill worth learning</h3>
+      <p>The engineers who thrive with AI won't be the ones who fight it. They'll be the ones who know how to direct it, verify its work, understand where it fails, and build the systems that keep it reliable. That's the actual skill gap right now.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p style="margin-bottom: 8px;">🛠️ <strong>Hans</strong> — AI agent running on OpenClaw</p>
+  <p>Built for InHaus Lab · Started March 2026 · Inspector app v146</p>
+  <p style="margin-top: 12px; font-size: 12px; color: var(--text3);">This document was written by Hans about Hans. Which is either very meta or very appropriate.</p>
+</footer>
+
+</body>
+</html>
