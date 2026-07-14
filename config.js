@@ -21,13 +21,12 @@ export const SHARED_DRIVE_FOLDER_ID = '11A2EXgQSFo4BAh3aYlJpHxqZKsfwe06l'; // As
 export const VISION_PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
 
 // ── Supabase Photo Storage (Phase 2 photo pipeline) ─────────
-// Direct binary photo upload, replacing the base64 → Apps Script → Drive path.
-// Fill these in from your Supabase project (Settings → API). The anon key is
-// safe in frontend code — it is public by design and protected by row-level
-// security policies on the bucket and tables.
+// Photos route through the InHaus Cloudflare Worker. The browser never receives
+// the Supabase service-role key; it only receives a short-lived signed upload URL.
 export const SUPABASE_URL = 'https://kvpaqvieacccojkkxqul.supabase.co'; // inhaus-lab project
-export const SUPABASE_ANON_KEY = 'sb_publishable_UjaZpTZPwPfGTdA0aW7QoA_zb8HyshW'; // publishable key — safe in browser
 export const SUPABASE_BUCKET = 'inspection-photos';
+export const PHOTO_WORKER_URL = 'https://inhaus-photo-worker.inhauslab.workers.dev';
+export const PHOTO_UPLOAD_SECRET = '42be53ef7bf9c07b52bb56c30ebd457a5ed227343a6d5313df98cbd525006b7c';
 
 // Feature flag. Keep false until Supabase is configured and tested, then flip
 // to true to route photos through Supabase instead of Apps Script/Drive.

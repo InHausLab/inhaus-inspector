@@ -30,14 +30,13 @@ CREATE TABLE IF NOT EXISTS inspector_photo_uploads (
     slot            int,
     bucket          text DEFAULT 'inspection-photos',
     storage_path    text NOT NULL,          -- full path inside bucket
+    drive_url       text,                   -- filled by Cloudflare Worker /mirror
     source_system   text DEFAULT 'inspector_app_v2',
     created_at      timestamptz DEFAULT now()
 );
 
--- NOTE: No unique constraint on photo_id currently exists.
--- Retries can create duplicate metadata rows (storage objects are idempotent).
--- Recommend adding a unique index here, or handling during fold-in to ihl_photos.
--- ALTER TABLE inspector_photo_uploads ADD CONSTRAINT uq_photo_id UNIQUE (photo_id);
+-- Go-live requires a unique photo_id so retries stay idempotent.
+-- Add the constraint after deleting test/duplicate rows in section 7.
 
 -- ============================================================
 -- 3. RLS policies (table)
@@ -133,11 +132,18 @@ CREATE POLICY "anon insert inspector_photo_uploads"
 -- Delete test data from bucket:
 --   - browsertest/
 --   - __validation__/
+--   - __codex_validation__/
+--   - __codex_mirror_*/
 --   - vaulttest-*/
 --   - flushfix-insp/
 --
 -- Delete test inspections from inspector_photo_uploads:
 --   DELETE FROM inspector_photo_uploads WHERE inspection_id IN ('Q970DG', '0AKB8I', 'P11PU1');
+--   DELETE FROM inspector_photo_uploads WHERE inspection_id ILIKE '__codex%';
+--
+-- July 14 go-live additions required for the Cloudflare Worker mirror:
+--   ALTER TABLE inspector_photo_uploads ADD COLUMN IF NOT EXISTS drive_url text;
+--   ALTER TABLE inspector_photo_uploads ADD CONSTRAINT uq_photo_id UNIQUE (photo_id);
 --
 -- Drop temp read policies:
 --   DROP POLICY "temp anon read tbl" ON inspector_photo_uploads;

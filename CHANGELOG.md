@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v146 (staging: feat/supabase-photo-pipeline, not yet merged) |
+| App version | v147 (go-live candidate: Supabase photo pipeline + InHaus photo Worker) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v50 — see URL below |
@@ -19,6 +19,7 @@ This file is the authoritative record of every significant change, decision, bug
 | Repo | /Users/hans/inhaus-update/ |
 | Review portal | https://inhauslab.github.io/inhaus-review/ (token: InHaus2026) |
 | AI proxy | https://inhaus-vision-proxy.mjordanjay.workers.dev (Cloudflare Worker) |
+| Photo Worker | inhaus-photo-worker (Cloudflare Worker, InHaus company account) |
 | Known open bug | `photoNeedsUpload()` checks `photo.imageData` but photos stored as `photo.dataUrl` — superseded by Supabase migration (branch feat/supabase-photo-pipeline) which fixes this at the root |
 | Branch (staging) | feat/supabase-photo-pipeline · draft PR #2 · deploy-preview-2--inhaus-inspector.netlify.app |
 | Supabase project | inhaus-lab · ref kvpaqvieacccojkkxqul |
@@ -220,6 +221,15 @@ All caught on staging, never in production.
 ---
 
 ## Changelog
+
+### v147 — July 14 2026
+- [FEAT] Added InHaus company Cloudflare Worker `inhaus-photo-worker`.
+- [SECURITY] Photo uploads now request a short-lived signed upload URL from the Worker instead of writing directly to Supabase with a browser publishable key.
+- [FEAT] Added Worker `/mirror` endpoint to copy Supabase-stored photos into the existing Google Drive assessment folder and write `drive_url` back to `inspector_photo_uploads`.
+- [FEAT] Final submit now flushes photos to Supabase and then calls the Drive mirror endpoint.
+- [OPS] Rebased/cherry-picked the July 5 Supabase photo staging commits onto current `main` so newer docs/pages are preserved.
+- [OPS] Bumped app shell and service-worker cache to v147.
+- [VERIFY] Worker `/sign` smoke test passed end-to-end; `/mirror` is blocked until Tanner adds `inspector_photo_uploads.drive_url`.
 
 ### v146 — July 4 2026
 - [OPS] Updated Apps Script URL to v49/v50 deployment (previous URL was broken)

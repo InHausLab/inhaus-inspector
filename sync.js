@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=145';
-import { uploadPhotoToSupabase } from './supabase-photos.js?v=147';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=147';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=147';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=145';
-import { scheduleSave } from './storage.js?v=145';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=145';
+         getBestCloudSyncAt } from './state.js?v=147';
+import { scheduleSave } from './storage.js?v=147';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=147';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -551,7 +551,8 @@ async function storePhotoInSupabase(photo, inspectionId, originalDataUrl) {
       dataUrl: originalDataUrl,
       roomName: photo.roomName || '',
       stepName: photo.stepName || '',
-      caption: photo.caption || ''
+      caption: photo.caption || '',
+      assignedSlot: photo.assignedSlot || photo.slot || ''
     });
     photo.storagePath = storagePath;
     photo._storedConfirmed = true;
@@ -703,6 +704,29 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   if (all.length > 0) showUploadBanner('success', 'All ' + all.length + ' photo' + (all.length === 1 ? '' : 's') + ' saved');
 }
 
+function getMirrorInspectionName(exportData, inspection) {
+  return (inspection && (inspection.inspectionName || inspection.folderName || inspection.assessmentName)) ||
+    exportData.inspectionName ||
+    exportData.folderName ||
+    exportData.assessmentName ||
+    [exportData.clientName, exportData.propertyAddress].filter(Boolean).join(' - ') ||
+    exportData.inspectionId ||
+    '';
+}
+
+async function mirrorSupabasePhotosToDrive(exportData, inspection) {
+  showUploadBanner('pending', 'Mirroring photos to Drive…');
+  const result = await mirrorPhotosToDrive({
+    inspectionId: exportData.inspectionId,
+    inspectionName: getMirrorInspectionName(exportData, inspection),
+    driveFolderId: getKnownDriveFolderId(inspection, exportData)
+  });
+  if (result && result.mirrored > 0) {
+    showUploadBanner('success', 'Mirrored ' + result.mirrored + ' photo' + (result.mirrored === 1 ? '' : 's') + ' to Drive');
+  }
+  return result;
+}
+
 // NOTE: Photos are uploaded to Drive as private files.
 // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
 // for the review portal to display them. This is a known workaround - see issue tracker.
@@ -735,6 +759,7 @@ export async function sendToGoogleScript(exportData) {
     // Always run — the flush pulls from the vault too, so it catches photos whose
     // pixels never made it into the export.
     await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
+    await mirrorSupabasePhotosToDrive(exportData, inspection);
   } else if (photosToUpload.length > 0) {
     showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
     let confirmedCount = 0;

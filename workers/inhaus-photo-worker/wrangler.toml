@@ -1,0 +1,9 @@
+name = "inhaus-photo-worker"
+main = "src/index.js"
+compatibility_date = "2026-07-14"
+account_id = "bbf861ec06c3d708b464c5c40e2d4833"
+workers_dev = true
+
+[vars]
+SUPABASE_URL = "https://kvpaqvieacccojkkxqul.supabase.co"
+SUPABASE_BUCKET = "inspection-photos"
