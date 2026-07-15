@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=147';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=147';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=148';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=148';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=147';
-import { scheduleSave } from './storage.js?v=147';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=147';
+         getBestCloudSyncAt } from './state.js?v=148';
+import { scheduleSave } from './storage.js?v=148';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=148';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -449,6 +449,9 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
     return await storePhotoInSupabase(photo, inspectionId, originalDataUrl);
   }
 
+  // [RETIRED] If we reach here, USE_SUPABASE_PHOTOS is false — should not happen in production.
+  console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
+
   const payload = {
     photoUploadOnly: true,
     inspectionId: inspectionId,
@@ -739,6 +742,8 @@ export async function sendToGoogleScript(exportData) {
   const photosToUpload = allPhotos.filter(photoNeedsUpload);
 
   if (photosToUpload.length > 0 && !USE_SUPABASE_PHOTOS) {
+    // [RETIRED] Guard: this block should never run when USE_SUPABASE_PHOTOS=true.
+    console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
     await recoverDriveMetadataFromReviewApi(exportData.inspectionId, mainPayloadFingerprint);
   }
 
@@ -761,6 +766,8 @@ export async function sendToGoogleScript(exportData) {
     await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
     await mirrorSupabasePhotosToDrive(exportData, inspection);
   } else if (photosToUpload.length > 0) {
+    // [RETIRED] Guard: this block should never run when USE_SUPABASE_PHOTOS=true.
+    console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
     showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
     let confirmedCount = 0;
     const missingPhotos = [];

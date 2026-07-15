@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v147 (go-live candidate: Supabase photo pipeline + InHaus photo Worker) |
+| App version | v148 (pre-live polish: dry run verified, retired path guards, portal confirmed, refresh reminder) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v50 — see URL below |
@@ -221,6 +221,14 @@ All caught on staging, never in production.
 ---
 
 ## Changelog
+
+### v148 — July 15 2026
+- [OPS] Bumped app shell and service-worker cache to v148.
+- [VERIFY] End-to-end dry run passed: Worker /sign, signed PUT to Supabase Storage, /mirror to Drive, row confirmed in inspector_photo_uploads with drive_url populated. Pipeline confirmed live.
+- [NOTE] Cleanup blocker: `service_role` lacks DELETE on inspector_photo_uploads — test row DRY-RUN-001 remains (harmless). Tanner needs `GRANT DELETE ON public.inspector_photo_uploads TO service_role`.
+- [GUARD] sync.js: added 3x `console.warn('[RETIRED] Apps Script photo path triggered...')` guards to the old base64/Apps Script upload path. Code not deleted — just loud if accidentally re-engaged.
+- [VERIFY] Review portal photo loading: no changes needed. New inspection photos are mirrored to Drive via /mirror; Apps Script `getInspectionForReview` already scans the Drive folder via `mergeDriveFolderPhotosForReview`. Portal will render photos from new inspections the same way it always has.
+- [FEAT] Home screen: added one-time-per-session hard-refresh reminder banner. Uses sessionStorage flag, dismisses on tap, uses existing `.reminder-banner` CSS class.
 
 ### v147 — July 14 2026
 - [FEAT] Added InHaus company Cloudflare Worker `inhaus-photo-worker`.

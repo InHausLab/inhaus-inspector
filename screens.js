@@ -1,11 +1,11 @@
 // InHaus Inspector - Screen Rendering
-import { VISION_PROXY_URL } from './config.js?v=147';
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=147';
-import { saveNow, scheduleSave } from './storage.js?v=147';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=147';
-import { checkpointToCloud, submitInspection } from './sync.js?v=147';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=147';
-import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=147';
+import { VISION_PROXY_URL } from './config.js?v=148';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=148';
+import { saveNow, scheduleSave } from './storage.js?v=148';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=148';
+import { checkpointToCloud, submitInspection } from './sync.js?v=148';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=148';
+import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=148';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -472,6 +472,20 @@ export function buildAppHeader(subtitle) {
 export function renderHome() {
   const c = ui().el('div', { className: 'screen home-screen' });
   c.appendChild(buildAppHeader());
+
+  // ── Hard-refresh reminder (once per session) ─────────────
+  if (!sessionStorage.getItem('inhaus_refresh_dismissed')) {
+    const refreshBanner = ui().el('div', {
+      className: 'reminder-banner',
+      style: 'cursor:pointer;position:relative;padding-right:36px;',
+      onClick: () => {
+        sessionStorage.setItem('inhaus_refresh_dismissed', '1');
+        refreshBanner.remove();
+      }
+    });
+    refreshBanner.innerHTML = '<strong>Before starting:</strong> pull down to refresh this page in Safari to make sure you have the latest version. <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:1.1rem;opacity:0.6;">✕</span>';
+    c.appendChild(refreshBanner);
+  }
 
   c.appendChild(ui().el('button', {
     className: 'btn btn-primary btn-full',
