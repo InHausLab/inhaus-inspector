@@ -229,7 +229,7 @@ All caught on staging, never in production.
 - [FEAT] Final submit now flushes photos to Supabase and then calls the Drive mirror endpoint.
 - [OPS] Rebased/cherry-picked the July 5 Supabase photo staging commits onto current `main` so newer docs/pages are preserved.
 - [OPS] Bumped app shell and service-worker cache to v147.
-- [VERIFY] Worker `/sign` smoke test passed end-to-end; `/mirror` is blocked until Tanner adds `inspector_photo_uploads.drive_url`.
+- [VERIFY] Worker `/sign` and `/mirror` smoke tests passed end-to-end; `/mirror` wrote `drive_url` and produced a public Drive thumbnail redirect.
 
 ### v146 — July 4 2026
 - [OPS] Updated Apps Script URL to v49/v50 deployment (previous URL was broken)
