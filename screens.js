@@ -1848,7 +1848,7 @@ export function renderReview() {
   } else {
     const reuploadBtn = ui().el('button', { className: 'btn btn-outline btn-full', onClick: async () => {
       reuploadBtn.disabled = true;
-      reuploadBtn.textContent = 'Uploading\u2026 \u23f3';
+      reuploadBtn.textContent = 'Syncing\u2026 \u23f3';
       try {
         const reuploadData = buildExportJSON(ctx.stepList);
         const allPhotos = extractAllPhotosFromExport(reuploadData);
@@ -1859,10 +1859,10 @@ export function renderReview() {
             'Drive did not confirm every photo upload.'
           );
         }
-        reuploadBtn.textContent = '\u2713 Upload Complete (' + allPhotos.length + ' photos)';
+        reuploadBtn.textContent = '\u2713 Sync Complete (' + allPhotos.length + ' photos safe)';
       } catch(e) {
         reuploadBtn.disabled = false;
-        reuploadBtn.textContent = '\u21ba Re-upload photos';
+        reuploadBtn.textContent = '\u21ba Retry cloud sync';
         alert('Upload failed: ' + e.message);
       }
     }}, '\u21ba Re-upload photos');
@@ -1876,7 +1876,7 @@ export function renderReview() {
         const allConfirmed = health.total === 0 || (
           health.drive >= health.total && health.pending === 0 && health.missing === 0
         );
-        if (allConfirmed && reuploadBtn.parentNode) reuploadBtn.remove();
+        if (allConfirmed) reuploadBtn.textContent = '\u21ba Retry inspection data sync';
       }).catch(function(err) {
         console.warn('Could not verify photo status for re-upload button:', err);
       });
