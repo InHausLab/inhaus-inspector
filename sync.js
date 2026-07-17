@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=155';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=155';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=159';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=159';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=155';
-import { scheduleSave } from './storage.js?v=155';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=155';
+         getBestCloudSyncAt } from './state.js?v=159';
+import { scheduleSave } from './storage.js?v=159';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=159';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -668,7 +668,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=155');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=159');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -764,6 +764,33 @@ async function mirrorSupabasePhotosToDrive(exportData, inspection) {
   return result;
 }
 
+function getExpectedPhotoIds(photos, inspection) {
+  const ids = [];
+  function addPhoto(photo) {
+    const photoId = String(photo && photo.photoId || '').trim();
+    if (!photoId) throw new Error('A captured photo is missing its photo ID. Re-open the inspection before retrying.');
+    if (!ids.includes(photoId)) ids.push(photoId);
+  }
+  (photos || []).forEach(addPhoto);
+  visitLocalInspectionPhotos(inspection, addPhoto);
+  return ids;
+}
+
+async function verifyFinalSync(exportData, allPhotos, inspection) {
+  updateSyncStatus('syncing', 'verifying');
+  showUploadBanner('pending', 'Verifying cloud save…');
+  const expectedPhotoIds = getExpectedPhotoIds(allPhotos, inspection);
+  const status = await verifyInspectionStatus(exportData.inspectionId, expectedPhotoIds);
+  if (!status || status.complete !== true || status.assessmentExists !== true) {
+    const missingCount = Array.isArray(status && status.missingPhotoIds) ? status.missingPhotoIds.length : expectedPhotoIds.length;
+    if (!status || status.assessmentExists !== true) {
+      throw new Error('Cloud verification failed: the assessment record is missing.');
+    }
+    throw new Error('Cloud verification failed: ' + missingCount + ' photo' + (missingCount === 1 ? '' : 's') + ' missing from storage.');
+  }
+  return status;
+}
+
 // NOTE: Photos are uploaded to Drive as private files.
 // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
 // for the review portal to display them. This is a known workaround - see issue tracker.
@@ -793,6 +820,12 @@ export async function sendToGoogleScript(exportData) {
     // pixels never made it into the export.
     await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
     await mirrorSupabasePhotosToDrive(exportData, inspection);
+    const verified = await verifyFinalSync(exportData, allPhotos, inspection);
+    if (inspection) {
+      inspection._lastServerVerification = verified;
+      inspection._lastServerVerifiedAt = new Date().toISOString();
+      scheduleSave();
+    }
   } else if (photosToUpload.length > 0) {
     // [RETIRED] Guard: this block should never run when USE_SUPABASE_PHOTOS=true.
     console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
@@ -945,7 +978,7 @@ export async function checkpointToCloud(stepList) {
 export async function submitInspection(exportData) {
   if (!GOOGLE_SCRIPT_URL) return true;
   updateSyncStatus('syncing'); // Change 2
-  showUploadBanner('pending', 'Uploading to Google Drive\u2026');
+  showUploadBanner('pending', 'Saving assessment to cloud\u2026');
   try {
     await sendToGoogleScript(exportData);
     await window.DB.removeFromQueue(exportData.inspectionId);
@@ -956,7 +989,7 @@ export async function submitInspection(exportData) {
       scheduleSave();
     }
     updateSyncStatus('synced'); // Change 2
-    showUploadBanner('success', '\u2713 Saved to Google Drive');
+    showUploadBanner('success', '\u2713 Cloud save verified');
     // Auto-disable Dev Mode after successful final sync
     if (localStorage.getItem('inhausDevMode') === 'true') {
       localStorage.setItem('inhausDevMode', 'false');

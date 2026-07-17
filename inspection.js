@@ -1,6 +1,6 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=155';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=155';
+import { getInspection } from './state.js?v=159';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=159';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -54,6 +54,29 @@ export function stripPhotosFromExport(exportData) {
                        'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
   sectionKeys.forEach(key => stripFromSection(stripped[key]));
   (stripped.rooms || []).forEach(room => stripFromSection(room));
+
+  // Defense in depth: photo fields can be introduced by new steps or legacy
+  // saved data outside the fixed section list above. Never allow image bytes
+  // into the assessment JSON, regardless of nesting depth.
+  function stripEmbeddedImageData(value) {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      value.forEach(stripEmbeddedImageData);
+      return;
+    }
+    Object.keys(value).forEach(key => {
+      if ((key === 'imageData' || key === 'dataUrl') && typeof value[key] === 'string') {
+        delete value[key];
+        return;
+      }
+      if (key === 'wifiPassword') {
+        delete value[key];
+        return;
+      }
+      stripEmbeddedImageData(value[key]);
+    });
+  }
+  stripEmbeddedImageData(stripped);
   return stripped;
 }
 

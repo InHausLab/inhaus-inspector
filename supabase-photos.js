@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=155';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=159';
 
 function dataUrlToBlob(dataUrl) {
   const comma = dataUrl.indexOf(',');
@@ -144,4 +144,20 @@ export async function checkSupabaseConfirmed(inspectionId) {
     console.warn('checkSupabaseConfirmed failed:', e && e.message);
     return [];
   }
+}
+
+// Final-submit proof. The Worker checks the authoritative assessment table and
+// Supabase Storage, rather than trusting browser flags or upload responses.
+export async function verifyInspectionStatus(inspectionId, expectedPhotoIds) {
+  if (!inspectionId) throw new Error('Missing inspectionId for final verification');
+  const resp = await fetch(workerUrl('/inspection-status'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      inspectionId,
+      expectedPhotoIds: Array.isArray(expectedPhotoIds) ? expectedPhotoIds : [],
+      sharedSecret: PHOTO_UPLOAD_SECRET
+    })
+  });
+  return await parseJsonResponse(resp, 'Final verification failed');
 }

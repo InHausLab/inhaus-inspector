@@ -21,6 +21,8 @@ export default {
       const url = new URL(request.url);
       if (url.pathname === '/sign' && request.method === 'POST') return await handleSign(request, env);
       if (url.pathname === '/mirror' && request.method === 'POST') return await handleMirror(request, env);
+      if (url.pathname === '/confirmed' && request.method === 'POST') return await handleConfirmed(request, env);
+      if (url.pathname === '/inspection-status' && request.method === 'POST') return await handleInspectionStatus(request, env);
       return json({ error: 'not_found' }, 404);
     } catch (err) {
       return json({ error: err && err.message ? err.message : String(err) }, 500);
@@ -399,11 +401,8 @@ async function handleConfirmed(request, env) {
   const body = await readJson(request);
   validateSharedSecret(body, env);
   const inspectionId = cleanId(body.inspectionId, 'inspectionId');
-  const params = new URLSearchParams();
-  params.set('inspection_id', 'eq.' + inspectionId);
-  params.set('select', 'photo_id');
-  params.set('not.storage_path', 'is.null');
-  const res = await fetch(env.SUPABASE_URL + '/rest/v1/inspector_photo_uploads?' + params, {
+  const queryString = 'inspection_id=eq.' + encodeURIComponent(inspectionId) + '&select=photo_id&storage_path=not.is.null';
+  const res = await fetch(env.SUPABASE_URL + '/rest/v1/inspector_photo_uploads?' + queryString, {
     headers: {
       'apikey': env.SUPABASE_SERVICE_KEY,
       'Authorization': 'Bearer ' + env.SUPABASE_SERVICE_KEY
@@ -412,4 +411,104 @@ async function handleConfirmed(request, env) {
   if (!res.ok) throw new Error('supabase_confirmed_failed:' + res.status);
   const rows = await res.json();
   return json({ photoIds: rows.map(r => r.photo_id) });
+}
+
+// ── /inspection-status — authoritative final-sync verification ─────────────
+// The browser may show "Sync Complete" only when the assessment row exists
+// and every photo referenced by the inspection exists in Supabase Storage.
+// Drive mirroring is reported separately so callers can distinguish durable
+// cloud storage from review-portal readiness.
+async function handleInspectionStatus(request, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
+  const body = await readJson(request);
+  validateSharedSecret(body, env);
+
+  const inspectionId = cleanId(body.inspectionId, 'inspectionId');
+  const expectedPhotoIds = Array.from(new Set(
+    (Array.isArray(body.expectedPhotoIds) ? body.expectedPhotoIds : []).map(function(value) {
+      return cleanId(value, 'photoId');
+    })
+  ));
+
+  const [assessmentExists, photoRows, storedNames] = await Promise.all([
+    assessmentExistsForInspection(env, inspectionId),
+    getPhotoRowsForInspection(env, inspectionId),
+    listStoredPhotoNames(env, inspectionId)
+  ]);
+
+  const storedPhotoIds = new Set();
+  storedNames.forEach(function(name) {
+    const match = String(name || '').match(/^(.+)\.jpg$/i);
+    if (match) storedPhotoIds.add(match[1]);
+  });
+  const missingPhotoIds = expectedPhotoIds.filter(function(photoId) {
+    return !storedPhotoIds.has(photoId);
+  });
+  const mirroredPhotoIds = new Set(
+    photoRows.filter(function(row) { return !!row.drive_url; }).map(function(row) { return row.photo_id; })
+  );
+  const missingMirrorPhotoIds = expectedPhotoIds.filter(function(photoId) {
+    return !mirroredPhotoIds.has(photoId);
+  });
+  const complete = assessmentExists && missingPhotoIds.length === 0;
+
+  return json({
+    inspectionId,
+    assessmentExists,
+    expectedPhotos: expectedPhotoIds.length,
+    storedPhotos: storedPhotoIds.size,
+    databasePhotos: new Set(photoRows.map(function(row) { return row.photo_id; })).size,
+    mirroredPhotos: mirroredPhotoIds.size,
+    missingPhotoIds,
+    missingMirrorPhotoIds,
+    reviewPortalReady: complete && missingMirrorPhotoIds.length === 0,
+    complete
+  });
+}
+
+async function assessmentExistsForInspection(env, inspectionId) {
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('select', 'inspection_id');
+  params.set('limit', '1');
+  const res = await fetch(normalizeSupabaseUrl(env, `/rest/v1/ihl_assessments?${params}`), {
+    headers: serviceHeaders(env)
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`assessment_status_failed:${res.status}:${text.slice(0, 200)}`);
+  const rows = text ? JSON.parse(text) : [];
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+async function getPhotoRowsForInspection(env, inspectionId) {
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('select', 'photo_id,drive_url,storage_path');
+  const res = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
+    headers: serviceHeaders(env)
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`photo_status_failed:${res.status}:${text.slice(0, 200)}`);
+  return text ? JSON.parse(text) : [];
+}
+
+async function listStoredPhotoNames(env, inspectionId) {
+  const endpoint = normalizeSupabaseUrl(
+    env,
+    `/storage/v1/object/list/${encodeURIComponent(env.SUPABASE_BUCKET)}`
+  );
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: serviceHeaders(env, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      prefix: `${inspectionId}/`,
+      limit: 1000,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' }
+    })
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`storage_status_failed:${res.status}:${text.slice(0, 200)}`);
+  const rows = text ? JSON.parse(text) : [];
+  return Array.isArray(rows) ? rows.map(function(row) { return row.name || ''; }) : [];
 }
