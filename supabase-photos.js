@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=154';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=155';
 
 function dataUrlToBlob(dataUrl) {
   const comma = dataUrl.indexOf(',');
@@ -126,4 +126,22 @@ export async function mirrorPhotosToDrive(payload) {
   }
 
   return { mirrored: totalMirrored, skipped: 0, hasMore: false, folderId, folderName };
+}
+
+// Check which photos for an inspection are already confirmed in Supabase.
+// Returns a Set of photoIds. Used by sync.js to skip re-uploading after a crash.
+export async function checkSupabaseConfirmed(inspectionId) {
+  if (!inspectionId) return [];
+  try {
+    const resp = await fetch(workerUrl('/confirmed'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inspectionId, sharedSecret: PHOTO_UPLOAD_SECRET })
+    });
+    const result = await parseJsonResponse(resp, 'confirmed check failed');
+    return Array.isArray(result.photoIds) ? result.photoIds : [];
+  } catch (e) {
+    console.warn('checkSupabaseConfirmed failed:', e && e.message);
+    return [];
+  }
 }

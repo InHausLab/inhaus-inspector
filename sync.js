@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=154';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=154';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=155';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=155';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=154';
-import { scheduleSave } from './storage.js?v=154';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=154';
+         getBestCloudSyncAt } from './state.js?v=155';
+import { scheduleSave } from './storage.js?v=155';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=155';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -644,6 +644,21 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   const inspectionId = exportData.inspectionId;
   const localMap = getLocalPhotoMap(inspection);
 
+  // Preflight: ask Supabase which photos are already confirmed for this inspection.
+  // This handles the case where the app crashed after upload but before marking local
+  // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
+  const supabaseConfirmed = new Set();
+  try {
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=155');
+    const confirmedIds = await checkSupabaseConfirmed(inspectionId);
+    confirmedIds.forEach(id => supabaseConfirmed.add(id));
+    if (supabaseConfirmed.size > 0) {
+      console.log('[sync] Supabase preflight: ' + supabaseConfirmed.size + ' photos already confirmed, skipping re-upload');
+    }
+  } catch (e) {
+    console.warn('[sync] Supabase preflight check failed (non-fatal):', e && e.message);
+  }
+
   // Build the upload set from the export AND the photo vault. Pixels can live ONLY
   // in the vault (e.g. after an iOS local-save hiccup) where the export misses them,
   // so the vault is the source of truth for "every photo that still needs uploading".
@@ -676,7 +691,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
     const exported = all[i];
     const vs = vaultState.get(exported.photoId);
     // Already stored in Supabase — count it, don't re-upload (avoids duplicate rows).
-    if (vs === 'stored' || vs === 'uploaded' || (exported && (exported._driveConfirmed || exported.storagePath))) {
+    if (vs === 'stored' || vs === 'uploaded' || (exported && (exported._driveConfirmed || exported.storagePath)) || supabaseConfirmed.has(exported.photoId)) {
       confirmed++;
       if (exported.photoId) confirmedMap.set(exported.photoId, { driveId: '' });
       continue;

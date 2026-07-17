@@ -392,3 +392,24 @@ function driveHeaders(accessToken, extra = {}) {
 function escapeDriveQuery(value) {
   return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
+
+// ── /confirmed — return photoIds already stored in Supabase for an inspection ──
+async function handleConfirmed(request, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
+  const body = await readJson(request);
+  validateSharedSecret(body, env);
+  const inspectionId = cleanId(body.inspectionId, 'inspectionId');
+  const params = new URLSearchParams();
+  params.set('inspection_id', 'eq.' + inspectionId);
+  params.set('select', 'photo_id');
+  params.set('not.storage_path', 'is.null');
+  const res = await fetch(env.SUPABASE_URL + '/rest/v1/inspector_photo_uploads?' + params, {
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': 'Bearer ' + env.SUPABASE_SERVICE_KEY
+    }
+  });
+  if (!res.ok) throw new Error('supabase_confirmed_failed:' + res.status);
+  const rows = await res.json();
+  return json({ photoIds: rows.map(r => r.photo_id) });
+}
