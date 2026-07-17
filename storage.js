@@ -1,5 +1,5 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=145';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=149';
 
 let _onSyncStatusChange = null;
 let _saveTimeout = null;
@@ -33,7 +33,7 @@ export async function saveNow() {
   if (!inspection) return;
   showSave('Saving...');
   try {
-    await DB.save(inspection);
+    await window.DB.save(inspection);
     setLastLocalSaveAt(Date.now()); // Change 1
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     _onSyncStatusChange('local'); // Change 2

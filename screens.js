@@ -1,7 +1,7 @@
 // InHaus Inspector - Screen Rendering
 import { VISION_PROXY_URL } from './config.js?v=148';
 import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=148';
-import { saveNow, scheduleSave } from './storage.js?v=148';
+import { saveNow, scheduleSave } from './storage.js?v=149';
 import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=148';
 import { checkpointToCloud, submitInspection } from './sync.js?v=148';
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=148';
