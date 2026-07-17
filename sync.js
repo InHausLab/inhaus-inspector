@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=150';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=150';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=151';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=151';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=150';
-import { scheduleSave } from './storage.js?v=150';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=150';
+         getBestCloudSyncAt } from './state.js?v=151';
+import { scheduleSave } from './storage.js?v=151';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=151';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -920,7 +920,7 @@ export async function submitInspection(exportData) {
   showUploadBanner('pending', 'Uploading to Google Drive\u2026');
   try {
     await sendToGoogleScript(exportData);
-    await DB.removeFromQueue(exportData.inspectionId);
+    await window.DB.removeFromQueue(exportData.inspectionId);
     setLastSuccessfulCloudSyncAt(Date.now()); // Change 1
     const inspection = getInspection();
     if (inspection) {
@@ -942,7 +942,7 @@ export async function submitInspection(exportData) {
       inspection._lastFinalSyncError = e && e.message ? e.message : String(e || 'Unknown upload error');
       scheduleSave();
     }
-    await DB.queueUpload(exportData);
+    await window.DB.queueUpload(exportData);
     updateSyncStatus('final-failed'); // Change 2
     showUploadBanner('pending', 'Saved locally \u2014 will upload when online');
     return false;
