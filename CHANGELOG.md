@@ -222,6 +222,11 @@ All caught on staging, never in production.
 
 ## Changelog
 
+### v158 — July 17 2026
+- [BACKEND FIX] Apps Script `syncToSupabase()` now supplies required `assessment_num` from the generated Drive assessment number.
+- [BACKEND FIX] A rejected `ihl_assessments` insert now throws through `doPost` instead of being swallowed and falsely reported as success.
+- [OPS] Deployed Apps Script version 52 and updated the inspector app to the new web-app URL.
+
 ### v157 — July 17 2026
 - [ROOT CAUSE] Final submit could skip the inspection JSON POST when local `_dataSyncedToDrive`, folder ID, and payload fingerprint flags claimed the data had already synced. Those flags can survive a stale/dead Apps Script deployment even when no `ihl_assessments` record exists.
 - [FIX] Final submit and **Retry inspection data sync** now always POST the stripped inspection JSON to Apps Script before photo confirmation/mirroring. Server-side folder reuse and Supabase upsert keep retries idempotent.
