@@ -1871,6 +1871,16 @@ export function renderReview() {
       ui().el('p', null, 'Completed: ' + ui().fmtDate(ctx.inspection.endedAt)),
       reuploadBtn
     ]));
+    if (window.getPhotoHealth) {
+      window.getPhotoHealth().then(function(health) {
+        const allConfirmed = health.total === 0 || (
+          health.drive >= health.total && health.pending === 0 && health.missing === 0
+        );
+        if (allConfirmed && reuploadBtn.parentNode) reuploadBtn.remove();
+      }).catch(function(err) {
+        console.warn('Could not verify photo status for re-upload button:', err);
+      });
+    }
   }
   c.appendChild(actCard);
 

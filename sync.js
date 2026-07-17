@@ -35,14 +35,29 @@ async function postWithSyncSecret(payload, secret) {
     body: JSON.stringify(body)
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return resp.json();
+  const responseText = await resp.text();
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (err) {
+    const looksLikeHtml = /^\s*</.test(responseText);
+    throw new Error(
+      looksLikeHtml
+        ? 'Apps Script returned an HTML page instead of JSON. The deployment URL may be expired or inaccessible.'
+        : 'Apps Script returned invalid JSON.'
+    );
+  }
+  if (!data || typeof data !== 'object') {
+    throw new Error('Apps Script returned an invalid response.');
+  }
+  return data;
 }
 
 export async function scriptFetch(payload) {
   let lastUnauthorized = 'Unauthorized';
   for (const secret of getSyncSecretsToTry()) {
     const data = await postWithSyncSecret(payload, secret);
-    if (data && data.status === 'error') {
+    if (data.status === 'error') {
       const message = data.message || 'Apps Script error';
       if (message.toLowerCase().includes('unauthorized')) {
         lastUnauthorized = message;
@@ -50,6 +65,10 @@ export async function scriptFetch(payload) {
       }
       _workingSyncSecret = secret;
       throw new Error(message);
+    }
+    if (data.status !== 'ok') {
+      _workingSyncSecret = secret;
+      throw new Error(data.message || 'Apps Script did not confirm the save.');
     }
     _workingSyncSecret = secret;
     return data;
@@ -958,8 +977,15 @@ export async function submitInspection(exportData) {
       scheduleSave();
     }
     await window.DB.queueUpload(exportData);
-    updateSyncStatus('final-failed'); // Change 2
-    showUploadBanner('pending', 'Saved locally \u2014 will upload when online');
+    const isOffline = navigator.onLine === false;
+    updateSyncStatus(isOffline ? 'offline' : 'final-failed'); // Change 2
+    showUploadBanner(
+      isOffline ? 'pending' : 'error',
+      isOffline
+        ? 'Offline \u2014 saved locally. Keep the app open and reconnect to upload.'
+        : 'Upload failed \u2014 saved locally. Tap Submit to retry. Error: ' +
+          (e && e.message ? e.message : 'Unknown sync error')
+    );
     return false;
   }
 }

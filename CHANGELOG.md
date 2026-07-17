@@ -222,6 +222,14 @@ All caught on staging, never in production.
 
 ## Changelog
 
+### v156 — July 17 2026
+- [INCIDENT] Real inspection `INH-20260717-YZNHG0` uploaded and mirrored 34 photos, but its inspection JSON did not reach Apps Script; the live review list returned zero inspections. Form data remains recoverable only from Matt's device/local backup.
+- [FIX] `scriptFetch()` now rejects HTTP failures, HTML/non-JSON responses, invalid response shapes, and any response that does not explicitly return `status: "ok"`.
+- [FIX] Final-submit failures no longer claim the phone is offline merely because a server sync failed. Offline wording is used only when `navigator.onLine === false`; online failures show the real error and a retry instruction.
+- [FIX] The completed-inspection screen hides **Re-upload photos** when all photos are already confirmed in Supabase/Drive.
+- [VERIFY] Direct Apps Script ping and review-list calls returned valid JSON; list count remained zero. Mocked 50-photo mirror completed all 50 photos in four Worker batches (14+14+14+8).
+- [AUDIT] Phone sleep or force-closing Safari can still interrupt the in-flight final sync. Local/IndexedDB and Supabase retries protect data, but inspectors must keep the app open and awake until the success receipt appears.
+
 ### v148 — July 15 2026
 - [OPS] Bumped app shell and service-worker cache to v148.
 - [VERIFY] End-to-end dry run passed: Worker /sign, signed PUT to Supabase Storage, /mirror to Drive, row confirmed in inspector_photo_uploads with drive_url populated. Pipeline confirmed live.
