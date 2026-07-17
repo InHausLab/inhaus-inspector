@@ -1,4 +1,4 @@
-// InHaus Inspector Service Worker v151
+// InHaus Inspector Service Worker v152
 // Safe iOS Safari implementation - June 28 2026
 //
 // Rules:
@@ -9,23 +9,23 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v151';
+const CACHE_NAME = 'inhaus-v152';
 
 const APP_SHELL = [
   './',
   './index.html',
   './cache-reset.html',
-  './app.js?v=151',
-  './screens.js?v=151',
-  './sync.js?v=151',
-  './ui.js?v=151',
-  './steps.js?v=151',
-  './config.js?v=151',
-  './storage.js?v=151',
-  './fields.js?v=151',
-  './inspection.js?v=151',
-  './db.js?v=151',
-  './state.js?v=151',
+  './app.js?v=152',
+  './screens.js?v=152',
+  './sync.js?v=152',
+  './ui.js?v=152',
+  './steps.js?v=152',
+  './config.js?v=152',
+  './storage.js?v=152',
+  './fields.js?v=152',
+  './inspection.js?v=152',
+  './db.js?v=152',
+  './state.js?v=152',
   './styles.css',
   './manifest.json',
 ];
@@ -117,4 +117,13 @@ self.addEventListener('fetch', event => {
       });
     })
   );
+});
+
+// ── Update message handler ────────────────────────────────
+// Banner in index.html posts SKIP_WAITING when user clicks Reload.
+// skipWaiting() here is safe because it is user-initiated (not automatic).
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
