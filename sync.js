@@ -781,18 +781,12 @@ export async function sendToGoogleScript(exportData) {
     await recoverDriveMetadataFromReviewApi(exportData.inspectionId, mainPayloadFingerprint);
   }
 
-  const knownFolderId = getKnownDriveFolderId(inspection, exportData);
-  const canReuseExistingDataSync = !!(
-    inspection &&
-    inspection._dataSyncedToDrive &&
-    knownFolderId &&
-    inspection._lastMainPayloadFingerprint === mainPayloadFingerprint
-  );
-
-  if (!canReuseExistingDataSync) {
-    const mainResult = await scriptFetch(mainPayload);
-    rememberDriveResult(mainResult, mainPayloadFingerprint, 'main-sync');
-  }
+  // Always resend inspection JSON during final submit/retry. Local sync flags can
+  // survive a stale or retired deployment and falsely claim the server has the
+  // assessment. The Apps Script folder/sheet path and Supabase write are
+  // idempotent, so a confirmed server round-trip is safer than trusting local state.
+  const mainResult = await scriptFetch(mainPayload);
+  rememberDriveResult(mainResult, mainPayloadFingerprint, 'main-sync');
 
   if (USE_SUPABASE_PHOTOS) {
     // Always run — the flush pulls from the vault too, so it catches photos whose

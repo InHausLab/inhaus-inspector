@@ -222,6 +222,11 @@ All caught on staging, never in production.
 
 ## Changelog
 
+### v157 — July 17 2026
+- [ROOT CAUSE] Final submit could skip the inspection JSON POST when local `_dataSyncedToDrive`, folder ID, and payload fingerprint flags claimed the data had already synced. Those flags can survive a stale/dead Apps Script deployment even when no `ihl_assessments` record exists.
+- [FIX] Final submit and **Retry inspection data sync** now always POST the stripped inspection JSON to Apps Script before photo confirmation/mirroring. Server-side folder reuse and Supabase upsert keep retries idempotent.
+- [VERIFY] Supabase query for `INH-20260717-YZNHG0` returned no assessment row before this fix. The live Apps Script list endpoint accepted `InHaus2026` and also returned zero inspections.
+
 ### v156 — July 17 2026
 - [INCIDENT] Real inspection `INH-20260717-YZNHG0` uploaded and mirrored 34 photos, but its inspection JSON did not reach Apps Script; the live review list returned zero inspections. Form data remains recoverable only from Matt's device/local backup.
 - [FIX] `scriptFetch()` now rejects HTTP failures, HTML/non-JSON responses, invalid response shapes, and any response that does not explicitly return `status: "ok"`.
