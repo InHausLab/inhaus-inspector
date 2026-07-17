@@ -1,4 +1,4 @@
-// InHaus Inspector Service Worker v152
+// InHaus Inspector Service Worker v153
 // Safe iOS Safari implementation - June 28 2026
 //
 // Rules:
@@ -9,23 +9,23 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v152';
+const CACHE_NAME = 'inhaus-v153';
 
 const APP_SHELL = [
   './',
   './index.html',
   './cache-reset.html',
-  './app.js?v=152',
-  './screens.js?v=152',
-  './sync.js?v=152',
-  './ui.js?v=152',
-  './steps.js?v=152',
-  './config.js?v=152',
-  './storage.js?v=152',
-  './fields.js?v=152',
-  './inspection.js?v=152',
-  './db.js?v=152',
-  './state.js?v=152',
+  './app.js?v=153',
+  './screens.js?v=153',
+  './sync.js?v=153',
+  './ui.js?v=153',
+  './steps.js?v=153',
+  './config.js?v=153',
+  './storage.js?v=153',
+  './fields.js?v=153',
+  './inspection.js?v=153',
+  './db.js?v=153',
+  './state.js?v=153',
   './styles.css',
   './manifest.json',
 ];

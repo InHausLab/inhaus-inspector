@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=152';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=153';
 
 function dataUrlToBlob(dataUrl) {
   const comma = dataUrl.indexOf(',');
@@ -97,15 +97,33 @@ export async function uploadPhotoToSupabase(photo) {
 
 export async function mirrorPhotosToDrive(payload) {
   if (!payload || !payload.inspectionId) throw new Error('Missing inspectionId for Drive mirror');
-  const resp = await fetch(workerUrl('/mirror'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      inspectionId: payload.inspectionId,
-      inspectionName: payload.inspectionName || '',
-      driveFolderId: payload.driveFolderId || '',
-      sharedSecret: PHOTO_UPLOAD_SECRET
-    })
-  });
-  return await parseJsonResponse(resp, 'Drive mirror failed');
+
+  // The Worker batches 14 photos per invocation to stay under CF's 50 subrequest limit.
+  // Loop until hasMore is false (all photos mirrored).
+  let totalMirrored = 0;
+  let folderId = payload.driveFolderId || '';
+  let folderName = '';
+  const MAX_BATCHES = 20; // safety cap (20 × 14 = 280 photos max)
+  let batch = 0;
+
+  while (batch < MAX_BATCHES) {
+    batch++;
+    const resp = await fetch(workerUrl('/mirror'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        inspectionId: payload.inspectionId,
+        inspectionName: payload.inspectionName || '',
+        driveFolderId: folderId,
+        sharedSecret: PHOTO_UPLOAD_SECRET
+      })
+    });
+    const result = await parseJsonResponse(resp, 'Drive mirror failed');
+    totalMirrored += (result.mirrored || 0);
+    if (result.folderId) folderId = result.folderId;
+    if (result.folderName) folderName = result.folderName;
+    if (!result.hasMore) break;
+  }
+
+  return { mirrored: totalMirrored, skipped: 0, hasMore: false, folderId, folderName };
 }

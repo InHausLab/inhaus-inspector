@@ -59,8 +59,15 @@ async function handleMirror(request, env) {
 
   const inspectionId = cleanId(body.inspectionId, 'inspectionId');
   const inspectionName = String(body.inspectionName || body.folderName || inspectionId).trim();
-  const rows = await getUnmirroredPhotoRows(env, inspectionId);
-  if (!rows.length) return json({ mirrored: 0, skipped: 0, folderId: body.driveFolderId || '' });
+  const allRows = await getUnmirroredPhotoRows(env, inspectionId);
+  if (!allRows.length) return json({ mirrored: 0, skipped: 0, hasMore: false, folderId: body.driveFolderId || '' });
+
+  // CF Workers have a 50 subrequest limit per invocation.
+  // Each photo costs 3 subrequests (Supabase download + Drive upload + Drive permission).
+  // Cap at 14 photos per call (~42 subrequests) and return hasMore so the app can loop.
+  const BATCH_SIZE = 14;
+  const rows = allRows.slice(0, BATCH_SIZE);
+  const hasMore = allRows.length > BATCH_SIZE;
 
   const accessToken = await getGoogleAccessToken(env);
   const folder = body.driveFolderId
@@ -79,7 +86,7 @@ async function handleMirror(request, env) {
     results.push({ photoId: row.photo_id, driveUrl });
   }
 
-  return json({ mirrored: results.length, skipped: 0, folderId: folder.id, folderName: folder.name, photos: results });
+  return json({ mirrored: results.length, skipped: 0, hasMore, remaining: allRows.length - rows.length, folderId: folder.id, folderName: folder.name, photos: results });
 }
 
 async function readJson(request) {
