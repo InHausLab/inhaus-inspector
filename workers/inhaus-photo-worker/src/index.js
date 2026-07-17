@@ -1,6 +1,6 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, PUT, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400'
 };
@@ -23,6 +23,7 @@ export default {
       if (url.pathname === '/mirror' && request.method === 'POST') return await handleMirror(request, env);
       if (url.pathname === '/confirmed' && request.method === 'POST') return await handleConfirmed(request, env);
       if (url.pathname === '/inspection-status' && request.method === 'POST') return await handleInspectionStatus(request, env);
+      if (url.pathname === '/photo' && request.method === 'GET') return await handleReviewPhoto(url, env);
       return json({ error: 'not_found' }, 404);
     } catch (err) {
       return json({ error: err && err.message ? err.message : String(err) }, 500);
@@ -52,6 +53,46 @@ async function handleSign(request, env) {
   });
 
   return json({ signedUrl, storagePath });
+}
+
+// Review-portal image delivery. Drive files in the Shared Drive cannot always
+// be made public, so serve the durable private Supabase object after validating
+// the per-inspection review token already present in the portal URL.
+async function handleReviewPhoto(url, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY']);
+  const inspectionId = cleanId(url.searchParams.get('inspectionId'), 'inspectionId');
+  const photoId = cleanId(url.searchParams.get('photoId'), 'photoId');
+  const token = String(url.searchParams.get('token') || '');
+  if (!token || token !== inspectionId.toLowerCase()) throw new Error('unauthorized');
+
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('photo_id', `eq.${photoId}`);
+  params.set('select', 'storage_path');
+  params.set('limit', '1');
+  const metadataResponse = await fetch(
+    normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`),
+    { headers: serviceHeaders(env) }
+  );
+  const metadataText = await metadataResponse.text();
+  if (!metadataResponse.ok) {
+    throw new Error(`photo_lookup_failed:${metadataResponse.status}:${metadataText.slice(0, 120)}`);
+  }
+  const rows = metadataText ? JSON.parse(metadataText) : [];
+  if (!Array.isArray(rows) || !rows.length || !rows[0].storage_path) {
+    return json({ error: 'photo_not_found' }, 404);
+  }
+
+  const photo = await downloadSupabaseObject(env, rows[0].storage_path);
+  return new Response(photo, {
+    status: 200,
+    headers: {
+      ...CORS_HEADERS,
+      'Content-Type': photo.type || 'image/jpeg',
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
 }
 
 async function handleMirror(request, env) {
