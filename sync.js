@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=148';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=148';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=150';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive } from './supabase-photos.js?v=150';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=148';
-import { scheduleSave } from './storage.js?v=148';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=148';
+         getBestCloudSyncAt } from './state.js?v=150';
+import { scheduleSave } from './storage.js?v=150';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=150';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.

@@ -1,11 +1,11 @@
 // InHaus Inspector - Screen Rendering
-import { VISION_PROXY_URL } from './config.js?v=148';
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=148';
-import { saveNow, scheduleSave } from './storage.js?v=149';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=148';
-import { checkpointToCloud, submitInspection } from './sync.js?v=148';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=148';
-import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=148';
+import { VISION_PROXY_URL } from './config.js?v=150';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=150';
+import { saveNow, scheduleSave } from './storage.js?v=150';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=150';
+import { checkpointToCloud, submitInspection } from './sync.js?v=150';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=150';
+import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=150';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -533,7 +533,7 @@ export function renderHome() {
       className: 'btn btn-outline btn-full',
       style: 'margin-top:8px;font-size:0.8rem;color:#ff9900;border-color:#ff9900;',
       onClick: () => {
-        DB.getAll().then(all => {
+        window.DB.getAll().then(all => {
           const inProg = all.filter(x => x.status === 'in-progress');
           if (!inProg.length) { alert('No in-progress inspection. Start one first.'); return; }
           const insp = inProg[0];
@@ -557,7 +557,7 @@ export function renderHome() {
   const list = ui().el('div', { className: 'inspection-list' });
   c.appendChild(list);
 
-  DB.getAll().then(all => {
+  window.DB.getAll().then(all => {
     all.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
     const inProg = all.filter(x => x.status === 'in-progress');
     const done = all.filter(x => x.status === 'completed');
@@ -591,7 +591,7 @@ export function renderInspCard(insp, canResume) {
       ui().el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
       ui().el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
         if (confirm('⚠️ Delete this inspection permanently?\n\nAll photos and data will be removed from this device.\n\nOnly delete after confirming your photos have been uploaded to Google Drive.\n\nThis cannot be undone.')) {
-          DB.remove(insp.inspectionId).then(() => ctx.render());
+          window.DB.remove(insp.inspectionId).then(() => ctx.render());
         }
       }}, 'Delete')
     ])
@@ -599,7 +599,7 @@ export function renderInspCard(insp, canResume) {
 }
 
 export async function resumeInsp(id) {
-  ctx.inspection = await DB.get(id); setInspection(ctx.inspection);
+  ctx.inspection = await window.DB.get(id); setInspection(ctx.inspection);
   if (!ctx.inspection) return;
   ctx.stepList = buildStepList(ctx.inspection);
   const lastVisited = ctx.inspection._lastStepIdx || 0;
@@ -610,7 +610,7 @@ export async function resumeInsp(id) {
 }
 
 export async function viewInsp(id) {
-  ctx.inspection = await DB.get(id); setInspection(ctx.inspection);
+  ctx.inspection = await window.DB.get(id); setInspection(ctx.inspection);
   if (!ctx.inspection) return;
   ctx.stepList = buildStepList(ctx.inspection);
   setScreen('review');
@@ -903,6 +903,7 @@ export function renderIntake() {
       } else {
         ctx.inspection = {
           ...data,
+          inspectionId: ctx.genId(),
           startedAt: new Date().toISOString(),
           endedAt: null,
           status: 'in-progress',
