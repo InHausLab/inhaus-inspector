@@ -1,6 +1,6 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=159';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=159';
+import { getInspection } from './state.js?v=160';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=160';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -17,6 +17,8 @@ export function extractAllPhotosFromExport(exportData) {
       roomName: p.roomName || fallbackRoomName || '',
       stepName: p.stepName || '',
       timestamp: p.timestamp || '',
+      placementSource: p.placementSource || '',
+      routingStatus: p.routingStatus || '',
       driveUrl: p.driveUrl || null,
       driveId: p.driveId || null
     };
@@ -34,6 +36,12 @@ export function extractAllPhotosFromExport(exportData) {
                        'radonSetup', 'utilityRoom', 'wrapUp', 'customerDebrief', 'postAssessment'];
   sectionKeys.forEach(key => extractFromSection(exportData[key]));
   (exportData.rooms || []).forEach(room => extractFromSection(room, room.roomName));
+  if (Array.isArray(exportData.sparePhotos)) {
+    exportData.sparePhotos.forEach(photo => {
+      const picked = pickPhoto(photo, photo.roomName || photo.stepName || '');
+      if (picked) photos.push(picked);
+    });
+  }
   return photos;
 }
 
@@ -80,16 +88,25 @@ export function stripPhotosFromExport(exportData) {
   return stripped;
 }
 
+function exportPhotoArray(arr) {
+  return arr.map(p => ({
+    photoId: p.photoId,
+    roomName: p.roomName,
+    stepName: p.stepName,
+    timestamp: p.timestamp,
+    caption: p.caption,
+    placementSource: p.placementSource || '',
+    routingStatus: p.routingStatus || '',
+    assignedSlot: p.assignedSlot || null,
+    imageData: p.dataUrl,
+    driveUrl: p.driveUrl || null,
+    driveId: p.driveId || null
+  }));
+}
+
 function cleanStepData(data) {
   if (!data) return {};
   const clean = {};
-  function exportPhotos(arr) {
-    return arr.map(p => ({
-      photoId: p.photoId, roomName: p.roomName, stepName: p.stepName,
-      timestamp: p.timestamp, caption: p.caption, imageData: p.dataUrl,
-      driveUrl: p.driveUrl || null, driveId: p.driveId || null
-    }));
-  }
   for (const [k, v] of Object.entries(data)) {
     if (k.startsWith('_')) continue;
     clean[k] = v;
@@ -99,7 +116,7 @@ function cleanStepData(data) {
     if (!k.startsWith('_')) continue;
     if (!Array.isArray(v) || !v.length) continue;
     if (v[0] && typeof v[0].photoId === 'string') {
-      clean[k.slice(1)] = exportPhotos(v); // strip leading _ for export key
+      clean[k.slice(1)] = exportPhotoArray(v); // strip leading _ for export key
     }
   }
   return clean;
@@ -182,6 +199,7 @@ export function buildExportJSON(stepList) {
     wrapUp: cleanStepData(inspection.stepData?.['final-checks']),
     customerDebrief: cleanStepData(inspection.stepData?.debrief),
     postAssessment: cleanStepData(inspection.stepData?.['post-assessment']),
+    sparePhotos: exportPhotoArray(inspection.sparePhotos || []),
     completedAt: inspection.completedAt || null
   };
 

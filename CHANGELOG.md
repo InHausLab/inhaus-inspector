@@ -6,11 +6,11 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
-## Quick Reference — Current State (July 5 2026)
+## Quick Reference — Current State (July 18 2026)
 
 | Item | Value |
 |------|-------|
-| App version | v148 (pre-live polish: dry run verified, retired path guards, portal confirmed, refresh reminder) |
+| App version | v160 (automatic photo routing, exception-only organization, visible inspector comments) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v50 — see URL below |
@@ -221,6 +221,14 @@ All caught on staging, never in production.
 ---
 
 ## Changelog
+
+### v160 — July 18 2026
+- [PHOTO WORKFLOW] Photos now carry the room and task from their capture screen automatically and show a clear **Saved to room → task** confirmation.
+- [INSPECTOR UX] The floating camera button no longer asks inspectors to choose report-builder observation/action/follow-up slots. It saves immediately to the current inspection context.
+- [INSPECTOR UX] The Photos screen now opens to exceptions only, summarizes automatically organized photos, and offers a simple room/task dropdown only when a photo truly needs placement.
+- [COMMENTS] Inspector photo comments are explicitly labeled and visually highlighted in the capture cards, Photos screen, and Final Review summary.
+- [DATA FIX] Additional photos from the floating camera button are now included in the inspection export and final photo verification instead of existing only in local/cloud photo storage.
+- [SAFETY] The localStorage shadow backup retains routing metadata for every photo while continuing to strip image bytes.
 
 ### v158 — July 17 2026
 - [BACKEND FIX] Apps Script `syncToSupabase()` now supplies required `assessment_num` from the generated Drive assessment number.

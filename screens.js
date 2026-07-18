@@ -1,11 +1,11 @@
 // InHaus Inspector - Screen Rendering
-import { VISION_PROXY_URL } from './config.js?v=159';
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=159';
-import { saveNow, scheduleSave } from './storage.js?v=159';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=159';
-import { checkpointToCloud, submitInspection } from './sync.js?v=159';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=159';
-import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=159';
+import { VISION_PROXY_URL } from './config.js?v=160';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=160';
+import { saveNow, scheduleSave } from './storage.js?v=160';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=160';
+import { checkpointToCloud, submitInspection } from './sync.js?v=160';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=160';
+import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=160';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -13,67 +13,6 @@ function ui() { return window.UI; }
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
 let _stepRenderJob = 0;
-
-const SPARE_SLOT_GROUPS = [
-  { title: 'Observation', prefix: 'obs_', count: 6 },
-  { title: 'Action Taken', prefix: 'actionTaken_', count: 6 },
-  { title: 'Follow-Up', prefix: 'followUp_', count: 5 }
-];
-
-function buildSpareSlotPicker(selectedValue, onSelect, opts) {
-  const options = opts || {};
-  let selected = selectedValue || '';
-  const wrap = document.createElement('div');
-  wrap.className = 'spare-slot-picker' + (options.compact ? ' spare-slot-picker-compact' : '');
-
-  function updateSelected() {
-    wrap.querySelectorAll('.spare-slot-choice').forEach(btn => {
-      btn.classList.toggle('selected', btn.dataset.value === selected);
-    });
-  }
-
-  function addChoice(grid, value, label, extraClass) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'spare-slot-choice' + (extraClass ? ' ' + extraClass : '');
-    btn.dataset.value = value;
-    btn.textContent = label;
-    btn.onclick = () => {
-      selected = value;
-      updateSelected();
-      onSelect(value || null);
-    };
-    grid.appendChild(btn);
-  }
-
-  if (options.includeUnassigned) {
-    const clearGrid = document.createElement('div');
-    clearGrid.className = 'spare-slot-grid spare-slot-grid-clear';
-    addChoice(clearGrid, '', 'Unassigned', 'spare-slot-unassigned');
-    wrap.appendChild(clearGrid);
-  }
-
-  SPARE_SLOT_GROUPS.forEach(group => {
-    const groupWrap = document.createElement('div');
-    groupWrap.className = 'spare-slot-group';
-
-    const title = document.createElement('div');
-    title.className = 'spare-slot-group-title';
-    title.textContent = group.title;
-    groupWrap.appendChild(title);
-
-    const grid = document.createElement('div');
-    grid.className = 'spare-slot-grid';
-    for (let i = 1; i <= group.count; i++) {
-      addChoice(grid, group.prefix + i, String(i));
-    }
-    groupWrap.appendChild(grid);
-    wrap.appendChild(groupWrap);
-  });
-
-  updateSelected();
-  return wrap;
-}
 
 export function initScreens(context) {
   ctx = context;
@@ -176,20 +115,68 @@ function getStepNameFromPhotoPath(path) {
   return step ? step.name : '';
 }
 
+function getPhotoContextFromPath(path) {
+  const match = String(path || '').match(/stepData\.([^.[\]]+)/);
+  if (!match || !ctx?.inspection?.stepData) return { roomName: '', stepName: '' };
+  const stepId = match[1];
+  const step = (ctx.stepList || []).find(item => item.id === stepId);
+  const data = ctx.inspection.stepData[stepId] || {};
+  return {
+    roomName: String(data.roomName || data._roomName || step?.name || '').trim(),
+    stepName: String(step?.name || data.stepName || '').trim()
+  };
+}
+
+function formatPhotoDestination(roomName, stepName) {
+  const room = String(roomName || '').trim();
+  const step = String(stepName || '').trim();
+  if (room && step && room.toLowerCase() !== step.toLowerCase()) return room + ' → ' + step;
+  return room || step || 'Needs placement';
+}
+
+function photoRefNeedsPlacement(ref) {
+  return !String(ref?.roomName || '').trim() && !String(ref?.stepName || '').trim();
+}
+
 function collectInspectionPhotoRefs() {
   const refs = [];
   if (!ctx || !ctx.inspection) return refs;
   visitScreenPhotos(ctx.inspection, (photo, path) => {
     if (!photo || !photo.photoId) return;
-    const stepName = photo.stepName || getStepNameFromPhotoPath(path);
+    const pathContext = getPhotoContextFromPath(path);
+    const stepName = String(photo.stepName || pathContext.stepName || getStepNameFromPhotoPath(path) || '').trim();
+    const roomName = String(photo.roomName || pathContext.roomName || '').trim();
     refs.push({
       photo,
       path,
+      roomName,
       stepName,
-      title: photo.roomName || stepName || 'Inspection photo'
+      destination: formatPhotoDestination(roomName, stepName),
+      title: roomName || stepName || 'Inspection photo'
     });
   });
   return refs;
+}
+
+function collectPhotoDestinations() {
+  const destinations = [];
+  const seen = new Set();
+  function add(roomName, stepName) {
+    const room = String(roomName || '').trim();
+    const step = String(stepName || '').trim();
+    if (!room && !step) return;
+    const key = room.toLowerCase() + '|' + step.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    destinations.push({ roomName: room, stepName: step, label: formatPhotoDestination(room, step) });
+  }
+
+  (ctx?.stepList || []).forEach(step => {
+    const data = ctx?.inspection?.stepData?.[step.id] || {};
+    add(data.roomName || data._roomName || step.name, step.name);
+  });
+  collectInspectionPhotoRefs().forEach(ref => add(ref.roomName, ref.stepName));
+  return destinations.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function getPhotoPreviewSrc(photo) {
@@ -1122,71 +1109,35 @@ export function renderStep() {
         try {
           const dataUrl = await ui().compressImage ? ui().compressImage(e.target.files[0]) : new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
           if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
-          const sp = { photoId: 'spare-' + Math.random().toString(36).substr(2,9), timestamp: new Date().toISOString(), caption: '', dataUrl, stepName: step.name, roomName: (getStepData(step.id).roomName || step.name), assignedSlot: null };
+          const captureRoom = getStepData(step.id).roomName || step.name;
+          const sp = {
+            photoId: 'spare-' + Math.random().toString(36).substr(2,9),
+            timestamp: new Date().toISOString(),
+            caption: '',
+            dataUrl,
+            stepName: step.name,
+            roomName: captureRoom,
+            placementSource: 'capture_context',
+            routingStatus: 'auto',
+            assignedSlot: null
+          };
           ctx.inspection.sparePhotos.push(sp);
-          saveNow();
+          await saveNow();
+          if (window.DB?.savePhoto) {
+            try {
+              await window.DB.savePhoto({
+                ...sp,
+                inspectionId: ctx.inspection.inspectionId,
+                uploadState: 'local'
+              });
+              sp._vaultSaved = true;
+            } catch (vaultErr) {
+              console.warn('Spare photo vault save failed:', vaultErr);
+            }
+          }
+          if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(sp);
           if (window.savePhotoToDevice) window.savePhotoToDevice(dataUrl, sp.photoId);
-
-          // ── Quick-assign sheet ──────────────────────────────────
-          let selectedSlot = '';
-          const overlay = document.createElement('div');
-          overlay.className = 'spare-assign-overlay';
-
-          const sheet = document.createElement('div');
-          sheet.className = 'spare-assign-sheet';
-
-          const preview = document.createElement('img');
-          preview.src = dataUrl;
-          preview.className = 'spare-assign-preview';
-          sheet.appendChild(preview);
-
-          const sheetTitle = document.createElement('div');
-          sheetTitle.className = 'spare-assign-title';
-          sheetTitle.textContent = '📸 Assign spare photo';
-          sheet.appendChild(sheetTitle);
-
-          const sheetSub = document.createElement('div');
-          sheetSub.className = 'spare-assign-subtitle';
-          sheetSub.textContent = 'Tap a bucket, then save. You can also skip and assign it in Review.';
-          sheet.appendChild(sheetSub);
-
-          sheet.appendChild(buildSpareSlotPicker('', value => { selectedSlot = value || ''; }));
-
-          const capInput = document.createElement('input');
-          capInput.type = 'text';
-          capInput.placeholder = 'Caption (optional)…';
-          capInput.style = 'width:100%;padding:12px;font-size:14px;font-family:inherit;border:1px solid #e5e7eb;border-radius:8px;box-sizing:border-box;margin-bottom:16px;';
-          sheet.appendChild(capInput);
-
-          const btnRow = document.createElement('div');
-          btnRow.style = 'display:flex;gap:10px;';
-
-          const confirmBtn = document.createElement('button');
-          confirmBtn.type = 'button';
-          confirmBtn.textContent = 'Save';
-          confirmBtn.style = 'flex:1;padding:14px;background:#f59e0b;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;touch-action:manipulation;';
-          confirmBtn.onclick = () => {
-            if (selectedSlot) sp.assignedSlot = selectedSlot;
-            if (capInput.value.trim()) sp.caption = capInput.value.trim();
-            saveNow();
-            document.body.removeChild(overlay);
-            ui().showToast(selectedSlot ? '📸 Spare photo saved + assigned' : '📸 Spare photo saved — assign in Review');
-          };
-
-          const skipBtn = document.createElement('button');
-          skipBtn.type = 'button';
-          skipBtn.textContent = 'Skip';
-          skipBtn.style = 'padding:14px 20px;background:transparent;color:#64748b;border:1px solid #e5e7eb;border-radius:10px;font-size:1rem;cursor:pointer;touch-action:manipulation;';
-          skipBtn.onclick = () => {
-            document.body.removeChild(overlay);
-            ui().showToast('📸 Spare photo saved — assign in Review');
-          };
-
-          btnRow.appendChild(confirmBtn);
-          btnRow.appendChild(skipBtn);
-          sheet.appendChild(btnRow);
-          overlay.appendChild(sheet);
-          document.body.appendChild(overlay);
+          ui().showToast('📸 Saved to ' + formatPhotoDestination(captureRoom, step.name));
         } catch(err) { console.error(err); }
       };
       document.body.appendChild(inp); inp.click(); setTimeout(() => inp.remove(), 2000);
@@ -1379,10 +1330,27 @@ export function renderPhotos() {
   c.appendChild(topActions);
 
   const summaryCard = ui().el('div', { className: 'card photo-review-summary' });
-  summaryCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Photo Status'));
+  summaryCard.appendChild(ui().el('h3', { className: 'section-heading' }, 'Photo Organization'));
   const summaryBody = ui().el('div', { className: 'photo-health-grid' }, 'Checking...');
   summaryCard.appendChild(summaryBody);
   c.appendChild(summaryCard);
+
+  let showAllPhotos = false;
+  let photoSummaryRun = 0;
+  const listHeader = ui().el('div', { className: 'photo-review-list-header' });
+  const listHeadingText = ui().el('div');
+  const listHeading = ui().el('h3', { className: 'section-heading' }, 'Photos Needing Attention');
+  const listHelp = ui().el('p', { className: 'photo-review-help' }, 'Only photos without a room or task appear here.');
+  listHeadingText.appendChild(listHeading);
+  listHeadingText.appendChild(listHelp);
+  const viewAllBtn = ui().el('button', { className: 'btn btn-small btn-outline', type: 'button' }, 'View all photos');
+  viewAllBtn.addEventListener('click', () => {
+    showAllPhotos = !showAllPhotos;
+    renderPhotoList();
+  });
+  listHeader.appendChild(listHeadingText);
+  listHeader.appendChild(viewAllBtn);
+  c.appendChild(listHeader);
 
   const list = ui().el('div', { className: 'photo-review-list' });
   c.appendChild(list);
@@ -1392,26 +1360,75 @@ export function renderPhotos() {
   }
 
   function renderPhotoSummary() {
+    const runId = ++photoSummaryRun;
+    const refs = collectInspectionPhotoRefs();
+    const needsPlacement = refs.filter(photoRefNeedsPlacement).length;
+    const commented = refs.filter(ref => String(ref.photo.caption || '').trim()).length;
+    const organized = refs.length - needsPlacement;
+    summaryBody.innerHTML = '';
+    summaryBody.appendChild(statusPill(organized + ' organized automatically', organized ? 'good' : 'neutral'));
+    summaryBody.appendChild(statusPill(needsPlacement + ' need placement', needsPlacement ? 'wait' : 'good'));
+    summaryBody.appendChild(statusPill(commented + ' comments added', commented ? 'neutral' : 'good'));
+
     if (!window.getPhotoHealth) {
-      summaryBody.textContent = 'Photo check unavailable.';
+      summaryBody.appendChild(statusPill('Cloud check unavailable', 'wait'));
       return;
     }
     window.getPhotoHealth().then(h => {
-      summaryBody.innerHTML = '';
-      summaryBody.appendChild(statusPill(h.total + ' total', 'neutral'));
-      summaryBody.appendChild(statusPill(h.local + ' phone', 'good'));
-      summaryBody.appendChild(statusPill(h.drive + ' Drive', 'good'));
-      summaryBody.appendChild(statusPill(h.pending + ' waiting', h.pending ? 'wait' : 'good'));
-      summaryBody.appendChild(statusPill(h.missing + ' missing', h.missing ? 'bad' : 'good'));
-      if (h.vaultOnly > 0) summaryBody.appendChild(statusPill(h.vaultOnly + ' vault only', 'wait'));
+      if (runId !== photoSummaryRun) return;
+      if (h.pending > 0) summaryBody.appendChild(statusPill(h.pending + ' waiting for cloud', 'wait'));
+      if (h.missing > 0) summaryBody.appendChild(statusPill(h.missing + ' missing', 'bad'));
+      if (h.pending === 0 && h.missing === 0) summaryBody.appendChild(statusPill('Cloud backup verified', 'good'));
     }).catch(err => {
-      summaryBody.textContent = 'Photo check failed: ' + (err && err.message ? err.message : String(err));
+      if (runId !== photoSummaryRun) return;
+      summaryBody.appendChild(statusPill('Cloud check failed', 'bad'));
     });
+  }
+
+  function addPlacementControl(body, ref) {
+    if (!photoRefNeedsPlacement(ref)) return;
+    const destinations = collectPhotoDestinations();
+    const wrap = ui().el('label', { className: 'photo-placement-control' });
+    wrap.appendChild(ui().el('span', { className: 'photo-comment-label' }, 'Move photo to room/task'));
+    const select = ui().el('select', { className: 'field-input' });
+    select.appendChild(ui().el('option', { value: '' }, '— Select room or task —'));
+    destinations.forEach((destination, destinationIndex) => {
+      select.appendChild(ui().el('option', { value: String(destinationIndex) }, destination.label));
+    });
+    select.addEventListener('change', async () => {
+      if (select.value === '') return;
+      const destination = destinations[Number(select.value)];
+      if (!destination) return;
+      ref.photo.roomName = destination.roomName;
+      ref.photo.stepName = destination.stepName;
+      ref.photo.placementSource = 'manual_exception';
+      ref.photo.routingStatus = 'manual';
+      if (window.DB?.updatePhoto && ref.photo.photoId) {
+        try {
+          await window.DB.updatePhoto(ref.photo.photoId, {
+            roomName: destination.roomName,
+            stepName: destination.stepName,
+            placementSource: 'manual_exception',
+            routingStatus: 'manual',
+            updatedAt: Date.now()
+          });
+        } catch (vaultErr) {
+          console.warn('Photo vault placement update failed:', vaultErr);
+        }
+      }
+      scheduleSave();
+      ui().showToast('Photo moved to ' + destination.label);
+      renderPhotoSummary();
+      renderPhotoList();
+    });
+    wrap.appendChild(select);
+    body.appendChild(wrap);
   }
 
   function renderPhotoCard(ref, idx) {
     const p = ref.photo;
-    const card = ui().el('div', { className: 'photo-review-card' });
+    const hasComment = !!String(p.caption || '').trim();
+    const card = ui().el('div', { className: 'photo-review-card' + (hasComment ? ' has-comment' : '') });
     const preview = getPhotoPreviewSrc(p);
     const media = ui().el('div', { className: 'photo-review-media' });
     if (preview) {
@@ -1431,6 +1448,11 @@ export function renderPhotos() {
     const meta = [ref.stepName && ref.stepName !== ref.title ? ref.stepName : '', formatPhotoTime(p.timestamp)].filter(Boolean).join(' | ');
     if (meta) body.appendChild(ui().el('div', { className: 'photo-review-meta' }, meta));
 
+    body.appendChild(ui().el('div', {
+      className: 'photo-route-chip ' + (photoRefNeedsPlacement(ref) ? 'needs-placement' : 'is-organized')
+    }, photoRefNeedsPlacement(ref) ? '⚠ Needs placement' : '✓ ' + ref.destination));
+    addPlacementControl(body, ref);
+
     const status = getPhotoStatus(p);
     const statusRow = ui().el('div', { className: 'photo-status-row' });
     statusRow.appendChild(statusPill(status.label, status.tone));
@@ -1439,10 +1461,12 @@ export function renderPhotos() {
     if (p.dataUrl && p.dataUrl !== '__uploaded__') statusRow.appendChild(statusPill('Phone copy', 'good'));
     body.appendChild(statusRow);
 
+    const commentLabel = ui().el('div', { className: 'photo-comment-label' }, hasComment ? 'Inspector comment' : 'Add an optional comment');
+    body.appendChild(commentLabel);
     const cap = ui().el('textarea', {
       className: 'photo-caption-input',
       rows: 2,
-      placeholder: 'Caption'
+      placeholder: 'Why does this photo matter?'
     });
     cap.value = p.caption || '';
     cap.addEventListener('input', () => {
@@ -1450,6 +1474,8 @@ export function renderPhotos() {
       if (window.DB && window.DB.updatePhoto && p.photoId) {
         window.DB.updatePhoto(p.photoId, { caption: p.caption, updatedAt: Date.now() });
       }
+      card.classList.toggle('has-comment', !!p.caption.trim());
+      commentLabel.textContent = p.caption.trim() ? 'Inspector comment' : 'Add an optional comment';
       scheduleSave();
     });
     body.appendChild(cap);
@@ -1467,12 +1493,26 @@ export function renderPhotos() {
 
   function renderPhotoList() {
     const refs = collectInspectionPhotoRefs();
+    const needsPlacement = refs.filter(photoRefNeedsPlacement);
+    const visibleRefs = showAllPhotos ? refs : needsPlacement;
     list.innerHTML = '';
+    listHeading.textContent = showAllPhotos ? 'All Photos' : 'Photos Needing Attention';
+    listHelp.textContent = showAllPhotos
+      ? 'Every photo keeps its capture location and inspector comment.'
+      : 'Only photos without a room or task appear here.';
+    viewAllBtn.textContent = showAllPhotos ? 'Show only exceptions' : 'View all ' + refs.length + ' photos';
     if (!refs.length) {
       list.appendChild(ui().el('div', { className: 'empty-msg' }, 'No photos yet'));
       return;
     }
-    refs.forEach((ref, idx) => list.appendChild(renderPhotoCard(ref, idx)));
+    if (!visibleRefs.length) {
+      list.appendChild(ui().el('div', { className: 'photo-review-success' }, [
+        ui().el('strong', null, '✓ All ' + refs.length + ' photos are organized'),
+        ui().el('span', null, 'You only need to open all photos if you want to review comments or make a correction.')
+      ]));
+      return;
+    }
+    visibleRefs.forEach((ref, idx) => list.appendChild(renderPhotoCard(ref, idx)));
   }
 
   renderPhotoSummary();
@@ -1804,9 +1844,13 @@ export function renderReview() {
         summary.appendChild(ui().el('div', { className: 'review-photos-section' }, [ui().el('strong', null, arr.length + ' ' + label + ':')]));
         const grid = ui().el('div', { className: 'review-photo-grid' });
         arr.forEach(p => {
-          grid.appendChild(ui().el('div', { className: 'review-photo-item' }, [
+          const photoComment = String(p.caption || '').trim();
+          grid.appendChild(ui().el('div', { className: 'review-photo-item' + (photoComment ? ' has-comment' : '') }, [
             ui().el('img', { src: getPhotoPreviewSrc(p), className: 'review-photo-img', loading: 'lazy' }),
-            p.caption ? ui().el('div', { className: 'review-photo-caption' }, p.caption) : null
+            photoComment ? ui().el('div', { className: 'review-photo-caption' }, [
+              ui().el('strong', null, 'Inspector comment'),
+              ui().el('span', null, photoComment)
+            ]) : null
           ]));
         });
         summary.appendChild(grid);
@@ -1897,159 +1941,18 @@ export function renderReview() {
   ]));
 
 
-  // Spare Photos section in Review
+  // Spare photos are routed from their capture context. Report-section choices
+  // belong in the reviewer portal, not in the inspector's final checklist.
   if (ctx.inspection.sparePhotos && ctx.inspection.sparePhotos.length) {
-    const unassigned = ctx.inspection.sparePhotos.filter(sp => !sp.assignedSlot);
-    const assigned   = ctx.inspection.sparePhotos.filter(sp =>  sp.assignedSlot);
-
-    // ── Bucket header ──
-    const spHead = document.createElement('div');
-    spHead.style = 'background:' + (unassigned.length ? '#fff8e1' : '#f0fdf4') + ';border-left:4px solid ' + (unassigned.length ? '#f59e0b' : '#22c55e') + ';padding:12px 16px;margin:16px 0 8px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;';
-    spHead.innerHTML = '<span style="font-weight:800;color:' + (unassigned.length ? '#92400e' : '#166534') + ';">📸 Spare Photos (' + ctx.inspection.sparePhotos.length + ')</span>' +
-      (unassigned.length ? '<span style="font-size:12px;font-weight:700;background:#f59e0b;color:#fff;padding:2px 10px;border-radius:99px;">' + unassigned.length + ' need assignment</span>' : '<span style="font-size:12px;color:#166534;">✓ All assigned</span>');
-    c.appendChild(spHead);
-
-    // ── Render a single spare photo card ──
-    function renderSpareCard(sp, i) {
-      const spCard = document.createElement('div');
-      spCard.className = 'photo-card';
-      spCard.style = 'margin-bottom:10px;border:2px solid ' + (sp.assignedSlot ? '#22c55e' : '#f59e0b') + ';border-radius:8px;overflow:hidden;';
-      spCard.id = 'spare-card-' + sp.photoId;
-
-      // Photo
-      const spImg = document.createElement('img');
-      spImg.src = getPhotoPreviewSrc(sp);
-      spImg.className = 'photo-img';
-      spImg.loading = 'lazy';
-      spImg.alt = 'Spare ' + (i + 1);
-      spCard.appendChild(spImg);
-
-      // Meta
-      const spMeta = document.createElement('div');
-      spMeta.style = 'padding:4px 10px;font-size:11px;color:#64748b;';
-      spMeta.textContent = 'Captured during: ' + (sp.roomName || sp.stepName || 'inspection') + ' • ' + new Date(sp.timestamp).toLocaleTimeString();
-      spCard.appendChild(spMeta);
-
-      // Caption
-      const spCap = document.createElement('input');
-      spCap.type = 'text';
-      spCap.placeholder = 'Caption…';
-      spCap.value = sp.caption || '';
-      spCap.style = 'width:100%;border:none;border-top:1px solid #e5e7eb;padding:10px;font-size:13px;font-family:inherit;box-sizing:border-box;';
-      spCap.oninput = () => { sp.caption = spCap.value; scheduleSave(); };
-      spCard.appendChild(spCap);
-
-      // ── AI Caption Suggestion (spare photos) ────────────────────
-      if (sp.dataUrl && sp.dataUrl !== '__uploaded__') {
-        const aiSpareBtn = document.createElement('button');
-        aiSpareBtn.type = 'button';
-        aiSpareBtn.textContent = '✨ Suggest caption';
-        aiSpareBtn.style = 'display:block;width:100%;padding:6px 10px;border-top:1px solid #e5e7eb;background:#f0f4ff;border-left:none;border-right:none;border-bottom:none;color:#3a5ec5;font-size:0.82rem;font-weight:600;cursor:pointer;text-align:left;';
-        aiSpareBtn.onclick = async () => {
-          aiSpareBtn.disabled = true;
-          aiSpareBtn.textContent = '⏳ Analyzing photo...';
-          try {
-            const PROXY_URL = VISION_PROXY_URL;
-            const base64 = sp.dataUrl.split(',')[1];
-            const mimeType = (sp.dataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
-            const prompt = 'You are a home health inspector writing a caption for a photo taken during a residential inspection.' +
-              ' The caption should be 1-2 sentences, written in plain, accessible language — not overly technical.' +
-              ' Describe what is visible in the photo.' +
-              ' If there is any issue present, briefly explain how it could affect the health or comfort of the home\'s occupants if left unaddressed (e.g. mold risk, air quality, water quality, structural safety).' +
-              ' If the photo shows something that appears normal and fine, just describe it briefly.' +
-              ' Do not use alarming language. Be matter-of-fact and helpful.' +
-              (sp.roomName ? ' Room: ' + sp.roomName + '.' : '') +
-              (sp.stepName ? ' Section: ' + sp.stepName + '.' : '') +
-              ' Return ONLY the caption text, no quotes, no labels, no extra formatting.';
-            const resp = await fetch(PROXY_URL, {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ imageBase64: base64, mimeType, prompt })
-            });
-            if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
-            const result = await resp.json();
-            const text = result.content && result.content[0] && result.content[0].text;
-            if (!text) throw new Error('EMPTY_RESPONSE');
-            sp.caption = text.trim();
-            spCap.value = sp.caption;
-            scheduleSave();
-            aiSpareBtn.textContent = '✓ Caption added — edit if needed';
-            aiSpareBtn.style.background = '#edfaf1';
-            aiSpareBtn.style.color = '#1e7e34';
-            setTimeout(() => {
-              aiSpareBtn.textContent = '✨ Re-suggest caption';
-              aiSpareBtn.disabled = false;
-              aiSpareBtn.style.background = '#f0f4ff';
-              aiSpareBtn.style.color = '#3a5ec5';
-            }, 3000);
-          } catch (err) {
-            aiSpareBtn.disabled = false;
-            aiSpareBtn.textContent = '✨ Suggest caption';
-          }
-        };
-        spCard.appendChild(aiSpareBtn);
-      }
-
-      // Section assignment buttons
-      const assignWrap = document.createElement('div');
-      assignWrap.style = 'padding:8px 10px;border-top:1px solid #e5e7eb;background:#f8fafc;';
-
-      const assignLabel = document.createElement('div');
-      assignLabel.style = 'font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;';
-      assignLabel.textContent = 'Assign to section';
-      assignWrap.appendChild(assignLabel);
-
-      const picker = buildSpareSlotPicker(sp.assignedSlot || '', value => {
-        sp.assignedSlot = value || null;
-        scheduleSave();
-        const container = document.getElementById('spare-photos-container');
-        if (container) {
-          container.parentNode.removeChild(container);
-        }
-        renderSpareSection();
-      }, { compact: true, includeUnassigned: true });
-
-      assignWrap.appendChild(picker);
-      spCard.appendChild(assignWrap);
-      return spCard;
-    }
-
-    // ── Render the full spare section ──
-    function renderSpareSection() {
-      const wrap = document.createElement('div');
-      wrap.id = 'spare-photos-container';
-
-      const unassignedNow = ctx.inspection.sparePhotos.filter(sp => !sp.assignedSlot);
-      const assignedNow   = ctx.inspection.sparePhotos.filter(sp =>  sp.assignedSlot);
-
-      // Update header
-      spHead.style.background = unassignedNow.length ? '#fff8e1' : '#f0fdf4';
-      spHead.style.borderLeftColor = unassignedNow.length ? '#f59e0b' : '#22c55e';
-      spHead.innerHTML = '<span style="font-weight:800;color:' + (unassignedNow.length ? '#92400e' : '#166534') + ';">📸 Spare Photos (' + ctx.inspection.sparePhotos.length + ')</span>' +
-        (unassignedNow.length ? '<span style="font-size:12px;font-weight:700;background:#f59e0b;color:#fff;padding:2px 10px;border-radius:99px;">' + unassignedNow.length + ' need assignment</span>' : '<span style="font-size:12px;color:#166534;">✓ All assigned</span>');
-
-      // Unassigned bucket
-      if (unassignedNow.length) {
-        const bucketHdr = document.createElement('div');
-        bucketHdr.style = 'font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;padding:8px 0 4px;';
-        bucketHdr.textContent = '⚠️ Needs assignment (' + unassignedNow.length + ')';
-        wrap.appendChild(bucketHdr);
-        unassignedNow.forEach((sp, i) => wrap.appendChild(renderSpareCard(sp, ctx.inspection.sparePhotos.indexOf(sp))));
-      }
-
-      // Assigned bucket
-      if (assignedNow.length) {
-        const assignedHdr = document.createElement('div');
-        assignedHdr.style = 'font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;padding:12px 0 4px;';
-        assignedHdr.textContent = '✓ Assigned (' + assignedNow.length + ')';
-        wrap.appendChild(assignedHdr);
-        assignedNow.forEach((sp, i) => wrap.appendChild(renderSpareCard(sp, ctx.inspection.sparePhotos.indexOf(sp))));
-      }
-
-      c.appendChild(wrap);
-    }
-
-    renderSpareSection();
+    const spareComments = ctx.inspection.sparePhotos.filter(photo => String(photo.caption || '').trim()).length;
+    c.appendChild(ui().el('div', { className: 'card auto-routed-spare-summary' }, [
+      ui().el('strong', null, '✓ ' + ctx.inspection.sparePhotos.length + ' additional photo' + (ctx.inspection.sparePhotos.length === 1 ? '' : 's') + ' organized automatically'),
+      ui().el('p', null, formatPhotoDestination(
+        ctx.inspection.sparePhotos[0].roomName,
+        ctx.inspection.sparePhotos[0].stepName
+      ) + (spareComments ? ' • ' + spareComments + ' comment' + (spareComments === 1 ? '' : 's') : '')),
+      ui().el('p', { className: 'text-muted' }, 'Open Photos only if you want to review comments or correct a placement.')
+    ]));
   }
 
   ctx.root.appendChild(c);

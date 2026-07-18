@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=159';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=160';
 
 function dataUrlToBlob(dataUrl) {
   const comma = dataUrl.indexOf(',');

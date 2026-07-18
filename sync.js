@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=159';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=159';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=160';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=160';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=159';
-import { scheduleSave } from './storage.js?v=159';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=159';
+         getBestCloudSyncAt } from './state.js?v=160';
+import { scheduleSave } from './storage.js?v=160';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=160';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -668,7 +668,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=159');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=160');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {

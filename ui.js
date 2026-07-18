@@ -232,6 +232,8 @@
         roomName: photo.roomName || '',
         stepName: photo.stepName || '',
         caption: photo.caption || '',
+        placementSource: photo.placementSource || '',
+        routingStatus: photo.routingStatus || '',
         timestamp: photo.timestamp || new Date().toISOString(),
         dataUrl: photo.dataUrl,
         thumbnailDataUrl: thumbnailDataUrl,
@@ -1098,6 +1100,11 @@
   function renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, options) {
     if (!photos) photos = [];
     const photoOptions = options || {};
+    const roomLabel = String(roomName || '').trim();
+    const stepLabel = String(stepName || '').trim();
+    const destinationLabel = roomLabel && stepLabel && roomLabel.toLowerCase() !== stepLabel.toLowerCase()
+      ? roomLabel + ' → ' + stepLabel
+      : roomLabel || stepLabel || 'Needs placement';
     const section = el('div', { className: 'field-group photo-section' });
     if (!photoOptions.hideLabel) {
       section.appendChild(el('label', { className: 'field-label' }, photoOptions.label || 'Photos'));
@@ -1115,11 +1122,19 @@
           card.appendChild(lazyImage(displayUrl, 'photo-img', 'Photo ' + (idx + 1)));
         }
         card.appendChild(el('div', { className: 'photo-time' }, fmtDate(p.timestamp)));
+        const savedRoom = String(p.roomName || roomLabel || '').trim();
+        const savedStep = String(p.stepName || stepLabel || '').trim();
+        const savedDestination = savedRoom && savedStep && savedRoom.toLowerCase() !== savedStep.toLowerCase()
+          ? savedRoom + ' → ' + savedStep
+          : savedRoom || savedStep || 'Needs placement';
+        card.appendChild(el('div', {
+          className: 'photo-capture-route' + (savedRoom || savedStep ? '' : ' needs-placement')
+        }, (savedRoom || savedStep ? '✓ Saved to ' : '⚠ ') + savedDestination));
 
         const capRow = el('div', { className: 'input-row' });
         const capInp = el('textarea', {
           className: 'field-input photo-caption-input', rows: '2',
-          placeholder: 'Add caption...'
+          placeholder: 'Optional comment — why does this photo matter?'
         });
         capInp.value = p.caption || '';
         capInp.style.cssText = 'resize:none;min-height:54px;font-size:0.9rem;line-height:1.4;padding:8px;';
@@ -1245,6 +1260,7 @@
       }
     }
     async function handleFiles(files) {
+      let savedCount = 0;
       for (const file of Array.from(files)) {
         try {
           const dataUrl = await compressImage(file);
@@ -1253,6 +1269,8 @@
             photoId: 'p-' + Math.random().toString(36).substr(2, 9),
             roomName: roomName || '', stepName: stepName || '',
             timestamp: new Date().toISOString(), caption: '', dataUrl, thumbnailDataUrl,
+            placementSource: roomName || stepName ? 'capture_context' : 'unassigned',
+            routingStatus: roomName || stepName ? 'auto' : 'needs_review',
             _uploaded: false, _vaultSaved: false
           };
           await savePhotoRecordToVault(newPhoto, inspectionId);
@@ -1262,7 +1280,12 @@
           if (window.queuePhotoForBackgroundUpload) {
             window.queuePhotoForBackgroundUpload(newPhoto);
           }
+          savedCount++;
         } catch (err) { console.error('Photo error:', err); }
+      }
+      if (savedCount > 0 && window.showToast) {
+        const countLabel = savedCount === 1 ? 'Photo' : savedCount + ' photos';
+        window.showToast(countLabel + ' saved to ' + destinationLabel);
       }
     }
 
