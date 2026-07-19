@@ -13,7 +13,7 @@ This file is the authoritative record of every significant change, decision, bug
 | App version | v163 (photo routing, company comments, field sync, My Work, recovery) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v163 team merge and company comment library — see URL below |
+| Apps Script | v63 team merge and company comment library — see URL below |
 | Apps Script URL | `https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
