@@ -1,6 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=161';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=161';
+import { getInspection } from './state.js?v=162';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=162';
+import { ensureInspectionWorkspace } from './findings.js?v=162';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -147,6 +148,7 @@ function cleanStepData(data) {
 // ── Export JSON Builder ────────────────────────────────────
 export function buildExportJSON(stepList) {
   const inspection = getInspection();
+  ensureInspectionWorkspace(inspection);
   const exp = {
     inspectionId: inspection.inspectionId,
     propertyAddress: inspection.propertyAddress,
@@ -181,6 +183,9 @@ export function buildExportJSON(stepList) {
     endedAt: inspection.endedAt,
     status: inspection.status,
     reviewStatus: inspection.reviewStatus || '',
+    findings: JSON.parse(JSON.stringify(inspection.findings || [])),
+    commentLibrary: JSON.parse(JSON.stringify(inspection.commentLibrary || [])),
+    collaboration: JSON.parse(JSON.stringify(inspection.collaboration || {})),
     sharedDriveFolderId: SHARED_DRIVE_FOLDER_ID || '',
 
     // ── Key test identifiers & locations ────────────────────────

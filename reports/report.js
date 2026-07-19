@@ -683,6 +683,21 @@ function buildRooms(insp) {
 }
 
 function buildFindings(insp) {
+  const approved = Array.isArray(insp.findings)
+    ? insp.findings.filter(finding => finding && finding.status === 'approved' && (finding.cleanedComment || finding.rawComment))
+    : [];
+  if (approved.length) {
+    return approved.map(finding => ({
+      title: finding.roomName || finding.reportSection || finding.stepName || 'Assessment Finding',
+      meta: [
+        finding.severity || '',
+        finding.reportSection && finding.reportSection !== finding.roomName ? finding.reportSection : '',
+        finding.photoIds?.length ? finding.photoIds.length + ' photo' + (finding.photoIds.length === 1 ? '' : 's') : '',
+        finding.approvedBy ? 'Approved by ' + finding.approvedBy : ''
+      ].filter(Boolean).join(' / '),
+      copy: finding.cleanedComment || finding.rawComment
+    }));
+  }
   const rooms = buildRooms(insp);
   return rooms
     .filter(room => hasConcernText(room) || room.flirConcerns === 'Yes' || room.notes)

@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v161 (office preparation and phone handoff) |
+| App version | v162 (rapid capture, smart findings, approved comments, multi-inspector mode) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v50 — see URL below |
@@ -28,6 +28,21 @@ This file is the authoritative record of every significant change, decision, bug
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v162 — Rapid Capture, Smart Findings, Approved Comments, and Multi-Inspector Mode
+**Date:** July 19, 2026
+
+- Added **Rapid Capture** inside every inspection section. Inspectors choose the current room/task once, capture repeated photos, dictate one field note, and save directly into a Findings Inbox.
+- Added a structured finding model containing location, report section, severity, original inspector wording, cleaned report wording, photos, review status, author, timestamps, and reusable-comment status.
+- Every photo with an inspector comment automatically creates a finding. Final submission is blocked until each finding is approved for the report or explicitly excluded.
+- Added a guarded comment-cleaning workflow: the original inspector wording stays visible, can be copied into a separate report draft, and must be fine-tuned and approved before it can be reused.
+- Added an approved reusable comment library. A comment can only enter the library after its cleaned wording has been reviewed and approved; approved comments are available in future Rapid Capture sessions.
+- Added **Multi-Inspector Mode** with named team members, per-device identity selection, section assignments, capture/edit attribution, activity history, and a team sync action.
+- Team checkpoints now pull the latest cloud draft and merge sections, findings, photos, assignments, activity, rooms, and approved comments before saving. Section timestamps provide convergent sync without silently discarding another inspector's separately assigned work.
+- Updated the report builder to prefer approved structured findings and include severity, report location, photo count, and approver attribution.
+- Existing photo annotation remains unchanged and is available from captured photo cards.
 
 ---
 

@@ -1,11 +1,11 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=161';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt } from './state.js?v=161';
-import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js?v=161';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=161';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js?v=161';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=161';
-import { initScreens, render } from './screens.js?v=161';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=162';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt } from './state.js?v=162';
+import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js?v=162';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=162';
+import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js?v=162';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=162';
+import { initScreens, render } from './screens.js?v=162';
 
 (function () {
   'use strict';
@@ -487,7 +487,7 @@ import { initScreens, render } from './screens.js?v=161';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v161',
+      appVersion: 'v162',
       success: success
     };
   }

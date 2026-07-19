@@ -1722,3 +1722,87 @@ body {
   -webkit-user-select: text;
   cursor: text;
 }
+
+/* ── Inspector workspace: rapid capture, findings, and team mode ── */
+.field-workspace-tools,
+.findings-toolbar,
+.team-toolbar,
+.rapid-capture-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.field-workspace-tools .btn,
+.findings-toolbar .btn,
+.team-toolbar .btn,
+.rapid-capture-actions .btn { min-height: 48px; padding: 10px 8px; }
+.step-assignment-banner { border-radius: 10px; padding: 9px 12px; margin: 8px 0 12px; font-size: 0.88rem; font-weight: 700; }
+.step-assignment-banner.is-mine { background: #ecfdf3; color: #166534; }
+.step-assignment-banner.is-other { background: #fff7ed; color: #9a3412; }
+
+.rapid-capture-intro { display: grid; gap: 4px; background: #eff6e9; border-left: 5px solid var(--primary); border-radius: 12px; padding: 16px; margin: 14px 0; }
+.rapid-capture-intro strong { font-size: 1.08rem; }
+.rapid-capture-intro span { color: var(--text-muted); line-height: 1.45; }
+.rapid-context-card .field-label { margin-top: 12px; }
+.rapid-context-card .field-label:first-child { margin-top: 0; }
+.rapid-photo-card .photo-add-btn { min-height: 60px; font-size: 1.05rem; }
+.rapid-capture-actions { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr); position: sticky; bottom: 8px; z-index: 80; }
+.rapid-capture-actions .btn { box-shadow: 0 4px 18px rgba(25, 42, 19, 0.2); }
+
+.findings-toolbar, .team-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.findings-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.findings-summary > div { display: grid; gap: 2px; text-align: center; background: #f4f7f1; border: 1px solid #dbe5d5; border-radius: 12px; padding: 12px 6px; }
+.findings-summary strong { font-size: 1.5rem; color: var(--primary); }
+.findings-summary span { color: var(--text-muted); font-size: 0.78rem; font-weight: 700; }
+.findings-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 100%; padding: 4px 0 12px; }
+.findings-tabs .btn { min-width: 0; min-height: 42px; padding-inline: 6px; white-space: normal; }
+.findings-tabs .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.findings-list { display: grid; gap: 12px; }
+.finding-card { border-left: 6px solid #d7dfd2; }
+.finding-needs_review { border-left-color: #f59e0b; }
+.finding-approved { border-left-color: #22c55e; }
+.finding-excluded { border-left-color: #9ca3af; opacity: 0.84; }
+.finding-card-head, .review-findings-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.finding-card-head > div { display: grid; gap: 3px; }
+.finding-card-head > div > span { font-size: 0.78rem; color: var(--text-muted); }
+.finding-severity { border-radius: 999px; padding: 5px 9px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
+.severity-information { background: #e0f2fe; color: #075985; }
+.severity-observation { background: #eef2ff; color: #3730a3; }
+.severity-maintenance { background: #fef9c3; color: #854d0e; }
+.severity-concern { background: #ffedd5; color: #9a3412; }
+.severity-urgent { background: #fee2e2; color: #991b1b; }
+.finding-photo-strip { display: flex; gap: 7px; overflow-x: auto; margin: 12px 0; }
+.finding-photo-strip img { width: 104px; height: 82px; flex: 0 0 auto; object-fit: cover; border-radius: 8px; }
+.finding-original { background: #f7f7f5; border-radius: 9px; padding: 10px 12px; margin: 12px 0; }
+.finding-original span { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 800; }
+.finding-original p { margin: 5px 0 0; line-height: 1.45; }
+.finding-controls { display: grid; grid-template-columns: minmax(0, 0.65fr) minmax(0, 1.35fr); gap: 8px; margin-top: 10px; }
+.finding-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.finding-actions .btn { flex: 1 1 150px; min-height: 44px; }
+
+.team-identity-choices, .team-member-list { display: grid; gap: 8px; }
+.team-identity-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 2px solid #d8e1d2; background: #fff; color: var(--primary); border-radius: 12px; padding: 13px 14px; font: inherit; cursor: pointer; }
+.team-identity-btn.active { background: #edf6e8; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(44, 63, 22, 0.08); }
+.team-identity-btn span { color: var(--text-muted); font-size: 0.8rem; }
+.team-add-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.team-member-list { margin-top: 14px; }
+.team-member-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; border-top: 1px solid #e5eadf; padding: 11px 0; }
+.team-member-row > div { display: grid; gap: 2px; }
+.team-member-row span { color: var(--text-muted); font-size: 0.8rem; }
+.team-phase-group { border: 1px solid #dbe5d5; border-radius: 10px; margin: 8px 0; overflow: hidden; }
+.team-phase-group summary { cursor: pointer; padding: 13px; background: #f4f7f1; font-weight: 800; }
+.team-assignment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 0.8fr); gap: 10px; align-items: center; padding: 9px 12px; border-top: 1px solid #eef1eb; }
+.team-assignment-row span { font-size: 0.88rem; font-weight: 650; }
+.team-start-btn { margin: 14px 0; min-height: 58px; position: sticky; bottom: 8px; z-index: 70; box-shadow: 0 5px 20px rgba(25, 42, 19, 0.22); }
+.team-activity-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #edf0e9; font-size: 0.86rem; }
+.team-activity-row time { color: var(--text-muted); white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .field-workspace-tools { grid-template-columns: 1fr 1fr; }
+  .field-workspace-tools .btn:first-child { grid-column: 1 / -1; min-height: 58px; font-size: 1rem; }
+  .finding-card-head, .review-findings-head { align-items: stretch; flex-direction: column; }
+  .finding-severity { align-self: flex-start; }
+  .finding-controls, .team-add-row, .team-assignment-row { grid-template-columns: 1fr; }
+  .team-assignment-row { gap: 5px; }
+}

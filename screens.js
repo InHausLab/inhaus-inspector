@@ -1,11 +1,17 @@
 // InHaus Inspector - Screen Rendering
-import { VISION_PROXY_URL } from './config.js?v=161';
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=161';
-import { saveNow, scheduleSave } from './storage.js?v=161';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=161';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=161';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=161';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=161';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=162';
+import { saveNow, scheduleSave } from './storage.js?v=162';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=162';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=162';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=162';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=162';
+import {
+  ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
+  approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
+  getInspectorIdentity, hasStoredInspectorIdentity, setInspectorIdentity,
+  addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
+  markStepUpdated, recordTeamActivity
+} from './findings.js?v=162';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -14,6 +20,9 @@ function ui() { return window.UI; }
 let ctx = null;
 let _stepRenderJob = 0;
 let _intakeMode = 'field';
+let _workspaceReturnScreen = 'step';
+let _rapidReturnScreen = 'step';
+let _rapidCaptureContext = null;
 
 export function initScreens(context) {
   ctx = context;
@@ -62,6 +71,21 @@ function renderFieldsIncrementally({ card, fields, data, onFieldChange, inspecti
 function goToStep(idx) {
   ctx.currentStepIdx = idx;
   setScreen('step');
+  ctx.render();
+  window.scrollTo(0, 0);
+}
+
+function openInspectionWorkspace(screen, returnScreen, rapidContext) {
+  if (screen === 'rapid-capture') _rapidReturnScreen = returnScreen || getScreen() || 'step';
+  else _workspaceReturnScreen = returnScreen || getScreen() || 'step';
+  if (rapidContext) _rapidCaptureContext = rapidContext;
+  setScreen(screen);
+  ctx.render();
+  window.scrollTo(0, 0);
+}
+
+function returnFromInspectionWorkspace() {
+  setScreen(getScreen() === 'rapid-capture' ? (_rapidReturnScreen || 'step') : (_workspaceReturnScreen || 'step'));
   ctx.render();
   window.scrollTo(0, 0);
 }
@@ -425,6 +449,9 @@ export function render() {
     case 'step': renderStep(); break;
     case 'review': renderReview(); break;
     case 'photos': renderPhotos(); break;
+    case 'rapid-capture': renderRapidCapture(); break;
+    case 'findings': renderFindingsInbox(); break;
+    case 'team': renderTeamWorkspace(); break;
   }
 }
 
@@ -614,6 +641,7 @@ export function renderInspCard(insp, canResume) {
 
 export async function editPreparedInspection(id) {
   ctx.inspection = await window.DB.get(id);
+  ensureInspectionWorkspace(ctx.inspection);
   setInspection(ctx.inspection);
   if (!ctx.inspection) return;
   _intakeMode = 'prepare';
@@ -624,6 +652,7 @@ export async function editPreparedInspection(id) {
 export async function resumeInsp(id) {
   ctx.inspection = await window.DB.get(id); setInspection(ctx.inspection);
   if (!ctx.inspection) return;
+  ensureInspectionWorkspace(ctx.inspection);
   ctx.stepList = buildStepList(ctx.inspection);
   const lastVisited = ctx.inspection._lastStepIdx || 0;
   ctx.currentStepIdx = Math.min(lastVisited, ctx.stepList.length - 1);
@@ -635,6 +664,7 @@ export async function resumeInsp(id) {
 export async function viewInsp(id) {
   ctx.inspection = await window.DB.get(id); setInspection(ctx.inspection);
   if (!ctx.inspection) return;
+  ensureInspectionWorkspace(ctx.inspection);
   ctx.stepList = buildStepList(ctx.inspection);
   setScreen('review');
   ctx.startAutoSave();
@@ -671,6 +701,7 @@ export function inspectionFromCloudRecord(cloudRecord) {
   inspection.reviewStatus = 'Field Active';
   inspection.fieldStartedAt = inspection.fieldStartedAt || new Date().toISOString();
   inspection._claimedFromCloudAt = new Date().toISOString();
+  ensureInspectionWorkspace(inspection);
   return inspection;
 }
 
@@ -694,9 +725,16 @@ async function continueCloudInspection(item, button) {
     await saveNow();
     _intakeMode = 'field';
     const wasPrepared = String(cloudRecord?.resumeData?.status || '').toLowerCase() === 'prepared';
-    setScreen(wasPrepared ? 'precheck' : 'step');
+    const needsTeamIdentity = inspection.collaboration.enabled &&
+      inspection.collaboration.members.length > 1 && !hasStoredInspectorIdentity(inspection);
+    _workspaceReturnScreen = wasPrepared ? 'precheck' : 'step';
+    setScreen(needsTeamIdentity ? 'team' : _workspaceReturnScreen);
     ctx.startAutoSave();
     ctx.render();
+    if (needsTeamIdentity) {
+      ui().showToast('Select your name before starting team work');
+      return;
+    }
     const cloudClaimed = await checkpointToCloud(ctx.stepList);
     if (!cloudClaimed) {
       ui().showToast('Inspection downloaded. Cloud claim will retry automatically.');
@@ -977,10 +1015,11 @@ export function renderTruckCheck() {
 const OFFICE_PREP_FIELDS = [
   'pfasSetup', 'pfasKitNum', 'waterPanelPlanned', 'waterSampleId',
   'microplasticsStatus', 'microplasticsSampleId', 'pfasStatus',
-  'pfasSampleId', 'officePrepNotes'
+  'pfasSampleId', 'officePrepNotes', 'teamInspectorNames'
 ];
 
 function applyOfficePreparation(inspection, data) {
+  ensureInspectionWorkspace(inspection);
   if (!inspection.stepData) inspection.stepData = {};
   inspection.stepData['device-setup'] = Object.assign({}, inspection.stepData['device-setup'] || {}, {
     pfasSetup: data.pfasSetup || '',
@@ -994,6 +1033,11 @@ function applyOfficePreparation(inspection, data) {
     pfasStatus: data.pfasStatus || '',
     pfasSampleId: data.pfasSampleId || '',
     officePrepNotes: data.officePrepNotes || ''
+  });
+  String(data.teamInspectorNames || '').split(/\n|,/).map(name => name.trim()).filter(Boolean).forEach(name => {
+    if (name.toLowerCase() !== String(inspection.inspectorName || '').trim().toLowerCase()) {
+      addTeamMember(inspection, name, '', 'Inspector');
+    }
   });
 }
 
@@ -1032,7 +1076,8 @@ export function renderIntake() {
     microplasticsSampleId: existingWater.microplasticsSampleId || '',
     pfasStatus: existingWater.pfasStatus || '',
     pfasSampleId: existingWater.pfasSampleId || '',
-    officePrepNotes: existingWater.officePrepNotes || ''
+    officePrepNotes: existingWater.officePrepNotes || '',
+    teamInspectorNames: (ctx.inspection.collaboration?.members || []).slice(1).map(member => member.name).join('\n')
   } : {
     inspectionId: ctx.genId(),
     inspectorName: '',
@@ -1056,7 +1101,8 @@ export function renderIntake() {
     microplasticsSampleId: '',
     pfasStatus: '',
     pfasSampleId: '',
-    officePrepNotes: ''
+    officePrepNotes: '',
+    teamInspectorNames: ''
   };
 
   const c = ui().el('div', { className: 'screen' });
@@ -1096,6 +1142,9 @@ export function renderIntake() {
 
   if (isPrepare) {
     fields.push(
+      divider(),
+      heading('Inspection Team'),
+      textarea('teamInspectorNames', 'Additional inspectors', { placeholder: 'One inspector name per line. Each person will select their name when opening the inspection.' }),
       divider(),
       heading('Water Test Kit Preparation'),
       sel('waterPanelPlanned', 'Water panel test', ['Requested — collect on site', 'Not requested']),
@@ -1163,6 +1212,7 @@ export function renderIntake() {
             _lastStepIdx: 0,
             truckCheck: {}
           };
+          ensureInspectionWorkspace(ctx.inspection);
           setInspection(ctx.inspection);
         }
         applyOfficePreparation(ctx.inspection, data);
@@ -1204,7 +1254,12 @@ export function renderIntake() {
           dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
           _lastStepIdx: 0,
           truckCheck: Object.assign({}, ctx._truckCheck)
-        }; setInspection(ctx.inspection);
+        };
+        ensureInspectionWorkspace(ctx.inspection);
+        if (ctx.inspection.collaboration.members[0]) {
+          setInspectorIdentity(ctx.inspection, ctx.inspection.collaboration.members[0].memberId);
+        }
+        setInspection(ctx.inspection);
         ctx.stepList = buildStepList(ctx.inspection);
         ctx.currentStepIdx = 0;
         setScreen('precheck');
@@ -1289,6 +1344,7 @@ export function renderStep() {
     return;
   }
   const step = ctx.stepList[ctx.currentStepIdx];
+  ensureInspectionWorkspace(ctx.inspection);
 
   const data = getStepData(step.id);
   if (!data._enteredAt) data._enteredAt = new Date().toISOString();
@@ -1354,6 +1410,35 @@ export function renderStep() {
     const idx = ctx.stepList.findIndex(s => s.phase === phaseId);
     if (idx >= 0) { ctx.currentStepIdx = idx; ctx.render(); }
   }, ctx.currentStepIdx + 1, ctx.stepList.length));
+
+  const pendingFindings = ctx.inspection.findings.filter(item => item.status === 'needs_review').length;
+  const identity = getInspectorIdentity(ctx.inspection);
+  const assignment = getStepAssignment(ctx.inspection, step.id);
+  const workspaceTools = ui().el('div', { className: 'field-workspace-tools' });
+  workspaceTools.appendChild(ui().el('button', {
+    type: 'button', className: 'btn btn-secondary',
+    onClick: () => openInspectionWorkspace('rapid-capture', 'step', {
+      roomName: data.roomName || data._roomName || step.name,
+      stepName: step.name,
+      stepId: step.id
+    })
+  }, '📸 Rapid Capture'));
+  workspaceTools.appendChild(ui().el('button', {
+    type: 'button', className: 'btn btn-outline',
+    onClick: () => openInspectionWorkspace('findings', 'step')
+  }, '📥 Findings' + (pendingFindings ? ' (' + pendingFindings + ')' : '')));
+  workspaceTools.appendChild(ui().el('button', {
+    type: 'button', className: 'btn btn-outline',
+    onClick: () => openInspectionWorkspace('team', 'step')
+  }, '👥 ' + (ctx.inspection.collaboration.enabled ? identity.name : 'Team')));
+  c.appendChild(workspaceTools);
+  if (assignment) {
+    c.appendChild(ui().el('div', {
+      className: 'step-assignment-banner' + (assignment.memberId === identity.memberId ? ' is-mine' : ' is-other')
+    }, assignment.memberId === identity.memberId
+      ? '✓ Assigned to you'
+      : 'Assigned to ' + assignment.memberName + ' • You can still assist if needed'));
+  }
 
   const phaseSteps = ctx.stepList.filter(s => s.phase === currentPhase && s.type !== 'review');
   const alwaysShowSubNav = ['lowest', 'upper', 'rooms', 'supplementary', 'wrapup'].includes(currentPhase);
@@ -1459,7 +1544,7 @@ export function renderStep() {
     const fields = fieldGen();
     const card = ui().el('div', { className: 'card' });
     const onFieldChange = () => {
-      data._updatedAt = new Date().toISOString();
+      markStepUpdated(ctx.inspection, step.id, step.name);
       scheduleSave();
       ui().updateShowIf(card, data);
       // Change 3: Detect allSectionsComplete on post-assessment step
@@ -1584,6 +1669,481 @@ export function renderStep() {
     };
     renderFieldsIncrementally(pendingFieldRender);
   }
+}
+
+function findingPhotoById(photoId) {
+  const ref = collectInspectionPhotoRefs().find(item => item.photo.photoId === photoId);
+  return ref ? ref.photo : null;
+}
+
+function rapidCaptureDestinationOptions() {
+  const options = collectPhotoDestinations();
+  if (_rapidCaptureContext && (_rapidCaptureContext.roomName || _rapidCaptureContext.stepName)) {
+    const key = String(_rapidCaptureContext.roomName || '').toLowerCase() + '|' + String(_rapidCaptureContext.stepName || '').toLowerCase();
+    if (!options.some(item => String(item.roomName).toLowerCase() + '|' + String(item.stepName).toLowerCase() === key)) {
+      options.unshift({
+        roomName: _rapidCaptureContext.roomName || '',
+        stepName: _rapidCaptureContext.stepName || '',
+        label: formatPhotoDestination(_rapidCaptureContext.roomName, _rapidCaptureContext.stepName)
+      });
+    }
+  }
+  return options;
+}
+
+// ── RAPID CAPTURE ─────────────────────────────────────────
+export function renderRapidCapture() {
+  if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
+  ensureInspectionWorkspace(ctx.inspection);
+  const destinations = rapidCaptureDestinationOptions();
+  const rememberedDestination = destinations.find(item =>
+    item.roomName === _rapidCaptureContext?.roomName && item.stepName === _rapidCaptureContext?.stepName
+  );
+  const defaultDestination = rememberedDestination || destinations[0] || {
+    roomName: _rapidCaptureContext?.roomName || '',
+    stepName: _rapidCaptureContext?.stepName || '',
+    label: formatPhotoDestination(_rapidCaptureContext?.roomName, _rapidCaptureContext?.stepName)
+  };
+  if (!ctx.inspection.rapidCaptureDraft) {
+    ctx.inspection.rapidCaptureDraft = {
+      roomName: defaultDestination.roomName,
+      stepName: defaultDestination.stepName,
+      reportSection: defaultDestination.stepName,
+      severity: 'Observation',
+      rawComment: '',
+      photos: [],
+      startedAt: new Date().toISOString()
+    };
+  }
+  const draft = ctx.inspection.rapidCaptureDraft;
+  if (!Array.isArray(draft.photos)) draft.photos = [];
+
+  const c = ui().el('div', { className: 'screen rapid-capture-screen' });
+  c.appendChild(buildAppHeader('Rapid Capture'));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
+  c.appendChild(ui().el('div', { className: 'rapid-capture-intro' }, [
+    ui().el('strong', null, 'Stay in camera mode and capture everything.'),
+    ui().el('span', null, 'Photos and comments become a finding for review. Nothing enters the reusable library until an inspector cleans and approves it.')
+  ]));
+
+  const contextCard = ui().el('div', { className: 'card rapid-context-card' });
+  const contextLabel = ui().el('label', { className: 'field-label' }, 'Where are you working?');
+  const contextSelect = ui().el('select', { className: 'field-input' });
+  destinations.forEach((destination, index) => {
+    contextSelect.appendChild(ui().el('option', { value: String(index) }, destination.label));
+  });
+  const selectedDestinationIndex = destinations.findIndex(destination => destination.roomName === draft.roomName && destination.stepName === draft.stepName);
+  if (selectedDestinationIndex >= 0) contextSelect.value = String(selectedDestinationIndex);
+  contextSelect.addEventListener('change', () => {
+    const destination = destinations[Number(contextSelect.value)];
+    if (!destination) return;
+    draft.roomName = destination.roomName;
+    draft.stepName = destination.stepName;
+    draft.reportSection = destination.stepName;
+    draft.photos.forEach(photoItem => {
+      photoItem.roomName = destination.roomName;
+      photoItem.stepName = destination.stepName;
+      photoItem.placementSource = 'rapid_capture_context';
+      if (window.DB?.updatePhoto) window.DB.updatePhoto(photoItem.photoId, {
+        roomName: destination.roomName, stepName: destination.stepName, placementSource: 'rapid_capture_context'
+      });
+    });
+    scheduleSave();
+  });
+  contextCard.appendChild(contextLabel);
+  contextCard.appendChild(contextSelect);
+
+  const severityLabel = ui().el('label', { className: 'field-label' }, 'Finding type');
+  const severitySelect = ui().el('select', { className: 'field-input' });
+  ['Information', 'Observation', 'Maintenance', 'Concern', 'Urgent'].forEach(value => {
+    severitySelect.appendChild(ui().el('option', { value }, value));
+  });
+  severitySelect.value = draft.severity || 'Observation';
+  severitySelect.addEventListener('change', () => { draft.severity = severitySelect.value; scheduleSave(); });
+  contextCard.appendChild(severityLabel);
+  contextCard.appendChild(severitySelect);
+
+  if (ctx.inspection.commentLibrary.length) {
+    const libraryLabel = ui().el('label', { className: 'field-label' }, 'Use an approved comment');
+    const librarySelect = ui().el('select', { className: 'field-input reusable-comment-select' });
+    librarySelect.appendChild(ui().el('option', { value: '' }, '— Optional: choose approved wording —'));
+    ctx.inspection.commentLibrary.forEach(entry => {
+      librarySelect.appendChild(ui().el('option', { value: entry.commentId }, entry.cleanedText));
+    });
+    librarySelect.addEventListener('change', () => {
+      if (!librarySelect.value) return;
+      const entry = useLibraryComment(ctx.inspection, librarySelect.value);
+      if (!entry) return;
+      draft.rawComment = entry.cleanedText;
+      draft.severity = entry.severity || draft.severity;
+      scheduleSave();
+      ctx.render();
+    });
+    contextCard.appendChild(libraryLabel);
+    contextCard.appendChild(librarySelect);
+  }
+  c.appendChild(contextCard);
+
+  const commentCard = ui().el('div', { className: 'card rapid-comment-card' });
+  commentCard.appendChild(ui().renderTextarea('rapidComment', 'What did you notice?', draft.rawComment, value => {
+    draft.rawComment = value;
+    scheduleSave();
+  }, { placeholder: 'Dictate a quick field note. It will be cleaned in the Findings Inbox before reuse.' }));
+  c.appendChild(commentCard);
+
+  const photoCard = ui().el('div', { className: 'card rapid-photo-card' });
+  const photoHost = ui().renderPhoto(
+    draft.photos,
+    () => {
+      draft.photos.forEach(photoItem => {
+        photoItem.roomName = draft.roomName;
+        photoItem.stepName = draft.stepName;
+        photoItem.capturedBy = getInspectorIdentity(ctx.inspection).name;
+      });
+      scheduleSave();
+    },
+    draft.roomName,
+    draft.stepName,
+    ctx.inspection.inspectionId,
+    { label: 'Finding photos' }
+  );
+  photoCard.appendChild(photoHost);
+  c.appendChild(photoCard);
+
+  async function saveRapidFinding(captureAnother) {
+    const comment = String(draft.rawComment || '').trim();
+    if (!comment && !draft.photos.length) {
+      ui().showToast('Add a photo or comment first');
+      return false;
+    }
+    if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
+    const existingIds = new Set(ctx.inspection.sparePhotos.map(photoItem => photoItem.photoId));
+    draft.photos.forEach((photoItem, index) => {
+      photoItem.roomName = draft.roomName;
+      photoItem.stepName = draft.stepName;
+      photoItem.capturedBy = getInspectorIdentity(ctx.inspection).name;
+      if (comment && !photoItem.caption && index === 0) photoItem.caption = comment;
+      if (!existingIds.has(photoItem.photoId)) ctx.inspection.sparePhotos.push(photoItem);
+    });
+    const finding = createFinding(ctx.inspection, {
+      roomName: draft.roomName,
+      stepName: draft.stepName,
+      reportSection: draft.reportSection,
+      severity: draft.severity,
+      rawComment: comment,
+      photoIds: draft.photos.map(photoItem => photoItem.photoId),
+      source: 'rapid_capture'
+    });
+    draft.photos.forEach(photoItem => { photoItem.findingId = finding.findingId; });
+    const savedRoom = draft.roomName;
+    ctx.inspection.rapidCaptureDraft = null;
+    await saveNow();
+    ui().showToast('Finding saved to ' + (savedRoom || 'Findings Inbox'));
+    if (captureAnother) {
+      _rapidCaptureContext = { roomName: draft.roomName, stepName: draft.stepName };
+      ctx.render();
+    } else {
+      openInspectionWorkspace('findings', _workspaceReturnScreen);
+    }
+    return true;
+  }
+
+  const actions = ui().el('div', { className: 'rapid-capture-actions' });
+  actions.appendChild(ui().el('button', {
+    className: 'btn btn-outline', onClick: async () => {
+      if (draft.photos.length || String(draft.rawComment || '').trim()) await saveRapidFinding(false);
+      else returnFromInspectionWorkspace();
+    }
+  }, '← Finish'));
+  actions.appendChild(ui().el('button', {
+    className: 'btn btn-primary', onClick: () => saveRapidFinding(true)
+  }, 'Save & Capture Another'));
+  c.appendChild(actions);
+  ctx.root.appendChild(c);
+  window.scrollTo(0, 0);
+}
+
+// ── SMART FINDINGS INBOX ──────────────────────────────────
+export function renderFindingsInbox() {
+  if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
+  ensureInspectionWorkspace(ctx.inspection);
+  const created = syncPhotoCommentsToFindings(ctx.inspection);
+  if (created) scheduleSave();
+
+  const c = ui().el('div', { className: 'screen findings-screen' });
+  c.appendChild(buildAppHeader('Smart Findings Inbox'));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
+  const top = ui().el('div', { className: 'findings-toolbar' });
+  top.appendChild(ui().el('button', { className: 'btn btn-outline', onClick: returnFromInspectionWorkspace }, '← Back'));
+  top.appendChild(ui().el('button', {
+    className: 'btn btn-primary',
+    onClick: () => openInspectionWorkspace('rapid-capture', 'findings', _rapidCaptureContext)
+  }, '📸 Rapid Capture'));
+  c.appendChild(top);
+
+  const counts = {
+    review: ctx.inspection.findings.filter(item => item.status === 'needs_review').length,
+    approved: ctx.inspection.findings.filter(item => item.status === 'approved').length,
+    excluded: ctx.inspection.findings.filter(item => item.status === 'excluded').length
+  };
+  const summary = ui().el('div', { className: 'findings-summary' }, [
+    ui().el('div', null, [ui().el('strong', null, String(counts.review)), ui().el('span', null, 'Needs review')]),
+    ui().el('div', null, [ui().el('strong', null, String(counts.approved)), ui().el('span', null, 'Report ready')]),
+    ui().el('div', null, [ui().el('strong', null, String(ctx.inspection.commentLibrary.length)), ui().el('span', null, 'Reusable')])
+  ]);
+  c.appendChild(summary);
+
+  let activeFilter = counts.review ? 'needs_review' : 'approved';
+  const tabs = ui().el('div', { className: 'findings-tabs' });
+  const list = ui().el('div', { className: 'findings-list' });
+  const tabDefs = [
+    ['needs_review', 'Needs Review'], ['approved', 'Report Ready'], ['excluded', 'Excluded']
+  ];
+
+  function renderList() {
+    summary.children[0].querySelector('strong').textContent = String(ctx.inspection.findings.filter(item => item.status === 'needs_review').length);
+    summary.children[1].querySelector('strong').textContent = String(ctx.inspection.findings.filter(item => item.status === 'approved').length);
+    summary.children[2].querySelector('strong').textContent = String(ctx.inspection.commentLibrary.length);
+    list.innerHTML = '';
+    tabs.querySelectorAll('button').forEach(button => button.classList.toggle('active', button.dataset.filter === activeFilter));
+    const findings = ctx.inspection.findings
+      .filter(item => item.status === activeFilter)
+      .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    if (!findings.length) {
+      list.appendChild(ui().el('div', { className: 'photo-review-success' }, [
+        ui().el('strong', null, activeFilter === 'needs_review' ? '✓ Findings inbox is clear' : 'No findings in this section'),
+        ui().el('span', null, activeFilter === 'needs_review' ? 'New photo comments and rapid captures will appear here.' : '')
+      ]));
+      return;
+    }
+
+    findings.forEach(finding => {
+      const card = ui().el('div', { className: 'card finding-card finding-' + finding.status });
+      const head = ui().el('div', { className: 'finding-card-head' }, [
+        ui().el('div', null, [
+          ui().el('strong', null, finding.roomName || finding.stepName || 'Unplaced finding'),
+          ui().el('span', null, [finding.reportSection || finding.stepName, finding.createdBy ? 'Captured by ' + finding.createdBy : ''].filter(Boolean).join(' • '))
+        ]),
+        ui().el('span', { className: 'finding-severity severity-' + String(finding.severity || '').toLowerCase() }, finding.severity || 'Observation')
+      ]);
+      card.appendChild(head);
+
+      if (finding.photoIds?.length) {
+        const photoStrip = ui().el('div', { className: 'finding-photo-strip' });
+        finding.photoIds.forEach(photoId => {
+          const photoItem = findingPhotoById(photoId);
+          const src = getPhotoPreviewSrc(photoItem);
+          if (src) photoStrip.appendChild(ui().el('img', { src, loading: 'lazy', alt: 'Finding photo' }));
+        });
+        if (photoStrip.childNodes.length) card.appendChild(photoStrip);
+      }
+
+      const original = ui().el('div', { className: 'finding-original' }, [
+        ui().el('span', null, 'Original inspector comment'),
+        ui().el('p', null, finding.rawComment || 'Photo-only finding — add a comment below.')
+      ]);
+      card.appendChild(original);
+
+      const cleanLabel = ui().el('label', { className: 'field-label' }, 'Clean report comment');
+      const cleaned = ui().el('textarea', {
+        className: 'field-textarea', rows: 3,
+        placeholder: 'Clean the dictation, preserve the facts, and remove property-specific details before approving.'
+      });
+      cleaned.value = finding.cleanedComment || '';
+      cleaned.addEventListener('input', () => {
+        updateFinding(ctx.inspection, finding.findingId, { cleanedComment: cleaned.value, status: finding.status === 'excluded' ? 'needs_review' : finding.status });
+        scheduleSave();
+      });
+      card.appendChild(cleanLabel);
+      card.appendChild(cleaned);
+
+      const controls = ui().el('div', { className: 'finding-controls' });
+      const severity = ui().el('select', { className: 'field-input' });
+      ['Information', 'Observation', 'Maintenance', 'Concern', 'Urgent'].forEach(value => {
+        severity.appendChild(ui().el('option', { value }, value));
+      });
+      severity.value = finding.severity || 'Observation';
+      severity.addEventListener('change', () => { updateFinding(ctx.inspection, finding.findingId, { severity: severity.value }); scheduleSave(); });
+      controls.appendChild(severity);
+      const destination = ui().el('select', { className: 'field-input' });
+      destination.appendChild(ui().el('option', { value: '' }, 'Report section / location'));
+      collectPhotoDestinations().forEach((item, index) => {
+        destination.appendChild(ui().el('option', { value: String(index) }, item.label));
+      });
+      const currentDestinationIndex = collectPhotoDestinations().findIndex(item => item.roomName === finding.roomName && item.stepName === finding.stepName);
+      if (currentDestinationIndex >= 0) destination.value = String(currentDestinationIndex);
+      destination.addEventListener('change', () => {
+        const item = collectPhotoDestinations()[Number(destination.value)];
+        if (!item) return;
+        updateFinding(ctx.inspection, finding.findingId, { roomName: item.roomName, stepName: item.stepName, reportSection: item.stepName });
+        scheduleSave();
+      });
+      controls.appendChild(destination);
+      card.appendChild(controls);
+
+      const actions = ui().el('div', { className: 'finding-actions' });
+      if (!String(finding.cleanedComment || '').trim() && String(finding.rawComment || '').trim()) {
+        actions.appendChild(ui().el('button', { className: 'btn btn-outline', onClick: () => {
+          const draftText = String(finding.rawComment || '').trim();
+          updateFinding(ctx.inspection, finding.findingId, { cleanedComment: draftText });
+          cleaned.value = draftText;
+          scheduleSave();
+          ui().showToast('Original copied — fine-tune it before approval');
+        } }, 'Copy Original to Edit'));
+      }
+      if (finding.status !== 'approved') {
+        actions.appendChild(ui().el('button', { className: 'btn btn-primary', onClick: () => {
+          if (!approveFinding(ctx.inspection, finding.findingId)) { ui().showToast('Add or clean the report comment first'); return; }
+          scheduleSave();
+          ui().showToast('Finding approved for the report');
+          renderList();
+        } }, '✓ Approve for Report'));
+      } else {
+        const saveReuseButton = ui().el('button', {
+          className: 'btn btn-secondary', onClick: () => {
+            const saved = saveFindingToLibrary(ctx.inspection, finding.findingId);
+            if (!saved) { ui().showToast('Approve a cleaned comment first'); return; }
+            scheduleSave();
+            ui().showToast('Approved comment saved for reuse');
+            ctx.render();
+          }
+        }, finding.reusableStatus === 'saved' ? '✓ Saved for Reuse' : 'Save Clean Comment for Reuse');
+        saveReuseButton.disabled = finding.reusableStatus === 'saved';
+        actions.appendChild(saveReuseButton);
+      }
+      if (finding.status !== 'excluded') {
+        actions.appendChild(ui().el('button', { className: 'btn btn-danger-outline', onClick: () => {
+          excludeFinding(ctx.inspection, finding.findingId); scheduleSave(); renderList();
+        } }, 'Exclude'));
+      }
+      card.appendChild(actions);
+      list.appendChild(card);
+    });
+  }
+
+  tabDefs.forEach(([filter, label]) => {
+    const button = ui().el('button', { className: 'btn btn-outline', 'data-filter': filter, onClick: () => { activeFilter = filter; renderList(); } }, label);
+    tabs.appendChild(button);
+  });
+  c.appendChild(tabs);
+  c.appendChild(list);
+  renderList();
+  ctx.root.appendChild(c);
+  window.scrollTo(0, 0);
+}
+
+// ── MULTI-INSPECTOR TEAM WORKSPACE ───────────────────────
+export function renderTeamWorkspace() {
+  if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
+  ensureInspectionWorkspace(ctx.inspection);
+  const collaboration = ctx.inspection.collaboration;
+  const identity = getInspectorIdentity(ctx.inspection);
+  const identityStored = hasStoredInspectorIdentity(ctx.inspection) || collaboration.members.length === 1;
+  const c = ui().el('div', { className: 'screen team-screen' });
+  c.appendChild(buildAppHeader('Inspection Team'));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
+  c.appendChild(ui().el('div', { className: 'team-toolbar' }, [
+    ui().el('button', { className: 'btn btn-outline', onClick: returnFromInspectionWorkspace }, '← Back'),
+    ui().el('button', { className: 'btn btn-primary', onClick: async () => {
+      await saveNow();
+      const ok = await checkpointToCloud(ctx.stepList);
+      ui().showToast(ok ? 'Team work synced' : 'Team sync will retry');
+    } }, 'Sync Team Now')
+  ]));
+
+  const identityCard = ui().el('div', { className: 'card team-identity-card' });
+  identityCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Who is using this device?'));
+  identityCard.appendChild(ui().el('p', { className: 'text-muted' }, 'Choose your name so every section, finding, and photo shows who captured it.'));
+  const identityChoices = ui().el('div', { className: 'team-identity-choices' });
+  collaboration.members.forEach(member => {
+    identityChoices.appendChild(ui().el('button', {
+      className: 'team-identity-btn' + (identityStored && member.memberId === identity.memberId ? ' active' : ''),
+      onClick: () => { setInspectorIdentity(ctx.inspection, member.memberId); scheduleSave(); ctx.render(); }
+    }, [ui().el('strong', null, member.name), ui().el('span', null, member.role || 'Inspector')]));
+  });
+  identityCard.appendChild(identityChoices);
+  c.appendChild(identityCard);
+
+  const membersCard = ui().el('div', { className: 'card team-members-card' });
+  membersCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Inspectors'));
+  const nameInput = ui().el('input', { className: 'field-input', placeholder: 'Inspector name' });
+  const emailInput = ui().el('input', { className: 'field-input', type: 'email', placeholder: 'Email (optional)' });
+  const addRow = ui().el('div', { className: 'team-add-row' }, [nameInput, emailInput]);
+  const addButton = ui().el('button', { className: 'btn btn-secondary', onClick: () => {
+    const member = addTeamMember(ctx.inspection, nameInput.value, emailInput.value, 'Inspector');
+    if (!member) { ui().showToast('Enter the inspector’s name'); return; }
+    scheduleSave();
+    ctx.render();
+  } }, '+ Add Inspector');
+  membersCard.appendChild(addRow);
+  membersCard.appendChild(addButton);
+  const memberList = ui().el('div', { className: 'team-member-list' });
+  collaboration.members.forEach((member, index) => {
+    memberList.appendChild(ui().el('div', { className: 'team-member-row' }, [
+      ui().el('div', null, [ui().el('strong', null, member.name), ui().el('span', null, [member.role, member.email].filter(Boolean).join(' • '))]),
+      index ? ui().el('button', { className: 'btn btn-small btn-danger-outline', onClick: () => {
+        if (confirm('Remove ' + member.name + ' from this inspection team?')) { removeTeamMember(ctx.inspection, member.memberId); scheduleSave(); ctx.render(); }
+      } }, 'Remove') : ui().el('span', { className: 'badge prepared' }, 'Lead')
+    ]));
+  });
+  membersCard.appendChild(memberList);
+  c.appendChild(membersCard);
+
+  if (collaboration.members.length > 1) {
+    collaboration.enabled = true;
+    const assignmentsCard = ui().el('div', { className: 'card team-assignments-card' });
+    assignmentsCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Assign Sections'));
+    assignmentsCard.appendChild(ui().el('p', { className: 'text-muted' }, 'Unassigned sections can be claimed automatically when an inspector starts entering data.'));
+    PHASES.forEach(phase => {
+      const steps = (ctx.stepList || []).filter(step => step.phase === phase.id && step.type !== 'review');
+      if (!steps.length) return;
+      const details = ui().el('details', { className: 'team-phase-group' });
+      details.appendChild(ui().el('summary', null, phase.label || phase.name || phase.id));
+      steps.forEach(step => {
+        const assignment = getStepAssignment(ctx.inspection, step.id);
+        const select = ui().el('select', { className: 'field-input' });
+        select.appendChild(ui().el('option', { value: '' }, 'Unassigned'));
+        collaboration.members.forEach(member => {
+          select.appendChild(ui().el('option', { value: member.memberId }, member.name));
+        });
+        select.value = assignment?.memberId || '';
+        select.addEventListener('change', () => {
+          setStepAssignment(ctx.inspection, step.id, select.value, step.name);
+          scheduleSave();
+        });
+        details.appendChild(ui().el('label', { className: 'team-assignment-row' }, [ui().el('span', null, step.name), select]));
+      });
+      assignmentsCard.appendChild(details);
+    });
+    c.appendChild(assignmentsCard);
+  }
+
+  const myAssignments = (ctx.stepList || []).filter(step => getStepAssignment(ctx.inspection, step.id)?.memberId === identity.memberId);
+  const startButton = ui().el('button', { className: 'btn btn-primary btn-full team-start-btn', onClick: async () => {
+    setInspectorIdentity(ctx.inspection, identity.memberId);
+    const target = myAssignments.find(step => !ctx.inspection.stepData?.[step.id]?._visited) || myAssignments[0];
+    if (target) ctx.currentStepIdx = Math.max(0, ctx.stepList.findIndex(step => step.id === target.id));
+    await saveNow();
+    checkpointToCloud(ctx.stepList);
+    setScreen(_workspaceReturnScreen === 'precheck' ? 'precheck' : 'step');
+    ctx.render();
+  } }, !identityStored ? 'Select Your Name Above' : (myAssignments.length ? 'Start My ' + myAssignments.length + ' Assigned Sections' : 'Continue Inspection as ' + identity.name));
+  startButton.disabled = !identityStored;
+  c.appendChild(startButton);
+
+  if (collaboration.activity.length) {
+    const activityCard = ui().el('div', { className: 'card team-activity-card' });
+    activityCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Recent Team Activity'));
+    collaboration.activity.slice(0, 12).forEach(item => {
+      activityCard.appendChild(ui().el('div', { className: 'team-activity-row' }, [
+        ui().el('span', null, item.message), ui().el('time', null, formatPhotoTime(item.createdAt))
+      ]));
+    });
+    c.appendChild(activityCard);
+  }
+
+  ctx.root.appendChild(c);
+  window.scrollTo(0, 0);
 }
 
 // ── PHOTOS SCREEN ──────────────────────────────────────────
@@ -1842,6 +2402,30 @@ export function renderPhotos() {
 
 // ── REVIEW SCREEN ──────────────────────────────────────────
 export function renderReview() {
+  ensureInspectionWorkspace(ctx.inspection);
+  const recoveredDraft = ctx.inspection.rapidCaptureDraft;
+  if (recoveredDraft && (String(recoveredDraft.rawComment || '').trim() || recoveredDraft.photos?.length)) {
+    if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
+    const existingPhotoIds = new Set(ctx.inspection.sparePhotos.map(photoItem => photoItem.photoId));
+    (recoveredDraft.photos || []).forEach(photoItem => {
+      if (!existingPhotoIds.has(photoItem.photoId)) ctx.inspection.sparePhotos.push(photoItem);
+    });
+    const recoveredFinding = createFinding(ctx.inspection, {
+      roomName: recoveredDraft.roomName,
+      stepName: recoveredDraft.stepName,
+      reportSection: recoveredDraft.reportSection,
+      severity: recoveredDraft.severity,
+      rawComment: recoveredDraft.rawComment,
+      photoIds: (recoveredDraft.photos || []).map(photoItem => photoItem.photoId),
+      source: 'rapid_capture_recovered'
+    });
+    (recoveredDraft.photos || []).forEach(photoItem => { photoItem.findingId = recoveredFinding.findingId; });
+    ctx.inspection.rapidCaptureDraft = null;
+    scheduleSave();
+  }
+  const importedPhotoFindings = syncPhotoCommentsToFindings(ctx.inspection);
+  if (importedPhotoFindings) scheduleSave();
+  const pendingFindingCount = ctx.inspection.findings.filter(item => item.status === 'needs_review').length;
   const c = ui().el('div', { className: 'screen review-screen' });
   c.appendChild(buildAppHeader('Final Review'));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
@@ -1928,6 +2512,7 @@ export function renderReview() {
     if (healthError) blockers.push('Photo check failed');
     if (health.missing > 0) blockers.push(health.missing + ' missing photo' + (health.missing === 1 ? '' : 's'));
     if (reviewIssues.length) blockers.push(reviewIssues.length + ' required item' + (reviewIssues.length === 1 ? '' : 's'));
+    if (pendingFindingCount) blockers.push(pendingFindingCount + ' finding' + (pendingFindingCount === 1 ? '' : 's') + ' need review');
     if (!departureDone) blockers.push('Leave checklist open');
     if (!lastCloud) blockers.push('No cloud backup yet');
     if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' waiting to upload');
@@ -1950,6 +2535,7 @@ export function renderReview() {
     leaveMetrics.appendChild(leaveMetric('Photos', health.missing ? health.missing + ' missing' : (health.pending ? health.pending + ' waiting' : health.total + ' safe'), health.missing ? 'bad' : (health.pending ? 'wait' : 'good')));
     leaveMetrics.appendChild(leaveMetric('Cloud', getCloudLabel(), lastCloud ? ((syncStatus === 'failed' || syncStatus === 'final-failed') ? 'wait' : 'good') : 'bad'));
     leaveMetrics.appendChild(leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good'));
+    leaveMetrics.appendChild(leaveMetric('Findings', pendingFindingCount ? pendingFindingCount + ' open' : 'Ready', pendingFindingCount ? 'bad' : 'good'));
     leaveMetrics.appendChild(leaveMetric('Before leaving', departureDone ? 'Done' : 'Open', departureDone ? 'good' : 'bad'));
     if (health.vaultOnly > 0) leaveMetrics.appendChild(leaveMetric('Rescue vault', String(health.vaultOnly), 'wait'));
   }
@@ -2005,6 +2591,21 @@ export function renderReview() {
   if (ctx.inspection.clientConcerns) hCard.appendChild(ui().el('div', { className: 'info-block' }, [ui().el('strong', null, 'Client Concerns: '), document.createTextNode(ctx.inspection.clientConcerns)]));
   if (ctx.inspection.knownProblemAreas) hCard.appendChild(ui().el('div', { className: 'info-block' }, [ui().el('strong', null, 'Known Problem Areas: '), document.createTextNode(ctx.inspection.knownProblemAreas)]));
   c.appendChild(hCard);
+
+  const findingReviewCard = ui().el('div', { className: 'card review-findings-card' });
+  findingReviewCard.appendChild(ui().el('div', { className: 'review-findings-head' }, [
+    ui().el('div', null, [
+      ui().el('h3', { className: 'section-heading' }, 'Smart Findings'),
+      ui().el('p', { className: 'text-muted' }, pendingFindingCount
+        ? pendingFindingCount + ' finding' + (pendingFindingCount === 1 ? '' : 's') + ' still need cleaned wording or approval.'
+        : ctx.inspection.findings.filter(item => item.status === 'approved').length + ' findings are ready for the report builder.')
+    ]),
+    ui().el('button', {
+      className: pendingFindingCount ? 'btn btn-primary' : 'btn btn-outline',
+      onClick: () => openInspectionWorkspace('findings', 'review')
+    }, pendingFindingCount ? 'Review Findings' : 'Open Findings')
+  ]));
+  c.appendChild(findingReviewCard);
 
   // ── Room Summaries ──
   const summariesCard = ui().el('div', { className: 'card' });
@@ -2172,6 +2773,12 @@ export function renderReview() {
 
   if (ctx.inspection.status !== 'completed') {
     const submitBtn = ui().el('button', { className: 'btn btn-primary btn-full', onClick: () => {
+      const openFindings = ctx.inspection.findings.filter(item => item.status === 'needs_review');
+      if (openFindings.length) {
+        alert(openFindings.length + ' finding' + (openFindings.length === 1 ? '' : 's') + ' still need review. Clean, approve, or exclude each finding before submitting.');
+        openInspectionWorkspace('findings', 'review');
+        return;
+      }
       const allIssues = formatIssueList(collectInspectionIssues());
       if (allIssues.length) {
         const names = allIssues.join('\n\u2022 ');

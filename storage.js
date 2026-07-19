@@ -1,5 +1,5 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=161';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=162';
 
 let _onSyncStatusChange = null;
 let _saveTimeout = null;
@@ -91,6 +91,18 @@ export function backupToLocalStorage() {
         placementSource: p.placementSource || '',
         routingStatus: p.routingStatus || '',
         assignedSlot: p.assignedSlot || null,
+        uploaded: p.dataUrl === '__uploaded__'
+      }));
+    }
+    if (bak.rapidCaptureDraft && Array.isArray(bak.rapidCaptureDraft.photos)) {
+      bak.rapidCaptureDraft.photos = bak.rapidCaptureDraft.photos.map(p => ({
+        photoId: p.photoId,
+        stepName: p.stepName,
+        roomName: p.roomName,
+        caption: p.caption,
+        timestamp: p.timestamp,
+        placementSource: p.placementSource || '',
+        routingStatus: p.routingStatus || '',
         uploaded: p.dataUrl === '__uploaded__'
       }));
     }
