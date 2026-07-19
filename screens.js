@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=165';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=165';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=165';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=165';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=165';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=165';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=166';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=166';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=166';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=166';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=166';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=166';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=165';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=165';
+} from './findings.js?v=166';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=166';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=165';
+} from './comment-library.js?v=166';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -105,7 +105,13 @@ function openInspectionWorkspace(screen, returnScreen, rapidContext) {
 }
 
 function returnFromInspectionWorkspace() {
-  setScreen(getScreen() === 'rapid-capture' ? (_rapidReturnScreen || 'step') : (_workspaceReturnScreen || 'step'));
+  const currentScreen = getScreen();
+  let returnScreen = currentScreen === 'rapid-capture' ? (_rapidReturnScreen || 'step') : (_workspaceReturnScreen || 'step');
+  // A nested workspace (for example My Work -> Recovery) temporarily sets the
+  // return target to My Work. Once back there, Back must return to the active
+  // inspection instead of reopening My Work forever.
+  if (currentScreen === 'my-work' && returnScreen === 'my-work') returnScreen = 'step';
+  setScreen(returnScreen);
   ctx.render();
   window.scrollTo(0, 0);
 }

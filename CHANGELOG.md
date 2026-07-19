@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v165 (database-upgrade hang protection) |
+| App version | v166 (workspace back-navigation fix) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v64 team merge and company comment library — see URL below |
@@ -30,6 +30,11 @@ This file is the authoritative record of every significant change, decision, bug
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v166 — Workspace Back Navigation
+**Date:** July 19, 2026
+
+- Fixed a navigation loop where opening Recovery, Team, or Findings from **My Work** could leave the **Back** button reopening My Work instead of returning to the active inspection.
 
 ## v165 — Database Upgrade Hang Protection
 **Date:** July 19, 2026
