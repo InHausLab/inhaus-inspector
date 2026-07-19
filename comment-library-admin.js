@@ -1,5 +1,4 @@
-import { GOOGLE_SCRIPT_URL } from './config.js?v=163';
-import { scriptFetch } from './sync.js?v=163';
+import { scriptFetch } from './sync.js?v=164';
 
 const tokenInput = document.getElementById('admin-token');
 const loadButton = document.getElementById('load-library');
@@ -34,12 +33,8 @@ async function loadLibrary() {
   loadButton.disabled = true;
   setStatus('Loading…');
   try {
-    const url = new URL(GOOGLE_SCRIPT_URL);
-    url.searchParams.set('action', 'commentLibraryAdmin');
-    url.searchParams.set('adminToken', token);
-    const response = await fetch(url, { cache: 'no-store' });
-    const data = await response.json();
-    if (!response.ok || data.status !== 'ok' || data.libraryVersion !== 1 || !data.library) throw new Error(data.message || 'Company library backend is not deployed yet');
+    const data = await scriptFetch({ action: 'commentLibraryAdmin', command: 'list', adminToken: token });
+    if (data.libraryVersion !== 1 || !data.library) throw new Error(data.message || 'Company library backend is not deployed yet');
     library = data.library || { comments: [], candidates: [] };
     sessionStorage.setItem('inhaus_comment_admin_token', token);
     content.hidden = false;

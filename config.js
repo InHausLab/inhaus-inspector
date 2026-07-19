@@ -2,7 +2,7 @@
 
 // ── Google Drive Export Config ─────────────────────────────
 // Google Apps Script web app URL
-export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec'; // Apps Script v63 — July 19 2026
+export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec'; // Apps Script v64 — July 19 2026
 
 // ── Sync secret ────────────────────────────────────────────
 // Frontend token only - not a true secret. Must match SYNC_SECRET in Apps Script Properties.

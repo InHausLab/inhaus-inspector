@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=163';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=163';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=163';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=163';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=163';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=163';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=164';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=164';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=164';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=164';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=164';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=164';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=163';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=163';
+} from './findings.js?v=164';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=164';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=163';
+} from './comment-library.js?v=164';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -28,6 +28,7 @@ let _stepRenderJob = 0;
 let _intakeMode = 'field';
 let _workspaceReturnScreen = 'step';
 let _rapidReturnScreen = 'step';
+let _photosReturnScreen = 'review';
 let _rapidCaptureContext = null;
 let _globalWorkspaceListenersReady = false;
 const _companyLibraryRequested = new Set();
@@ -1545,7 +1546,9 @@ export function renderStep() {
       inp.onchange = async e => {
         if (!e.target.files[0]) return;
         try {
-          const dataUrl = await ui().compressImage ? ui().compressImage(e.target.files[0]) : new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
+          const dataUrl = ui().compressImage
+            ? await ui().compressImage(e.target.files[0])
+            : await new Promise(r => { const fr = new FileReader(); fr.onload = ev => r(ev.target.result); fr.readAsDataURL(e.target.files[0]); });
           if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
           const captureRoom = getStepData(step.id).roomName || step.name;
           const sp = {
@@ -2233,7 +2236,10 @@ export function renderMyWork() {
   ]);
   c.appendChild(toolbar);
 
-  const assignedSteps = (ctx.stepList || []).filter(step => getStepAssignment(ctx.inspection, step.id)?.memberId === identity.memberId);
+  const teamMode = ctx.inspection.collaboration.enabled && ctx.inspection.collaboration.members.length > 1;
+  const assignedSteps = (ctx.stepList || []).filter(step =>
+    step.type !== 'review' && (!teamMode || getStepAssignment(ctx.inspection, step.id)?.memberId === identity.memberId)
+  );
   const incompleteAssigned = assignedSteps.filter(step => !ctx.inspection.stepData?.[step.id]?._completedAt);
   const myFindings = ctx.inspection.findings.filter(item => item.createdById === identity.memberId || item.updatedById === identity.memberId);
   const pendingFindings = myFindings.filter(item => item.status === 'needs_review');
@@ -2279,7 +2285,7 @@ export function renderMyWork() {
   attentionCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Needs My Attention'));
   const attentionItems = [
     pendingFindings.length ? ui().el('button', { className: 'my-work-attention', onClick: () => openInspectionWorkspace('findings', 'my-work') }, '📥 Review ' + pendingFindings.length + ' finding' + (pendingFindings.length === 1 ? '' : 's')) : null,
-    myUnplacedPhotos.length ? ui().el('button', { className: 'my-work-attention', onClick: () => { setScreen('photos'); ctx.render(); } }, '📷 Place ' + myUnplacedPhotos.length + ' photo' + (myUnplacedPhotos.length === 1 ? '' : 's')) : null
+    myUnplacedPhotos.length ? ui().el('button', { className: 'my-work-attention', onClick: () => { _photosReturnScreen = 'my-work'; setScreen('photos'); ctx.render(); } }, '📷 Place ' + myUnplacedPhotos.length + ' photo' + (myUnplacedPhotos.length === 1 ? '' : 's')) : null
   ].filter(Boolean);
   if (!attentionItems.length) attentionCard.appendChild(ui().el('div', { className: 'photo-review-success' }, [ui().el('strong', null, '✓ Your work queue is clear'), ui().el('span', null, 'Continue with your assigned inspection sections.') ]));
   else attentionItems.forEach(item => attentionCard.appendChild(item));
@@ -2436,8 +2442,8 @@ export function renderPhotos() {
   const topActions = ui().el('div', { className: 'photo-review-toolbar' });
   topActions.appendChild(ui().el('button', {
     className: 'btn btn-outline',
-    onClick: () => { setScreen('review'); ctx.render(); }
-  }, 'Back to Review'));
+    onClick: () => { setScreen(_photosReturnScreen || 'review'); ctx.render(); }
+  }, _photosReturnScreen === 'my-work' ? 'Back to My Work' : 'Back to Review'));
   const rescueBtn = ui().el('button', {
     className: 'btn btn-secondary',
     onClick: async () => {
@@ -2699,7 +2705,7 @@ export function renderPhotos() {
   }
 
   c.appendChild(ui().el('div', { className: 'bottom-nav' }, [
-    ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { setScreen('review'); ctx.render(); } }, 'Back to Review')
+    ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { setScreen(_photosReturnScreen || 'review'); ctx.render(); } }, _photosReturnScreen === 'my-work' ? 'Back to My Work' : 'Back to Review')
   ]));
 
   ctx.root.appendChild(c);
@@ -2754,7 +2760,7 @@ export function renderReview() {
   const leaveActions = ui().el('div', { className: 'leave-actions' });
   const photosBtn = ui().el('button', {
     className: 'btn btn-primary',
-    onClick: () => { setScreen('photos'); ctx.render(); }
+    onClick: () => { _photosReturnScreen = 'review'; setScreen('photos'); ctx.render(); }
   }, 'Photos');
   const rescueBtn = ui().el('button', {
     className: 'btn btn-outline',

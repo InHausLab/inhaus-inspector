@@ -10,10 +10,10 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v163 (photo routing, company comments, field sync, My Work, recovery) |
+| App version | v164 (v163 features plus full-audit fixes) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v63 team merge and company comment library — see URL below |
+| Apps Script | v64 team merge and company comment library — see URL below |
 | Apps Script URL | `https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
@@ -28,6 +28,16 @@ This file is the authoritative record of every significant change, decision, bug
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v164 — Full Audit Fixes
+**Date:** July 19, 2026
+
+- Fixed the floating spare-photo camera so compression is fully awaited before the photo is saved, vaulted, and queued for upload.
+- Made **My Work** useful in single-inspector mode by treating all inspection sections as that inspector's work; team mode still shows only explicitly assigned sections.
+- Preserved navigation context when an inspector opens Photos from My Work, so Back returns to My Work instead of Review.
+- Changed comment-library admin loading from a token-bearing GET URL to an authenticated POST, keeping the admin token out of browser history and ordinary URL logs.
 
 ---
 
