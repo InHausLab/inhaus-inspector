@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=166';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=166';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=167';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=167';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=166';
-import { scheduleSave } from './storage.js?v=166';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=166';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=166';
+         getBestCloudSyncAt } from './state.js?v=167';
+import { scheduleSave } from './storage.js?v=167';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=167';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=167';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -669,7 +669,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=166');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=167');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {

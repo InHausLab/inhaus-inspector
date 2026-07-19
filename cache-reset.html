@@ -118,7 +118,7 @@
           localStorage.setItem('inhausCacheResetAt', new Date().toISOString());
         } catch (err) {}
 
-        setStatus('Cache reset complete. Opening v145...');
+        setStatus('Cache reset complete. Opening the latest version...');
         setTimeout(function() {
           window.location.replace(latestUrl());
         }, 700);

@@ -9,6 +9,18 @@
   const PHOTO_TRASH_STORE = 'photoTrash';
   let _db = null;
 
+  function showDatabaseBlockedNotice() {
+    if (typeof document === 'undefined') return;
+    let banner = document.getElementById('database-upgrade-blocked-banner');
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.id = 'database-upgrade-blocked-banner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b42318;color:#fff;font-size:16px;font-weight:800;line-height:1.35;text-align:center;padding:14px 18px;z-index:100000;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);';
+    banner.textContent = 'App update is blocked by another InHaus Inspector tab. Close the other app tabs, then tap here to retry.';
+    banner.addEventListener('click', () => window.location.reload());
+    document.body.appendChild(banner);
+  }
+
   function open() {
     if (_db) return Promise.resolve(_db);
     return new Promise((resolve, reject) => {
@@ -44,6 +56,7 @@
       req.onblocked = () => {
         if (settled) return;
         settled = true;
+        showDatabaseBlockedNotice();
         const err = new Error('Another InHaus Inspector tab is blocking a local database update. Close the other app tabs, then try again.');
         err.name = 'DatabaseUpgradeBlockedError';
         reject(err);

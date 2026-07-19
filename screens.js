@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=166';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=166';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=166';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=166';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=166';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=166';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=167';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=167';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=167';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=167';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=167';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=167';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=166';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=166';
+} from './findings.js?v=167';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=167';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=166';
+} from './comment-library.js?v=167';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1522,7 +1522,7 @@ export function renderStep() {
   const backToIntakeBtn = ui().el('button', {
     type: 'button',
     className: 'btn btn-outline btn-small',
-    style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:10px;z-index:200;font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;justify-content:center;',
+    style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:10px;z-index:200;font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#2C3F16;border-color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.22);',
     onClick: () => { setScreen('intake'); ctx.render(); }
   }, '\u270E Intake');
   c.appendChild(backToIntakeBtn);
@@ -1530,7 +1530,8 @@ export function renderStep() {
   // Search button
   const searchBtn = ui().el('button', {
     type: 'button',
-    style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:82px;z-index:200;background:#2C3F16;color:#fff;border:none;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;',
+    'aria-label': 'Search inspection',
+    style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:82px;z-index:200;background:#fff;color:#2C3F16;border:1px solid #fff;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;',
     onClick: () => openSearch()
   }, '\uD83D\uDD0D');
   c.appendChild(searchBtn);

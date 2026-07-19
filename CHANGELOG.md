@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v166 (workspace back-navigation fix) |
+| App version | v167 (mobile header and upgrade guidance) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v64 team merge and company comment library — see URL below |
@@ -30,6 +30,13 @@ This file is the authoritative record of every significant change, decision, bug
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v167 — Mobile Header Visibility and Upgrade Guidance
+**Date:** July 19, 2026
+
+- Made the fixed **Intake** and inspection-search controls clearly visible against the dark mobile header.
+- Added an always-visible database-upgrade notice so any older open app tab produces a clear close-tabs-and-retry instruction instead of a blank or frozen screen.
+- Removed the stale hard-coded version number from the cache-reset screen; it now says it is opening the latest version.
 
 ## v166 — Workspace Back Navigation
 **Date:** July 19, 2026
