@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v169 (bounded network and database failures) |
+| App version | v170 (finding and photo-change cloud checkpoints) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v64 team merge and company comment library — see URL below |
@@ -30,6 +30,15 @@ This file is the authoritative record of every significant change, decision, bug
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v170 — Finding and Photo-Change Cloud Checkpoints
+**Date:** July 19, 2026
+
+- Rapid Capture now checkpoints each saved finding to the cloud immediately after the local save.
+- Approving or excluding a finding now waits for a verified cloud checkpoint and clearly reports when only the local copy is safe.
+- Finding comment, severity, and report-destination edits now use a short debounce and then checkpoint to the cloud.
+- Photo caption and placement changes now checkpoint to the cloud instead of waiting for a later inspection-step transition.
+- Confirmed the complete test-photo path through Supabase, Drive mirroring, the Apps Script record, fresh-device resume, and the review portal.
 
 ## v169 — Bounded Network and Database Failures
 **Date:** July 19, 2026

@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=169';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=169';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=169';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=169';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=169';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=169';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=170';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=170';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=170';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=170';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=170';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=170';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=169';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=169';
+} from './findings.js?v=170';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=170';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=169';
+} from './comment-library.js?v=170';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1902,7 +1902,12 @@ export function renderRapidCapture() {
     const savedRoom = draft.roomName;
     ctx.inspection.rapidCaptureDraft = null;
     await saveNow();
-    ui().showToast('Finding saved to ' + (savedRoom || 'Findings Inbox'));
+    const cloudSaved = await checkpointToCloud(ctx.stepList);
+    ui().showToast(
+      cloudSaved
+        ? 'Finding saved to ' + (savedRoom || 'Findings Inbox') + ' and backed up'
+        : 'Finding saved locally — cloud backup will retry'
+    );
     if (captureAnother) {
       _rapidCaptureContext = { roomName: draft.roomName, stepName: draft.stepName };
       ctx.render();
@@ -1933,7 +1938,6 @@ export function renderFindingsInbox() {
   ensureInspectionWorkspace(ctx.inspection);
   requestCompanyLibraryRefresh();
   const created = syncPhotoCommentsToFindings(ctx.inspection);
-  if (created) scheduleSave();
 
   const c = ui().el('div', { className: 'screen findings-screen' });
   c.appendChild(buildAppHeader('Smart Findings Inbox'));
@@ -1945,6 +1949,31 @@ export function renderFindingsInbox() {
     onClick: () => openInspectionWorkspace('rapid-capture', 'findings', _rapidCaptureContext)
   }, '📸 Rapid Capture'));
   c.appendChild(top);
+
+  let findingCloudSaveTimer = null;
+  async function saveFindingChangesToCloud() {
+    if (findingCloudSaveTimer) {
+      clearTimeout(findingCloudSaveTimer);
+      findingCloudSaveTimer = null;
+    }
+    const savedLocally = await saveNow();
+    if (!savedLocally) {
+      ui().showToast('Finding could not be saved on this device');
+      return false;
+    }
+    const cloudSaved = await checkpointToCloud(ctx.stepList);
+    if (!cloudSaved) ui().showToast('Finding saved locally — cloud backup will retry');
+    return cloudSaved;
+  }
+  function scheduleFindingCloudSave(delay) {
+    scheduleSave();
+    if (findingCloudSaveTimer) clearTimeout(findingCloudSaveTimer);
+    findingCloudSaveTimer = setTimeout(() => {
+      findingCloudSaveTimer = null;
+      saveFindingChangesToCloud();
+    }, Number(delay || 900));
+  }
+  if (created) scheduleFindingCloudSave(100);
 
   const counts = {
     review: ctx.inspection.findings.filter(item => item.status === 'needs_review').length,
@@ -2017,7 +2046,7 @@ export function renderFindingsInbox() {
       cleaned.value = finding.cleanedComment || '';
       cleaned.addEventListener('input', () => {
         updateFinding(ctx.inspection, finding.findingId, { cleanedComment: cleaned.value, status: finding.status === 'excluded' ? 'needs_review' : finding.status });
-        scheduleSave();
+        scheduleFindingCloudSave();
       });
       card.appendChild(cleanLabel);
       card.appendChild(cleaned);
@@ -2028,7 +2057,7 @@ export function renderFindingsInbox() {
         severity.appendChild(ui().el('option', { value }, value));
       });
       severity.value = finding.severity || 'Observation';
-      severity.addEventListener('change', () => { updateFinding(ctx.inspection, finding.findingId, { severity: severity.value }); scheduleSave(); });
+      severity.addEventListener('change', () => { updateFinding(ctx.inspection, finding.findingId, { severity: severity.value }); scheduleFindingCloudSave(250); });
       controls.appendChild(severity);
       const destination = ui().el('select', { className: 'field-input' });
       destination.appendChild(ui().el('option', { value: '' }, 'Report section / location'));
@@ -2041,7 +2070,7 @@ export function renderFindingsInbox() {
         const item = collectPhotoDestinations()[Number(destination.value)];
         if (!item) return;
         updateFinding(ctx.inspection, finding.findingId, { roomName: item.roomName, stepName: item.stepName, reportSection: item.stepName });
-        scheduleSave();
+        scheduleFindingCloudSave(250);
       });
       controls.appendChild(destination);
       card.appendChild(controls);
@@ -2052,16 +2081,16 @@ export function renderFindingsInbox() {
           const draftText = String(finding.rawComment || '').trim();
           updateFinding(ctx.inspection, finding.findingId, { cleanedComment: draftText });
           cleaned.value = draftText;
-          scheduleSave();
+          scheduleFindingCloudSave(250);
           ui().showToast('Original copied — fine-tune it before approval');
         } }, 'Copy Original to Edit'));
       }
       if (finding.status !== 'approved') {
-        actions.appendChild(ui().el('button', { className: 'btn btn-primary', onClick: () => {
+        actions.appendChild(ui().el('button', { className: 'btn btn-primary', onClick: async () => {
           if (!approveFinding(ctx.inspection, finding.findingId)) { ui().showToast('Add or clean the report comment first'); return; }
-          scheduleSave();
-          ui().showToast('Finding approved for the report');
           renderList();
+          const cloudSaved = await saveFindingChangesToCloud();
+          if (cloudSaved) ui().showToast('Finding approved and backed up');
         } }, '✓ Approve for Report'));
       } else {
         const saveReuseButton = ui().el('button', {
@@ -2069,7 +2098,7 @@ export function renderFindingsInbox() {
             const saved = saveFindingToLibrary(ctx.inspection, finding.findingId);
             if (!saved) { ui().showToast('Approve a cleaned comment first'); return; }
             saved.companyStatus = 'pending_upload';
-            scheduleSave();
+            scheduleFindingCloudSave(250);
             try {
               await submitCompanyCommentCandidate(ctx.inspection, finding, saved);
               saved.companyStatus = 'pending_review';
@@ -2078,7 +2107,7 @@ export function renderFindingsInbox() {
             } catch (err) {
               ui().showToast('Saved locally — company submission will retry');
             }
-            scheduleSave();
+            scheduleFindingCloudSave(250);
             ctx.render();
           }
         }, finding.reusableStatus === 'saved' ? '✓ Saved for Reuse' : 'Save Clean Comment for Reuse');
@@ -2086,8 +2115,11 @@ export function renderFindingsInbox() {
         actions.appendChild(saveReuseButton);
       }
       if (finding.status !== 'excluded') {
-        actions.appendChild(ui().el('button', { className: 'btn btn-danger-outline', onClick: () => {
-          excludeFinding(ctx.inspection, finding.findingId); scheduleSave(); renderList();
+        actions.appendChild(ui().el('button', { className: 'btn btn-danger-outline', onClick: async () => {
+          excludeFinding(ctx.inspection, finding.findingId);
+          renderList();
+          const cloudSaved = await saveFindingChangesToCloud();
+          if (cloudSaved) ui().showToast('Finding excluded and backed up');
         } }, 'Exclude'));
       }
       card.appendChild(actions);
@@ -2497,6 +2529,29 @@ export function renderPhotos() {
 
   let showAllPhotos = false;
   let photoSummaryRun = 0;
+  let photoCloudSaveTimer = null;
+  async function savePhotoChangesToCloud() {
+    if (photoCloudSaveTimer) {
+      clearTimeout(photoCloudSaveTimer);
+      photoCloudSaveTimer = null;
+    }
+    const savedLocally = await saveNow();
+    if (!savedLocally) {
+      ui().showToast('Photo change could not be saved on this device');
+      return false;
+    }
+    const cloudSaved = await checkpointToCloud(ctx.stepList);
+    if (!cloudSaved) ui().showToast('Photo change saved locally — cloud backup will retry');
+    return cloudSaved;
+  }
+  function schedulePhotoCloudSave() {
+    scheduleSave();
+    if (photoCloudSaveTimer) clearTimeout(photoCloudSaveTimer);
+    photoCloudSaveTimer = setTimeout(() => {
+      photoCloudSaveTimer = null;
+      savePhotoChangesToCloud();
+    }, 900);
+  }
   const listHeader = ui().el('div', { className: 'photo-review-list-header' });
   const listHeadingText = ui().el('div');
   const listHeading = ui().el('h3', { className: 'section-heading' }, 'Photos Needing Attention');
@@ -2575,8 +2630,12 @@ export function renderPhotos() {
       stepName: destination.stepName,
       source: ref.photo.placementSource
     });
-    scheduleSave();
-    ui().showToast('Photo moved to ' + destination.label);
+    const cloudSaved = await savePhotoChangesToCloud();
+    ui().showToast(
+      cloudSaved
+        ? 'Photo moved to ' + destination.label + ' and backed up'
+        : 'Photo moved locally — cloud backup will retry'
+    );
     renderPhotoSummary();
     renderPhotoList();
   }
@@ -2663,7 +2722,7 @@ export function renderPhotos() {
       }
       card.classList.toggle('has-comment', !!p.caption.trim());
       commentLabel.textContent = p.caption.trim() ? 'Inspector comment' : 'Add an optional comment';
-      scheduleSave();
+      schedulePhotoCloudSave();
     });
     body.appendChild(cap);
 
