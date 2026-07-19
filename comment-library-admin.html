@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>InHaus Comment Library</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="library-admin-shell">
+    <header class="library-admin-header">
+      <img src="icons/logo.png" alt="InHaus Lab">
+      <div><h1>Approved Comment Library</h1><p>Clean, approve, update, or retire wording used by inspectors.</p></div>
+    </header>
+    <section class="card library-admin-login">
+      <label class="field-label" for="admin-token">Admin token</label>
+      <div class="library-admin-login-row">
+        <input class="field-input" id="admin-token" type="password" autocomplete="current-password">
+        <button class="btn btn-primary" id="load-library">Open Library</button>
+      </div>
+      <p class="text-muted" id="library-status">Enter the existing review admin token.</p>
+    </section>
+    <section id="library-content" hidden>
+      <div class="library-admin-summary" id="library-summary"></div>
+      <section class="card"><h2 class="section-heading">Waiting for Approval</h2><div id="candidate-list" class="library-admin-list"></div></section>
+      <section class="card"><h2 class="section-heading">Company Approved</h2><div id="approved-list" class="library-admin-list"></div></section>
+    </section>
+  </main>
+  <script type="module" src="comment-library-admin.js?v=163"></script>
+</body>
+</html>

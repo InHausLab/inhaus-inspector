@@ -1,8 +1,10 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=162';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=163';
 
 let _onSyncStatusChange = null;
 let _saveTimeout = null;
+const _lastSnapshotAt = new Map();
+const AUTO_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
 export function initStorage({ onSyncStatusChange }) {
   _onSyncStatusChange = onSyncStatusChange;
@@ -34,6 +36,15 @@ export async function saveNow() {
   showSave('Saving...');
   try {
     await window.DB.save(inspection);
+    const lastSnapshot = _lastSnapshotAt.get(inspection.inspectionId) || 0;
+    if (window.DB.saveSnapshot && Date.now() - lastSnapshot >= AUTO_SNAPSHOT_INTERVAL_MS) {
+      try {
+        await window.DB.saveSnapshot(inspection, 'Automatic restore point');
+        _lastSnapshotAt.set(inspection.inspectionId, Date.now());
+      } catch (snapshotErr) {
+        console.warn('Automatic restore point failed:', snapshotErr);
+      }
+    }
     setLastLocalSaveAt(Date.now()); // Change 1
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     _onSyncStatusChange('local'); // Change 2
@@ -49,6 +60,14 @@ export async function saveNow() {
       showSaveError('\u26a0\ufe0f Save failed \u2014 data may be lost on reload. Tap Sync to Drive now.');
     }
   }
+}
+
+export async function createRestorePoint(reason) {
+  const inspection = getInspection();
+  if (!inspection || !window.DB?.saveSnapshot) return null;
+  const record = await window.DB.saveSnapshot(inspection, reason || 'Manual restore point');
+  _lastSnapshotAt.set(inspection.inspectionId, Date.now());
+  return record;
 }
 
 export function scheduleSave() {

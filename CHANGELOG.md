@@ -10,11 +10,11 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v162 (rapid capture, smart findings, approved comments, multi-inspector mode) |
+| App version | v163 (photo routing, company comments, field sync, My Work, recovery) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v50 — see URL below |
-| Apps Script URL | `https://script.google.com/macros/s/AKfycbz21ibOdZOWgyUZB_9ttoUtGob3Ak3Cxe-AqpoZKXpa7TQLkM6Io1T6mB-xYryDYP2NGQ/exec` |
+| Apps Script | v163 team merge and company comment library — see URL below |
+| Apps Script URL | `https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
 | Review portal | https://inhauslab.github.io/inhaus-review/ (token: InHaus2026) |
@@ -28,6 +28,19 @@ This file is the authoritative record of every significant change, decision, bug
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v163 — Smart Photo Routing, Company Comments, My Work, and Recovery
+**Date:** July 19, 2026
+
+- Added automatic destination suggestions for unplaced photos using caption keywords, inspection context, and capture-time proximity. Inspectors confirm a suggestion with one tap or choose a different room/task manually.
+- Added a centrally curated company comment library. Approved wording is available to every inspector; new reusable comments remain local and enter a separate admin approval queue before company-wide use.
+- Added atomic server-side team synchronization with per-field timestamps. Different inspectors can edit different fields in the same section without one device overwriting the other. Active-section presence warns when another inspector is in the same section.
+- Added **My Work** with each inspector's assigned sections, incomplete requirements, findings needing review, and photos still needing placement.
+- Added automatic and manual restore points, Recently Deleted photo recovery, shared photo tombstones, and an inspection audit history.
+- Deleted-photo tombstones are honored by the review API so an older Supabase or Drive copy cannot silently reappear.
+- Kept the inspector workflow and final report handoff intact; report preview/building remains outside the inspector role.
 
 ---
 

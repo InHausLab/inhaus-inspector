@@ -1205,13 +1205,19 @@
 
         card.appendChild(el('button', {
           type: 'button', className: 'photo-del-btn',
-          onClick: () => {
+          onClick: async () => {
             if (confirm('Delete this photo?')) {
-              if (window.DB && window.DB.removePhoto && p.photoId) {
-                window.DB.removePhoto(p.photoId);
+              if (window.DB && p.photoId) {
+                if (window.DB.trashPhoto) await window.DB.trashPhoto(p, inspectionId, 'Deleted from photo card');
+                else if (window.DB.removePhoto) await window.DB.removePhoto(p.photoId);
               }
               photos.splice(idx, 1);
               onUpdate();
+              window.dispatchEvent(new CustomEvent('inhaus-photo-deleted', { detail: {
+                photoId: p.photoId,
+                roomName: p.roomName || roomName || '',
+                stepName: p.stepName || stepName || ''
+              } }));
               const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions);
               section.replaceWith(newSection);
             }
@@ -1352,7 +1358,7 @@
       return wrapper;
     }
 
-    const changed = () => onChange();
+    const changed = () => onChange(f.key || f.dataKey || f.type || 'field');
 
     switch (f.type) {
       case 'weather-link': {
@@ -1421,7 +1427,7 @@
         confirmInp.style = 'width:100%;padding:9px 12px;border:2px solid #86efac;border-radius:8px;font-size:1rem;font-weight:700;background:#fff;box-sizing:border-box;';
         confirmInp.value = data.boulderBlueTestDuration || '';
         confirmInp.placeholder = 'e.g. 2 hrs 15 min';
-        confirmInp.addEventListener('input', () => { data.boulderBlueTestDuration = confirmInp.value; onChange(); });
+        confirmInp.addEventListener('input', () => { data.boulderBlueTestDuration = confirmInp.value; changed(); });
         confirmRow.appendChild(confirmLbl); confirmRow.appendChild(confirmInp);
 
         function refresh() {
@@ -1532,7 +1538,7 @@
         confirmInp.style = 'width:100%;padding:9px 12px;border:2px solid #93c5fd;border-radius:8px;font-size:1rem;font-weight:700;letter-spacing:.5px;background:#fff;box-sizing:border-box;';
         confirmInp.value = data[dataKey] || '';
         confirmInp.placeholder = 'e.g. WP-123456';
-        confirmInp.addEventListener('input', () => { data[dataKey] = confirmInp.value; onChange(); });
+        confirmInp.addEventListener('input', () => { data[dataKey] = confirmInp.value; changed(); });
         confirmRow.appendChild(confirmLbl); confirmRow.appendChild(confirmInp);
 
         inp.onchange = async e => {
@@ -1570,7 +1576,7 @@
               status.textContent = '\u26a0\ufe0f Could not read ID \u2014 type it below';
               status.style.color = '#b45309';
             }
-            onChange();
+            changed();
           } catch (err) {
             confirmRow.style.display = '';
             status.textContent = '\u26a0\ufe0f Scan failed \u2014 type ID below';
@@ -1644,7 +1650,7 @@
               delete data['flirImageLabel' + j];
               entryCount = Math.max(entryCount - 1, 1);
               rebuildEntries();
-              onChange();
+              changed();
             };
             hdr.appendChild(removeBtn);
           }
@@ -1661,7 +1667,7 @@
             inp.placeholder = placeholder || '';
             inp.value = data[key] || '';
             inp.style = 'width:100%;padding:7px 10px;border:1.5px solid #d0dcc8;border-radius:7px;font-size:0.9rem;background:#fff;box-sizing:border-box;';
-            inp.addEventListener('input', () => { data[key] = inp.value; onChange(); });
+            inp.addEventListener('input', () => { data[key] = inp.value; changed(); });
             row.appendChild(lbl); row.appendChild(inp);
             return row;
           }
@@ -1781,7 +1787,7 @@
           inp.placeholder = placeholder || '';
           inp.value = data[key] || '';
           inp.style = 'width:100%;padding:8px 10px;border:1.5px solid #d0dcc8;border-radius:8px;font-size:0.95rem;background:#fff;box-sizing:border-box;' + (type === 'textarea' ? 'min-height:64px;resize:vertical;' : '');
-          inp.addEventListener('input', () => { data[key] = inp.value; onChange(); });
+          inp.addEventListener('input', () => { data[key] = inp.value; changed(); });
           return inp;
         }
         function mkSelect(key, options) {
@@ -1793,7 +1799,7 @@
             sel.appendChild(opt);
           });
           sel.value = data[key] || '';
-          sel.addEventListener('change', () => { data[key] = sel.value; onChange(); });
+          sel.addEventListener('change', () => { data[key] = sel.value; changed(); });
           return sel;
         }
         function setVal(key, value) {
@@ -1887,7 +1893,7 @@
             tagStatus.className = 'ai-scan-status ai-scan-success';
             syncConfirmCard();
             revealConfirmIfReady();
-            onChange();
+            changed();
           } catch (err) {
             tagBtn.style.display = '';
             tagStatus.textContent = '⚠️ Could not read tag — fill in manually below';
@@ -1980,7 +1986,7 @@
             filterStatus.className = 'ai-scan-status ai-scan-success';
             syncConfirmCard();
             revealConfirmIfReady();
-            onChange();
+            changed();
           } catch (err) {
             filterBtn.style.display = '';
             filterStatus.textContent = '⚠️ Could not read filter — fill in manually below';
@@ -2127,7 +2133,7 @@
         cleanedCb.type = 'checkbox';
         cleanedCb.style = 'width:18px;height:18px;flex-shrink:0;accent-color:#2C3F16;';
         cleanedCb.checked = !!(data.filterCleaned);
-        cleanedCb.addEventListener('change', () => { data.filterCleaned = cleanedCb.checked; onChange(); });
+        cleanedCb.addEventListener('change', () => { data.filterCleaned = cleanedCb.checked; changed(); });
         cleanedRow.appendChild(cleanedCb);
         cleanedRow.appendChild(document.createTextNode('Filters checked and cleaned if needed'));
         confirmCard.appendChild(cleanedRow);
@@ -2211,7 +2217,7 @@
           cb.type = 'checkbox';
           cb.style = 'margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:#2C3F16;';
           cb.checked = !!(data[item.key]);
-          cb.addEventListener('change', () => { data[item.key] = cb.checked; onChange(); });
+          cb.addEventListener('change', () => { data[item.key] = cb.checked; changed(); });
           const lbl = document.createElement('span');
           lbl.textContent = item.label;
           lbl.style = 'line-height:1.4;';
@@ -2296,7 +2302,7 @@
           ta.className = 'field-textarea ai-room-summary-textarea';
           ta.placeholder = 'Tap to generate, then review and edit\u2026';
           ta.value = data.aiSummary || '';
-          ta.addEventListener('input', () => { data.aiSummary = ta.value; onChange(); });
+          ta.addEventListener('input', () => { data.aiSummary = ta.value; changed(); });
 
           const hint = document.createElement('div');
           hint.className = 'ai-room-summary-hint';
@@ -2347,7 +2353,7 @@
               data.aiSummary = text;
               data.aiSummaryGeneratedAt = new Date().toISOString();
               ta.value = text;
-              onChange();
+              changed();
               genBtn.textContent = '\u2713 Summary Generated';
               setTimeout(() => {
                 genBtn.disabled = false;
@@ -2397,7 +2403,7 @@
           ta.rows = 10;
           ta.placeholder = 'Tap to generate the follow-up inspection plan\u2026';
           ta.value = data.aiFollowUpPlan || '';
-          ta.addEventListener('input', () => { data.aiFollowUpPlan = ta.value; onChange(); });
+          ta.addEventListener('input', () => { data.aiFollowUpPlan = ta.value; changed(); });
 
           const hint = document.createElement('div');
           hint.className = 'ai-room-summary-hint';
@@ -2461,7 +2467,7 @@
               data.aiFollowUpPlan = text;
               data.aiFollowUpPlanGeneratedAt = new Date().toISOString();
               ta.value = text;
-              onChange();
+              changed();
               genBtn.textContent = '\u2713 Plan Generated';
               setTimeout(() => { genBtn.disabled = false; genBtn.textContent = '\u21BA Regenerate Plan'; }, 2000);
             } catch (err) {
@@ -2525,7 +2531,7 @@
               };
             }
             qUpdateLabel(file.name);
-            onChange();
+            changed();
           };
           if (file.name.toLowerCase().endsWith('.csv')) {
             reader.readAsText(file);

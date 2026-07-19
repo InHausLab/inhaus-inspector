@@ -66,6 +66,8 @@ export function ensureInspectionWorkspace(inspection) {
   if (!inspection) return inspection;
   if (!Array.isArray(inspection.findings)) inspection.findings = [];
   if (!Array.isArray(inspection.commentLibrary)) inspection.commentLibrary = [];
+  if (!Array.isArray(inspection.auditTrail)) inspection.auditTrail = [];
+  if (!inspection.photoTombstones || typeof inspection.photoTombstones !== 'object') inspection.photoTombstones = {};
   inspection.commentLibrary = mergeLibraryEntries(inspection.commentLibrary, readLocalLibrary());
   writeLocalLibrary(inspection.commentLibrary);
 
@@ -76,6 +78,7 @@ export function ensureInspectionWorkspace(inspection) {
   if (!Array.isArray(collaboration.members)) collaboration.members = [];
   if (!collaboration.assignments || typeof collaboration.assignments !== 'object') collaboration.assignments = {};
   if (!Array.isArray(collaboration.activity)) collaboration.activity = [];
+  if (!collaboration.presence || typeof collaboration.presence !== 'object') collaboration.presence = {};
 
   const primaryName = String(inspection.inspectorName || '').trim();
   if (primaryName && !collaboration.members.some(member => normalizeCommentText(member.name) === normalizeCommentText(primaryName))) {
@@ -139,18 +142,21 @@ export function addTeamMember(inspection, name, email, role) {
   inspection.collaboration.enabled = inspection.collaboration.members.length > 1;
   inspection.collaboration.updatedAt = now;
   recordTeamActivity(inspection, 'member_added', cleanName + ' added to the inspection team');
+  recordAuditEvent(inspection, 'team_member_added', cleanName + ' added to the inspection team', { memberId: member.memberId, role: member.role });
   return member;
 }
 
 export function removeTeamMember(inspection, memberId) {
   ensureInspectionWorkspace(inspection);
   if (inspection.collaboration.members.length <= 1) return false;
+  const removed = inspection.collaboration.members.find(member => member.memberId === memberId);
   inspection.collaboration.members = inspection.collaboration.members.filter(member => member.memberId !== memberId);
   Object.keys(inspection.collaboration.assignments).forEach(stepId => {
     if (inspection.collaboration.assignments[stepId]?.memberId === memberId) delete inspection.collaboration.assignments[stepId];
   });
   inspection.collaboration.enabled = inspection.collaboration.members.length > 1;
   inspection.collaboration.updatedAt = isoNow();
+  if (removed) recordAuditEvent(inspection, 'team_member_removed', removed.name + ' removed from the inspection team', { memberId });
   return true;
 }
 
@@ -169,6 +175,12 @@ export function setStepAssignment(inspection, stepId, memberId, stepName) {
     };
   }
   inspection.collaboration.updatedAt = isoNow();
+  recordAuditEvent(
+    inspection,
+    'section_assignment',
+    (stepName || stepId) + (member ? ' assigned to ' + member.name : ' marked unassigned'),
+    { stepId, stepName: stepName || stepId, memberId: member?.memberId || '', memberName: member?.name || '' }
+  );
 }
 
 export function getStepAssignment(inspection, stepId) {
@@ -190,7 +202,48 @@ export function recordTeamActivity(inspection, type, message, memberOverride) {
   inspection.collaboration.activity = inspection.collaboration.activity.slice(0, 100);
 }
 
-export function markStepUpdated(inspection, stepId, stepName) {
+export function recordAuditEvent(inspection, type, message, details, memberOverride) {
+  ensureInspectionWorkspace(inspection);
+  const member = memberOverride || getInspectorIdentity(inspection);
+  const event = {
+    auditId: makeId('audit'),
+    type: String(type || 'change'),
+    message: String(message || 'Inspection updated'),
+    details: details && typeof details === 'object' ? clone(details) : {},
+    memberId: member?.memberId || '',
+    memberName: member?.name || '',
+    deviceId: getDeviceId(),
+    createdAt: isoNow()
+  };
+  inspection.auditTrail.unshift(event);
+  inspection.auditTrail = inspection.auditTrail.slice(0, 500);
+  return event;
+}
+
+export function setActiveStepPresence(inspection, stepId, stepName) {
+  ensureInspectionWorkspace(inspection);
+  const member = getInspectorIdentity(inspection);
+  const deviceId = getDeviceId();
+  inspection.collaboration.presence[deviceId] = {
+    deviceId,
+    memberId: member.memberId,
+    memberName: member.name,
+    stepId: stepId || '',
+    stepName: stepName || '',
+    updatedAt: isoNow()
+  };
+  return inspection.collaboration.presence[deviceId];
+}
+
+export function getActivePresence(inspection, maxAgeMs) {
+  ensureInspectionWorkspace(inspection);
+  const cutoff = Date.now() - Number(maxAgeMs || 120000);
+  return Object.values(inspection.collaboration.presence || {})
+    .filter(item => timeValue(item.updatedAt) >= cutoff)
+    .sort((a, b) => timeValue(b.updatedAt) - timeValue(a.updatedAt));
+}
+
+export function markStepUpdated(inspection, stepId, stepName, fieldKey) {
   ensureInspectionWorkspace(inspection);
   if (!inspection.stepData) inspection.stepData = {};
   if (!inspection.stepData[stepId]) inspection.stepData[stepId] = {};
@@ -199,8 +252,20 @@ export function markStepUpdated(inspection, stepId, stepName) {
   inspection.stepData[stepId]._updatedAt = now;
   inspection.stepData[stepId]._updatedBy = member.name;
   inspection.stepData[stepId]._updatedById = member.memberId;
+  if (!inspection.stepData[stepId]._fieldUpdates || typeof inspection.stepData[stepId]._fieldUpdates !== 'object') {
+    inspection.stepData[stepId]._fieldUpdates = {};
+  }
+  if (fieldKey) {
+    inspection.stepData[stepId]._fieldUpdates[fieldKey] = {
+      updatedAt: now,
+      updatedBy: member.name,
+      updatedById: member.memberId,
+      deviceId: getDeviceId()
+    };
+  }
   inspection.collaboration.lastActiveAt = now;
   inspection.collaboration.lastActiveBy = member.name;
+  setActiveStepPresence(inspection, stepId, stepName);
   const assignment = getStepAssignment(inspection, stepId);
   if (!assignment && inspection.collaboration.enabled) setStepAssignment(inspection, stepId, member.memberId, stepName);
 }
@@ -231,6 +296,12 @@ export function createFinding(inspection, values) {
   };
   inspection.findings.push(finding);
   recordTeamActivity(inspection, 'finding_created', member.name + ' added a finding in ' + (finding.roomName || finding.stepName || 'the inspection'), member);
+  recordAuditEvent(inspection, 'finding_created', member.name + ' added a finding in ' + (finding.roomName || finding.stepName || 'the inspection'), {
+    findingId: finding.findingId,
+    roomName: finding.roomName,
+    stepName: finding.stepName,
+    photoCount: finding.photoIds.length
+  }, member);
   return finding;
 }
 
@@ -297,17 +368,21 @@ export function approveFinding(inspection, findingId) {
   const cleaned = String(finding.cleanedComment || '').trim();
   if (!cleaned) return null;
   const member = getInspectorIdentity(inspection);
-  return updateFinding(inspection, findingId, {
+  const approved = updateFinding(inspection, findingId, {
     cleanedComment: cleaned,
     status: 'approved',
     approvedAt: isoNow(),
     approvedBy: member.name,
     approvedById: member.memberId
   });
+  recordAuditEvent(inspection, 'finding_approved', 'Finding approved for the report', { findingId, roomName: finding.roomName, stepName: finding.stepName }, member);
+  return approved;
 }
 
 export function excludeFinding(inspection, findingId) {
-  return updateFinding(inspection, findingId, { status: 'excluded', excludedAt: isoNow() });
+  const finding = updateFinding(inspection, findingId, { status: 'excluded', excludedAt: isoNow() });
+  if (finding) recordAuditEvent(inspection, 'finding_excluded', 'Finding excluded from the report', { findingId, roomName: finding.roomName, stepName: finding.stepName });
+  return finding;
 }
 
 export function saveFindingToLibrary(inspection, findingId) {
@@ -339,6 +414,7 @@ export function saveFindingToLibrary(inspection, findingId) {
   finding.updatedAt = now;
   inspection.commentLibrary = mergeLibraryEntries(inspection.commentLibrary, readLocalLibrary());
   writeLocalLibrary(inspection.commentLibrary);
+  recordAuditEvent(inspection, 'comment_saved_for_reuse', 'Approved comment saved for reuse', { commentId: entry.commentId, findingId });
   return entry;
 }
 
@@ -396,13 +472,31 @@ function mergeStepData(localStep, remoteStep) {
   const older = localIsNewer ? remoteStep : localStep;
   const merged = Object.assign({}, clone(older || {}), clone(newer || {}));
   const keys = new Set([...Object.keys(older || {}), ...Object.keys(newer || {})]);
+  const mergedFieldUpdates = Object.assign({}, clone(remoteStep?._fieldUpdates || {}));
   keys.forEach(key => {
+    if (key === '_fieldUpdates') return;
     const localValue = localStep?.[key];
     const remoteValue = remoteStep?.[key];
     if (looksLikePhotoArray(localValue) || looksLikePhotoArray(remoteValue)) {
       merged[key] = mergePhotos(localValue, remoteValue);
+      return;
+    }
+    const localField = localStep?._fieldUpdates?.[key];
+    const remoteField = remoteStep?._fieldUpdates?.[key];
+    if (localField || remoteField) {
+      const localFieldIsNewer = timeValue(localField?.updatedAt) >= timeValue(remoteField?.updatedAt);
+      if (localFieldIsNewer) {
+        if (localValue === undefined) delete merged[key];
+        else merged[key] = clone(localValue);
+        if (localField) mergedFieldUpdates[key] = clone(localField);
+      } else {
+        if (remoteValue === undefined) delete merged[key];
+        else merged[key] = clone(remoteValue);
+        if (remoteField) mergedFieldUpdates[key] = clone(remoteField);
+      }
     }
   });
+  merged._fieldUpdates = mergedFieldUpdates;
   return merged;
 }
 
@@ -446,8 +540,15 @@ export function mergeRemoteInspection(localInspection, remoteInspection) {
   localInspection.findings = mergeById(localInspection.findings, remoteInspection.findings, 'findingId');
   localInspection.sparePhotos = mergePhotos(localInspection.sparePhotos, remoteInspection.sparePhotos);
   localInspection.commentLibrary = mergeLibraryEntries(localInspection.commentLibrary, remoteInspection.commentLibrary);
+  localInspection.auditTrail = mergeById(localInspection.auditTrail, remoteInspection.auditTrail, 'auditId')
+    .sort((a, b) => timeValue(b.createdAt) - timeValue(a.createdAt)).slice(0, 500);
   writeLocalLibrary(localInspection.commentLibrary);
   localInspection.dynamicRooms = mergeDynamicRooms(localInspection.dynamicRooms, remoteInspection.dynamicRooms);
+  const tombstones = Object.assign({}, remoteInspection.photoTombstones || {});
+  Object.entries(localInspection.photoTombstones || {}).forEach(([photoId, item]) => {
+    if (!tombstones[photoId] || timeValue(item.updatedAt) >= timeValue(tombstones[photoId].updatedAt)) tombstones[photoId] = clone(item);
+  });
+  localInspection.photoTombstones = tombstones;
 
   const localCollab = localInspection.collaboration;
   const remoteCollab = remoteInspection.collaboration;
@@ -460,6 +561,11 @@ export function mergeRemoteInspection(localInspection, remoteInspection) {
     if (!assignments[stepId] || timeValue(assignment.updatedAt) >= timeValue(assignments[stepId].updatedAt)) assignments[stepId] = clone(assignment);
   });
   localCollab.assignments = assignments;
+  const presence = Object.assign({}, remoteCollab.presence || {});
+  Object.entries(localCollab.presence || {}).forEach(([deviceId, item]) => {
+    if (!presence[deviceId] || timeValue(item.updatedAt) >= timeValue(presence[deviceId].updatedAt)) presence[deviceId] = clone(item);
+  });
+  localCollab.presence = presence;
   localCollab.lastMergedAt = isoNow();
   return localInspection;
 }

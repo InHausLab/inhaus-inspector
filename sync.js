@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=162';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=162';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=163';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=163';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=162';
-import { scheduleSave } from './storage.js?v=162';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=162';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=162';
+         getBestCloudSyncAt } from './state.js?v=163';
+import { scheduleSave } from './storage.js?v=163';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=163';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=163';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -669,7 +669,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=162');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=163');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -948,6 +948,21 @@ async function fetchCloudInspectionJson(url, context) {
   return data;
 }
 
+let _bridgeCapabilities = null;
+async function loadBridgeCapabilities() {
+  if (_bridgeCapabilities) return _bridgeCapabilities;
+  try {
+    const url = new URL(GOOGLE_SCRIPT_URL);
+    url.searchParams.set('action', 'capabilities');
+    url.searchParams.set('token', FIELD_RESUME_TOKEN);
+    const data = await fetchCloudInspectionJson(url, 'Cloud capabilities');
+    _bridgeCapabilities = data.capabilities || {};
+  } catch (err) {
+    _bridgeCapabilities = {};
+  }
+  return _bridgeCapabilities;
+}
+
 export async function listCloudInspections() {
   if (!GOOGLE_SCRIPT_URL) throw new Error('Cloud inspection service is not configured.');
   const url = new URL(GOOGLE_SCRIPT_URL);
@@ -986,18 +1001,43 @@ export async function checkpointToCloud(stepList) {
   setLastCheckpointAttemptAt(Date.now()); // Change 1
   try {
     ensureInspectionWorkspace(inspection);
+    let usedServerTeamMerge = false;
     if (inspection.collaboration?.enabled && inspection.inspectionId) {
-      try {
-        const cloudRecord = await loadCloudInspection(inspection.inspectionId);
-        if (cloudRecord?.resumeData) {
-          mergeRemoteInspection(inspection, cloudRecord.resumeData);
-          scheduleSave();
+      const capabilities = await loadBridgeCapabilities();
+      if (capabilities.teamFieldMerge === true) {
+        const teamExport = buildExportJSON(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
+        const teamPayload = stripPhotosFromExport(teamExport);
+        teamPayload._checkpoint = true;
+        updateSyncStatus('syncing');
+        const teamResult = await scriptFetch({
+          action: 'teamMerge',
+          token: FIELD_RESUME_TOKEN,
+          inspection: teamPayload
+        });
+        if (teamResult.inspection) mergeRemoteInspection(inspection, teamResult.inspection);
+        if (teamResult.resumeData) mergeRemoteInspection(inspection, teamResult.resumeData);
+        scheduleSave();
+        usedServerTeamMerge = true;
+      } else {
+        try {
+          const cloudRecord = await loadCloudInspection(inspection.inspectionId);
+          if (cloudRecord?.resumeData) {
+            mergeRemoteInspection(inspection, cloudRecord.resumeData);
+            scheduleSave();
+          }
+        } catch (mergeErr) {
+          // A newly prepared inspection may not exist in the review API yet.
+          // Continue with the local checkpoint; the next team sync will merge it.
+          console.warn('Team merge pull skipped:', mergeErr);
         }
-      } catch (mergeErr) {
-        // A newly prepared inspection may not exist in the review API yet.
-        // Continue with the local checkpoint; the next team sync will merge it.
-        console.warn('Team merge pull skipped:', mergeErr);
       }
+    }
+    if (usedServerTeamMerge) {
+      setLastCheckpointSucceededAt(Date.now());
+      _checkpointFailCount = 0;
+      updateSyncStatus('checkpoint');
+      schedulePhotoRetry(1000);
+      return true;
     }
     const exportData = buildExportJSON(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
     const payload = stripPhotosFromExport(exportData);

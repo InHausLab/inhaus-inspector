@@ -1,17 +1,23 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=162';
-import { saveNow, scheduleSave } from './storage.js?v=162';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=162';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=162';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=162';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=162';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=163';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=163';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=163';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=163';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=163';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=163';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
   getInspectorIdentity, hasStoredInspectorIdentity, setInspectorIdentity,
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
-  markStepUpdated, recordTeamActivity
-} from './findings.js?v=162';
+  markStepUpdated, recordTeamActivity, recordAuditEvent,
+  setActiveStepPresence, getActivePresence
+} from './findings.js?v=163';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=163';
+import {
+  refreshCompanyComments, submitCompanyCommentCandidate,
+  flushPendingCompanyCommentCandidates
+} from './comment-library.js?v=163';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -23,9 +29,22 @@ let _intakeMode = 'field';
 let _workspaceReturnScreen = 'step';
 let _rapidReturnScreen = 'step';
 let _rapidCaptureContext = null;
+let _globalWorkspaceListenersReady = false;
+const _companyLibraryRequested = new Set();
 
 export function initScreens(context) {
   ctx = context;
+  if (!_globalWorkspaceListenersReady) {
+    _globalWorkspaceListenersReady = true;
+    window.addEventListener('inhaus-photo-deleted', event => {
+      if (!ctx?.inspection) return;
+      const detail = event.detail || {};
+      if (!ctx.inspection.photoTombstones) ctx.inspection.photoTombstones = {};
+      ctx.inspection.photoTombstones[detail.photoId] = { status: 'deleted', updatedAt: new Date().toISOString() };
+      recordAuditEvent(ctx.inspection, 'photo_deleted', 'Photo moved to Recently Deleted', detail);
+      scheduleSave();
+    });
+  }
 }
 
 function renderFieldsIncrementally({ card, fields, data, onFieldChange, inspection, onSave, jobId, onComplete }) {
@@ -88,6 +107,21 @@ function returnFromInspectionWorkspace() {
   setScreen(getScreen() === 'rapid-capture' ? (_rapidReturnScreen || 'step') : (_workspaceReturnScreen || 'step'));
   ctx.render();
   window.scrollTo(0, 0);
+}
+
+function requestCompanyLibraryRefresh() {
+  const inspection = ctx?.inspection;
+  if (!inspection?.inspectionId || _companyLibraryRequested.has(inspection.inspectionId)) return;
+  _companyLibraryRequested.add(inspection.inspectionId);
+  Promise.all([
+    refreshCompanyComments(inspection, false),
+    flushPendingCompanyCommentCandidates(inspection)
+  ]).then(([added, submitted]) => {
+    if (added || submitted) {
+      scheduleSave();
+      if (getScreen() === 'rapid-capture' || getScreen() === 'findings') ctx.render();
+    }
+  }).catch(err => console.warn('Company comment refresh skipped:', err));
 }
 
 function getStepReviewIssues(step) {
@@ -176,6 +210,7 @@ function collectInspectionPhotoRefs() {
       path,
       roomName,
       stepName,
+      needsPlacement: !roomName && !stepName,
       destination: formatPhotoDestination(roomName, stepName),
       title: roomName || stepName || 'Inspection photo'
     });
@@ -452,6 +487,8 @@ export function render() {
     case 'rapid-capture': renderRapidCapture(); break;
     case 'findings': renderFindingsInbox(); break;
     case 'team': renderTeamWorkspace(); break;
+    case 'my-work': renderMyWork(); break;
+    case 'recovery': renderRecoveryCenter(); break;
   }
 }
 
@@ -1345,6 +1382,7 @@ export function renderStep() {
   }
   const step = ctx.stepList[ctx.currentStepIdx];
   ensureInspectionWorkspace(ctx.inspection);
+  setActiveStepPresence(ctx.inspection, step.id, step.name);
 
   const data = getStepData(step.id);
   if (!data._enteredAt) data._enteredAt = new Date().toISOString();
@@ -1425,6 +1463,10 @@ export function renderStep() {
   }, '📸 Rapid Capture'));
   workspaceTools.appendChild(ui().el('button', {
     type: 'button', className: 'btn btn-outline',
+    onClick: () => openInspectionWorkspace('my-work', 'step')
+  }, '✅ My Work'));
+  workspaceTools.appendChild(ui().el('button', {
+    type: 'button', className: 'btn btn-outline',
     onClick: () => openInspectionWorkspace('findings', 'step')
   }, '📥 Findings' + (pendingFindings ? ' (' + pendingFindings + ')' : '')));
   workspaceTools.appendChild(ui().el('button', {
@@ -1438,6 +1480,11 @@ export function renderStep() {
     }, assignment.memberId === identity.memberId
       ? '✓ Assigned to you'
       : 'Assigned to ' + assignment.memberName + ' • You can still assist if needed'));
+  }
+  const otherEditors = getActivePresence(ctx.inspection).filter(item => item.stepId === step.id && item.memberId !== identity.memberId);
+  if (otherEditors.length) {
+    c.appendChild(ui().el('div', { className: 'step-presence-warning' },
+      '⚠ ' + otherEditors.map(item => item.memberName).join(', ') + ' ' + (otherEditors.length === 1 ? 'is' : 'are') + ' also editing this section. Your individual field changes will merge, but coordinate before changing the same answer.'));
   }
 
   const phaseSteps = ctx.stepList.filter(s => s.phase === currentPhase && s.type !== 'review');
@@ -1543,8 +1590,8 @@ export function renderStep() {
   if (fieldGen) {
     const fields = fieldGen();
     const card = ui().el('div', { className: 'card' });
-    const onFieldChange = () => {
-      markStepUpdated(ctx.inspection, step.id, step.name);
+    const onFieldChange = fieldKey => {
+      markStepUpdated(ctx.inspection, step.id, step.name, fieldKey);
       scheduleSave();
       ui().updateShowIf(card, data);
       // Change 3: Detect allSectionsComplete on post-assessment step
@@ -1695,6 +1742,7 @@ function rapidCaptureDestinationOptions() {
 export function renderRapidCapture() {
   if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
   ensureInspectionWorkspace(ctx.inspection);
+  requestCompanyLibraryRefresh();
   const destinations = rapidCaptureDestinationOptions();
   const rememberedDestination = destinations.find(item =>
     item.roomName === _rapidCaptureContext?.roomName && item.stepName === _rapidCaptureContext?.stepName
@@ -1768,7 +1816,7 @@ export function renderRapidCapture() {
     const librarySelect = ui().el('select', { className: 'field-input reusable-comment-select' });
     librarySelect.appendChild(ui().el('option', { value: '' }, '— Optional: choose approved wording —'));
     ctx.inspection.commentLibrary.forEach(entry => {
-      librarySelect.appendChild(ui().el('option', { value: entry.commentId }, entry.cleanedText));
+      librarySelect.appendChild(ui().el('option', { value: entry.commentId }, (entry.source === 'company_library' ? 'Company • ' : '') + entry.cleanedText));
     });
     librarySelect.addEventListener('change', () => {
       if (!librarySelect.value) return;
@@ -1867,6 +1915,7 @@ export function renderRapidCapture() {
 export function renderFindingsInbox() {
   if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
   ensureInspectionWorkspace(ctx.inspection);
+  requestCompanyLibraryRefresh();
   const created = syncPhotoCommentsToFindings(ctx.inspection);
   if (created) scheduleSave();
 
@@ -2000,11 +2049,20 @@ export function renderFindingsInbox() {
         } }, '✓ Approve for Report'));
       } else {
         const saveReuseButton = ui().el('button', {
-          className: 'btn btn-secondary', onClick: () => {
+          className: 'btn btn-secondary', onClick: async () => {
             const saved = saveFindingToLibrary(ctx.inspection, finding.findingId);
             if (!saved) { ui().showToast('Approve a cleaned comment first'); return; }
+            saved.companyStatus = 'pending_upload';
             scheduleSave();
-            ui().showToast('Approved comment saved for reuse');
+            try {
+              await submitCompanyCommentCandidate(ctx.inspection, finding, saved);
+              saved.companyStatus = 'pending_review';
+              saved.companySubmittedAt = new Date().toISOString();
+              ui().showToast('Saved locally and sent for company approval');
+            } catch (err) {
+              ui().showToast('Saved locally — company submission will retry');
+            }
+            scheduleSave();
             ctx.render();
           }
         }, finding.reusableStatus === 'saved' ? '✓ Saved for Reuse' : 'Save Clean Comment for Reuse');
@@ -2063,6 +2121,19 @@ export function renderTeamWorkspace() {
   });
   identityCard.appendChild(identityChoices);
   c.appendChild(identityCard);
+
+  const activePresence = getActivePresence(ctx.inspection);
+  if (activePresence.length) {
+    const presenceCard = ui().el('div', { className: 'card team-presence-card' });
+    presenceCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Working Now'));
+    activePresence.forEach(item => {
+      presenceCard.appendChild(ui().el('div', { className: 'team-presence-row' }, [
+        ui().el('strong', null, item.memberName || 'Inspector'),
+        ui().el('span', null, item.stepName ? 'Editing ' + item.stepName : 'Active in inspection')
+      ]));
+    });
+    c.appendChild(presenceCard);
+  }
 
   const membersCard = ui().el('div', { className: 'card team-members-card' });
   membersCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Inspectors'));
@@ -2144,6 +2215,210 @@ export function renderTeamWorkspace() {
 
   ctx.root.appendChild(c);
   window.scrollTo(0, 0);
+}
+
+// ── MY WORK ───────────────────────────────────────────────
+export function renderMyWork() {
+  if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
+  ensureInspectionWorkspace(ctx.inspection);
+  const identity = getInspectorIdentity(ctx.inspection);
+  const c = ui().el('div', { className: 'screen my-work-screen' });
+  c.appendChild(buildAppHeader('My Work'));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
+
+  const toolbar = ui().el('div', { className: 'my-work-toolbar' }, [
+    ui().el('button', { className: 'btn btn-outline', onClick: returnFromInspectionWorkspace }, '← Back'),
+    ui().el('button', { className: 'btn btn-outline', onClick: () => openInspectionWorkspace('team', 'my-work') }, '👥 Team'),
+    ui().el('button', { className: 'btn btn-outline', onClick: () => openInspectionWorkspace('recovery', 'my-work') }, '↶ Recovery')
+  ]);
+  c.appendChild(toolbar);
+
+  const assignedSteps = (ctx.stepList || []).filter(step => getStepAssignment(ctx.inspection, step.id)?.memberId === identity.memberId);
+  const incompleteAssigned = assignedSteps.filter(step => !ctx.inspection.stepData?.[step.id]?._completedAt);
+  const myFindings = ctx.inspection.findings.filter(item => item.createdById === identity.memberId || item.updatedById === identity.memberId);
+  const pendingFindings = myFindings.filter(item => item.status === 'needs_review');
+  const photoRefs = collectInspectionPhotoRefs();
+  const myUnplacedPhotos = photoRefs.filter(ref => photoRefNeedsPlacement(ref) && (!ref.photo.capturedBy || ref.photo.capturedBy === identity.name));
+
+  c.appendChild(ui().el('div', { className: 'card my-work-summary-card' }, [
+    ui().el('h2', { className: 'section-heading' }, identity.name),
+    ui().el('div', { className: 'my-work-summary' }, [
+      ui().el('div', null, [ui().el('strong', null, String(incompleteAssigned.length)), ui().el('span', null, 'Assigned sections open')]),
+      ui().el('div', null, [ui().el('strong', null, String(pendingFindings.length)), ui().el('span', null, 'Findings to review')]),
+      ui().el('div', null, [ui().el('strong', null, String(myUnplacedPhotos.length)), ui().el('span', null, 'Photos to place')])
+    ])
+  ]));
+
+  const sectionsCard = ui().el('div', { className: 'card my-work-sections-card' });
+  sectionsCard.appendChild(ui().el('div', { className: 'my-work-card-head' }, [
+    ui().el('h2', { className: 'section-heading' }, 'My Assigned Sections'),
+    ui().el('button', { className: 'btn btn-small btn-outline', onClick: () => openInspectionWorkspace('team', 'my-work') }, 'Change assignments')
+  ]));
+  if (!assignedSteps.length) {
+    sectionsCard.appendChild(ui().el('p', { className: 'text-muted' }, 'No sections are assigned to you yet. Open Team to assign work, or begin an unassigned section to claim it automatically.'));
+  } else {
+    assignedSteps.forEach(step => {
+      const data = ctx.inspection.stepData?.[step.id] || {};
+      const issues = getStepReviewIssues(step);
+      const completed = !!data._completedAt;
+      sectionsCard.appendChild(ui().el('button', {
+        className: 'my-work-step' + (completed ? ' complete' : '') + (issues.length ? ' has-issues' : ''),
+        onClick: () => {
+          const index = ctx.stepList.findIndex(item => item.id === step.id);
+          if (index >= 0) goToStep(index);
+        }
+      }, [
+        ui().el('span', null, [ui().el('strong', null, step.name), ui().el('small', null, issues.length ? issues.length + ' required item' + (issues.length === 1 ? '' : 's') + ' open' : (completed ? 'Completed' : 'Ready to inspect'))]),
+        ui().el('b', null, completed && !issues.length ? '✓' : '→')
+      ]));
+    });
+  }
+  c.appendChild(sectionsCard);
+
+  const attentionCard = ui().el('div', { className: 'card my-work-attention-card' });
+  attentionCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Needs My Attention'));
+  const attentionItems = [
+    pendingFindings.length ? ui().el('button', { className: 'my-work-attention', onClick: () => openInspectionWorkspace('findings', 'my-work') }, '📥 Review ' + pendingFindings.length + ' finding' + (pendingFindings.length === 1 ? '' : 's')) : null,
+    myUnplacedPhotos.length ? ui().el('button', { className: 'my-work-attention', onClick: () => { setScreen('photos'); ctx.render(); } }, '📷 Place ' + myUnplacedPhotos.length + ' photo' + (myUnplacedPhotos.length === 1 ? '' : 's')) : null
+  ].filter(Boolean);
+  if (!attentionItems.length) attentionCard.appendChild(ui().el('div', { className: 'photo-review-success' }, [ui().el('strong', null, '✓ Your work queue is clear'), ui().el('span', null, 'Continue with your assigned inspection sections.') ]));
+  else attentionItems.forEach(item => attentionCard.appendChild(item));
+  c.appendChild(attentionCard);
+
+  ctx.root.appendChild(c);
+  window.scrollTo(0, 0);
+}
+
+// ── RECOVERY & AUDIT ──────────────────────────────────────
+export function renderRecoveryCenter() {
+  if (!ctx.inspection) { setScreen('home'); ctx.render(); return; }
+  ensureInspectionWorkspace(ctx.inspection);
+  const c = ui().el('div', { className: 'screen recovery-screen' });
+  c.appendChild(buildAppHeader('Recovery & History'));
+  c.appendChild(ui().renderStatusBar(getLastSaveText()));
+  c.appendChild(ui().el('div', { className: 'recovery-toolbar' }, [
+    ui().el('button', { className: 'btn btn-outline', onClick: returnFromInspectionWorkspace }, '← Back'),
+    ui().el('button', { className: 'btn btn-primary', onClick: async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = 'Saving…';
+      try {
+        await createRestorePoint('Manual restore point');
+        recordAuditEvent(ctx.inspection, 'restore_point_created', 'Manual restore point created');
+        await saveNow();
+        ui().showToast('Restore point created');
+        ctx.render();
+      } finally {
+        button.disabled = false;
+      }
+    } }, 'Create Restore Point')
+  ]));
+
+  const snapshotsCard = ui().el('div', { className: 'card recovery-snapshots-card' });
+  snapshotsCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Restore Points'));
+  snapshotsCard.appendChild(ui().el('p', { className: 'text-muted' }, 'The app keeps up to 25 form and organization restore points. Photo pixels remain protected separately in the photo vault.'));
+  const snapshotList = ui().el('div', { className: 'recovery-list' }, 'Loading restore points…');
+  snapshotsCard.appendChild(snapshotList);
+  c.appendChild(snapshotsCard);
+
+  const deletedCard = ui().el('div', { className: 'card recovery-deleted-card' });
+  deletedCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Recently Deleted Photos'));
+  deletedCard.appendChild(ui().el('p', { className: 'text-muted' }, 'Deleted photos remain recoverable on this device for 30 days unless permanently removed.'));
+  const deletedList = ui().el('div', { className: 'recovery-photo-list' }, 'Checking recently deleted photos…');
+  deletedCard.appendChild(deletedList);
+  c.appendChild(deletedCard);
+
+  const auditCard = ui().el('div', { className: 'card recovery-audit-card' });
+  auditCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Inspection History'));
+  const events = (ctx.inspection.auditTrail || []).slice(0, 80);
+  if (!events.length) auditCard.appendChild(ui().el('p', { className: 'text-muted' }, 'No significant changes recorded yet.'));
+  events.forEach(event => {
+    auditCard.appendChild(ui().el('div', { className: 'audit-row' }, [
+      ui().el('div', null, [ui().el('strong', null, event.message), ui().el('span', null, event.memberName || 'Inspector')]),
+      ui().el('time', null, formatPhotoTime(event.createdAt))
+    ]));
+  });
+  c.appendChild(auditCard);
+
+  ctx.root.appendChild(c);
+  window.scrollTo(0, 0);
+
+  if (window.DB?.getSnapshotsForInspection) {
+    window.DB.getSnapshotsForInspection(ctx.inspection.inspectionId).then(records => {
+      if (getScreen() !== 'recovery') return;
+      snapshotList.innerHTML = '';
+      if (!records.length) {
+        snapshotList.appendChild(ui().el('p', { className: 'text-muted' }, 'No restore points yet. One will be created automatically as you work.'));
+        return;
+      }
+      records.forEach(record => {
+        snapshotList.appendChild(ui().el('div', { className: 'recovery-row' }, [
+          ui().el('div', null, [ui().el('strong', null, record.reason || 'Restore point'), ui().el('span', null, formatPhotoTime(record.createdAt))]),
+          ui().el('button', { className: 'btn btn-small btn-outline', onClick: async () => {
+            if (!confirm('Restore this version? The current version will be saved first.')) return;
+            await createRestorePoint('Before restoring ' + formatPhotoTime(record.createdAt));
+            const restored = JSON.parse(JSON.stringify(record.data || {}));
+            restored.inspectionId = ctx.inspection.inspectionId;
+            ensureInspectionWorkspace(restored);
+            recordAuditEvent(restored, 'inspection_restored', 'Inspection restored to ' + formatPhotoTime(record.createdAt), { snapshotId: record.snapshotId });
+            ctx.inspection = restored;
+            setInspection(restored);
+            ctx.stepList = buildStepList(restored);
+            if (window.hydrateInspectionPhotosFromVault) {
+              await window.hydrateInspectionPhotosFromVault(restored);
+            }
+            await window.DB.save(restored);
+            ui().showToast('Previous version restored');
+            ctx.render();
+          } }, 'Restore')
+        ]));
+      });
+    }).catch(() => { snapshotList.textContent = 'Restore points unavailable on this device.'; });
+  }
+
+  if (window.DB?.getDeletedPhotos) {
+    window.DB.getDeletedPhotos(ctx.inspection.inspectionId).then(records => {
+      if (getScreen() !== 'recovery') return;
+      deletedList.innerHTML = '';
+      if (!records.length) {
+        deletedList.appendChild(ui().el('p', { className: 'text-muted' }, 'No deleted photos.'));
+        return;
+      }
+      records.forEach(photoItem => {
+        const row = ui().el('div', { className: 'recovery-photo-row' });
+        const preview = getPhotoPreviewSrc(photoItem);
+        row.appendChild(preview
+          ? ui().el('img', { src: preview, alt: 'Deleted inspection photo' })
+          : ui().el('div', { className: 'photo-review-placeholder' }, 'Photo'));
+        row.appendChild(ui().el('div', null, [
+          ui().el('strong', null, formatPhotoDestination(photoItem.roomName, photoItem.stepName)),
+          ui().el('span', null, 'Deleted ' + formatPhotoTime(photoItem.deletedAt))
+        ]));
+        row.appendChild(ui().el('div', { className: 'recovery-photo-actions' }, [
+          ui().el('button', { className: 'btn btn-small btn-primary', onClick: async () => {
+            const restored = await window.DB.restoreDeletedPhoto(photoItem.photoId);
+            if (!restored) return;
+            if (!Array.isArray(ctx.inspection.sparePhotos)) ctx.inspection.sparePhotos = [];
+            if (!ctx.inspection.sparePhotos.some(item => item.photoId === restored.photoId)) ctx.inspection.sparePhotos.push(restored);
+            if (!ctx.inspection.photoTombstones) ctx.inspection.photoTombstones = {};
+            ctx.inspection.photoTombstones[restored.photoId] = { status: 'restored', updatedAt: new Date().toISOString() };
+            recordAuditEvent(ctx.inspection, 'photo_restored', 'Deleted photo restored', { photoId: restored.photoId, roomName: restored.roomName, stepName: restored.stepName });
+            await saveNow();
+            ui().showToast('Photo restored');
+            ctx.render();
+          } }, 'Restore'),
+          ui().el('button', { className: 'btn btn-small btn-danger-outline', onClick: async () => {
+            if (!confirm('Permanently delete this photo from this device? This cannot be undone.')) return;
+            await window.DB.permanentlyDeletePhoto(photoItem.photoId);
+            recordAuditEvent(ctx.inspection, 'photo_permanently_deleted', 'Photo permanently deleted from device recovery', { photoId: photoItem.photoId });
+            await saveNow();
+            ctx.render();
+          } }, 'Delete forever')
+        ]));
+        deletedList.appendChild(row);
+      });
+    }).catch(() => { deletedList.textContent = 'Recently deleted photos are unavailable on this device.'; });
+  }
 }
 
 // ── PHOTOS SCREEN ──────────────────────────────────────────
@@ -2231,10 +2506,13 @@ export function renderPhotos() {
     const needsPlacement = refs.filter(photoRefNeedsPlacement).length;
     const commented = refs.filter(ref => String(ref.photo.caption || '').trim()).length;
     const organized = refs.length - needsPlacement;
+    const suggestions = buildPhotoRoutingSuggestions(refs, collectPhotoDestinations());
+    const highConfidence = suggestions.filter(item => item.suggestion.confidence === 'high').length;
     summaryBody.innerHTML = '';
     summaryBody.appendChild(statusPill(organized + ' organized automatically', organized ? 'good' : 'neutral'));
     summaryBody.appendChild(statusPill(needsPlacement + ' need placement', needsPlacement ? 'wait' : 'good'));
     summaryBody.appendChild(statusPill(commented + ' comments added', commented ? 'neutral' : 'good'));
+    if (suggestions.length) summaryBody.appendChild(statusPill(suggestions.length + ' routing suggestion' + (suggestions.length === 1 ? '' : 's'), highConfidence ? 'good' : 'neutral'));
 
     if (!window.getPhotoHealth) {
       summaryBody.appendChild(statusPill('Cloud check unavailable', 'wait'));
@@ -2251,6 +2529,39 @@ export function renderPhotos() {
     });
   }
 
+  async function applyPhotoDestination(ref, destination, source) {
+    if (!destination) return;
+    ref.photo.roomName = destination.roomName;
+    ref.photo.stepName = destination.stepName;
+    ref.photo.placementSource = source || 'manual_exception';
+    ref.photo.routingStatus = source === 'smart_suggestion' ? 'confirmed_suggestion' : 'manual';
+    ref.photo.routingSuggestion = null;
+    if (window.DB?.updatePhoto && ref.photo.photoId) {
+      try {
+        await window.DB.updatePhoto(ref.photo.photoId, {
+          roomName: destination.roomName,
+          stepName: destination.stepName,
+          placementSource: ref.photo.placementSource,
+          routingStatus: ref.photo.routingStatus,
+          routingSuggestion: null,
+          updatedAt: Date.now()
+        });
+      } catch (vaultErr) {
+        console.warn('Photo vault placement update failed:', vaultErr);
+      }
+    }
+    recordAuditEvent(ctx.inspection, 'photo_routed', 'Photo placed in ' + destination.label, {
+      photoId: ref.photo.photoId,
+      roomName: destination.roomName,
+      stepName: destination.stepName,
+      source: ref.photo.placementSource
+    });
+    scheduleSave();
+    ui().showToast('Photo moved to ' + destination.label);
+    renderPhotoSummary();
+    renderPhotoList();
+  }
+
   function addPlacementControl(body, ref) {
     if (!photoRefNeedsPlacement(ref)) return;
     const destinations = collectPhotoDestinations();
@@ -2265,27 +2576,7 @@ export function renderPhotos() {
       if (select.value === '') return;
       const destination = destinations[Number(select.value)];
       if (!destination) return;
-      ref.photo.roomName = destination.roomName;
-      ref.photo.stepName = destination.stepName;
-      ref.photo.placementSource = 'manual_exception';
-      ref.photo.routingStatus = 'manual';
-      if (window.DB?.updatePhoto && ref.photo.photoId) {
-        try {
-          await window.DB.updatePhoto(ref.photo.photoId, {
-            roomName: destination.roomName,
-            stepName: destination.stepName,
-            placementSource: 'manual_exception',
-            routingStatus: 'manual',
-            updatedAt: Date.now()
-          });
-        } catch (vaultErr) {
-          console.warn('Photo vault placement update failed:', vaultErr);
-        }
-      }
-      scheduleSave();
-      ui().showToast('Photo moved to ' + destination.label);
-      renderPhotoSummary();
-      renderPhotoList();
+      await applyPhotoDestination(ref, destination, 'manual_exception');
     });
     wrap.appendChild(select);
     body.appendChild(wrap);
@@ -2317,6 +2608,17 @@ export function renderPhotos() {
     body.appendChild(ui().el('div', {
       className: 'photo-route-chip ' + (photoRefNeedsPlacement(ref) ? 'needs-placement' : 'is-organized')
     }, photoRefNeedsPlacement(ref) ? '⚠ Needs placement' : '✓ ' + ref.destination));
+    if (photoRefNeedsPlacement(ref) && p.routingSuggestion) {
+      const suggestion = p.routingSuggestion;
+      const suggestionBox = ui().el('div', { className: 'photo-routing-suggestion confidence-' + suggestion.confidence }, [
+        ui().el('div', null, [
+          ui().el('strong', null, 'Suggested: ' + suggestion.label),
+          ui().el('span', null, (suggestion.confidence === 'high' ? 'High confidence' : suggestion.confidence === 'medium' ? 'Possible match' : 'Best available match') + (suggestion.reason ? ' • ' + suggestion.reason : ''))
+        ]),
+        ui().el('button', { className: 'btn btn-small btn-primary', onClick: () => applyPhotoDestination(ref, suggestion, 'smart_suggestion') }, 'Confirm')
+      ]);
+      body.appendChild(suggestionBox);
+    }
     addPlacementControl(body, ref);
 
     const status = getPhotoStatus(p);
@@ -2359,6 +2661,10 @@ export function renderPhotos() {
 
   function renderPhotoList() {
     const refs = collectInspectionPhotoRefs();
+    const suggestionMap = new Map(buildPhotoRoutingSuggestions(refs, collectPhotoDestinations()).map(item => [item.photoId, item.suggestion]));
+    refs.forEach(ref => {
+      if (photoRefNeedsPlacement(ref)) ref.photo.routingSuggestion = suggestionMap.get(ref.photo.photoId) || null;
+    });
     const needsPlacement = refs.filter(photoRefNeedsPlacement);
     const visibleRefs = showAllPhotos ? refs : needsPlacement;
     list.innerHTML = '';
