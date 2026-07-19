@@ -1,5 +1,5 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=164';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=165';
 
 let _onSyncStatusChange = null;
 let _saveTimeout = null;
@@ -32,7 +32,7 @@ function showSaveError(msg) {
 
 export async function saveNow() {
   const inspection = getInspection();
-  if (!inspection) return;
+  if (!inspection) return false;
   showSave('Saving...');
   try {
     await window.DB.save(inspection);
@@ -52,13 +52,17 @@ export async function saveNow() {
     // Clear any previous error banners
     const b = document.getElementById('save-error-banner');
     if (b) b.remove();
+    return true;
   } catch (e) {
     console.error('Save failed:', e);
-    if (e && (e.name === 'QuotaExceededError' || (e.message && e.message.includes('quota')))) {
+    if (e && e.name === 'DatabaseUpgradeBlockedError') {
+      showSaveError('\u26a0\ufe0f Close other InHaus Inspector tabs, then try again');
+    } else if (e && (e.name === 'QuotaExceededError' || (e.message && e.message.includes('quota')))) {
       showSaveError('\u26a0\ufe0f Storage full \u2014 SCREENSHOT THIS SCREEN NOW then tap Sync to Drive');
     } else {
       showSaveError('\u26a0\ufe0f Save failed \u2014 data may be lost on reload. Tap Sync to Drive now.');
     }
+    return false;
   }
 }
 

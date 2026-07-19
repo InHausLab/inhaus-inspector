@@ -13,6 +13,7 @@
     if (_db) return Promise.resolve(_db);
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
+      let settled = false;
       req.onupgradeneeded = e => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(STORE)) {
@@ -40,8 +41,31 @@
           ts.createIndex('deletedAt', 'deletedAt');
         }
       };
-      req.onsuccess = e => { _db = e.target.result; resolve(_db); };
-      req.onerror = e => reject(e.target.error);
+      req.onblocked = () => {
+        if (settled) return;
+        settled = true;
+        const err = new Error('Another InHaus Inspector tab is blocking a local database update. Close the other app tabs, then try again.');
+        err.name = 'DatabaseUpgradeBlockedError';
+        reject(err);
+      };
+      req.onsuccess = e => {
+        if (settled) {
+          e.target.result.close();
+          return;
+        }
+        settled = true;
+        _db = e.target.result;
+        _db.onversionchange = () => {
+          _db.close();
+          _db = null;
+        };
+        resolve(_db);
+      };
+      req.onerror = e => {
+        if (settled) return;
+        settled = true;
+        reject(e.target.error);
+      };
     });
   }
 

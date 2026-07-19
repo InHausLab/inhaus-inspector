@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=164';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=164';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=164';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=164';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=164';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=164';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=165';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=165';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=165';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=165';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=165';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=165';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=164';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=164';
+} from './findings.js?v=165';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=165';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=164';
+} from './comment-library.js?v=165';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1256,7 +1256,13 @@ export function renderIntake() {
         applyOfficePreparation(ctx.inspection, data);
         setInspection(ctx.inspection);
         ctx.stepList = buildStepList(ctx.inspection);
-        await saveNow();
+        const localSaved = await saveNow();
+        if (!localSaved) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = isEdit ? 'Update for Inspector' : 'Save for Inspector';
+          alert('This inspection could not be saved locally. If another InHaus Inspector tab is open, close it, then tap Save for Inspector again.');
+          return;
+        }
         const cloudSaved = await checkpointToCloud(ctx.stepList);
         if (!cloudSaved) {
           submitBtn.disabled = false;

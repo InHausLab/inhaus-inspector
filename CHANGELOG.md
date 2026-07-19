@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v164 (v163 features plus full-audit fixes) |
+| App version | v165 (database-upgrade hang protection) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v64 team merge and company comment library — see URL below |
@@ -30,6 +30,13 @@ This file is the authoritative record of every significant change, decision, bug
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v165 — Database Upgrade Hang Protection
+**Date:** July 19, 2026
+
+- Fixed **Save for Inspector** getting stuck forever on **Saving to Cloud…** when an older InHaus Inspector tab was still holding the previous IndexedDB version open.
+- Future app versions now release their local database connection when an upgrade is requested.
+- If an older tab cannot release the database, the app now restores the save button and tells the user to close other InHaus Inspector tabs and retry.
 
 ## v164 — Full Audit Fixes
 **Date:** July 19, 2026
