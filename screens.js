@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=168';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=168';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=168';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=168';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=168';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=168';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=169';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=169';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=169';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=169';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=169';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=169';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=168';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=168';
+} from './findings.js?v=169';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=169';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=168';
+} from './comment-library.js?v=169';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }

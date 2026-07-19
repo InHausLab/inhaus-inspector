@@ -1,10 +1,23 @@
 // InHaus Inspector - company-wide approved comment library bridge
-import { GOOGLE_SCRIPT_URL, FIELD_RESUME_TOKEN } from './config.js?v=168';
-import { scriptFetch } from './sync.js?v=168';
+import { GOOGLE_SCRIPT_URL, FIELD_RESUME_TOKEN } from './config.js?v=169';
+import { scriptFetch } from './sync.js?v=169';
 
 const CACHE_KEY = 'inhaus_company_comment_library_v1';
 let memoryCache = null;
 let serverReady = false;
+
+async function fetchWithTimeout(url, options, timeoutMs, label) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw new Error((label || 'Request') + ' timed out');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function normalize(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -31,7 +44,12 @@ function writeCache(comments) {
 }
 
 async function fetchJson(url, context) {
-  const response = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
+  const response = await fetchWithTimeout(
+    url,
+    { cache: 'no-store', headers: { Accept: 'application/json' } },
+    30000,
+    context
+  );
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch (err) { throw new Error(context + ' returned invalid JSON'); }

@@ -2,7 +2,7 @@
 
 ## Release
 
-- Inspector app: **v168**
+- Inspector app: **v169**
 - Live app: https://inhaus-inspector.netlify.app/
 - Backup deployment: https://inhaus-inspector.vercel.app/
 - Review portal: https://inhauslab.github.io/inhaus-review/
@@ -10,7 +10,7 @@
 
 ## Current Go/No-Go Status
 
-**GO for a supervised field inspection after the phone shows v168.**
+**GO for a supervised field inspection after the phone shows v169.**
 
 Verified on the live production systems:
 
@@ -23,14 +23,15 @@ Verified on the live production systems:
 - The review portal loads the real inspection `INH-20260717-YZNHG0` with all **34 photos**.
 - All 34 photos have individual placement controls and Describe controls.
 - Photo destinations include **Water Treatment System**.
-- Netlify and Vercel serve the same v168 cache, database guard, header controls, and cache-reset guidance.
+- Netlify and Vercel serve the same v169 cache, database guard, header controls, and cache-reset guidance.
+- Cloud, photo, AI, and local database operations now fail with retryable messages instead of spinning indefinitely when a request or transaction stalls.
 - No live browser warnings or errors were present at the end of the audit.
 
 ## Before the First Inspection
 
 1. Open https://inhaus-inspector.netlify.app/ on the inspector's phone.
 2. Pull down to refresh. If needed, open https://inhaus-inspector.netlify.app/cache-reset.html once.
-3. Confirm the gray version badge says **v168**.
+3. Confirm the gray version badge says **v169**.
 4. Confirm only one InHaus Inspector tab is open.
 5. Open the prepared inspection through **Continue Inspection** and select the inspector's name.
 6. Take one ordinary test photo, add a short comment, and confirm it appears in Findings before beginning the full house.

@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v168 (mobile header spacing correction) |
+| App version | v169 (bounded network and database failures) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v64 team merge and company comment library — see URL below |
@@ -30,6 +30,14 @@ This file is the authoritative record of every significant change, decision, bug
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v169 — Bounded Network and Database Failures
+**Date:** July 19, 2026
+
+- Added explicit deadlines to Apps Script saves and reads so weak cellular service cannot leave cloud controls spinning forever.
+- Added bounded timeouts for photo signing, upload, Drive mirroring, confirmation, and final photo verification; failures remain retryable and local photo copies are preserved.
+- Added timeouts to AI photo captions, label scans, equipment scans, room summaries, follow-up plans, and company comment-library loading.
+- Added IndexedDB transaction-abort handling so interrupted local writes reject cleanly instead of leaving their callers waiting indefinitely.
 
 ## v168 — Mobile Header Spacing
 **Date:** July 19, 2026

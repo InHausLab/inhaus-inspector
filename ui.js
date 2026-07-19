@@ -2,6 +2,19 @@
 (function () {
   'use strict';
 
+  async function fetchWithTimeout(url, options, timeoutMs, label) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
+    } catch (err) {
+      if (err && err.name === 'AbortError') throw new Error((label || 'Request') + ' timed out');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // ── DOM Helper ─────────────────────────────────────────────
   function el(tag, attrs, children) {
     const node = document.createElement(tag);
@@ -1171,11 +1184,11 @@
                 (roomName ? ' Room: ' + roomName + '.' : '') +
                 (stepName ? ' Section: ' + stepName + '.' : '') +
                 ' Return ONLY the caption text, no quotes, no labels, no extra formatting.';
-              const resp = await fetch(PROXY_URL, {
+              const resp = await fetchWithTimeout(PROXY_URL, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ imageBase64: base64, mimeType, prompt })
-              });
+              }, 60000, 'AI photo caption');
               if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
               const result = await resp.json();
               const text = result.content && result.content[0] && result.content[0].text;
@@ -1556,11 +1569,11 @@
             previewWrap.style.display = '';
             shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
             const prompt = 'This is a water testing sample label or chain-of-custody form. Extract the sample ID, bottle number, or accession number. Return JSON with one key: sampleId (string). Return ONLY the JSON. If you cannot read a number, return {"sampleId": null}.';
-            const resp = await fetch(PROXY_URL, {
+            const resp = await fetchWithTimeout(PROXY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({ imageBase64: dataUrl.split(',')[1], mimeType: 'image/jpeg', prompt })
-            });
+            }, 60000, 'AI label scan');
             const result = await resp.json();
             const txt = result.content && result.content[0] && result.content[0].text;
             const parsed = JSON.parse(txt);
@@ -1762,11 +1775,11 @@
         async function callAnthropic(imageDataUrl, promptText) {
           const base64 = imageDataUrl.split(',')[1];
           const mimeType = (imageDataUrl.split(';')[0].split(':')[1]) || 'image/jpeg';
-          const resp = await fetch(PROXY_URL, {
+          const resp = await fetchWithTimeout(PROXY_URL, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ imageBase64: base64, mimeType, prompt: promptText })
-          });
+          }, 60000, 'AI equipment scan');
           if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
           const result = await resp.json();
           const text = result.content && result.content[0] && result.content[0].text;
@@ -2341,11 +2354,11 @@
               '\n- Maximum 3 sentences. Be brief.';
 
             try {
-              const resp = await fetch(PROXY_URL, {
+              const resp = await fetchWithTimeout(PROXY_URL, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ prompt })
-              });
+              }, 60000, 'AI room summary');
               if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
               const result = await resp.json();
               const text = result.content && result.content[0] && result.content[0].text;
@@ -2455,11 +2468,11 @@
               + '- Be direct and specific. No generic filler sentences.';
 
             try {
-              const resp = await fetch(PROXY_URL, {
+              const resp = await fetchWithTimeout(PROXY_URL, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ prompt })
-              });
+              }, 60000, 'AI follow-up plan');
               if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
               const result = await resp.json();
               const text = result.content && result.content[0] && result.content[0].text;

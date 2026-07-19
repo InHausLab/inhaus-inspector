@@ -88,7 +88,8 @@
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(data);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -118,7 +119,8 @@
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).delete(id);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -129,7 +131,8 @@
       const tx = db.transaction(QUEUE_STORE, 'readwrite');
       tx.objectStore(QUEUE_STORE).put(data);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -149,7 +152,8 @@
       const tx = db.transaction(QUEUE_STORE, 'readwrite');
       tx.objectStore(QUEUE_STORE).delete(id);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -168,7 +172,8 @@
       });
       tx.objectStore(PHOTO_STORE).put(clean);
       tx.oncomplete = () => resolve(clean);
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -205,7 +210,8 @@
       const tx = db.transaction(PHOTO_STORE, 'readwrite');
       tx.objectStore(PHOTO_STORE).delete(photoId);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -232,7 +238,8 @@
       const tx = db.transaction(HISTORY_STORE, 'readwrite');
       tx.objectStore(HISTORY_STORE).put(record);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
     const records = await getSnapshotsForInspection(inspection.inspectionId);
     const expired = records.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(25);
@@ -241,7 +248,8 @@
         const tx = db.transaction(HISTORY_STORE, 'readwrite');
         expired.forEach(item => tx.objectStore(HISTORY_STORE).delete(item.snapshotId));
         tx.oncomplete = resolve;
-        tx.onerror = e => reject(e.target.error);
+        tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+        tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
       });
     }
     return record;
@@ -279,7 +287,8 @@
         vaultStore.delete(record.photoId);
       };
       tx.oncomplete = () => resolve(trashed);
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -309,7 +318,8 @@
         tx.objectStore(PHOTO_TRASH_STORE).delete(photoId);
       };
       tx.oncomplete = () => resolve(restored);
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 
@@ -319,7 +329,8 @@
       const tx = db.transaction(PHOTO_TRASH_STORE, 'readwrite');
       tx.objectStore(PHOTO_TRASH_STORE).delete(photoId);
       tx.oncomplete = resolve;
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
+      tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
     });
   }
 

@@ -6,7 +6,22 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=168';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=169';
+
+async function fetchWithTimeout(url, options, timeoutMs, label) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new Error((label || 'Photo request') + ' timed out. Keep the app open and retry.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function dataUrlToBlob(dataUrl) {
   const comma = dataUrl.indexOf(',');
@@ -46,7 +61,7 @@ async function parseJsonResponse(resp, context) {
 }
 
 async function requestSignedUpload(photo, storagePath) {
-  const resp = await fetch(workerUrl('/sign'), {
+  const resp = await fetchWithTimeout(workerUrl('/sign'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -59,7 +74,7 @@ async function requestSignedUpload(photo, storagePath) {
       storagePath,
       sharedSecret: PHOTO_UPLOAD_SECRET
     })
-  });
+  }, 30000, 'Photo sign request');
   const data = await parseJsonResponse(resp, 'Photo sign failed');
   if (!data.signedUrl) throw new Error('Photo sign failed: missing signedUrl');
   return data;
@@ -74,14 +89,14 @@ export async function uploadPhotoToSupabase(photo) {
   const signed = await requestSignedUpload(photo, storagePath);
   const path = signed.storagePath || storagePath;
 
-  const upload = await fetch(signed.signedUrl, {
+  const upload = await fetchWithTimeout(signed.signedUrl, {
     method: 'PUT',
     headers: {
       'Content-Type': 'image/jpeg',
       'x-upsert': 'true'
     },
     body: blob
-  });
+  }, 120000, 'Photo upload');
 
   if (!upload.ok) {
     const detail = await upload.text().catch(() => '');
@@ -108,7 +123,7 @@ export async function mirrorPhotosToDrive(payload) {
 
   while (batch < MAX_BATCHES) {
     batch++;
-    const resp = await fetch(workerUrl('/mirror'), {
+    const resp = await fetchWithTimeout(workerUrl('/mirror'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -117,7 +132,7 @@ export async function mirrorPhotosToDrive(payload) {
         driveFolderId: folderId,
         sharedSecret: PHOTO_UPLOAD_SECRET
       })
-    });
+    }, 90000, 'Drive photo mirror');
     const result = await parseJsonResponse(resp, 'Drive mirror failed');
     totalMirrored += (result.mirrored || 0);
     if (result.folderId) folderId = result.folderId;
@@ -133,11 +148,11 @@ export async function mirrorPhotosToDrive(payload) {
 export async function checkSupabaseConfirmed(inspectionId) {
   if (!inspectionId) return [];
   try {
-    const resp = await fetch(workerUrl('/confirmed'), {
+    const resp = await fetchWithTimeout(workerUrl('/confirmed'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ inspectionId, sharedSecret: PHOTO_UPLOAD_SECRET })
-    });
+    }, 30000, 'Photo confirmation');
     const result = await parseJsonResponse(resp, 'confirmed check failed');
     return Array.isArray(result.photoIds) ? result.photoIds : [];
   } catch (e) {
@@ -150,7 +165,7 @@ export async function checkSupabaseConfirmed(inspectionId) {
 // Supabase Storage, rather than trusting browser flags or upload responses.
 export async function verifyInspectionStatus(inspectionId, expectedPhotoIds) {
   if (!inspectionId) throw new Error('Missing inspectionId for final verification');
-  const resp = await fetch(workerUrl('/inspection-status'), {
+  const resp = await fetchWithTimeout(workerUrl('/inspection-status'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -158,6 +173,6 @@ export async function verifyInspectionStatus(inspectionId, expectedPhotoIds) {
       expectedPhotoIds: Array.isArray(expectedPhotoIds) ? expectedPhotoIds : [],
       sharedSecret: PHOTO_UPLOAD_SECRET
     })
-  });
+  }, 45000, 'Final photo verification');
   return await parseJsonResponse(resp, 'Final verification failed');
 }
