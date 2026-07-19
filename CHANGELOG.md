@@ -10,7 +10,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 | Item | Value |
 |------|-------|
-| App version | v167 (mobile header and upgrade guidance) |
+| App version | v168 (mobile header spacing correction) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v64 team merge and company comment library — see URL below |
@@ -30,6 +30,11 @@ This file is the authoritative record of every significant change, decision, bug
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v168 — Mobile Header Spacing
+**Date:** July 19, 2026
+
+- Moved the now-visible inspection search control to the open left side of the mobile header so it cannot overlap the centered InHaus Lab logo.
 
 ## v167 — Mobile Header Visibility and Upgrade Guidance
 **Date:** July 19, 2026

@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=167';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=167';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=167';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=167';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=167';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=167';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=168';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=168';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=168';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=168';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=168';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=168';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,12 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=167';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=167';
+} from './findings.js?v=168';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=168';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=167';
+} from './comment-library.js?v=168';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1531,7 +1531,7 @@ export function renderStep() {
   const searchBtn = ui().el('button', {
     type: 'button',
     'aria-label': 'Search inspection',
-    style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));right:82px;z-index:200;background:#fff;color:#2C3F16;border:1px solid #fff;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;',
+    style: 'position:fixed;top:max(54px,calc(env(safe-area-inset-top) + 8px));left:10px;z-index:200;background:#fff;color:#2C3F16;border:1px solid #fff;border-radius:8px;font-size:15px;padding:6px 12px;cursor:pointer;min-height:0;line-height:1.4;font-weight:700;touch-action:manipulation;box-shadow:0 2px 8px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;',
     onClick: () => openSearch()
   }, '\uD83D\uDD0D');
   c.appendChild(searchBtn);
