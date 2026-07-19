@@ -6,11 +6,11 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
-## Quick Reference — Current State (July 18 2026)
+## Quick Reference — Current State (July 19 2026)
 
 | Item | Value |
 |------|-------|
-| App version | v160 (automatic photo routing, exception-only organization, visible inspector comments) |
+| App version | v161 (office preparation and phone handoff) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v50 — see URL below |
@@ -28,6 +28,18 @@ This file is the authoritative record of every significant change, decision, bug
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v161 — Office Preparation and Phone Handoff
+**Date:** July 19, 2026
+
+- Added **Prepare Inspection in Office** so staff can enter the client, property, inspector, inspection date, home details, Wi-Fi information, client concerns, and layout notes before the site visit.
+- Added water-test preparation fields for the water panel kit/sample ID, PFAS test and kit/sample IDs, microplastics test and sample ID, and office preparation notes.
+- Prepared inspections are saved locally and checkpointed to the existing cloud assessment record with the review status `Prepared`.
+- Added **Continue Inspection** with cloud lookup and search by address, client, inspector, date, or inspection ID.
+- Claiming a prepared inspection on a field device restores its resumable form data, marks it `Field Active`, and opens the pre-inspection checklist.
+- Cloud resume payloads exclude photo image bytes and Wi-Fi passwords. Existing final submissions continue to enter the review portal as `Needs Review`.
 
 ---
 

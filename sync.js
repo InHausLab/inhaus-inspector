@@ -1,13 +1,13 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, USE_SUPABASE_PHOTOS } from './config.js?v=160';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=160';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=161';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=161';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=160';
-import { scheduleSave } from './storage.js?v=160';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=160';
+         getBestCloudSyncAt } from './state.js?v=161';
+import { scheduleSave } from './storage.js?v=161';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=161';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -668,7 +668,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=160');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=161');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -926,6 +926,46 @@ export async function sendToGoogleScript(exportData) {
     }
     if (inspection) scheduleSave();
   }
+}
+
+async function fetchCloudInspectionJson(url, context) {
+  const resp = await fetch(url.toString(), {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' }
+  });
+  const text = await resp.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    throw new Error(context + ' returned an invalid response.');
+  }
+  if (!resp.ok || !data || data.status !== 'ok') {
+    throw new Error((data && data.message) || context + ' failed.');
+  }
+  return data;
+}
+
+export async function listCloudInspections() {
+  if (!GOOGLE_SCRIPT_URL) throw new Error('Cloud inspection service is not configured.');
+  const url = new URL(GOOGLE_SCRIPT_URL);
+  url.searchParams.set('action', 'list');
+  url.searchParams.set('token', FIELD_RESUME_TOKEN);
+  const data = await fetchCloudInspectionJson(url, 'Cloud inspection list');
+  return Array.isArray(data.inspections) ? data.inspections : [];
+}
+
+export async function loadCloudInspection(inspectionId) {
+  if (!GOOGLE_SCRIPT_URL) throw new Error('Cloud inspection service is not configured.');
+  if (!inspectionId) throw new Error('Missing inspection ID.');
+  const url = new URL(GOOGLE_SCRIPT_URL);
+  url.searchParams.set('action', 'get');
+  url.searchParams.set('id', inspectionId);
+  url.searchParams.set('token', FIELD_RESUME_TOKEN);
+  const data = await fetchCloudInspectionJson(url, 'Cloud inspection');
+  if (!data.inspection) throw new Error('Cloud inspection data is missing.');
+  return data.inspection;
 }
 
 // ── Step Checkpoint Sync ────────────────────────────

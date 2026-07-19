@@ -11,6 +11,10 @@ export const SYNC_SECRET = 'ihl-sync-2026';
 // Keep as a same-value fallback for cached clients and duplicate-secret de-duping.
 export const LEGACY_SYNC_SECRET = 'ihl-sync-2026';
 
+// Shared read token for the internal cloud inspection list. This is a frontend
+// access token (not a secret) and matches the existing review/list endpoint.
+export const FIELD_RESUME_TOKEN = 'InHaus2026';
+
 // ── Google Shared Drive Config ──────────────────────────────
 // Shared Drive folder ID where per-assessment subfolders should be created.
 // Find it in the URL when browsing the Shared Drive in Google Drive:

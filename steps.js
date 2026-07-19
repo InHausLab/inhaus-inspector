@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=160';
-import { getInspection } from './state.js?v=160';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=161';
+import { getInspection } from './state.js?v=161';
 
 export function getEquipmentFields() {
   return [
@@ -360,6 +360,8 @@ export function getKitchenApplianceFields() {
 export function getWaterSampleFields() {
   return [
     info('Label each bottle with customer last name and property address. Ensure chain of custody forms are completed for each test.'),
+    textarea('officePrepNotes', 'Office preparation notes', { placeholder: 'Kit locations, pre-assigned sample IDs, and special instructions from the office.' }),
+    sel('waterPanelPlanned', 'Water panel test plan', ['Requested — collect on site', 'Not requested']),
     { type: 'process-checklist', title: 'Sample Labeling', items: [
       { key: 'bottlesLabeled', label: 'Bottles labeled with client last name and property address' },
       { key: 'preMadeLabels', label: 'Pre-made labels applied (if available)' },
@@ -373,12 +375,12 @@ export function getWaterSampleFields() {
     showIf(photo('Water Panel'), 'waterPanelCollected', 'Yes'),
     divider(),
     heading('Microplastics Test'),
-    radio('microplasticsStatus', 'Microplastics test', ['Collected', 'Not requested']),
+    radio('microplasticsStatus', 'Microplastics test', ['Requested — collect on site', 'Collected', 'Not requested']),
     showIf({ type: 'sample-id-scanner', dataKey: 'microplasticsSampleId', label: 'Microplastics Sample ID' }, 'microplasticsStatus', 'Collected'),
     divider(),
     heading('PFAS Test'),
     info('Reminder: Collect PFAS sample from kitchen faucet (should have been draining since Device Setup)'),
-    radio('pfasStatus', 'PFAS test', ['Collected', 'Not requested']),
+    radio('pfasStatus', 'PFAS test', ['Requested — collect on site', 'Collected', 'Not requested']),
     showIf({ type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS Sample ID' }, 'pfasStatus', 'Collected'),
     textarea('notes', 'Notes')
   ];

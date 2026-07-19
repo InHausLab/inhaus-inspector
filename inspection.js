@@ -1,6 +1,6 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=160';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=160';
+import { getInspection } from './state.js?v=161';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=161';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -104,6 +104,28 @@ function exportPhotoArray(arr) {
   }));
 }
 
+function buildResumeData(inspection) {
+  const resume = JSON.parse(JSON.stringify(inspection || {}));
+  function sanitize(value) {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      value.forEach(sanitize);
+      return;
+    }
+    Object.keys(value).forEach(key => {
+      if (key === 'dataUrl' || key === 'imageData' || key === 'thumbnailDataUrl' ||
+          key === 'wifiPassword' || key === '_photoRetryQueue') {
+        delete value[key];
+        return;
+      }
+      sanitize(value[key]);
+    });
+  }
+  sanitize(resume);
+  resume.resumeSchemaVersion = 1;
+  return resume;
+}
+
 function cleanStepData(data) {
   if (!data) return {};
   const clean = {};
@@ -158,6 +180,7 @@ export function buildExportJSON(stepList) {
     startedAt: inspection.startedAt,
     endedAt: inspection.endedAt,
     status: inspection.status,
+    reviewStatus: inspection.reviewStatus || '',
     sharedDriveFolderId: SHARED_DRIVE_FOLDER_ID || '',
 
     // ── Key test identifiers & locations ────────────────────────
@@ -200,6 +223,7 @@ export function buildExportJSON(stepList) {
     customerDebrief: cleanStepData(inspection.stepData?.debrief),
     postAssessment: cleanStepData(inspection.stepData?.['post-assessment']),
     sparePhotos: exportPhotoArray(inspection.sparePhotos || []),
+    resumeData: buildResumeData(inspection),
     completedAt: inspection.completedAt || null
   };
 

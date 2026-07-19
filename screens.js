@@ -1,11 +1,11 @@
 // InHaus Inspector - Screen Rendering
-import { VISION_PROXY_URL } from './config.js?v=160';
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=160';
-import { saveNow, scheduleSave } from './storage.js?v=160';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=160';
-import { checkpointToCloud, submitInspection } from './sync.js?v=160';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=160';
-import { text, textarea, date, sel, chips, photo, divider, showIf } from './fields.js?v=160';
+import { VISION_PROXY_URL } from './config.js?v=161';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=161';
+import { saveNow, scheduleSave } from './storage.js?v=161';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=161';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=161';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=161';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=161';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -13,6 +13,7 @@ function ui() { return window.UI; }
 // ── Context (set via initScreens) ───────────────────────────
 let ctx = null;
 let _stepRenderJob = 0;
+let _intakeMode = 'field';
 
 export function initScreens(context) {
   ctx = context;
@@ -419,6 +420,7 @@ export function render() {
     case 'home': renderHome(); break;
     case 'truck-check': renderTruckCheck(); break;
     case 'intake': renderIntake(); break;
+    case 'cloud-resume': renderCloudResume(); break;
     case 'precheck': renderPrecheck(); break;
     case 'step': renderStep(); break;
     case 'review': renderReview(); break;
@@ -476,8 +478,25 @@ export function renderHome() {
 
   c.appendChild(ui().el('button', {
     className: 'btn btn-primary btn-full',
-    onClick: () => { setScreen('truck-check'); ctx.render(); }
-  }, 'New Inspection'));
+    onClick: () => { _intakeMode = 'field'; setScreen('truck-check'); ctx.render(); }
+  }, 'Start New Inspection'));
+
+  const handoffActions = ui().el('div', { className: 'home-handoff-actions' });
+  handoffActions.appendChild(ui().el('button', {
+    className: 'btn btn-secondary btn-full',
+    onClick: () => {
+      _intakeMode = 'prepare';
+      ctx.inspection = null;
+      setInspection(null);
+      setScreen('intake');
+      ctx.render();
+    }
+  }, 'Prepare Inspection in Office'));
+  handoffActions.appendChild(ui().el('button', {
+    className: 'btn btn-outline btn-full',
+    onClick: () => { setScreen('cloud-resume'); ctx.render(); }
+  }, 'Continue Inspection'));
+  c.appendChild(handoffActions);
 
   // ── Inspector mode toggle ─────────────────────────────────
   const isExp = localStorage.getItem('inhaus_experienced') === 'true';
@@ -546,9 +565,14 @@ export function renderHome() {
 
   window.DB.getAll().then(all => {
     all.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    const prepared = all.filter(x => x.status === 'prepared');
     const inProg = all.filter(x => x.status === 'in-progress');
     const done = all.filter(x => x.status === 'completed');
 
+    if (prepared.length) {
+      list.appendChild(ui().el('h2', { className: 'list-heading' }, 'Prepared in Office'));
+      prepared.forEach(x => list.appendChild(renderInspCard(x, false)));
+    }
     if (inProg.length) {
       list.appendChild(ui().el('h2', { className: 'list-heading' }, 'In Progress'));
       inProg.forEach(x => list.appendChild(renderInspCard(x, true)));
@@ -558,7 +582,7 @@ export function renderHome() {
       done.forEach(x => list.appendChild(renderInspCard(x, false)));
     }
     if (!all.length) {
-      list.appendChild(ui().el('p', { className: 'empty-msg' }, 'No inspections yet. Tap "New Inspection" to begin.'));
+      list.appendChild(ui().el('p', { className: 'empty-msg' }, 'No inspections yet. Tap "Start New Inspection" to begin.'));
     }
   });
 
@@ -566,14 +590,17 @@ export function renderHome() {
 }
 
 export function renderInspCard(insp, canResume) {
+  const isPrepared = insp.status === 'prepared';
+  const badgeLabel = insp.status === 'completed' ? 'Complete' : (isPrepared ? 'Prepared' : 'In Progress');
   return ui().el('div', { className: 'card insp-card' }, [
     ui().el('div', { className: 'card-top' }, [
       ui().el('strong', null, insp.inspectionId),
-      ui().el('span', { className: 'badge ' + insp.status }, insp.status === 'completed' ? 'Complete' : 'In Progress')
+      ui().el('span', { className: 'badge ' + insp.status }, badgeLabel)
     ]),
     ui().el('p', null, insp.propertyAddress || 'No address'),
     ui().el('p', { className: 'text-sm' }, (insp.inspectorName || '') + ' \u2022 ' + ui().fmtDate(insp.startedAt)),
     ui().el('div', { className: 'card-actions' }, [
+      isPrepared ? ui().el('button', { className: 'btn btn-primary', onClick: () => editPreparedInspection(insp.inspectionId) }, 'Edit Preparation') : null,
       canResume ? ui().el('button', { className: 'btn btn-primary', onClick: () => resumeInsp(insp.inspectionId) }, 'Resume') : null,
       ui().el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
       ui().el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
@@ -583,6 +610,15 @@ export function renderInspCard(insp, canResume) {
       }}, 'Delete')
     ])
   ]);
+}
+
+export async function editPreparedInspection(id) {
+  ctx.inspection = await window.DB.get(id);
+  setInspection(ctx.inspection);
+  if (!ctx.inspection) return;
+  _intakeMode = 'prepare';
+  setScreen('intake');
+  ctx.render();
 }
 
 export async function resumeInsp(id) {
@@ -603,6 +639,141 @@ export async function viewInsp(id) {
   setScreen('review');
   ctx.startAutoSave();
   ctx.render();
+}
+
+function isContinuableCloudInspection(item) {
+  const status = String(item?.status || '').trim().toLowerCase();
+  return status === 'prepared' || status === 'field active';
+}
+
+function cloudSearchText(item) {
+  return [
+    item?.propertyAddress,
+    item?.clientName,
+    item?.inspectorName,
+    item?.inspectionDate,
+    item?.inspectionId || item?.id
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+export function inspectionFromCloudRecord(cloudRecord) {
+  const source = cloudRecord?.resumeData;
+  if (!source || source.resumeSchemaVersion !== 1) {
+    throw new Error('This inspection was not prepared with the office handoff feature. Open it on the original device.');
+  }
+  const inspection = JSON.parse(JSON.stringify(source));
+  inspection.inspectionId = inspection.inspectionId || cloudRecord.inspectionId || cloudRecord.id;
+  inspection.stepData = inspection.stepData || {};
+  inspection.timers = inspection.timers || {};
+  inspection.dynamicRooms = inspection.dynamicRooms || { lowest: [{ name: 'Lowest Level — Room 1' }], additional: [] };
+  inspection.truckCheck = inspection.truckCheck || {};
+  inspection.status = 'in-progress';
+  inspection.reviewStatus = 'Field Active';
+  inspection.fieldStartedAt = inspection.fieldStartedAt || new Date().toISOString();
+  inspection._claimedFromCloudAt = new Date().toISOString();
+  return inspection;
+}
+
+async function continueCloudInspection(item, button) {
+  const id = item.inspectionId || item.id;
+  const local = await window.DB.get(id);
+  if (local && local.status === 'in-progress') {
+    await resumeInsp(id);
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'Downloading…';
+  try {
+    const cloudRecord = await loadCloudInspection(id);
+    const inspection = inspectionFromCloudRecord(cloudRecord);
+    ctx.inspection = inspection;
+    setInspection(inspection);
+    ctx.stepList = buildStepList(inspection);
+    ctx.currentStepIdx = Math.min(Number(inspection._lastStepIdx || 0), Math.max(ctx.stepList.length - 1, 0));
+    await saveNow();
+    _intakeMode = 'field';
+    const wasPrepared = String(cloudRecord?.resumeData?.status || '').toLowerCase() === 'prepared';
+    setScreen(wasPrepared ? 'precheck' : 'step');
+    ctx.startAutoSave();
+    ctx.render();
+    const cloudClaimed = await checkpointToCloud(ctx.stepList);
+    if (!cloudClaimed) {
+      ui().showToast('Inspection downloaded. Cloud claim will retry automatically.');
+    }
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = 'Continue on This Device';
+    alert('Could not continue this inspection: ' + (err?.message || String(err)));
+  }
+}
+
+export function renderCloudResume() {
+  const c = ui().el('div', { className: 'screen cloud-resume-screen' });
+  c.appendChild(buildAppHeader('Continue Inspection'));
+  c.appendChild(ui().el('button', {
+    className: 'btn btn-outline',
+    onClick: () => { setScreen('home'); ctx.render(); }
+  }, '← Home'));
+  c.appendChild(ui().el('div', { className: 'cloud-resume-intro' }, [
+    ui().el('h1', { className: 'screen-title' }, 'Select a Prepared Inspection'),
+    ui().el('p', null, 'Search by address, client, inspector, inspection date, or inspection ID.')
+  ]));
+
+  const search = ui().el('input', {
+    className: 'field-input cloud-resume-search',
+    type: 'search',
+    placeholder: 'Search address, client, inspector, or date…',
+    autocomplete: 'off'
+  });
+  c.appendChild(search);
+
+  const status = ui().el('div', { className: 'cloud-resume-status' }, 'Loading prepared inspections…');
+  const list = ui().el('div', { className: 'cloud-resume-list' });
+  c.appendChild(status);
+  c.appendChild(list);
+  ctx.root.appendChild(c);
+
+  let inspections = [];
+  function renderMatches() {
+    const query = search.value.trim().toLowerCase();
+    const matches = inspections.filter(item => !query || cloudSearchText(item).includes(query));
+    list.innerHTML = '';
+    status.textContent = matches.length
+      ? matches.length + ' inspection' + (matches.length === 1 ? '' : 's') + ' available'
+      : (query ? 'No prepared inspections match that search.' : 'No prepared inspections are waiting.');
+    matches.forEach(item => {
+      const continueBtn = ui().el('button', { className: 'btn btn-primary btn-full' }, 'Continue on This Device');
+      continueBtn.addEventListener('click', () => continueCloudInspection(item, continueBtn));
+      list.appendChild(ui().el('div', { className: 'card cloud-resume-card' }, [
+        ui().el('div', { className: 'cloud-resume-card-top' }, [
+          ui().el('strong', null, item.propertyAddress || 'Address not entered'),
+          ui().el('span', { className: 'badge prepared' }, item.status || 'Prepared')
+        ]),
+        ui().el('div', { className: 'cloud-resume-details' }, [
+          ui().el('span', null, 'Client: ' + (item.clientName || '—')),
+          ui().el('span', null, 'Inspector: ' + (item.inspectorName || '—')),
+          ui().el('span', null, 'Date: ' + (item.inspectionDate || '—')),
+          ui().el('span', null, 'ID: ' + (item.inspectionId || item.id || '—'))
+        ]),
+        continueBtn
+      ]));
+    });
+  }
+
+  search.addEventListener('input', renderMatches);
+  listCloudInspections().then(items => {
+    inspections = items.filter(isContinuableCloudInspection).sort((a, b) =>
+      String(b.inspectionDate || b.lastUpdated || '').localeCompare(String(a.inspectionDate || a.lastUpdated || ''))
+    );
+    renderMatches();
+  }).catch(err => {
+    status.textContent = 'Could not load prepared inspections.';
+    list.appendChild(ui().el('div', { className: 'cloud-resume-error' }, [
+      ui().el('strong', null, err?.message || String(err)),
+      ui().el('span', null, 'Check the internet connection and try again.')
+    ]));
+  });
 }
 
 // ── TRUCK CHECK SCREEN ────────────────────────────────────
@@ -803,8 +974,40 @@ export function renderTruckCheck() {
 }
 
 // ── INTAKE SCREEN ──────────────────────────────────────────
+const OFFICE_PREP_FIELDS = [
+  'pfasSetup', 'pfasKitNum', 'waterPanelPlanned', 'waterSampleId',
+  'microplasticsStatus', 'microplasticsSampleId', 'pfasStatus',
+  'pfasSampleId', 'officePrepNotes'
+];
+
+function applyOfficePreparation(inspection, data) {
+  if (!inspection.stepData) inspection.stepData = {};
+  inspection.stepData['device-setup'] = Object.assign({}, inspection.stepData['device-setup'] || {}, {
+    pfasSetup: data.pfasSetup || '',
+    pfasKitNum: data.pfasKitNum || ''
+  });
+  inspection.stepData['water-sample'] = Object.assign({}, inspection.stepData['water-sample'] || {}, {
+    waterPanelPlanned: data.waterPanelPlanned || '',
+    waterSampleId: data.waterSampleId || '',
+    microplasticsStatus: data.microplasticsStatus || '',
+    microplasticsSampleId: data.microplasticsSampleId || '',
+    pfasStatus: data.pfasStatus || '',
+    pfasSampleId: data.pfasSampleId || '',
+    officePrepNotes: data.officePrepNotes || ''
+  });
+}
+
+function intakeValuesOnly(data) {
+  const clean = Object.assign({}, data);
+  OFFICE_PREP_FIELDS.forEach(key => delete clean[key]);
+  return clean;
+}
+
 export function renderIntake() {
+  const isPrepare = _intakeMode === 'prepare';
   const isEdit = !!ctx.inspection;
+  const existingDevice = ctx.inspection?.stepData?.['device-setup'] || {};
+  const existingWater = ctx.inspection?.stepData?.['water-sample'] || {};
   const data = isEdit ? {
     inspectionId: ctx.inspection.inspectionId,
     inspectorName: ctx.inspection.inspectorName || '',
@@ -820,7 +1023,16 @@ export function renderIntake() {
     wifiPassword: ctx.inspection.wifiPassword || '',
     clientConcerns: ctx.inspection.clientConcerns || '',
     blueprintNotes: ctx.inspection.blueprintNotes || '',
-    inspectorEmail: ctx.inspection.inspectorEmail || ''
+    inspectorEmail: ctx.inspection.inspectorEmail || '',
+    pfasSetup: existingDevice.pfasSetup || '',
+    pfasKitNum: existingDevice.pfasKitNum || '',
+    waterPanelPlanned: existingWater.waterPanelPlanned || '',
+    waterSampleId: existingWater.waterSampleId || '',
+    microplasticsStatus: existingWater.microplasticsStatus || '',
+    microplasticsSampleId: existingWater.microplasticsSampleId || '',
+    pfasStatus: existingWater.pfasStatus || '',
+    pfasSampleId: existingWater.pfasSampleId || '',
+    officePrepNotes: existingWater.officePrepNotes || ''
   } : {
     inspectionId: ctx.genId(),
     inspectorName: '',
@@ -835,12 +1047,28 @@ export function renderIntake() {
     wifiNetwork: '',
     wifiPassword: '',
     clientConcerns: '',
-    blueprintNotes: ''
+    blueprintNotes: '',
+    pfasSetup: '',
+    pfasKitNum: '',
+    waterPanelPlanned: '',
+    waterSampleId: '',
+    microplasticsStatus: '',
+    microplasticsSampleId: '',
+    pfasStatus: '',
+    pfasSampleId: '',
+    officePrepNotes: ''
   };
 
   const c = ui().el('div', { className: 'screen' });
-  c.appendChild(buildAppHeader(isEdit ? 'Edit Intake Details' : 'Customer & Property Intake'));
+  c.appendChild(buildAppHeader(isPrepare ? 'Office Inspection Preparation' : (isEdit ? 'Edit Intake Details' : 'Customer & Property Intake')));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
+
+  if (isPrepare) {
+    c.appendChild(ui().el('div', { className: 'office-prep-intro' }, [
+      ui().el('strong', null, 'Prepare everything the inspector needs before leaving the office.'),
+      ui().el('span', null, 'The inspector will find this by address, client, inspector, or date under Continue Inspection.')
+    ]));
+  }
 
   const card = ui().el('div', { className: 'card' });
   const fields = [
@@ -858,11 +1086,28 @@ export function renderIntake() {
     showIf(text('waterSourceDescription', 'If "Other": describe water source', { placeholder: 'e.g. Private spring on property' }), 'waterSource', 'Other'),
     divider(),
     text('wifiNetwork', 'Home wifi network name'),
-    text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
-    { type: 'wifi-copy' },
+    ...(isPrepare ? [] : [
+      text('wifiPassword', 'WiFi Password', { placeholder: 'For Airthings and device connectivity' }),
+      { type: 'wifi-copy' }
+    ]),
     textarea('clientConcerns', 'Client concerns / known problem areas', { placeholder: 'Tap \uD83C\uDF99 mic in your iPhone keyboard to dictate \u2014 read back and fix errors before saving.' }),
     textarea('blueprintNotes', 'Client blueprints / layout notes (optional)')
   ];
+
+  if (isPrepare) {
+    fields.push(
+      divider(),
+      heading('Water Test Kit Preparation'),
+      sel('waterPanelPlanned', 'Water panel test', ['Requested — collect on site', 'Not requested']),
+      text('waterSampleId', 'Water panel kit / sample ID', { placeholder: 'Enter or scan the pre-assigned kit number' }),
+      sel('pfasSetup', 'PFAS water test', ['Yes', 'No', 'Not requested']),
+      showIf(text('pfasKitNum', 'PFAS Kit #', { placeholder: 'e.g. WTK_PFAS_27099' }), 'pfasSetup', 'Yes'),
+      text('pfasSampleId', 'PFAS sample ID (if pre-assigned)'),
+      sel('microplasticsStatus', 'Microplastics test', ['Requested — collect on site', 'Not requested']),
+      text('microplasticsSampleId', 'Microplastics sample ID (if pre-assigned)'),
+      textarea('officePrepNotes', 'Office preparation notes', { placeholder: 'Kit locations, special customer instructions, labels prepared, or anything the inspector needs to know.' })
+    );
+  }
 
   const onIntakeChange = () => { ui().updateShowIf(card, data); };
   fields.forEach(f => {
@@ -872,15 +1117,74 @@ export function renderIntake() {
   ui().updateShowIf(card, data);
   c.appendChild(card);
 
-  const nav = ui().el('div', { className: 'bottom-nav' }, [
-    ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
-      if (isEdit) { setScreen('step'); ctx.render(); } else { setScreen('truck-check'); ctx.render(); }
-    } }, isEdit ? '\u2190 Back to Steps' : '\u2190 Back'),
-    ui().el('button', { className: 'btn btn-primary btn-nav', onClick: () => {
+  const nav = ui().el('div', { className: 'bottom-nav' });
+  const backBtn = ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => {
+    if (isPrepare) {
+      ctx.inspection = null;
+      setInspection(null);
+      setScreen('home');
+    } else if (isEdit) {
+      setScreen('step');
+    } else {
+      setScreen('truck-check');
+    }
+    ctx.render();
+  } }, isPrepare ? '\u2190 Home' : (isEdit ? '\u2190 Back to Steps' : '\u2190 Back'));
+
+  const submitBtn = ui().el('button', { className: 'btn btn-primary btn-nav', onClick: async () => {
       const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms'];
       const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
       if (!data.waterSource || (Array.isArray(data.waterSource) ? data.waterSource.length === 0 : !data.waterSource)) missing.push('waterSource');
       if (missing.length) { alert('Please fill in all required fields (marked with *).'); return; }
+
+      if (isPrepare) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving to Cloud…';
+        const now = new Date().toISOString();
+        if (isEdit) {
+          Object.assign(ctx.inspection, intakeValuesOnly(data));
+          ctx.inspection.status = 'prepared';
+          ctx.inspection.reviewStatus = 'Prepared';
+          ctx.inspection.preparedAt = ctx.inspection.preparedAt || now;
+          ctx.inspection.updatedAt = now;
+        } else {
+          ctx.inspection = {
+            ...intakeValuesOnly(data),
+            inspectionId: data.inspectionId || ctx.genId(),
+            startedAt: now,
+            preparedAt: now,
+            updatedAt: now,
+            endedAt: null,
+            status: 'prepared',
+            reviewStatus: 'Prepared',
+            stepData: {},
+            timers: {},
+            dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
+            _lastStepIdx: 0,
+            truckCheck: {}
+          };
+          setInspection(ctx.inspection);
+        }
+        applyOfficePreparation(ctx.inspection, data);
+        setInspection(ctx.inspection);
+        ctx.stepList = buildStepList(ctx.inspection);
+        await saveNow();
+        const cloudSaved = await checkpointToCloud(ctx.stepList);
+        if (!cloudSaved) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = isEdit ? 'Update for Inspector' : 'Save for Inspector';
+          alert('Saved on this computer, but the cloud handoff failed. Keep this page open and tap Save for Inspector again.');
+          return;
+        }
+        await saveNow();
+        ui().showToast('Inspection prepared and available on the inspector’s phone');
+        ctx.inspection = null;
+        setInspection(null);
+        setScreen('home');
+        ctx.render();
+        return;
+      }
+
       if (isEdit) {
         Object.assign(ctx.inspection, data);
         ctx.stepList = buildStepList(ctx.inspection);
@@ -894,6 +1198,7 @@ export function renderIntake() {
           startedAt: new Date().toISOString(),
           endedAt: null,
           status: 'in-progress',
+          reviewStatus: 'Field Active',
           stepData: {},
           timers: {},
           dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
@@ -909,8 +1214,9 @@ export function renderIntake() {
           if (window.runCloudPreflight) window.runCloudPreflight();
         });
       }
-    }}, isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192')
-  ]);
+    }}, isPrepare ? (isEdit ? 'Update for Inspector' : 'Save for Inspector') : (isEdit ? 'Save Changes \u2713' : 'Start Inspection \u2192'));
+  nav.appendChild(backBtn);
+  nav.appendChild(submitBtn);
   c.appendChild(nav);
   ctx.root.appendChild(c);
 }
@@ -1875,6 +2181,7 @@ export function renderReview() {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting... \u23f3';
       ctx.inspection.status = 'completed';
+      ctx.inspection.reviewStatus = 'Needs Review';
       ctx.inspection.endedAt = new Date().toISOString();
       ctx.inspection.completedAt = ctx.inspection.endedAt;
       const completeData = buildExportJSON(ctx.stepList);
