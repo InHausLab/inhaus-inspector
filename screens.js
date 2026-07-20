@@ -754,8 +754,8 @@ function cloudInspectionSortTime(item) {
 
 export function inspectionFromCloudRecord(cloudRecord) {
   const source = cloudRecord?.resumeData;
-  if (!source || source.resumeSchemaVersion !== 1) {
-    throw new Error('This inspection was not prepared with the office handoff feature. Open it on the original device.');
+  if (!source || !source.inspectionId) {
+    throw new Error('This inspection could not be loaded. No inspection data found.');
   }
   const inspection = JSON.parse(JSON.stringify(source));
   inspection.inspectionId = inspection.inspectionId || cloudRecord.inspectionId || cloudRecord.id;
