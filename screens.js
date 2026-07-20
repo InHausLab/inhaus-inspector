@@ -3234,7 +3234,16 @@ export function renderReview() {
     leaveMetrics.innerHTML = '';
     leaveMetrics.appendChild(leaveMetric('Photos', health.missing ? health.missing + ' missing' : (health.pending ? health.pending + ' waiting' : health.total + ' safe'), health.missing ? 'bad' : (health.pending ? 'wait' : 'good')));
     leaveMetrics.appendChild(leaveMetric('Cloud', getCloudLabel(), lastCloud ? ((syncStatus === 'failed' || syncStatus === 'final-failed') ? 'wait' : 'good') : 'bad'));
-    leaveMetrics.appendChild(leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good'));
+    const requiredMetric = leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good');
+    if (reviewIssues.length) {
+      requiredMetric.style.cursor = 'pointer';
+      requiredMetric.title = 'Tap to see required items';
+      requiredMetric.addEventListener('click', () => {
+        const issueCard = document.querySelector('.review-issues-card');
+        if (issueCard) issueCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+    leaveMetrics.appendChild(requiredMetric);
     leaveMetrics.appendChild(leaveMetric('Findings', pendingFindingCount ? pendingFindingCount + ' open' : 'Ready', pendingFindingCount ? 'bad' : 'good'));
     leaveMetrics.appendChild(leaveMetric('Before leaving', departureDone ? 'Done' : 'Open', departureDone ? 'good' : 'bad'));
     if (health.vaultOnly > 0) leaveMetrics.appendChild(leaveMetric('Rescue vault', String(health.vaultOnly), 'wait'));
