@@ -36,7 +36,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | App version | v179 (prepared inspections load automatically) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v65 restored deployment — checkpoint POST verified |
+| Apps Script | v66 source / Google deployment Version 75 — prepared handoff verified |
 | Apps Script URL | `https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
@@ -63,6 +63,10 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 - Made each inspection card tappable while retaining the explicit Continue on This Device button.
 - Added the exact empty state: `No inspections prepared yet`.
 - This release changes only the prepared-inspection screen; cloud data and sync behavior are unchanged.
+- Backend hotfix: Apps Script v66 now merges `Prepared` and `Field Active` checkpoints from the Resume Data sheet into the list endpoint and returns their complete `resumeData` from the detail endpoint.
+- Checkpoint saves now perform a read-after-write verification before reporting cloud success.
+- Deployed to the existing production Apps Script URL as Google deployment Version 75.
+- Verified `INH-20260720-SHMXOQ` (369 Hillcrest Dr, Dave) appears as `prepared` and its complete resume record loads successfully; a fresh `INH-TEST-CODEX` checkpoint was immediately readable in 2.96 seconds.
 
 ---
 
