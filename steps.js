@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=179';
-import { getInspection } from './state.js?v=179';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=180';
+import { getInspection } from './state.js?v=180';
 
 export function getEquipmentFields() {
   return [
@@ -594,8 +594,8 @@ export const PHASES = [
   { id: 'exterior', name: 'Exterior', icon: '3' },
   { id: 'lowest', name: 'Lowest Livable Level (e.g. Basement)', icon: '4' },
   { id: 'utility', name: 'Utility', icon: '5' },
-  { id: 'upper', name: 'Upper Level', icon: '6' },
-  { id: 'rooms', name: 'Bedrooms & Bathrooms', icon: '6.5' },
+  { id: 'upper', name: 'Bedrooms', icon: '6' },
+  { id: 'rooms', name: 'Bathrooms', icon: '6.5' },
   { id: 'main', name: 'Kitchen', icon: '7' },
   { id: 'supplementary', name: 'Additional Rooms', icon: '8' },
   { id: 'wrapup', name: 'Customer Debrief', icon: '9' },
