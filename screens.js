@@ -2910,24 +2910,7 @@ export function renderPhotos() {
     }
     window.getPhotoHealth().then(h => {
       if (runId !== photoSummaryRun) return;
-      if (h.pending > 0) {
-        summaryBody.appendChild(statusPill(h.pending + ' waiting for cloud', 'wait'));
-        const clearBtn = ui().el('button', {
-          type: 'button',
-          className: 'btn btn-danger-outline btn-full',
-          style: 'margin-top:10px;'
-        }, 'Delete waiting photos (' + h.pending + ')');
-        clearBtn.addEventListener('click', () => {
-          if (!confirm('Delete ' + h.pending + ' photo' + (h.pending === 1 ? '' : 's') + ' waiting to upload?\n\nThese photos will be permanently removed from this device.')) return;
-          if (ctx.inspection._photoRetryQueue) {
-            ctx.inspection._photoRetryQueue = [];
-          }
-          saveNow();
-          ui().showToast('Waiting photos removed');
-          renderPhotoSummary();
-        });
-        summaryBody.appendChild(clearBtn);
-      }
+      if (h.pending > 0) summaryBody.appendChild(statusPill(h.pending + ' waiting for cloud', 'wait'));
       if (h.missing > 0) summaryBody.appendChild(statusPill(h.missing + ' missing', 'bad'));
       if (h.pending === 0 && h.missing === 0) summaryBody.appendChild(statusPill('Cloud backup verified', 'good'));
     }).catch(err => {
@@ -3065,6 +3048,35 @@ export function renderPhotos() {
         onClick: () => window.open(p.driveUrl, '_blank')
       }, 'Open Drive'));
     }
+
+    // Delete button per photo
+    const deleteBtn = ui().el('button', {
+      type: 'button',
+      className: 'btn btn-danger-outline btn-small',
+      style: 'margin-top:8px;width:100%;'
+    }, '🗑 Delete this photo');
+    deleteBtn.addEventListener('click', () => {
+      if (!confirm('Delete this photo permanently?\n\nThis cannot be undone.')) return;
+      // Remove from retry queue
+      if (ctx.inspection._photoRetryQueue) {
+        ctx.inspection._photoRetryQueue = ctx.inspection._photoRetryQueue.filter(q => q.photoId !== p.photoId);
+      }
+      // Remove from stepData
+      function removeFromObj(obj) {
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj)) {
+          const idx = obj.findIndex(item => item && item.photoId === p.photoId);
+          if (idx >= 0) { obj.splice(idx, 1); return; }
+        }
+        Object.values(obj).forEach(removeFromObj);
+      }
+      removeFromObj(ctx.inspection.stepData);
+      saveNow();
+      ui().showToast('Photo deleted');
+      renderPhotoSummary();
+      renderPhotoList();
+    });
+    body.appendChild(deleteBtn);
 
     card.appendChild(body);
     return card;
