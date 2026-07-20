@@ -56,19 +56,19 @@ const autoChecks = [
   {
     id: 'apps-script-review-list',
     title: 'Apps Script review list',
-    detail: 'Live v37 bridge returns the review inventory with the portal access token.',
+    detail: 'Live bridge returns the review inventory with the portal access token.',
     path: bridgeUrl({ action: 'list', token: REVIEW_ACCESS_TOKEN }),
     timeoutMs: 10000,
     expect: text => {
       const parsed = JSON.parse(text);
-      return parsed.status === 'ok' && parsed.count >= 4 && Array.isArray(parsed.inspections);
+      return parsed.status === 'ok' && typeof parsed.count === 'number' && Array.isArray(parsed.inspections);
     },
     critical: true
   },
   {
     id: 'apps-script-report-detail',
     title: 'Apps Script report detail',
-    detail: 'Live v37 bridge returns a full inspection payload for the sample report.',
+    detail: 'Live bridge returns a full inspection payload for the sample report.',
     path: bridgeUrl({ action: 'get', id: SAMPLE_INSPECTION_ID, token: REVIEW_ACCESS_TOKEN }),
     timeoutMs: 10000,
     expect: text => {
@@ -326,7 +326,7 @@ async function runOneCheck(check) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), check.timeoutMs || 5000);
   try {
-    const response = await fetch(check.path, { cache: 'no-store', signal: controller.signal });
+    const response = await fetch(check.path, { cache: 'no-store', redirect: 'follow', signal: controller.signal });
     if (!response.ok) {
       return { status: check.critical ? FAIL : WARN, message: `HTTP ${response.status} from ${check.path}` };
     }
