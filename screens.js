@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=190';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=190';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=190';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=190';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=190';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=190';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=191';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=191';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=191';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=191';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=191';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=191';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=190';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=190';
-import { updatePhotoMetadata } from './supabase-photos.js?v=190';
+} from './findings.js?v=191';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=191';
+import { updatePhotoMetadata } from './supabase-photos.js?v=191';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=190';
+} from './comment-library.js?v=191';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -479,7 +479,7 @@ export function openSearch() {
 export function render() {
   if (ctx && typeof ctx.persistActivePosition === 'function') ctx.persistActivePosition();
   // Kill any body-level overlays that may have leaked across renders
-  ['room-drawer-overlay', 'search-overlay'].forEach(id => {
+  ['room-drawer-overlay', 'search-overlay', 'fixed-bottom-nav'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.remove();
   });
@@ -502,6 +502,16 @@ export function render() {
     case 'team': renderTeamWorkspace(); break;
     case 'my-work': renderMyWork(); break;
     case 'recovery': renderRecoveryCenter(); break;
+  }
+
+  // A fixed element nested inside the long inspection screen can still scroll
+  // or jump in iPhone Safari. Portal the nav to <body> so Back/Home/Next always
+  // belong to the visual viewport, never to the checklist's document flow.
+  const bottomNav = ctx.root.querySelector('.bottom-nav');
+  if (bottomNav) {
+    bottomNav.id = 'fixed-bottom-nav';
+    bottomNav.setAttribute('data-fixed-footer', 'true');
+    document.body.appendChild(bottomNav);
   }
 }
 
