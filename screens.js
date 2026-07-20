@@ -1662,8 +1662,10 @@ export function renderStep() {
       if (fieldKey === 'roomName' && data.roomName) {
         stepHeading.textContent = data.roomName;
         // Sync the subnav tab label to match
-        const activeTab = document.querySelector('.subnav-tab.active, .phase-tab.active, .room-tab.active');
+        const activeTab = document.querySelector('.sub-nav-btn.active');
         if (activeTab) activeTab.textContent = data.roomName;
+        // Also update step.name so it persists if re-rendered
+        step.name = data.roomName;
       }
       // Change 3: Detect allSectionsComplete on post-assessment step
       if (step.type === 'post-assessment' && data.finalCheck &&
