@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'inhaus-inspector-readiness-v178';
+const STORAGE_KEY = 'inhaus-inspector-readiness-v179';
 const PASS = 'pass';
 const WARN = 'warn';
 const FAIL = 'fail';
@@ -13,17 +13,17 @@ const autoChecks = [
   {
     id: 'field-app-shell',
     title: 'Field app shell',
-    detail: 'Inspector app v178 loads from the current production origin.',
+    detail: 'Inspector app v179 loads from the current production origin.',
     path: '/index.html',
-    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && text.includes('v178'),
+    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && text.includes('v179'),
     critical: true
   },
   {
     id: 'service-worker-bypass',
     title: 'Service worker isolation',
-    detail: 'The v178 service worker is live and standalone tools bypass the field-app cache.',
+    detail: 'The v179 service worker is live and standalone tools bypass the field-app cache.',
     path: '/service-worker.js',
-    expect: text => text.includes("CACHE_NAME = 'inhaus-v178'") && text.includes("'/readiness'") && text.includes("'/reports'"),
+    expect: text => text.includes("CACHE_NAME = 'inhaus-v179'") && text.includes("'/readiness'") && text.includes("'/reports'"),
     critical: true
   },
   {
@@ -102,7 +102,7 @@ const manualGates = [
   {
     id: 'phone-version',
     title: 'Phone version',
-    detail: 'The inspector phone shows v178 after refresh or cache reset.',
+    detail: 'The inspector phone shows v179 after refresh or cache reset.',
     required: true
   },
   {
@@ -461,7 +461,7 @@ function makeReport(summary) {
     `Status: ${summary.title}`,
     `Score: ${summary.score}%`,
     `Last run: ${state.lastRunAt ? formatDateTime(state.lastRunAt) : 'Not run'}`,
-    'Release: v178 / Apps Script v71',
+    'Release: v179 / Apps Script v71',
     '',
     '## Live Checks',
     ...summary.autoResults.map(({ check, result }) => `- ${statusLabel(result.status)}: ${check.title} - ${result.message || check.detail}`),

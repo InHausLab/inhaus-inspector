@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v178 (restore the inspector's last working position) |
+| App version | v179 (prepared inspections load automatically) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v65 restored deployment — checkpoint POST verified |
@@ -51,6 +51,18 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v179 — Prepared Inspections Load Automatically
+**Date:** July 20, 2026
+
+- The Select a Prepared Inspection screen now displays every available prepared inspection as soon as the screen opens; searching is optional.
+- Added a clear loading spinner while the cloud list is being fetched.
+- Prepared inspections are sorted newest first using the best available preparation or update timestamp.
+- Made each inspection card tappable while retaining the explicit Continue on This Device button.
+- Added the exact empty state: `No inspections prepared yet`.
+- This release changes only the prepared-inspection screen; cloud data and sync behavior are unchanged.
 
 ---
 

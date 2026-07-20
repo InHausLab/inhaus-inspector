@@ -164,13 +164,37 @@ body {
 
 .cloud-resume-search { margin: 8px 0 12px; }
 .cloud-resume-status {
+  align-items: center;
   color: var(--text-muted);
+  display: flex;
   font-size: 0.95rem;
   font-weight: 800;
+  gap: 9px;
   margin: 8px 0;
 }
 .cloud-resume-list { display: grid; gap: 12px; }
-.cloud-resume-card { margin: 0; }
+.cloud-resume-spinner {
+  animation: cloud-resume-spin 0.8s linear infinite;
+  border: 3px solid #d7e2d4;
+  border-radius: 50%;
+  border-top-color: var(--primary);
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 20px;
+  width: 20px;
+}
+@keyframes cloud-resume-spin { to { transform: rotate(360deg); } }
+.cloud-resume-card {
+  cursor: pointer;
+  margin: 0;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.cloud-resume-card:hover { border-color: var(--accent); }
+.cloud-resume-card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.cloud-resume-card:active { transform: scale(0.995); }
 .cloud-resume-card-top {
   align-items: flex-start;
   display: flex;

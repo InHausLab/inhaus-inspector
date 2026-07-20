@@ -1,6 +1,6 @@
 // InHaus Inspector - company-wide approved comment library bridge
-import { GOOGLE_SCRIPT_URL, FIELD_RESUME_TOKEN } from './config.js?v=178';
-import { scriptFetch } from './sync.js?v=178';
+import { GOOGLE_SCRIPT_URL, FIELD_RESUME_TOKEN } from './config.js?v=179';
+import { scriptFetch } from './sync.js?v=179';
 
 const CACHE_KEY = 'inhaus_company_comment_library_v1';
 let memoryCache = null;

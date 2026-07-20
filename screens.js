@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=178';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=178';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=178';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=178';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=178';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=178';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=179';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=179';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=179';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=179';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=179';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=179';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=178';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=178';
-import { updatePhotoMetadata } from './supabase-photos.js?v=178';
+} from './findings.js?v=179';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=179';
+import { updatePhotoMetadata } from './supabase-photos.js?v=179';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=178';
+} from './comment-library.js?v=179';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -737,6 +737,21 @@ function cloudSearchText(item) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function cloudInspectionSortTime(item) {
+  const candidates = [
+    item?.preparedAt,
+    item?.lastUpdated,
+    item?.updatedAt,
+    item?.inspectionDate,
+    item?.startedAt
+  ];
+  for (const value of candidates) {
+    const timestamp = Date.parse(value || '');
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+  return 0;
+}
+
 export function inspectionFromCloudRecord(cloudRecord) {
   const source = cloudRecord?.resumeData;
   if (!source || source.resumeSchemaVersion !== 1) {
@@ -806,7 +821,7 @@ export function renderCloudResume() {
   }, '← Home'));
   c.appendChild(ui().el('div', { className: 'cloud-resume-intro' }, [
     ui().el('h1', { className: 'screen-title' }, 'Select a Prepared Inspection'),
-    ui().el('p', null, 'Search by address, client, inspector, inspection date, or inspection ID.')
+    ui().el('p', null, 'All prepared inspections are shown below. Use search only if you want to narrow the list.')
   ]));
 
   const search = ui().el('input', {
@@ -817,7 +832,15 @@ export function renderCloudResume() {
   });
   c.appendChild(search);
 
-  const status = ui().el('div', { className: 'cloud-resume-status' }, 'Loading prepared inspections…');
+  const loadingSpinner = ui().el('span', {
+    className: 'cloud-resume-spinner',
+    role: 'status',
+    'aria-label': 'Loading prepared inspections'
+  });
+  const status = ui().el('div', {
+    className: 'cloud-resume-status',
+    'aria-live': 'polite'
+  }, [loadingSpinner, ui().el('span', null, 'Loading prepared inspections…')]);
   const list = ui().el('div', { className: 'cloud-resume-list' });
   c.appendChild(status);
   c.appendChild(list);
@@ -830,11 +853,24 @@ export function renderCloudResume() {
     list.innerHTML = '';
     status.textContent = matches.length
       ? matches.length + ' inspection' + (matches.length === 1 ? '' : 's') + ' available'
-      : (query ? 'No prepared inspections match that search.' : 'No prepared inspections are waiting.');
+      : (query ? 'No prepared inspections match that search.' : 'No inspections prepared yet');
     matches.forEach(item => {
       const continueBtn = ui().el('button', { className: 'btn btn-primary btn-full' }, 'Continue on This Device');
       continueBtn.addEventListener('click', () => continueCloudInspection(item, continueBtn));
-      list.appendChild(ui().el('div', { className: 'card cloud-resume-card' }, [
+      const card = ui().el('div', {
+        className: 'card cloud-resume-card',
+        role: 'button',
+        tabindex: '0',
+        onClick: event => {
+          if (event.target.closest('button')) return;
+          continueCloudInspection(item, continueBtn);
+        },
+        onKeyDown: event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          continueCloudInspection(item, continueBtn);
+        }
+      }, [
         ui().el('div', { className: 'cloud-resume-card-top' }, [
           ui().el('strong', null, item.propertyAddress || 'Address not entered'),
           ui().el('span', { className: 'badge prepared' }, item.status || 'Prepared')
@@ -846,15 +882,16 @@ export function renderCloudResume() {
           ui().el('span', null, 'ID: ' + (item.inspectionId || item.id || '—'))
         ]),
         continueBtn
-      ]));
+      ]);
+      list.appendChild(card);
     });
   }
 
   search.addEventListener('input', renderMatches);
   listCloudInspections().then(items => {
-    inspections = items.filter(isContinuableCloudInspection).sort((a, b) =>
-      String(b.inspectionDate || b.lastUpdated || '').localeCompare(String(a.inspectionDate || a.lastUpdated || ''))
-    );
+    inspections = items
+      .filter(isContinuableCloudInspection)
+      .sort((a, b) => cloudInspectionSortTime(b) - cloudInspectionSortTime(a));
     renderMatches();
   }).catch(err => {
     status.textContent = 'Could not load prepared inspections.';
