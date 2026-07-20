@@ -1,7 +1,7 @@
 // InHaus Inspector - App improvement feedback capture and durable retry queue
-import { getInspection, getScreen } from './state.js?v=196';
-import { scriptFetch } from './sync.js?v=196';
-import { GOOGLE_SCRIPT_URL } from './config.js?v=196';
+import { getInspection, getScreen } from './state.js?v=197';
+import { scriptFetch } from './sync.js?v=197';
+import { GOOGLE_SCRIPT_URL } from './config.js?v=197';
 
 let initialized = false;
 let retryInProgress = false;
@@ -279,7 +279,7 @@ function mountFeedbackButton() {
     className: 'app-feedback-button',
     onClick: openFeedbackOverlay,
     'aria-label': 'Suggest an app fix'
-  }, '\ud83d\udca1 App Fix');
+  }, '\ud83d\udca1');
   document.body.appendChild(button);
 }
 
