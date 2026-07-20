@@ -4,7 +4,7 @@ const WARN = 'warn';
 const FAIL = 'fail';
 const BLOCKED = 'blocked';
 const UNCHECKED = 'unchecked';
-const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbx6VWKm-smdwpiZbzVIk8VGLV7V7p0Zbq1X4DE3YMe9bjH-zxkfRH_aznYCp08LzEhBLw/exec';
+const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec'; // Apps Script v64 — updated July 20 2026
 const REVIEW_ACCESS_TOKEN = 'InHaus2026';
 const SAMPLE_INSPECTION_ID = 'INH-20260428-DKNSOB';
 
