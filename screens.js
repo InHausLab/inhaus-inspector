@@ -3267,10 +3267,10 @@ export function renderReview() {
       if (fcIdx >= 0) goToStep(fcIdx);
     });
     leaveMetrics.appendChild(beforeLeavingMetric);
-    // Rescue Vault tile → trigger rescue
+    // Rescue Vault tile → informational, tap shows explanation
     if (health.vaultOnly > 0) leaveMetrics.appendChild(makeMetricTappable(
-      leaveMetric('Rescue vault', String(health.vaultOnly), 'wait'),
-      async () => { if (window.exportLocalPhotoBackup) await window.exportLocalPhotoBackup(); }
+      leaveMetric('Rescue vault', String(health.vaultOnly) + ' saved', 'wait'),
+      () => { ui().showToast('Photos saved locally as backup — they are safe on this device. Sync will retry automatically.', 4000); }
     ));
     // Not Yet / status title → scroll to issues
     if (reviewIssues.length) {

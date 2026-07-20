@@ -220,6 +220,7 @@ import { initScreens, render } from './screens.js?v=191';
   // showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, retryFailedPhotos,
   // sendToGoogleScript, checkpointToCloud, submitInspection → moved to sync.js
   window.uploadPhotoImmediate = uploadPhotoImmediate;
+  window.retryFailedPhotos = retryFailedPhotos;
   window.queuePhotoForBackgroundUpload = queuePhotoForBackgroundUpload;
 
   function visitInspectionPhotos(insp, callback) {
@@ -625,7 +626,7 @@ import { initScreens, render } from './screens.js?v=191';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v193',
+      appVersion: 'v194',
       success: success
     };
   }
