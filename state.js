@@ -32,13 +32,14 @@ export function setScreen(v) { _screen = v; }
 
 // ── Active inspection position ─────────────────────────────
 // localStorage survives Safari reloads and service-worker cache restarts.
-export function saveActivePosition(inspection, stepIdx, screen) {
+export function saveActivePosition(inspection, stepIdx, screen, stepId) {
   if (!inspection || inspection.status !== 'in-progress' || !inspection.inspectionId) return false;
   try {
     localStorage.setItem(ACTIVE_POSITION_KEY, JSON.stringify({
       inspectionId: inspection.inspectionId,
       stepIdx: Number.isInteger(Number(stepIdx)) ? Number(stepIdx) : 0,
-      screen: String(screen || 'step')
+      screen: String(screen || 'step'),
+      stepId: stepId ? String(stepId) : ''
     }));
     return true;
   } catch (err) {
@@ -56,7 +57,8 @@ export function loadActivePosition() {
     return {
       inspectionId: String(saved.inspectionId),
       stepIdx: Number.isInteger(Number(saved.stepIdx)) ? Number(saved.stepIdx) : 0,
-      screen: String(saved.screen || 'step')
+      screen: String(saved.screen || 'step'),
+      stepId: saved.stepId ? String(saved.stepId) : ''
     };
   } catch (err) {
     try { localStorage.removeItem(ACTIVE_POSITION_KEY); } catch (_) {}

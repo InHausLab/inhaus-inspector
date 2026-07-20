@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=177';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=177';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=177';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=177';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=177';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=177';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=178';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=178';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=178';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=178';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=178';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=178';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=177';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=177';
-import { updatePhotoMetadata } from './supabase-photos.js?v=177';
+} from './findings.js?v=178';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=178';
+import { updatePhotoMetadata } from './supabase-photos.js?v=178';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=177';
+} from './comment-library.js?v=178';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -697,6 +697,10 @@ export async function editPreparedInspection(id) {
 }
 
 export async function resumeInsp(id) {
+  if (ctx.restoreActivePosition && await ctx.restoreActivePosition(id)) {
+    ctx.render();
+    return;
+  }
   ctx.inspection = await window.DB.get(id); setInspection(ctx.inspection);
   if (!ctx.inspection) return;
   ensureInspectionWorkspace(ctx.inspection);

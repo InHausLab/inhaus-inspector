@@ -1,11 +1,11 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=177';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=177';
-import { initStorage, saveNow, scheduleSave } from './storage.js?v=177';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=177';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=177';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=177';
-import { initScreens, render } from './screens.js?v=177';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=178';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=178';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=178';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=178';
+import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=178';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=178';
+import { initScreens, render } from './screens.js?v=178';
 
 (function () {
   'use strict';
@@ -55,16 +55,44 @@ import { initScreens, render } from './screens.js?v=177';
 
   const root = document.getElementById('app');
   const RESTORABLE_SCREENS = new Set([
-    'home', 'truck-check', 'intake', 'cloud-resume', 'precheck', 'step',
-    'review', 'photos', 'rapid-capture', 'findings', 'team', 'my-work', 'recovery'
+    'truck-check', 'intake', 'cloud-resume', 'precheck', 'step',
+    'photos', 'rapid-capture', 'findings', 'team', 'my-work', 'recovery'
   ]);
 
-  function persistActivePosition() {
-    return saveActivePosition(inspection, currentStepIdx, getScreen());
+  function clampStepIndex(idx) {
+    return Math.max(0, Math.min(Number(idx) || 0, Math.max(stepList.length - 1, 0)));
   }
 
-  async function restoreActivePosition() {
+  function lastWorkingStepIndex(preferredIdx) {
+    let idx = clampStepIndex(preferredIdx);
+    if (stepList[idx] && stepList[idx].type !== 'review') return idx;
+    idx = clampStepIndex(inspection && inspection._lastStepIdx);
+    if (stepList[idx] && stepList[idx].type !== 'review') return idx;
+    for (let i = stepList.length - 1; i >= 0; i--) {
+      if (stepList[i] && stepList[i].type !== 'review') return i;
+    }
+    return 0;
+  }
+
+  function persistActivePosition() {
+    if (!inspection) return false;
+    let resumeScreen = getScreen();
+    let resumeStepIdx = currentStepIdx;
+    // Home and Final Review are summary/exit surfaces, not field work positions.
+    // Never let them overwrite the inspector's last actual step.
+    if (resumeScreen === 'home' || resumeScreen === 'review') {
+      resumeScreen = 'step';
+      resumeStepIdx = lastWorkingStepIndex(inspection._lastStepIdx);
+    } else {
+      resumeStepIdx = lastWorkingStepIndex(resumeStepIdx);
+    }
+    const resumeStep = stepList[resumeStepIdx];
+    return saveActivePosition(inspection, resumeStepIdx, resumeScreen, resumeStep && resumeStep.id);
+  }
+
+  async function restoreActivePosition(expectedInspectionId) {
     const saved = loadActivePosition();
+    if (expectedInspectionId && (!saved || saved.inspectionId !== expectedInspectionId)) return false;
     if (!saved || !window.DB || !window.DB.get) return false;
     try {
       const restored = await window.DB.get(saved.inspectionId);
@@ -76,8 +104,12 @@ import { initScreens, render } from './screens.js?v=177';
       setInspection(restored);
       _inspectionDirty = restored._cloudCheckpointDirty === true;
       stepList = buildStepList(restored);
-      currentStepIdx = Math.max(0, Math.min(saved.stepIdx, Math.max(stepList.length - 1, 0)));
+      const stableStepIdx = saved.stepId ? stepList.findIndex(step => step.id === saved.stepId) : -1;
+      const savedStepIdx = stableStepIdx >= 0 ? stableStepIdx : saved.stepIdx;
+      currentStepIdx = lastWorkingStepIndex(savedStepIdx);
+      // Migrate old saved Home/Final Review positions back to the last field step.
       setScreen(RESTORABLE_SCREENS.has(saved.screen) ? saved.screen : 'step');
+      persistActivePosition();
       startAutoSave();
       return true;
     } catch (err) {
@@ -568,7 +600,7 @@ import { initScreens, render } from './screens.js?v=177';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v177',
+      appVersion: 'v178',
       success: success
     };
   }
@@ -619,6 +651,7 @@ import { initScreens, render } from './screens.js?v=177';
     addDynamicRoom,
     triggerFinalSync,
     persistActivePosition,
+    restoreActivePosition,
     render,
     startAutoSave,
     stopAutoSave

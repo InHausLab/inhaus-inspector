@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v177 (battery, retry backoff, and sample-label scanner reliability) |
+| App version | v178 (restore the inspector's last working position) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v65 restored deployment — checkpoint POST verified |
@@ -51,6 +51,18 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v178 — Restore the Last Working Position
+**Date:** July 20, 2026
+
+- Fixed active inspections reopening on Final Review instead of the inspector's last field step.
+- Home and Final Review are now treated as summary/exit surfaces and cannot overwrite the saved working position.
+- Existing devices with a stale Home or Final Review position automatically migrate back to the inspection's last actual step.
+- Stores the stable step ID alongside the numeric index so future step-list changes do not move inspectors to the wrong section.
+- The Resume button now uses the same exact-position restore path as a full Safari reload.
+- Verified locally by opening Final Review and reloading (returned to Lowest Level — Room 1), then moving to Utility Room and reloading (returned to Utility Room exactly).
 
 ---
 
