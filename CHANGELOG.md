@@ -62,6 +62,7 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 - Kept checkpoints fast and non-destructive: they update the Supabase inspection record without rebuilding the final Drive workbook.
 - Deployed Apps Script Version 71 and verified a real checkpoint POST, bridge capabilities, a four-inspection review list, and all 34 photos for `INH-20260717-YZNHG0` before changing the client URL.
 - Updated the inspector, readiness console, reports tool, review portal, and performance page to the same verified deployment.
+- Routed the readiness POST checkpoint through a same-origin Netlify health function because browsers cannot follow the Apps Script cross-origin POST redirect; the function still performs and validates the real upstream POST.
 
 ## v170 — Finding and Photo-Change Cloud Checkpoints
 **Date:** July 19, 2026

@@ -29,11 +29,13 @@ const autoChecks = [
   {
     id: 'apps-script-post',
     title: 'Apps Script POST checkpoint',
-    detail: 'Bridge accepts a POST checkpoint and returns status:ok. Catches broken deployments that pass GET but reject POST.',
-    path: LIVE_BRIDGE_URL,
-    postBody: { syncSecret: 'ihl-sync-2026', _checkpoint: true, inspectionId: 'INH-READINESS-PROBE', status: 'prepared' },
+    detail: 'The same-origin health function sends a real POST checkpoint to Apps Script and verifies status:ok.',
+    path: '/.netlify/functions/apps-script-post-check',
     timeoutMs: 30000,
-    expect: text => { try { return JSON.parse(text).status === 'ok'; } catch(e) { return false; } },
+    expect: text => {
+      const parsed = JSON.parse(text);
+      return parsed.status === 'ok' && parsed.upstreamStatus === 200 && parsed.checkpointed === true;
+    },
     critical: true
   },
   {
