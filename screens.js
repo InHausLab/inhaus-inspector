@@ -1643,7 +1643,8 @@ export function renderStep() {
   }, '📸');
   c.appendChild(spareFab);
 
-  c.appendChild(ui().el('h1', { className: 'screen-title' }, step.name));
+  const stepHeading = ui().el('h1', { className: 'screen-title' }, data.roomName || step.name);
+  c.appendChild(stepHeading);
 
   const fieldGen = STEP_FIELDS[step.type];
   let pendingFieldRender = null;
@@ -1654,6 +1655,8 @@ export function renderStep() {
       markStepUpdated(ctx.inspection, step.id, step.name, fieldKey);
       scheduleSave();
       ui().updateShowIf(card, data);
+      // Update heading live when inspector types a room name
+      if (fieldKey === 'roomName' && data.roomName) stepHeading.textContent = data.roomName;
       // Change 3: Detect allSectionsComplete on post-assessment step
       if (step.type === 'post-assessment' && data.finalCheck &&
           data.finalCheck.allSectionsComplete === true &&
