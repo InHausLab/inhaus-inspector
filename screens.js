@@ -2910,7 +2910,24 @@ export function renderPhotos() {
     }
     window.getPhotoHealth().then(h => {
       if (runId !== photoSummaryRun) return;
-      if (h.pending > 0) summaryBody.appendChild(statusPill(h.pending + ' waiting for cloud', 'wait'));
+      if (h.pending > 0) {
+        summaryBody.appendChild(statusPill(h.pending + ' waiting for cloud', 'wait'));
+        const clearBtn = ui().el('button', {
+          type: 'button',
+          className: 'btn btn-danger-outline btn-full',
+          style: 'margin-top:10px;'
+        }, 'Delete waiting photos (' + h.pending + ')');
+        clearBtn.addEventListener('click', () => {
+          if (!confirm('Delete ' + h.pending + ' photo' + (h.pending === 1 ? '' : 's') + ' waiting to upload?\n\nThese photos will be permanently removed from this device.')) return;
+          if (ctx.inspection._photoRetryQueue) {
+            ctx.inspection._photoRetryQueue = [];
+          }
+          saveNow();
+          ui().showToast('Waiting photos removed');
+          renderPhotoSummary();
+        });
+        summaryBody.appendChild(clearBtn);
+      }
       if (h.missing > 0) summaryBody.appendChild(statusPill(h.missing + ' missing', 'bad'));
       if (h.pending === 0 && h.missing === 0) summaryBody.appendChild(statusPill('Cloud backup verified', 'good'));
     }).catch(err => {
