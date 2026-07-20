@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=175';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=175';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=175';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=175';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=175';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=175';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=176';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=176';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=176';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=176';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=176';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=176';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=175';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=175';
-import { updatePhotoMetadata } from './supabase-photos.js?v=175';
+} from './findings.js?v=176';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=176';
+import { updatePhotoMetadata } from './supabase-photos.js?v=176';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=175';
+} from './comment-library.js?v=176';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }

@@ -9,28 +9,28 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v175';
+const CACHE_NAME = 'inhaus-v176';
 
 const APP_SHELL = [
   './',
   './index.html',
   './cache-reset.html',
-  './app.js?v=175',
-  './screens.js?v=175',
-  './sync.js?v=175',
-  './ui.js?v=175',
-  './steps.js?v=175',
-  './config.js?v=175',
-  './storage.js?v=175',
-  './fields.js?v=175',
-  './inspection.js?v=175',
-  './findings.js?v=175',
-  './photo-routing.js?v=175',
-  './comment-library.js?v=175',
+  './app.js?v=176',
+  './screens.js?v=176',
+  './sync.js?v=176',
+  './ui.js?v=176',
+  './steps.js?v=176',
+  './config.js?v=176',
+  './storage.js?v=176',
+  './fields.js?v=176',
+  './inspection.js?v=176',
+  './findings.js?v=176',
+  './photo-routing.js?v=176',
+  './comment-library.js?v=176',
   './comment-library-admin.html',
-  './comment-library-admin.js?v=175',
-  './db.js?v=175',
-  './state.js?v=175',
+  './comment-library-admin.js?v=176',
+  './db.js?v=176',
+  './state.js?v=176',
   './styles.css',
   './manifest.json',
 ];

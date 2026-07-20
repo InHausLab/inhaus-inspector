@@ -37,7 +37,7 @@ export function flirFields() {
   return [
     collapsible('FLIR Thermal Scan', [
     link('📲 Open Meterlink app', 'meterlink://'),
-    link('🌡 Get FLIR photos via Meterlink', 'https://www.flir.com/products/meterlink/'),
+    link('🌡 Get FLIR photos via Meterlink', 'https://apps.apple.com/us/app/flir-one/id970376330'),
     checklist('flirGuidance', null, [
       { key: 'flirScanStains', label: 'Scan for water stains, moisture intrusion, plumbing issues' },
       { key: 'flirStartExterior', label: 'Start with areas identified during exterior inspection' },
