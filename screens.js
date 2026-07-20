@@ -3055,23 +3055,31 @@ export function renderPhotos() {
       className: 'btn btn-danger-outline btn-small',
       style: 'margin-top:8px;width:100%;'
     }, '🗑 Delete this photo');
-    deleteBtn.addEventListener('click', () => {
+    deleteBtn.addEventListener('click', async () => {
       if (!confirm('Delete this photo permanently?\n\nThis cannot be undone.')) return;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting…';
       // Remove from retry queue
       if (ctx.inspection._photoRetryQueue) {
         ctx.inspection._photoRetryQueue = ctx.inspection._photoRetryQueue.filter(q => q.photoId !== p.photoId);
       }
-      // Remove from stepData
+      // Remove from stepData arrays
       function removeFromObj(obj) {
         if (!obj || typeof obj !== 'object') return;
         if (Array.isArray(obj)) {
-          const idx = obj.findIndex(item => item && item.photoId === p.photoId);
-          if (idx >= 0) { obj.splice(idx, 1); return; }
+          const i = obj.findIndex(item => item && item.photoId === p.photoId);
+          if (i >= 0) { obj.splice(i, 1); return; }
+          obj.forEach(removeFromObj);
+        } else {
+          Object.values(obj).forEach(removeFromObj);
         }
-        Object.values(obj).forEach(removeFromObj);
       }
       removeFromObj(ctx.inspection.stepData);
-      saveNow();
+      // Remove from IndexedDB vault
+      if (p.photoId && window.DB && window.DB.removePhoto) {
+        try { await window.DB.removePhoto(p.photoId); } catch (e) { console.warn('vault remove failed', e); }
+      }
+      await saveNow();
       ui().showToast('Photo deleted');
       renderPhotoSummary();
       renderPhotoList();
