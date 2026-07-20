@@ -15,6 +15,22 @@
     }
   }
 
+  function parseVisionJson(text) {
+    const raw = String(text || '').trim();
+    const unfenced = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim();
+    try {
+      return JSON.parse(unfenced);
+    } catch (err) {
+      const start = unfenced.indexOf('{');
+      const end = unfenced.lastIndexOf('}');
+      if (start >= 0 && end > start) return JSON.parse(unfenced.slice(start, end + 1));
+      throw err;
+    }
+  }
+
   // ── DOM Helper ─────────────────────────────────────────────
   function el(tag, attrs, children) {
     const node = document.createElement(tag);
@@ -181,8 +197,9 @@
   }
 
   // ── Image Compression ─────────────────────────────────────
-  function compressImage(file) {
+  function compressImage(file, options) {
     return new Promise((resolve, reject) => {
+      const opts = options || {};
       const reader = new FileReader();
       reader.onload = e => {
         const img = new Image();
@@ -191,6 +208,10 @@
           let w = img.width, h = img.height;
           if (w > MAX || h > MAX) {
             if (w > h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          if (opts.minWidth && w < opts.minWidth) {
+            h = Math.round(h * (opts.minWidth / w));
+            w = opts.minWidth;
           }
           const c = document.createElement('canvas');
           c.width = w; c.height = h;
@@ -1562,13 +1583,13 @@
           status.style.color = '#92400e';
           status.style.fontWeight = '600';
           try {
-            const dataUrl = await compressImage(file);
+            const dataUrl = await compressImage(file, { minWidth: 800 });
             // store photo reference
             data[dataKey + '_photo'] = { dataUrl, timestamp: new Date().toISOString() };
             preview.src = dataUrl;
             previewWrap.style.display = '';
             shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
-            const prompt = 'This is a water testing sample label or chain-of-custody form. Extract the sample ID, bottle number, or accession number. Return JSON with one key: sampleId (string). Return ONLY the JSON. If you cannot read a number, return {"sampleId": null}.';
+            const prompt = 'This is a water test kit label with a barcode. Ignore the barcode stripes. Read the human-readable text printed below or near the barcode — it is the sample ID or kit number (e.g. wtk_pfas_27079 or WP-123456). Return JSON with one key: sampleId (string). Return ONLY the JSON object. If you cannot find readable text, return {"sampleId": null}.';
             const resp = await fetchWithTimeout(PROXY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
@@ -1576,7 +1597,7 @@
             }, 60000, 'AI label scan');
             const result = await resp.json();
             const txt = result.content && result.content[0] && result.content[0].text;
-            const parsed = JSON.parse(txt);
+            const parsed = parseVisionJson(txt);
             if (parsed.sampleId) {
               data[dataKey] = parsed.sampleId;
               confirmInp.value = parsed.sampleId;
@@ -1689,7 +1710,7 @@
             }, 60000, 'AI number scan');
             const result = await resp.json();
             const txt = result.content && result.content[0] && result.content[0].text;
-            const parsed = JSON.parse(txt);
+            const parsed = parseVisionJson(txt);
             const value = typeof parsed.value === 'number' ? parsed.value : Number(parsed.value);
             if (parsed.value !== null && parsed.value !== '' && Number.isFinite(value)) {
               data[dataKey] = value;
@@ -1894,7 +1915,7 @@
           const result = await resp.json();
           const text = result.content && result.content[0] && result.content[0].text;
           if (!text) throw new Error('EMPTY_RESPONSE');
-          return JSON.parse(text);
+          return parseVisionJson(text);
         }
 
         // ── helpers ─────────────────────────────────────────────

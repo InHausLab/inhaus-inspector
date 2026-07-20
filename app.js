@@ -1,11 +1,11 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=176';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=176';
-import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js?v=176';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=176';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js?v=176';';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=176';
-import { initScreens, render } from './screens.js?v=176';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=177';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=177';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=177';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=177';
+import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=177';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=177';
+import { initScreens, render } from './screens.js?v=177';
 
 (function () {
   'use strict';
@@ -38,6 +38,10 @@ import { initScreens, render } from './screens.js?v=176';
   let inspection = getInspection();
   let stepList = [];
   let currentStepIdx = 0;
+  let _inspectionDirty = false;
+  let _autoCheckpointInterval = null;
+  const AUTO_CHECKPOINT_INTERVAL_MS = 3 * 60 * 1000;
+  const EXPECTED_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec';
   // screen moved to state.js
   // Load truck check from localStorage (persists across interruptions, expires at midnight)
   const _truckCheckKey = 'inhausTruckCheck_' + new Date().toISOString().slice(0, 10);
@@ -70,6 +74,7 @@ import { initScreens, render } from './screens.js?v=176';
       }
       inspection = restored;
       setInspection(restored);
+      _inspectionDirty = restored._cloudCheckpointDirty === true;
       stepList = buildStepList(restored);
       currentStepIdx = Math.max(0, Math.min(saved.stepIdx, Math.max(stepList.length - 1, 0)));
       setScreen(RESTORABLE_SCREENS.has(saved.screen) ? saved.screen : 'step');
@@ -79,6 +84,52 @@ import { initScreens, render } from './screens.js?v=176';
       console.warn('Could not restore active inspection position:', err);
       return false;
     }
+  }
+
+  function markInspectionDirty() {
+    if (!inspection) return;
+    _inspectionDirty = true;
+    inspection._cloudCheckpointDirty = true;
+    if (!document.hidden && inspection.status === 'in-progress') startAutoSave();
+  }
+
+  async function runAutomaticCheckpoint() {
+    if (!inspection || inspection.status !== 'in-progress' || !_inspectionDirty || !navigator.onLine || document.hidden) return false;
+    const retryBackoffMs = getCheckpointBackoffMs();
+    const lastAttemptAt = getLastCheckpointAttemptAt();
+    if (retryBackoffMs && lastAttemptAt && Date.now() - lastAttemptAt < retryBackoffMs) return false;
+    const savedInspectionId = inspection.inspectionId;
+    const ok = await checkpointToCloud(stepList);
+    if (ok && inspection && inspection.inspectionId === savedInspectionId) {
+      _inspectionDirty = false;
+      inspection._cloudCheckpointDirty = false;
+      stopAutoSave();
+    }
+    return !!ok;
+  }
+
+  function forceConfigRefreshIfStale() {
+    if (GOOGLE_SCRIPT_URL === EXPECTED_GOOGLE_SCRIPT_URL || !('serviceWorker' in navigator)) return;
+    const retryKey = 'inhausConfigRefreshAttemptAt';
+    const lastAttempt = Number(localStorage.getItem(retryKey) || 0);
+    if (Date.now() - lastAttempt < 5 * 60 * 1000) return;
+    localStorage.setItem(retryKey, String(Date.now()));
+    navigator.serviceWorker.getRegistration().then(async reg => {
+      if (!reg) return;
+      const activate = worker => {
+        if (!worker) return;
+        if (worker.state === 'installed') {
+          worker.postMessage({ type: 'SKIP_WAITING' });
+          navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+          return;
+        }
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed') activate(worker);
+        });
+      };
+      await reg.update();
+      activate(reg.waiting || reg.installing);
+    }).catch(err => console.warn('Could not refresh stale app configuration:', err));
   }
 
   // ── ID Generator ───────────────────────────────────────────
@@ -517,7 +568,7 @@ import { initScreens, render } from './screens.js?v=176';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v173',
+      appVersion: 'v177',
       success: success
     };
   }
@@ -535,7 +586,11 @@ import { initScreens, render } from './screens.js?v=176';
     }
   }
 
-  window.addEventListener('online', () => { retryQueuedUploads(); retryFailedPhotos(); });
+  window.addEventListener('online', () => {
+    retryQueuedUploads();
+    retryFailedPhotos({ automatic: true, limit: 4, quiet: true });
+    if (_inspectionDirty) startAutoSave();
+  });
 
 
   // Render/screen functions → moved to screens.js
@@ -543,10 +598,14 @@ import { initScreens, render } from './screens.js?v=176';
   // buildExportJSON, cleanStepData → moved to inspection.js
 
   // ── Init ───────────────────────────────────────────────────
-  initStorage({ onSyncStatusChange: updateSyncStatus });
+  initStorage({ onSyncStatusChange: updateSyncStatus, onInspectionDirty: markInspectionDirty });
   initScreens({
     get inspection() { return inspection; },
-    set inspection(v) { inspection = v; },
+    set inspection(v) {
+      inspection = v;
+      _inspectionDirty = !!(v && v._cloudCheckpointDirty === true);
+      if (!v) stopAutoSave();
+    },
     get stepList() { return stepList; },
     set stepList(v) { stepList = v; },
     get currentStepIdx() { return currentStepIdx; },
@@ -574,14 +633,25 @@ import { initScreens, render } from './screens.js?v=176';
     if (badge) { badge.textContent = '\u25cf Offline'; badge.className = 'online-badge offline'; }
     updateSyncStatus('offline'); // Change 2
   });
+  window.addEventListener('inhaus-checkpoint-success', () => {
+    _inspectionDirty = false;
+    if (inspection) inspection._cloudCheckpointDirty = false;
+    stopAutoSave();
+  });
 
   window.addEventListener('pagehide', persistActivePosition);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') persistActivePosition();
+    if (document.hidden) {
+      persistActivePosition();
+      stopAutoSave();
+    } else if (inspection && inspection.status === 'in-progress' && _inspectionDirty) {
+      startAutoSave();
+    }
   });
 
   // Service worker intentionally disabled — was causing Safari freeze on cache update
 
+  forceConfigRefreshIfStale();
   restoreActivePosition().finally(() => {
     retryQueuedUploads();
     render();
@@ -641,21 +711,15 @@ import { initScreens, render } from './screens.js?v=176';
   setInterval(checkStorageQuota, 60000); // check every minute
 
   // ── Auto-save & auto-checkpoint (started/stopped with inspection lifecycle) ──
-  let _autoSaveInterval = null;
-  let _autoCheckpointInterval = null;
-
   function startAutoSave() {
-    stopAutoSave();
-    _autoSaveInterval = setInterval(() => {
-      if (inspection) saveNow();
-    }, 30000);
+    if (!inspection || inspection.status !== 'in-progress' || !_inspectionDirty || document.hidden) return;
+    if (_autoCheckpointInterval) return;
     _autoCheckpointInterval = setInterval(() => {
-      if (inspection) { checkpointToCloud(stepList); backupToLocalStorage(); }
-    }, 60000);
+      runAutomaticCheckpoint();
+    }, AUTO_CHECKPOINT_INTERVAL_MS);
   }
 
   function stopAutoSave() {
-    if (_autoSaveInterval) { clearInterval(_autoSaveInterval); _autoSaveInterval = null; }
     if (_autoCheckpointInterval) { clearInterval(_autoCheckpointInterval); _autoCheckpointInterval = null; }
   }
 

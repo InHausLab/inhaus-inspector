@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=176';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=176';
-import { ensureInspectionWorkspace } from './findings.js?v=176';
+import { getInspection } from './state.js?v=177';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=177';
+import { ensureInspectionWorkspace } from './findings.js?v=177';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -115,7 +115,7 @@ function buildResumeData(inspection) {
     }
     Object.keys(value).forEach(key => {
       if (key === 'dataUrl' || key === 'imageData' || key === 'thumbnailDataUrl' ||
-          key === 'wifiPassword' || key === '_photoRetryQueue') {
+          key === 'wifiPassword' || key === '_photoRetryQueue' || key === '_cloudCheckpointDirty') {
         delete value[key];
         return;
       }

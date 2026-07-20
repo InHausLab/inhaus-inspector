@@ -1,26 +1,28 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=176';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=176';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=177';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=177';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=176';
-import { scheduleSave } from './storage.js?v=176';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=176';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=176';
+         getBestCloudSyncAt } from './state.js?v=177';
+import { scheduleSave } from './storage.js?v=177';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=177';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=177';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
 let _workingSyncSecret = null;
 const PHOTO_UPLOAD_BATCH_SIZE = 3;
 const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
+const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
 const CLOUD_POST_TIMEOUT_MS = 45000;
 const CLOUD_GET_TIMEOUT_MS = 30000;
 let _photoRetryTimer = null;
 let _photoRetryDueAt = 0;
 let _photoRetryInProgress = false;
 let _bulkPhotoUploadInProgress = false;
+let _lastAutomaticPhotoRetryAt = 0;
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
   const controller = new AbortController();
@@ -626,23 +628,25 @@ export function addToPhotoRetryQueue(photo) {
   const already = inspection._photoRetryQueue.find(function(p) { return p.photoId === photo.photoId; });
   if (!already) inspection._photoRetryQueue.push(photo);
   scheduleSave();
-  schedulePhotoRetry(60000);
+  schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
 }
 
 export function queuePhotoForBackgroundUpload(photo) {
   addToPhotoRetryQueue(photo);
-  schedulePhotoRetry(1000);
+  schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
 }
 
 export function schedulePhotoRetry(delayMs) {
-  const dueAt = Date.now() + Math.max(0, delayMs || 0);
+  if (!navigator.onLine) return;
+  const earliestRetryAt = _lastAutomaticPhotoRetryAt + PHOTO_RETRY_BACKOFF_MS;
+  const dueAt = Math.max(Date.now() + Math.max(0, delayMs || 0), earliestRetryAt);
   if (_photoRetryTimer && _photoRetryDueAt <= dueAt) return;
   if (_photoRetryTimer) clearTimeout(_photoRetryTimer);
   _photoRetryDueAt = dueAt;
   _photoRetryTimer = setTimeout(function() {
     _photoRetryTimer = null;
     _photoRetryDueAt = 0;
-    retryFailedPhotos({ limit: PHOTO_BACKGROUND_RETRY_LIMIT, quiet: true });
+    if (navigator.onLine) retryFailedPhotos({ automatic: true, limit: PHOTO_BACKGROUND_RETRY_LIMIT, quiet: true });
   }, Math.max(0, dueAt - Date.now()));
 }
 
@@ -653,6 +657,14 @@ export async function retryFailedPhotos(options) {
   if (_photoRetryInProgress || _bulkPhotoUploadInProgress) return;
   const queue = (inspection._photoRetryQueue || []).filter(photoNeedsUpload);
   if (!queue.length) return;
+  if (opts.automatic) {
+    const retryIn = PHOTO_RETRY_BACKOFF_MS - (Date.now() - _lastAutomaticPhotoRetryAt);
+    if (retryIn > 0) {
+      schedulePhotoRetry(retryIn);
+      return;
+    }
+    _lastAutomaticPhotoRetryAt = Date.now();
+  }
 
   _photoRetryInProgress = true;
   const limit = Number.isFinite(opts.limit) ? opts.limit : queue.length;
@@ -676,7 +688,7 @@ export async function retryFailedPhotos(options) {
     scheduleSave();
     updateSyncStatus('checkpoint', 'photos +' + confirmed);
   }
-  if ((inspection._photoRetryQueue || []).length > 0) schedulePhotoRetry(60000);
+  if ((inspection._photoRetryQueue || []).length > 0) schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
 }
 
 // Phase 2 final-submit path: ensure every photo is stored in Supabase (upload any
@@ -691,7 +703,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=176');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=177');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -847,7 +859,7 @@ export async function sendToGoogleScript(exportData) {
     if (inspection) {
       inspection._lastServerVerification = verified;
       inspection._lastServerVerifiedAt = new Date().toISOString();
-      scheduleSave();
+      scheduleSave({ markDirty: false });
     }
   } else if (photosToUpload.length > 0) {
     // [RETIRED] Guard: this block should never run when USE_SUPABASE_PHOTOS=true.
@@ -1014,6 +1026,10 @@ let _lastCheckpointStepList = [];
 let _lastBackupModalShownAt = 0;
 let _checkpointBackoffMs = 0; // 0 = no backoff active
 
+export function getCheckpointBackoffMs() {
+  return _checkpointBackoffMs;
+}
+
 export async function checkpointToCloud(stepList) {
   const inspection = getInspection();
   if (!inspection || !GOOGLE_SCRIPT_URL) return;
@@ -1040,14 +1056,14 @@ export async function checkpointToCloud(stepList) {
         });
         if (teamResult.inspection) mergeRemoteInspection(inspection, teamResult.inspection);
         if (teamResult.resumeData) mergeRemoteInspection(inspection, teamResult.resumeData);
-        scheduleSave();
+        scheduleSave({ markDirty: false });
         usedServerTeamMerge = true;
       } else {
         try {
           const cloudRecord = await loadCloudInspection(inspection.inspectionId);
           if (cloudRecord?.resumeData) {
             mergeRemoteInspection(inspection, cloudRecord.resumeData);
-            scheduleSave();
+            scheduleSave({ markDirty: false });
           }
         } catch (mergeErr) {
           // A newly prepared inspection may not exist in the review API yet.
@@ -1059,8 +1075,10 @@ export async function checkpointToCloud(stepList) {
     if (usedServerTeamMerge) {
       setLastCheckpointSucceededAt(Date.now());
       _checkpointFailCount = 0;
+      _checkpointBackoffMs = 0;
       updateSyncStatus('checkpoint');
-      schedulePhotoRetry(1000);
+      schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
+      window.dispatchEvent(new CustomEvent('inhaus-checkpoint-success'));
       return true;
     }
     const exportData = buildExportJSON(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
@@ -1070,10 +1088,12 @@ export async function checkpointToCloud(stepList) {
     const result = await scriptFetch(payload);
     rememberDriveResult(result, payloadFingerprint(payload), 'checkpoint');
     setLastCheckpointSucceededAt(Date.now()); // Change 1
-    scheduleSave();
+    scheduleSave({ markDirty: false });
     _checkpointFailCount = 0; // reset on success
+    _checkpointBackoffMs = 0;
     updateSyncStatus('checkpoint'); // Change 2
-    schedulePhotoRetry(1000);
+    schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
+    window.dispatchEvent(new CustomEvent('inhaus-checkpoint-success'));
     return true;
   } catch (e) {
     console.log('Checkpoint sync skipped:', e);

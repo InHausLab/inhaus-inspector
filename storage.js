@@ -1,13 +1,15 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=176';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=177';
 
 let _onSyncStatusChange = null;
+let _onInspectionDirty = null;
 let _saveTimeout = null;
 const _lastSnapshotAt = new Map();
 const AUTO_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
-export function initStorage({ onSyncStatusChange }) {
+export function initStorage({ onSyncStatusChange, onInspectionDirty }) {
   _onSyncStatusChange = onSyncStatusChange;
+  _onInspectionDirty = onInspectionDirty || null;
 }
 
 function showSave(msg) {
@@ -30,9 +32,11 @@ function showSaveError(msg) {
   banner.textContent = msg + ' - Tap to dismiss';
 }
 
-export async function saveNow() {
+export async function saveNow(options) {
   const inspection = getInspection();
   if (!inspection) return false;
+  const opts = options || {};
+  if (opts.markDirty !== false && _onInspectionDirty) _onInspectionDirty();
   showSave('Saving...');
   try {
     await window.DB.save(inspection);
@@ -74,9 +78,11 @@ export async function createRestorePoint(reason) {
   return record;
 }
 
-export function scheduleSave() {
+export function scheduleSave(options) {
+  const opts = options || {};
+  if (opts.markDirty !== false && _onInspectionDirty) _onInspectionDirty();
   if (_saveTimeout) clearTimeout(_saveTimeout);
-  _saveTimeout = setTimeout(saveNow, 300);
+  _saveTimeout = setTimeout(() => saveNow(opts), 300);
 }
 
 // ── localStorage Shadow Backup ────────────────────────────

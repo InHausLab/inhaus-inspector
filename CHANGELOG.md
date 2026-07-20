@@ -21,9 +21,9 @@ The Apps Script editor was wiped on July 20 2026 because Codex was editing the l
 
 **POST verification command (required before calling any deploy done):**
 ```
-curl -sL -X POST <new_url> -H "Content-Type: application/json" -d '{"syncSecret":"ihl-sync-2026","_checkpoint":true,"inspectionId":"INH-TEST-POST","status":"prepared"}' | python3 -m json.tool
+curl -sL <new_url> -H "Content-Type: text/plain;charset=utf-8" -d '{"syncSecret":"ihl-sync-2026","_checkpoint":true,"inspectionId":"INH-TEST-POST","status":"prepared"}' | python3 -m json.tool
 ```
-Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
+Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST across Google's redirect causes a false 405 at the redirected URL.
 
 ---
 
@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 
 | Item | Value |
 |------|-------|
-| App version | v173 (exact inspection position restore) |
+| App version | v177 (battery, retry backoff, and sample-label scanner reliability) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v65 restored deployment — checkpoint POST verified |
@@ -51,6 +51,36 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v177 — Battery Drain and Sample ID Scanner Reliability
+**Date:** July 20, 2026
+
+- Removed the 30-second polling save; local persistence remains event-driven on edits, navigation, explicit saves, and final submission.
+- Added a persisted inspection-dirty flag so automatic cloud checkpoints run only for changed, in-progress inspections while online and visible.
+- Increased the automatic checkpoint interval from one minute to three minutes; a successful checkpoint clears the dirty flag and stops the timer until another edit.
+- Pauses automatic checkpoint timers while Safari is hidden and restarts them only when an active inspection still has unsynced changes.
+- Capped automatic failed-photo retries at once per five minutes and prevented automatic retries while offline; explicit retry controls are unchanged.
+- Updated the sample-label vision prompt to ignore barcode stripes and read the human-readable kit or sample ID near the barcode.
+- Ensured sample-label scans send an image at least 800 pixels wide to the vision proxy, while leaving normal inspection-photo compression unchanged.
+- Made scanner response parsing tolerate JSON code fences after an end-to-end barcode test correctly read `wtk_pfas_27079` but returned the object inside a Markdown fence.
+- Added a guarded service-worker refresh when the running configuration does not contain the restored Apps Script v65 deployment URL.
+- Verification: a four-minute dirty-idle browser run produced one successful automatic checkpoint and no repeating save/checkpoint loop; the 800px synthetic barcode label returned `wtk_pfas_27079`; and the redirect-safe v65 checkpoint POST returned HTTP 200 with `status: ok`.
+- Rebases cleanly over the v174 checkpoint-modal cooldown and the v175-v176 Q-Trak/FLIR field updates.
+
+---
+
+## v176 — FLIR Meterlink Link and Q-Trak Cleanup
+**Date:** July 20, 2026
+
+- Updated the FLIR Meterlink link to open the FLIR ONE app store page.
+- Preserved the v175 removal of the Q-Trak floorplan checklist item.
+
+## v175 — Remove Q-Trak Floorplan Checklist
+**Date:** July 20, 2026
+
+- Removed the Q-Trak floorplan checklist item from room steps.
 
 ---
 
