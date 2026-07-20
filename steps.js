@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=174';
-import { getInspection } from './state.js?v=174';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=175';
+import { getInspection } from './state.js?v=175';
 
 export function getEquipmentFields() {
   return [
@@ -174,7 +174,6 @@ export function getRadonFields() {
 export function getRoomTestFields() {
   return [
     { type: 'process-checklist', title: 'Room Setup', items: [
-      { key: 'qtrakFloorplan', label: 'Open Q-Trak floorplan template - draw in rooms or correct layout' },
       { key: 'labelRooms', label: 'Label rooms using Q-Trak naming convention (e.g. Bedroom 1, Bedroom 2)' }
     ]},
     text('roomName', 'Room Name', { required: true }),
@@ -255,8 +254,7 @@ export function getUtilityFields() {
 export function getBedroomFields() {
   return [
     { type: 'process-checklist', title: 'Room Setup', items: [
-      { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps ready' },
-      { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open - rooms labelled correctly' }
+      { key: 'breezeRooms', label: 'Breeze ET pump + tripod + spore traps ready' }
     ]},
     text('roomName', 'Room Name', { required: true }),
     ...flirFields(),
@@ -287,8 +285,7 @@ export function getBathroomFields() {
 export function getLivingAreaFields() {
   return [
     { type: 'process-checklist', title: 'Room Setup', items: [
-      { key: 'breezeMain', label: 'Breeze ET pump + tripod + spore traps ready' },
-      { key: 'qtrakFloorplan', label: 'Q-Trak floorplan template open - rooms labelled correctly' }
+      { key: 'breezeMain', label: 'Breeze ET pump + tripod + spore traps ready' }
     ]},
     text('roomNames', 'Which specific rooms are in this Main Living Area? (e.g. Living Room, Dining Room, Office - list all rooms you tested here)', { required: true }),
     ...flirLogFields(),
