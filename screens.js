@@ -761,7 +761,7 @@ export function inspectionFromCloudRecord(cloudRecord) {
   inspection.inspectionId = inspection.inspectionId || cloudRecord.inspectionId || cloudRecord.id;
   inspection.stepData = inspection.stepData || {};
   inspection.timers = inspection.timers || {};
-  inspection.dynamicRooms = inspection.dynamicRooms || { lowest: [{ name: 'Lowest Level — Room 1' }], additional: [] };
+  inspection.dynamicRooms = inspection.dynamicRooms || { lowest: [{ name: 'Lowest Level — Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] };
   inspection.truckCheck = inspection.truckCheck || {};
   inspection.status = 'in-progress';
   inspection.reviewStatus = 'Field Active';
@@ -1297,7 +1297,7 @@ export function renderIntake() {
             reviewStatus: 'Prepared',
             stepData: {},
             timers: {},
-            dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
+            dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
             _lastStepIdx: 0,
             truckCheck: {}
           };
@@ -1346,7 +1346,7 @@ export function renderIntake() {
           reviewStatus: 'Field Active',
           stepData: {},
           timers: {},
-          dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [] },
+          dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
           _lastStepIdx: 0,
           truckCheck: Object.assign({}, ctx._truckCheck)
         };
@@ -1711,7 +1711,7 @@ export function renderStep() {
   }
   if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {
     if (step.id === 'kitchen-air' || (step.dynamic === 'additional' && step.id === ctx.stepList.filter(s => s.dynamic === 'additional').pop()?.id)) {
-      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('additional'); window.scrollTo(0, 0); } }, '+ Add Additional Room'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('additional'); window.scrollTo(0, 0); } }, '+ Add Room (Office, Dining Room, etc.)'));
     }
   }
 
