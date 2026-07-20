@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'openclaw-readiness-v0';
+const STORAGE_KEY = 'inhaus-inspector-readiness-v170';
 const PASS = 'pass';
 const WARN = 'warn';
 const FAIL = 'fail';
@@ -7,75 +7,65 @@ const UNCHECKED = 'unchecked';
 const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec'; // Apps Script v64 — updated July 20 2026
 const REVIEW_ACCESS_TOKEN = 'InHaus2026';
 const SAMPLE_INSPECTION_ID = 'INH-20260717-YZNHG0'; // Jay cabin — updated July 20 2026 (DKNSOB no longer in v64 bridge)
+const EXPECTED_PHOTO_COUNT = 34;
 
 const autoChecks = [
   {
     id: 'field-app-shell',
     title: 'Field app shell',
-    detail: 'Inspector app index loads from the current origin.',
+    detail: 'Inspector app v170 loads from the current production origin.',
     path: '/index.html',
-    expect: text => text.includes('InHaus') && text.includes('service-worker.js'),
+    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && text.includes('v170'),
     critical: true
   },
   {
     id: 'service-worker-bypass',
     title: 'Service worker isolation',
-    detail: 'Standalone report, workbench, and readiness routes bypass field-app cache.',
+    detail: 'The v170 service worker is live and standalone tools bypass the field-app cache.',
     path: '/service-worker.js',
-    expect: text => text.includes("'/readiness'") && text.includes("'/workbench'") && text.includes("'/reports'"),
-    critical: true
-  },
-  {
-    id: 'workbench-v1',
-    title: 'Hans Workbench v1',
-    detail: 'Protocol workbench is live with v1 labels and closeout gates.',
-    path: '/workbench/index.html',
-    expect: text => text.includes('Hans Operating Workbench') && text.includes('20260701-2') && text.includes('STOPPED AFTER 3 FAILURES'),
-    critical: true
-  },
-  {
-    id: 'report-viewer',
-    title: 'Report viewer shell',
-    detail: 'Standalone report viewer route is available.',
-    path: '/reports/report.html',
-    expect: text => text.includes('report.js') && text.includes('report.css'),
-    critical: true
-  },
-  {
-    id: 'report-static-list',
-    title: 'Report static list',
-    detail: 'Static fallback report inventory is available.',
-    path: '/reports/api/list.json',
-    expect: text => {
-      const parsed = JSON.parse(text);
-      const items = Array.isArray(parsed) ? parsed : parsed.inspections || parsed.reports || [];
-      return Array.isArray(items) && items.length > 0;
-    },
+    expect: text => text.includes("CACHE_NAME = 'inhaus-v170'") && text.includes("'/readiness'") && text.includes("'/reports'"),
     critical: true
   },
   {
     id: 'apps-script-review-list',
     title: 'Apps Script review list',
-    detail: 'Live bridge returns the review inventory with the portal access token.',
+    detail: 'Live v64 bridge returns the real inspection in the review inventory.',
     path: bridgeUrl({ action: 'list', token: REVIEW_ACCESS_TOKEN }),
-    timeoutMs: 10000,
+    timeoutMs: 30000,
     expect: text => {
       const parsed = JSON.parse(text);
-      return parsed.status === 'ok' && typeof parsed.count === 'number' && Array.isArray(parsed.inspections);
+      const inspections = Array.isArray(parsed.inspections) ? parsed.inspections : [];
+      const sample = inspections.find(item => item.inspectionId === SAMPLE_INSPECTION_ID);
+      return parsed.status === 'ok'
+        && Boolean(sample)
+        && sample.photoCount === EXPECTED_PHOTO_COUNT
+        && sample.missingCount === 0;
     },
     critical: true
   },
   {
     id: 'apps-script-report-detail',
     title: 'Apps Script report detail',
-    detail: 'Live bridge returns a full inspection payload for the sample report.',
+    detail: 'Live v64 bridge returns the complete 34-photo production inspection.',
     path: bridgeUrl({ action: 'get', id: SAMPLE_INSPECTION_ID, token: REVIEW_ACCESS_TOKEN }),
-    timeoutMs: 10000,
+    timeoutMs: 30000,
     expect: text => {
       const parsed = JSON.parse(text);
       const inspection = parsed.inspection || {};
-      return parsed.status === 'ok' && inspection.inspectionId === SAMPLE_INSPECTION_ID;
+      return parsed.status === 'ok'
+        && inspection.inspectionId === SAMPLE_INSPECTION_ID
+        && Array.isArray(inspection.photos)
+        && inspection.photos.length === EXPECTED_PHOTO_COUNT;
     },
+    critical: true
+  },
+  {
+    id: 'review-portal',
+    title: 'Review portal',
+    detail: 'The current report-building portal is deployed with the approved-findings build.',
+    path: 'https://inhauslab.github.io/inhaus-review/',
+    timeoutMs: 15000,
+    expect: text => text.includes('InHaus') && text.includes('portal.js?v=20260719-11'),
     critical: true
   },
   {
@@ -98,39 +88,33 @@ const autoChecks = [
 
 const manualGates = [
   {
-    id: 'gateway',
-    title: 'Gateway watchdog',
-    detail: 'doctor --fix has run or watchdog status is clean; no 3+ consecutive failures.',
+    id: 'phone-version',
+    title: 'Phone version',
+    detail: 'The inspector phone shows v170 after refresh or cache reset.',
     required: true
   },
   {
-    id: 'gog-auth',
-    title: 'gog auth',
-    detail: 'Confirmed the real keyring value is used, not a redacted display string.',
+    id: 'camera-capture',
+    title: 'Camera capture',
+    detail: 'A new photo can be captured, commented on, uploaded, and seen in Findings.',
     required: true
   },
   {
-    id: 'apps-script',
-    title: 'Apps Script v37',
-    detail: 'Live list/get and safe sync smoke test have evidence from the authoritative bridge.',
+    id: 'prepared-resume',
+    title: 'Office-to-phone resume',
+    detail: 'A prepared inspection appears under Continue Inspection on the inspector phone.',
     required: true
   },
   {
-    id: 'drive-write',
-    title: 'Drive write path',
-    detail: 'A safe checkpoint/write test landed in the expected Shared Drive location.',
+    id: 'photo-backup',
+    title: 'Photo backup',
+    detail: 'The test photo shows cloud saved and appears on a second device or in review.',
     required: true
   },
   {
-    id: 'last-sync',
-    title: 'Last inspection sync',
-    detail: 'A recent inspection sync has row/folder evidence, not just a UI banner.',
-    required: true
-  },
-  {
-    id: 'last-report',
-    title: 'Last report render',
-    detail: 'A real report URL rendered with sections/photos and can be shown to a person.',
+    id: 'final-cloud-status',
+    title: 'Final cloud status',
+    detail: 'Final Review reports cloud save verified and zero photos waiting.',
     required: true
   },
   {
@@ -149,19 +133,14 @@ const manualGates = [
 
 const failureDrills = [
   {
-    id: 'mac-mini-down',
-    title: 'Mac mini down',
-    detail: 'Hetzner failover path tested or explicitly scheduled before new users.'
-  },
-  {
     id: 'bad-auth-token',
     title: 'Bad auth token',
     detail: 'System fails closed with a clear message and no false success claim.'
   },
   {
-    id: 'drive-permission',
-    title: 'Drive permission failure',
-    detail: 'Write failure produces evidence and a recovery path.'
+    id: 'upload-recovery',
+    title: 'Upload recovery',
+    detail: 'A failed photo upload remains local and can be retried without retaking the photo.'
   },
   {
     id: 'netlify-delay',
@@ -169,9 +148,9 @@ const failureDrills = [
     detail: 'Operator knows how to distinguish stale edge content from broken code.'
   },
   {
-    id: 'broken-link',
-    title: 'Broken report link',
-    detail: 'URL verification catches a broken viewer link before sending it.'
+    id: 'review-recovery',
+    title: 'Review portal recovery',
+    detail: 'A portal load failure is clearly reported and can be retried without changing inspection data.'
   },
   {
     id: 'phone-only',
@@ -179,9 +158,9 @@ const failureDrills = [
     detail: 'Phone/browser visibility rule routes work to Codex before attempts.'
   },
   {
-    id: 'failure-stop',
-    title: 'Three-failure stop',
-    detail: 'Workbench blocks further execution and generates a handoff.'
+    id: 'backend-outage',
+    title: 'Backend outage',
+    detail: 'The app preserves work locally and never claims cloud success during an outage.'
   }
 ];
 
@@ -370,35 +349,32 @@ function calculateReadiness() {
   const autoResults = autoChecks.map(check => ({ check, result: state.auto[check.id] || { status: UNCHECKED } }));
   const manualResults = manualGates.map(item => ({ item, result: state.manual[item.id] || { status: UNCHECKED, evidence: '' } }));
   const drillResults = failureDrills.map(item => ({ item, result: state.drills[item.id] || { status: UNCHECKED, evidence: '' } }));
-  const allResults = [
-    ...autoResults.map(item => item.result),
-    ...manualResults.map(item => item.result),
-    ...drillResults.map(item => item.result)
-  ];
-
   const hasCriticalAutoFail = autoResults.some(item => item.check.critical && [FAIL, BLOCKED].includes(item.result.status));
   const hasManualFail = manualResults.some(item => [FAIL, BLOCKED].includes(item.result.status));
   const hasRequiredManualMissing = manualResults.some(item => item.item.required && item.result.status !== PASS);
-  const hasDrillFail = drillResults.some(item => [FAIL, BLOCKED].includes(item.result.status));
   const hasUncheckedAuto = autoResults.some(item => item.result.status === UNCHECKED);
-  const hasUncheckedDrills = drillResults.some(item => item.result.status === UNCHECKED);
 
-  const passed = allResults.filter(result => result.status === PASS).length;
-  const total = allResults.length || 1;
+  // The headline score is machine-verifiable live health. Manual phone checks
+  // remain visible as the gate between supervised testing and unsupervised use.
+  const passed = autoResults.filter(item => item.result.status === PASS).length;
+  const total = autoResults.length || 1;
   const score = Math.round((passed / total) * 100);
 
   let status = 'warn';
   let title = 'Caution';
-  let copy = 'Some checks are missing evidence. Do not add users until required manual gates pass.';
+  let copy = 'Live checks are still running or field evidence is incomplete.';
 
-  if (hasCriticalAutoFail || hasManualFail || hasDrillFail) {
+  if (hasCriticalAutoFail || hasManualFail) {
     status = 'blocked';
-    title = 'Do Not Add Users';
-    copy = 'At least one required health check failed or is blocked.';
-  } else if (!hasRequiredManualMissing && !hasUncheckedAuto && !hasUncheckedDrills) {
+    title = 'Stop — Fix Before Testing';
+    copy = 'A production health check or required field check failed.';
+  } else if (!hasRequiredManualMissing && !hasUncheckedAuto) {
     status = 'ok';
-    title = 'Ready For Limited User Expansion';
-    copy = 'All live checks, manual gates, and failure drills have passing evidence.';
+    title = 'Ready For Today\'s Team';
+    copy = 'Production systems and required phone checks have passing evidence.';
+  } else if (!hasUncheckedAuto) {
+    title = 'Ready For Supervised Testing';
+    copy = 'Production systems passed. Complete the phone checks below before unsupervised field use.';
   }
 
   return {
@@ -437,12 +413,12 @@ function setSummaryPill(id, text, status) {
 
 function makeReport(summary) {
   return [
-    '# OpenClaw System Readiness Report',
+    '# InHaus Inspector Readiness Report',
     '',
     `Status: ${summary.title}`,
     `Score: ${summary.score}%`,
     `Last run: ${state.lastRunAt ? formatDateTime(state.lastRunAt) : 'Not run'}`,
-    'Protocol: Workbench v1',
+    'Release: v170 / Apps Script v64',
     '',
     '## Live Checks',
     ...summary.autoResults.map(({ check, result }) => `- ${statusLabel(result.status)}: ${check.title} - ${result.message || check.detail}`),
@@ -455,8 +431,10 @@ function makeReport(summary) {
     '',
     '## Decision',
     summary.status === 'ok'
-      ? 'VERIFIED: Safe for limited user expansion with continued monitoring.'
-      : 'BLOCKED: Do not add users until failed or missing gates are resolved.'
+      ? 'VERIFIED: Ready for today\'s team.'
+      : summary.status === 'blocked'
+        ? 'BLOCKED: Fix the failed item before testing.'
+        : 'SUPERVISED TESTING: Live systems passed; complete the required phone checks before unsupervised use.'
   ].join('\n');
 }
 

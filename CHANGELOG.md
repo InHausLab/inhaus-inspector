@@ -6,7 +6,7 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
-## Quick Reference — Current State (July 19 2026)
+## Quick Reference — Current State (July 20 2026)
 
 | Item | Value |
 |------|-------|
@@ -39,6 +39,8 @@ This file is the authoritative record of every significant change, decision, bug
 - Finding comment, severity, and report-destination edits now use a short debounce and then checkpoint to the cloud.
 - Photo caption and placement changes now checkpoint to the cloud instead of waiting for a later inspection-step transition.
 - Confirmed the complete test-photo path through Supabase, Drive mirroring, the Apps Script record, fresh-device resume, and the review portal.
+- July 20 launch hardening: replaced the stale OpenClaw readiness assumptions with v170/v64 production checks against `INH-20260717-YZNHG0`, made the headline score reflect live system health, and kept real-phone checks as the supervised-to-unsupervised gate.
+- Corrected the cache-reset URL marker to v170 so field devices no longer reopen with an obsolete `v=145` query after clearing the app shell.
 
 ## v169 — Bounded Network and Database Failures
 **Date:** July 19, 2026
