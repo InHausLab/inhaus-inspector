@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v191 |
+| App version | v195 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
@@ -51,6 +51,19 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v195 — Inspector “Suggest an App Fix” Queue
+**Date:** July 20, 2026
+
+- Added a persistent **💡 App Fix** button throughout the inspector app.
+- Inspectors can attach a screenshot from Photos, record and review a voice note up to 60 seconds, add a typed explanation, and send the suggestion without leaving their inspection.
+- Every submission automatically includes the inspector, inspection ID, address, app version, current screen/step, page URL, device/browser, timestamp, and online state.
+- Added an IndexedDB feedback retry queue. If the cloud is unavailable, the suggestion and attachments stay on that phone and retry automatically when connectivity returns.
+- Added a capability gate so cached/older Apps Script deployments never misinterpret feedback as inspection data.
+- Added Apps Script v71 source support for a private Shared Drive folder and spreadsheet named **Things to Fix on the App**, with screenshot and voice-note links and a default `New` status.
+- Apps Script source commit: `257f37b` on Hans. Live deployment still requires the approved source-to-editor deployment step; the prior v70 endpoint safely causes v195 clients to queue instead of posting.
 
 ---
 

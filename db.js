@@ -1,12 +1,13 @@
 // InHaus Inspector - IndexedDB Storage Layer
 (function () {
   const DB_NAME = 'InHausInspector';
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
   const STORE = 'inspections';
   const QUEUE_STORE = 'uploadQueue';
   const PHOTO_STORE = 'photoVault';
   const HISTORY_STORE = 'inspectionHistory';
   const PHOTO_TRASH_STORE = 'photoTrash';
+  const APP_FEEDBACK_STORE = 'appFeedbackQueue';
   let _db = null;
 
   function showDatabaseBlockedNotice() {
@@ -51,6 +52,10 @@
           const ts = db.createObjectStore(PHOTO_TRASH_STORE, { keyPath: 'photoId' });
           ts.createIndex('inspectionId', 'inspectionId');
           ts.createIndex('deletedAt', 'deletedAt');
+        }
+        if (!db.objectStoreNames.contains(APP_FEEDBACK_STORE)) {
+          const fs = db.createObjectStore(APP_FEEDBACK_STORE, { keyPath: 'feedbackId' });
+          fs.createIndex('submittedAt', 'submittedAt');
         }
       };
       req.onblocked = () => {
@@ -154,6 +159,39 @@
       tx.oncomplete = resolve;
       tx.onerror = e => reject(e.target.error || new Error('Local database transaction failed'));
       tx.onabort = e => reject(e.target.error || new Error('Local database transaction was interrupted'));
+    });
+  }
+
+  // ── App Feedback Retry Queue ─────────────────────────────
+  async function saveAppFeedback(feedback) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(APP_FEEDBACK_STORE, 'readwrite');
+      tx.objectStore(APP_FEEDBACK_STORE).put(feedback);
+      tx.oncomplete = () => resolve(feedback);
+      tx.onerror = e => reject(e.target.error || new Error('App feedback could not be saved locally'));
+      tx.onabort = e => reject(e.target.error || new Error('App feedback save was interrupted'));
+    });
+  }
+
+  async function getAppFeedbackQueue() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(APP_FEEDBACK_STORE, 'readonly');
+      const req = tx.objectStore(APP_FEEDBACK_STORE).getAll();
+      req.onsuccess = () => resolve((req.result || []).sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt))));
+      req.onerror = e => reject(e.target.error);
+    });
+  }
+
+  async function removeAppFeedback(feedbackId) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(APP_FEEDBACK_STORE, 'readwrite');
+      tx.objectStore(APP_FEEDBACK_STORE).delete(feedbackId);
+      tx.oncomplete = resolve;
+      tx.onerror = e => reject(e.target.error || new Error('App feedback could not be removed from retry'));
+      tx.onabort = e => reject(e.target.error || new Error('App feedback retry update was interrupted'));
     });
   }
 
@@ -336,6 +374,7 @@
 
   window.DB = {
     save, get, getAll, remove, queueUpload, getQueue, removeFromQueue,
+    saveAppFeedback, getAppFeedbackQueue, removeAppFeedback,
     savePhoto, getPhoto, getPhotosForInspection, updatePhoto, removePhoto,
     saveSnapshot, getSnapshotsForInspection,
     trashPhoto, getDeletedPhotos, restoreDeletedPhoto, permanentlyDeletePhoto
