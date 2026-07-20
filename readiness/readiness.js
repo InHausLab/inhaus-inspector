@@ -27,6 +27,16 @@ const autoChecks = [
     critical: true
   },
   {
+    id: 'apps-script-post',
+    title: 'Apps Script POST checkpoint',
+    detail: 'Bridge accepts a POST checkpoint and returns status:ok. Catches broken deployments that pass GET but reject POST.',
+    path: LIVE_BRIDGE_URL,
+    postBody: { syncSecret: 'ihl-sync-2026', _checkpoint: true, inspectionId: 'INH-READINESS-PROBE', status: 'prepared' },
+    timeoutMs: 30000,
+    expect: text => { try { return JSON.parse(text).status === 'ok'; } catch(e) { return false; } },
+    critical: true
+  },
+  {
     id: 'apps-script-review-list',
     title: 'Apps Script review list',
     detail: 'Live v64 bridge returns the real inspection in the review inventory.',
@@ -302,6 +312,9 @@ async function runChecks() {
 }
 
 async function runOneCheck(check) {
+  // POST checks have a postBody field
+  if (check.postBody) return runOnePostCheck(check);
+
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), check.timeoutMs || 5000);
   try {
@@ -317,6 +330,34 @@ async function runOneCheck(check) {
     };
   } catch (err) {
     const message = err.name === 'AbortError' ? `Timed out checking ${check.path}` : err.message || 'Check failed.';
+    return { status: check.critical ? FAIL : WARN, message };
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function runOnePostCheck(check) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), check.timeoutMs || 10000);
+  try {
+    const response = await fetch(check.path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(check.postBody),
+      redirect: 'follow',
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      return { status: check.critical ? FAIL : WARN, message: `POST HTTP ${response.status} — Apps Script POST broken (405 = bad deployment settings)` };
+    }
+    const text = await response.text();
+    const ok = Boolean(check.expect(text));
+    return {
+      status: ok ? PASS : check.critical ? FAIL : WARN,
+      message: ok ? `POST verified: ${check.path}` : `POST returned unexpected response: ${text.slice(0, 120)}`
+    };
+  } catch (err) {
+    const message = err.name === 'AbortError' ? `POST timed out — Apps Script not responding` : err.message || 'POST check failed.';
     return { status: check.critical ? FAIL : WARN, message };
   } finally {
     window.clearTimeout(timer);
