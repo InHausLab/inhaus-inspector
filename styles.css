@@ -538,7 +538,8 @@ body {
 .app-feedback-button {
   position: fixed;
   left: 12px;
-  bottom: calc(112px + env(safe-area-inset-bottom));
+  top: max(12px, calc(env(safe-area-inset-top) + 8px));
+  bottom: auto;
   z-index: 9990;
   min-height: 48px;
   padding: 10px 14px;
@@ -580,7 +581,7 @@ body {
 .app-feedback-panel .recording { background:#dc2626; border-color:#dc2626; color:#fff; }
 
 @media (min-width: 768px) {
-  .app-feedback-button { bottom: 84px; }
+  .app-feedback-button { top: 12px; bottom: auto; }
 }
 
 .field-render-placeholder {

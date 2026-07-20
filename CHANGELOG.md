@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v195 |
+| App version | v196 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
@@ -51,6 +51,14 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v196 — App Fix Button at Top Left
+**Date:** July 20, 2026
+
+- Moved the persistent **💡 App Fix** button from above the bottom navigation to the top-left safe area.
+- Keeps the feedback shortcut clear of Back, Home, Next, and Review controls on phones and tablets.
 
 ---
 
