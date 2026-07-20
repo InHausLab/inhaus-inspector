@@ -1589,7 +1589,9 @@ function buildBathroomAssignmentCard(step) {
     relationship.autoName = true;
     rebuildAtStep(step.id);
     scheduleSave();
+    const savedScroll = window.scrollY;
     ctx.render();
+    requestAnimationFrame(() => window.scrollTo(0, savedScroll));
   });
   card.appendChild(typeLabel);
   card.appendChild(typeSelect);
@@ -1612,7 +1614,9 @@ function buildBathroomAssignmentCard(step) {
         relationship.autoName = true;
         rebuildAtStep(step.id);
         scheduleSave();
+        const savedScroll = window.scrollY;
         ctx.render();
+        requestAnimationFrame(() => window.scrollTo(0, savedScroll));
       });
       row.appendChild(checkbox);
       row.appendChild(document.createTextNode(roomDisplayName(bedroom)));
@@ -1629,7 +1633,9 @@ function buildBathroomAssignmentCard(step) {
         relationship.autoName = true;
         rebuildAtStep(step.id);
         scheduleSave();
+        const savedScroll = window.scrollY;
         ctx.render();
+        requestAnimationFrame(() => window.scrollTo(0, savedScroll));
       }
     }, 'Use Linked Bedroom Name'));
   }
