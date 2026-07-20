@@ -1,29 +1,29 @@
-const STORAGE_KEY = 'inhaus-inspector-readiness-v170';
+const STORAGE_KEY = 'inhaus-inspector-readiness-v171';
 const PASS = 'pass';
 const WARN = 'warn';
 const FAIL = 'fail';
 const BLOCKED = 'blocked';
 const UNCHECKED = 'unchecked';
-const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec'; // Apps Script v64 — updated July 20 2026
+const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec'; // Apps Script v70 — updated July 20 2026
 const REVIEW_ACCESS_TOKEN = 'InHaus2026';
-const SAMPLE_INSPECTION_ID = 'INH-20260717-YZNHG0'; // Jay cabin — updated July 20 2026 (DKNSOB no longer in v64 bridge)
+const SAMPLE_INSPECTION_ID = 'INH-20260717-YZNHG0'; // Jay cabin — verified in the v70 bridge on July 20 2026
 const EXPECTED_PHOTO_COUNT = 34;
 
 const autoChecks = [
   {
     id: 'field-app-shell',
     title: 'Field app shell',
-    detail: 'Inspector app v170 loads from the current production origin.',
+    detail: 'Inspector app v171 loads from the current production origin.',
     path: '/index.html',
-    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && text.includes('v170'),
+    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && text.includes('v171'),
     critical: true
   },
   {
     id: 'service-worker-bypass',
     title: 'Service worker isolation',
-    detail: 'The v170 service worker is live and standalone tools bypass the field-app cache.',
+    detail: 'The v171 service worker is live and standalone tools bypass the field-app cache.',
     path: '/service-worker.js',
-    expect: text => text.includes("CACHE_NAME = 'inhaus-v170'") && text.includes("'/readiness'") && text.includes("'/reports'"),
+    expect: text => text.includes("CACHE_NAME = 'inhaus-v171'") && text.includes("'/readiness'") && text.includes("'/reports'"),
     critical: true
   },
   {
@@ -100,7 +100,7 @@ const manualGates = [
   {
     id: 'phone-version',
     title: 'Phone version',
-    detail: 'The inspector phone shows v170 after refresh or cache reset.',
+    detail: 'The inspector phone shows v171 after refresh or cache reset.',
     required: true
   },
   {
@@ -459,7 +459,7 @@ function makeReport(summary) {
     `Status: ${summary.title}`,
     `Score: ${summary.score}%`,
     `Last run: ${state.lastRunAt ? formatDateTime(state.lastRunAt) : 'Not run'}`,
-    'Release: v170 / Apps Script v64',
+    'Release: v171 / Apps Script v70',
     '',
     '## Live Checks',
     ...summary.autoResults.map(({ check, result }) => `- ${statusLabel(result.status)}: ${check.title} - ${result.message || check.detail}`),

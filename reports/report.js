@@ -1,5 +1,5 @@
-const REPORT_REVIEW_API_URL = 'https://script.google.com/macros/s/AKfycbx6VWKm-smdwpiZbzVIk8VGLV7V7p0Zbq1X4DE3YMe9bjH-zxkfRH_aznYCp08LzEhBLw/exec';
-const REPORT_BRIDGE_API_URL = 'https://script.google.com/macros/s/AKfycbx6VWKm-smdwpiZbzVIk8VGLV7V7p0Zbq1X4DE3YMe9bjH-zxkfRH_aznYCp08LzEhBLw/exec';
+const REPORT_REVIEW_API_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec';
+const REPORT_BRIDGE_API_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec';
 const ACCESS_TOKEN_STORAGE_KEY = 'inhaus-report-access-token';
 const DEFAULT_REPORT_ID = 'INH-20260428-DKNSOB';
 const REPORT_CREDIT = 'Credit: Prepared by InHaus Lab from inspector-submitted field data and review notes.';

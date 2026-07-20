@@ -33,11 +33,11 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 
 | Item | Value |
 |------|-------|
-| App version | v170 (finding and photo-change cloud checkpoints) |
+| App version | v171 (restored production bridge and review photo API) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v64 team merge and company comment library — see URL below |
-| Apps Script URL | `https://script.google.com/macros/s/AKfycbwcCqVf_tnTJPm9D65SKEdfIq7-gYhCQZqaTL1rvVgJkGtdEXRNckLUkgW8octOQjFIXA/exec` |
+| Apps Script | v70 full review API, photo recovery, checkpoint and team sync restore |
+| Apps Script URL | `https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
 | Review portal | https://inhauslab.github.io/inhaus-review/ (token: InHaus2026) |
@@ -53,6 +53,15 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v171 — Restored Production Bridge and Review Photos
+**Date:** July 20, 2026
+
+- Restored the feature-complete Apps Script backend after the editor wipe, including the Supabase-backed review list/detail API, team field merging, company comment library, review submission controls, and secure photo metadata recovery.
+- Corrected the Supabase service-key property lookup to accept the configured `SUPABASE_KEY` name while retaining the legacy `SUPABASE_SERVICE_KEY` fallback.
+- Kept checkpoints fast and non-destructive: they update the Supabase inspection record without rebuilding the final Drive workbook.
+- Deployed Apps Script Version 70 and verified a real checkpoint POST, bridge capabilities, a four-inspection review list, and all 34 photos for `INH-20260717-YZNHG0` before changing the client URL.
+- Updated the inspector, readiness console, reports tool, review portal, and performance page to the same verified deployment.
 
 ## v170 — Finding and Photo-Change Cloud Checkpoints
 **Date:** July 19, 2026
