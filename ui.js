@@ -1652,18 +1652,88 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.style = 'background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:0.95rem;cursor:pointer;font-family:inherit;font-weight:600;width:100%;margin:4px 0;touch-action:manipulation;';
-        btn.textContent = '🌤 Open weather for current location';
-        btn.onclick = () => {
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-              const lat = pos.coords.latitude.toFixed(4);
-              const lon = pos.coords.longitude.toFixed(4);
-              window.open('https://forecast.weather.gov/MapClick.php?lat=' + lat + '&lon=' + lon, '_blank');
-            }, () => {
-              window.open('https://weather.com/weather/today', '_blank');
+        btn.textContent = '🌤 Auto-fill weather conditions';
+        btn.onclick = async () => {
+          btn.disabled = true;
+          btn.textContent = '⏳ Fetching weather…';
+          function formatWeatherSummary(cc) {
+            const tempF = parseInt(cc.temp_F);
+            const desc = (cc.weatherDesc[0] && cc.weatherDesc[0].value) || '';
+            const humidity = parseInt(cc.humidity);
+            const windMph = parseInt(cc.windspeedMiles);
+            const windDir = cc.winddir16Point || '';
+            const uvIndex = parseInt(cc.uvIndex || 0);
+            const visibility = parseInt(cc.visibility || 10);
+            // Temp description
+            const tempStr = tempF + '°F';
+            // Sky/condition
+            const sky = desc.toLowerCase();
+            // Humidity description
+            const humDesc = humidity < 30 ? 'low humidity' : humidity < 60 ? 'moderate humidity' : 'high humidity';
+            // Wind description
+            let windDesc;
+            if (windMph < 5) windDesc = 'calm winds';
+            else if (windMph < 12) windDesc = 'light ' + windDir.toLowerCase().replace(/([a-z])([A-Z])/g,'$1-$2').toLowerCase() + ' wind';
+            else if (windMph < 20) windDesc = 'moderate ' + windDir.toLowerCase().replace(/([a-z])([A-Z])/g,'$1-$2').toLowerCase() + ' wind';
+            else windDesc = 'strong ' + windDir.toLowerCase().replace(/([a-z])([A-Z])/g,'$1-$2').toLowerCase() + ' wind';
+            // Precipitation
+            const precip = sky.includes('rain') || sky.includes('storm') || sky.includes('drizzle') || sky.includes('shower')
+              ? 'active precipitation present'
+              : 'dry conditions with no meaningful precipitation';
+            // AQI proxy from UV + visibility
+            let aqiDesc;
+            if (visibility >= 10 && uvIndex <= 5) aqiDesc = 'very good outdoor air quality with low particulate and ozone levels (AQI within the \'Good\' range)';
+            else if (visibility >= 7) aqiDesc = 'good outdoor air quality (AQI within the \'Good\' range)';
+            else aqiDesc = 'moderate outdoor air quality; visibility reduced';
+            return tempStr + ' and ' + sky + '; ' + humDesc + ' with ' + windDesc + '; ' + precip + '; ' + aqiDesc + '.';
+          }
+          try {
+            const pos = await new Promise((resolve, reject) => {
+              if (!navigator.geolocation) return reject(new Error('no geolocation'));
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
             });
-          } else {
-            window.open('https://weather.com/weather/today', '_blank');
+            const lat = pos.coords.latitude.toFixed(4);
+            const lon = pos.coords.longitude.toFixed(4);
+            const resp = await fetch('https://wttr.in/' + lat + ',' + lon + '?format=j1');
+            if (!resp.ok) throw new Error('weather fetch failed');
+            const wx = await resp.json();
+            const cc = wx.current_condition && wx.current_condition[0];
+            if (!cc) throw new Error('no weather data');
+            const summary = formatWeatherSummary(cc);
+            // Find the weatherConditions textarea and populate it
+            const container = btn.closest('.card') || btn.parentElement;
+            const allCards = document.querySelectorAll('.card');
+            let targetInput = null;
+            allCards.forEach(card => {
+              const inputs = card.querySelectorAll('textarea, input[type="text"]');
+              inputs.forEach(inp => {
+                const label = inp.closest('.field-wrap, .field-row, div');
+                const labelEl = label && label.querySelector('label, .field-label');
+                if (labelEl && labelEl.textContent && labelEl.textContent.toLowerCase().includes('weather')) targetInput = inp;
+              });
+            });
+            // Also try by proximity — the textarea directly above this button
+            if (!targetInput) {
+              const allInputs = document.querySelectorAll('textarea');
+              allInputs.forEach(inp => {
+                if (inp.getBoundingClientRect().bottom < btn.getBoundingClientRect().top + 200) targetInput = inp;
+              });
+            }
+            if (targetInput) {
+              targetInput.value = summary;
+              targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+              targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+              btn.textContent = '✅ Weather filled';
+              btn.style.background = '#4caf50';
+            } else {
+              // fallback: copy to clipboard
+              await navigator.clipboard.writeText(summary);
+              btn.textContent = '📋 Copied — paste into weather field';
+            }
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = '🌤 Auto-fill weather conditions';
+            alert('Could not fetch weather: ' + (err.message || String(err)) + '\n\nCheck location permissions.');
           }
         };
         return btn;
