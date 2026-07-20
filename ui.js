@@ -1165,6 +1165,43 @@
           className: 'photo-capture-route' + (savedRoom || savedStep ? '' : ' needs-placement')
         }, (savedRoom || savedStep ? '✓ Saved to ' : '⚠ ') + savedDestination));
 
+        if (photoOptions.allowRoomAssignment && !String(p.roomName || '').trim()) {
+          const assignment = el('label', { className: 'field-row', style: 'display:block;margin:8px 0;' });
+          assignment.appendChild(el('span', { className: 'field-label', style: 'display:block;margin-bottom:4px;' }, 'Room / area'));
+          const roomInput = el('input', {
+            type: 'text',
+            className: 'field-input',
+            placeholder: 'Choose or type a room',
+            list: 'flir-room-options-' + p.photoId
+          });
+          roomInput.value = p.roomName || '';
+          const roomOptions = el('datalist', { id: 'flir-room-options-' + p.photoId });
+          (photoOptions.roomChoices || []).forEach(choice => {
+            roomOptions.appendChild(el('option', { value: choice }));
+          });
+          roomInput.addEventListener('change', () => {
+            p.roomName = roomInput.value.trim();
+            p.stepName = photoOptions.assignmentStepName || p.stepName || stepLabel || 'FLIR Thermal Scan';
+            p.placementSource = p.roomName ? 'manual' : 'unassigned';
+            p.routingStatus = p.roomName ? 'manual' : 'needs_review';
+            if (window.DB && window.DB.updatePhoto && p.photoId) {
+              window.DB.updatePhoto(p.photoId, {
+                roomName: p.roomName,
+                stepName: p.stepName,
+                placementSource: p.placementSource,
+                routingStatus: p.routingStatus,
+                updatedAt: Date.now()
+              });
+            }
+            onUpdate();
+            const newSection = renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions);
+            section.replaceWith(newSection);
+          });
+          assignment.appendChild(roomInput);
+          assignment.appendChild(roomOptions);
+          card.appendChild(assignment);
+        }
+
         const capRow = el('div', { className: 'input-row' });
         const capInp = el('textarea', {
           className: 'field-input photo-caption-input', rows: '2',
@@ -1301,16 +1338,19 @@
     }
     async function handleFiles(files) {
       let savedCount = 0;
+      const resolvedRoomName = String(
+        typeof photoOptions.getRoomName === 'function' ? photoOptions.getRoomName() : roomName || ''
+      ).trim();
       for (const file of Array.from(files)) {
         try {
           const dataUrl = await compressImage(file);
           const thumbnailDataUrl = await imageVariant(dataUrl, 420, 0.62);
           const newPhoto = {
             photoId: 'p-' + Math.random().toString(36).substr(2, 9),
-            roomName: roomName || '', stepName: stepName || '',
+            roomName: resolvedRoomName, stepName: stepName || '',
             timestamp: new Date().toISOString(), caption: '', dataUrl, thumbnailDataUrl,
-            placementSource: roomName || stepName ? 'capture_context' : 'unassigned',
-            routingStatus: roomName || stepName ? 'auto' : 'needs_review',
+            placementSource: resolvedRoomName || stepName ? 'capture_context' : 'unassigned',
+            routingStatus: resolvedRoomName || stepName ? 'auto' : 'needs_review',
             _uploaded: false, _vaultSaved: false
           };
           await savePhotoRecordToVault(newPhoto, inspectionId);
@@ -1325,7 +1365,10 @@
       }
       if (savedCount > 0 && window.showToast) {
         const countLabel = savedCount === 1 ? 'Photo' : savedCount + ' photos';
-        window.showToast(countLabel + ' saved to ' + destinationLabel);
+        const resolvedDestination = resolvedRoomName && stepLabel && resolvedRoomName.toLowerCase() !== stepLabel.toLowerCase()
+          ? resolvedRoomName + ' → ' + stepLabel
+          : resolvedRoomName || stepLabel || destinationLabel;
+        window.showToast(countLabel + ' saved to ' + resolvedDestination);
       }
     }
 
@@ -1338,8 +1381,13 @@
     section.appendChild(fileInp);
     section.appendChild(libInp);
     const photoBtnRow = el('div', { className: 'photo-btn-row' });
-    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => fileInp.click() }, photos.length ? '\uD83D\uDCF7 Add Another' : '\uD83D\uDCF7 Add Photo'));
-    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => libInp.click() }, '\uD83D\uDCC1 From Library'));
+    if (!photoOptions.libraryOnly) {
+      photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => fileInp.click() }, photos.length ? '\uD83D\uDCF7 Add Another' : '\uD83D\uDCF7 Add Photo'));
+    }
+    const libraryLabel = photos.length
+      ? (photoOptions.addAnotherLabel || (photoOptions.libraryOnly ? '\uD83D\uDCC1 Add Another Photo' : '\uD83D\uDCC1 From Library'))
+      : (photoOptions.addLabel || (photoOptions.libraryOnly ? '\uD83D\uDCC1 Import from Photo Library' : '\uD83D\uDCC1 From Library'));
+    photoBtnRow.appendChild(el('button', { type: 'button', className: 'btn btn-secondary photo-add-btn', onClick: () => libInp.click() }, libraryLabel));
     section.appendChild(photoBtnRow);
     return section;
   }
@@ -1740,114 +1788,40 @@
         return wrap;
       }
       case 'flir-photo-log': {
-        // Dynamic FLIR log: starts with 1 entry, + Add button appends more
-        // Stores data as flirRoom1/flirImg1/flirImageLabel1, flirRoom2... etc.
-        // Compatible with existing export loop.
-        const wrap = document.createElement('div');
-        wrap.style = 'display:flex;flex-direction:column;gap:0;';
+        if (!Array.isArray(data._flirPhotos)) data._flirPhotos = [];
 
-        function countEntries() {
-          let n = 0;
-          while (data['flirRoom' + (n + 1)] !== undefined ||
-                 data['flirImg' + (n + 1)] !== undefined ||
-                 data['flirImageLabel' + (n + 1)] !== undefined) n++;
-          return Math.max(n, 1); // always at least 1
-        }
-
-        let entryCount = countEntries();
-        const entriesWrap = document.createElement('div');
-        entriesWrap.style = 'display:flex;flex-direction:column;gap:10px;';
-
-        function buildEntry(i) {
-          const entry = document.createElement('div');
-          entry.style = 'background:#f4f8f0;border:1.5px solid #c8d8b0;border-radius:10px;padding:12px 14px;position:relative;';
-          entry.setAttribute('data-flir-entry', i);
-
-          // Entry header
-          const hdr = document.createElement('div');
-          hdr.style = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
-          const hdrLabel = document.createElement('div');
-          hdrLabel.style = 'font-size:12px;font-weight:700;color:#5a7a3a;text-transform:uppercase;letter-spacing:.4px;';
-          hdrLabel.textContent = 'Image ' + i;
-          hdr.appendChild(hdrLabel);
-
-          // Remove button (only show if more than 1 entry)
-          if (i > 1) {
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.style = 'background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;';
-            removeBtn.textContent = '\u00d7';
-            removeBtn.title = 'Remove this entry';
-            removeBtn.onclick = () => {
-              // Shift data down from i+1 onward
-              let j = i;
-              while (data['flirRoom' + (j + 1)] !== undefined ||
-                     data['flirImg' + (j + 1)] !== undefined ||
-                     data['flirImageLabel' + (j + 1)] !== undefined) {
-                data['flirRoom' + j] = data['flirRoom' + (j + 1)] || '';
-                data['flirImg' + j] = data['flirImg' + (j + 1)] || '';
-                data['flirImageLabel' + j] = data['flirImageLabel' + (j + 1)] || '';
-                j++;
-              }
-              delete data['flirRoom' + j];
-              delete data['flirImg' + j];
-              delete data['flirImageLabel' + j];
-              entryCount = Math.max(entryCount - 1, 1);
-              rebuildEntries();
-              changed();
-            };
-            hdr.appendChild(removeBtn);
-          }
-          entry.appendChild(hdr);
-
-          function mkRow(labelTxt, key, placeholder) {
-            const row = document.createElement('div');
-            row.style = 'margin-bottom:8px;';
-            const lbl = document.createElement('div');
-            lbl.style = 'font-size:11px;font-weight:600;color:#6a7a60;margin-bottom:3px;';
-            lbl.textContent = labelTxt;
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.placeholder = placeholder || '';
-            inp.value = data[key] || '';
-            inp.style = 'width:100%;padding:7px 10px;border:1.5px solid #d0dcc8;border-radius:7px;font-size:0.9rem;background:#fff;box-sizing:border-box;';
-            inp.addEventListener('input', () => { data[key] = inp.value; changed(); });
-            row.appendChild(lbl); row.appendChild(inp);
-            return row;
-          }
-
-          entry.appendChild(mkRow('Room / Area', 'flirRoom' + i, 'e.g. Living Room'));
-          entry.appendChild(mkRow('FLIR Image #', 'flirImg' + i, 'e.g. #0023'));
-          entry.appendChild(mkRow('Label / Notes', 'flirImageLabel' + i, 'e.g. Moisture stain near window'));
-          return entry;
-        }
-
-        function rebuildEntries() {
-          entriesWrap.innerHTML = '';
-          for (let i = 1; i <= entryCount; i++) {
-            entriesWrap.appendChild(buildEntry(i));
-          }
-        }
-        rebuildEntries();
-
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.style = 'margin-top:10px;padding:9px 16px;background:#fff;border:2px dashed #8aab5a;border-radius:9px;color:#5a7a3a;font-weight:700;font-size:0.9rem;cursor:pointer;width:100%;text-align:center;';
-        addBtn.textContent = '+ Add another image';
-        addBtn.onclick = () => {
-          entryCount++;
-          data['flirRoom' + entryCount] = '';
-          data['flirImg' + entryCount] = '';
-          data['flirImageLabel' + entryCount] = '';
-          rebuildEntries();
-          // scroll new entry into view
-          const last = entriesWrap.lastElementChild;
-          if (last) setTimeout(() => last.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+        const roomChoices = new Set();
+        const addRoomChoice = value => {
+          String(value || '').split(/[,;\n]/).map(item => item.trim()).filter(Boolean).forEach(item => roomChoices.add(item));
         };
+        addRoomChoice(data.roomName);
+        addRoomChoice(data._roomName);
+        addRoomChoice(data.roomNames);
+        addRoomChoice(data.levelLocation);
+        Object.values((inspection && inspection.stepData) || {}).forEach(stepData => {
+          addRoomChoice(stepData && stepData.roomName);
+          addRoomChoice(stepData && stepData._roomName);
+          addRoomChoice(stepData && stepData.roomNames);
+        });
 
-        wrap.appendChild(entriesWrap);
-        wrap.appendChild(addBtn);
-        return wrap;
+        const currentRoom = () => String(data.roomName || data._roomName || data.levelLocation || '').trim();
+        return renderPhoto(
+          data._flirPhotos,
+          () => { changed(); },
+          currentRoom(),
+          'FLIR Thermal Scan',
+          (inspection && inspection.inspectionId) || data.inspectionId || '',
+          {
+            hideLabel: true,
+            libraryOnly: true,
+            addLabel: '\uD83C\uDF21 Add FLIR Photo',
+            addAnotherLabel: '\uD83C\uDF21 Add Another FLIR Photo',
+            getRoomName: currentRoom,
+            allowRoomAssignment: !currentRoom(),
+            roomChoices: Array.from(roomChoices),
+            assignmentStepName: 'FLIR Thermal Scan'
+          }
+        );
       }
       case 'dynamic-room-label': {
         // Renders a contextual label showing which room the follow-up is for

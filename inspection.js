@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=180';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=180';
-import { ensureInspectionWorkspace } from './findings.js?v=180';
+import { getInspection } from './state.js?v=184';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=184';
+import { ensureInspectionWorkspace } from './findings.js?v=184';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -298,6 +298,16 @@ export function buildExportJSON(stepList) {
         flirLog.push({ room: d['flirRoom' + i] || step.name, label: d['flirImageLabel' + i] || '', imgNum: d['flirImg' + i] || '' });
       }
     }
+    // Current FLIR workflow: photos imported from the device library, assigned
+    // to the room automatically, and captioned directly on the photo card.
+    (Array.isArray(d._flirPhotos) ? d._flirPhotos : []).forEach(photoItem => {
+      flirLog.push({
+        room: photoItem.roomName || d.roomName || d._roomName || step.name,
+        label: photoItem.caption || '',
+        imgNum: '',
+        photoId: photoItem.photoId || ''
+      });
+    });
   });
   if (flirLog.length) exp.flirImageLog = flirLog;
 

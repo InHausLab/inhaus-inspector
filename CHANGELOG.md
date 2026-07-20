@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v180 |
+| App version | v184 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
@@ -51,6 +51,19 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v184 — Room-Level FLIR Photos
+**Date:** July 20, 2026
+
+- Replaced the numbered FLIR image-log forms with photo cards.
+- Every room's FLIR section now has an `Add FLIR Photo` button that imports from the device photo library and assigns the photo to that room automatically.
+- After the first photo, the control changes to `Add Another FLIR Photo`; inspectors can import multiple photos at once or add more later.
+- Each FLIR photo has an editable inspector comment. Multi-room areas show a room selector only when a photo cannot be assigned automatically.
+- Added the same FLIR photo workflow to bathrooms and the utility room.
+- FLIR photo room, comment, and photo ID are included in the report-builder export while legacy numbered FLIR entries remain readable.
+- Browser smoke test verified the first-photo state, additional-photo state, automatic Bathroom assignment, editable comment, and removal of the old `FLIR Image #` field.
 
 ---
 

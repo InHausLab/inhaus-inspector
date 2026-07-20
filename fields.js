@@ -47,7 +47,7 @@ export function flirFields() {
     yesno('flirDone', 'FLIR scan completed'),
     showIf(yesno('flirConcerns', 'Areas of concern found'), 'flirDone', 'Yes'),
     showIf(num('flirMoisture', 'Moisture reading', { unit: '%', note: 'Flag if >20%' }), 'flirDone', 'Yes'),
-    showIf(info('Log each FLIR image. Tap "+ Add another image" for more.'), 'flirDone', 'Yes'),
+    showIf(info('Import FLIR photos from your photo library. Each photo is assigned to this room automatically; add a comment if needed.'), 'flirDone', 'Yes'),
     showIf({ type: 'flir-photo-log' }, 'flirDone', 'Yes')
   ], { defaultOpen: false })
   ];
@@ -63,8 +63,8 @@ export function flirLogFields() {
         { key: 'flirPhotoNoConcern', label: 'If no concerns: photograph area where mold test conducted' }
       ]),
       check('flirScanned', 'Scan rooms for water stains, moisture intrusion, plumbing'),
-      heading('FLIR Photo Log'),
-      info('One entry per image. Tap \u201c+ Add another image\u201d for each additional one.'),
+      heading('FLIR Photos'),
+      info('Import FLIR photos from your photo library. Add a comment and confirm the room for each photo.'),
       { type: 'flir-photo-log' }
     ], { defaultOpen: false })
   ];
