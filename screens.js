@@ -1767,6 +1767,16 @@ export function renderStep() {
       }, s.name);
       subNav.appendChild(btn);
     });
+    // Add Room as a + tab inline with supplementary room tabs
+    if (currentPhase === 'supplementary') {
+      const addBtn = ui().el('button', {
+        type: 'button',
+        className: 'sub-nav-btn',
+        style: 'opacity:0.7;font-size:18px;padding:4px 12px;',
+        onClick: () => { ctx.addDynamicRoom('additional'); window.scrollTo(0, 0); }
+      }, '+');
+      subNav.appendChild(addBtn);
+    }
     c.appendChild(subNav);
   }
 
@@ -1940,11 +1950,7 @@ export function renderStep() {
       c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('bathrooms'); window.scrollTo(0, 0); } }, '+ Add Another Bathroom'));
     }
   }
-  if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {
-    if (step.id === 'kitchen-air' || (step.dynamic === 'additional' && step.id === ctx.stepList.filter(s => s.dynamic === 'additional').pop()?.id)) {
-      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('additional'); window.scrollTo(0, 0); } }, '+ Add Room (Office, Dining Room, etc.)'));
-    }
-  }
+  // Add Room button moved to sub-nav tab row for supplementary phase
 
   data._visited = true;
 
