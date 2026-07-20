@@ -2727,13 +2727,25 @@
   // ── Validation Flash ──────────────────────────────────────
   function flashUncheckedItems(container) {
     const items = container.querySelectorAll('.check-item:not(.optional-item)');
+    let firstMissing = null;
     items.forEach(row => {
       const box = row.querySelector('.check-box');
       if (box && !box.classList.contains('checked')) {
         row.classList.add('validation-flash');
         setTimeout(() => row.classList.remove('validation-flash'), 1500);
+        if (!firstMissing) firstMissing = row;
       }
     });
+    // Also catch empty required inputs/selects/textareas
+    if (!firstMissing) {
+      const inputs = container.querySelectorAll('input[required], select[required], textarea[required], input.required-field, select.required-field, textarea.required-field');
+      for (const el of inputs) {
+        if (!el.value || el.value.trim() === '') { firstMissing = el; break; }
+      }
+    }
+    if (firstMissing) {
+      setTimeout(() => firstMissing.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+    }
   }
 
   // ── ShowIf Real-time Update ───────────────────────────────
