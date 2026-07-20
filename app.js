@@ -1,11 +1,11 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=172';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt } from './state.js?v=172';
-import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js?v=172';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=172';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js?v=172';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=172';
-import { initScreens, render } from './screens.js?v=172';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=173';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=173';
+import { initStorage, saveNow, scheduleSave, backupToLocalStorage } from './storage.js?v=173';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=173';
+import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, submitInspection } from './sync.js?v=173';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=173';
+import { initScreens, render } from './screens.js?v=173';
 
 (function () {
   'use strict';
@@ -50,6 +50,36 @@ import { initScreens, render } from './screens.js?v=172';
   let _finalSyncTriggeredId = null;      // tracks which inspection triggered final sync
 
   const root = document.getElementById('app');
+  const RESTORABLE_SCREENS = new Set([
+    'home', 'truck-check', 'intake', 'cloud-resume', 'precheck', 'step',
+    'review', 'photos', 'rapid-capture', 'findings', 'team', 'my-work', 'recovery'
+  ]);
+
+  function persistActivePosition() {
+    return saveActivePosition(inspection, currentStepIdx, getScreen());
+  }
+
+  async function restoreActivePosition() {
+    const saved = loadActivePosition();
+    if (!saved || !window.DB || !window.DB.get) return false;
+    try {
+      const restored = await window.DB.get(saved.inspectionId);
+      if (!restored || restored.status !== 'in-progress' || restored.inspectionId !== saved.inspectionId) {
+        clearActivePosition(saved.inspectionId);
+        return false;
+      }
+      inspection = restored;
+      setInspection(restored);
+      stepList = buildStepList(restored);
+      currentStepIdx = Math.max(0, Math.min(saved.stepIdx, Math.max(stepList.length - 1, 0)));
+      setScreen(RESTORABLE_SCREENS.has(saved.screen) ? saved.screen : 'step');
+      startAutoSave();
+      return true;
+    } catch (err) {
+      console.warn('Could not restore active inspection position:', err);
+      return false;
+    }
+  }
 
   // ── ID Generator ───────────────────────────────────────────
   function genId() {
@@ -487,7 +517,7 @@ import { initScreens, render } from './screens.js?v=172';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v172',
+      appVersion: 'v173',
       success: success
     };
   }
@@ -529,6 +559,7 @@ import { initScreens, render } from './screens.js?v=172';
     genId,
     addDynamicRoom,
     triggerFinalSync,
+    persistActivePosition,
     render,
     startAutoSave,
     stopAutoSave
@@ -544,10 +575,17 @@ import { initScreens, render } from './screens.js?v=172';
     updateSyncStatus('offline'); // Change 2
   });
 
+  window.addEventListener('pagehide', persistActivePosition);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') persistActivePosition();
+  });
+
   // Service worker intentionally disabled — was causing Safari freeze on cache update
 
-  retryQueuedUploads();
-  render();
+  restoreActivePosition().finally(() => {
+    retryQueuedUploads();
+    render();
+  });
 
   // ── Storage quota monitor ──────────────────────────────────
   async function checkStorageQuota() {

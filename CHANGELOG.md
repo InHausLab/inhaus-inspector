@@ -33,11 +33,11 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 
 | Item | Value |
 |------|-------|
-| App version | v172 (cloud photo metadata sync and photo-to-number capture) |
+| App version | v173 (exact inspection position restore) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v71 full review API, photo recovery, checkpoint and team sync restore |
-| Apps Script URL | `https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec` |
+| Apps Script | v65 restored deployment — checkpoint POST verified |
+| Apps Script URL | `https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
 | Review portal | https://inhauslab.github.io/inhaus-review/ (token: InHaus2026) |
@@ -51,6 +51,17 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v173 — Exact Inspection Position Restore
+**Date:** July 20, 2026
+
+- Saves `{ inspectionId, stepIdx, screen }` to `inhausActivePosition` whenever an active inspection screen renders and whenever Safari hides or unloads the page.
+- On startup, restores the exact saved screen and step only after IndexedDB confirms the same inspection still exists with `in-progress` status.
+- Invalid, missing, completed, or mismatched records fall back to the normal home screen without changing the existing cloud-resume workflow.
+- Clears the saved position after a successful final submission or permanent inspection deletion.
+- Leaves checkpoint/sync logic and the truck, intake, and pre-inspection screen flows unchanged.
 
 ---
 

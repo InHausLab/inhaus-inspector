@@ -4,6 +4,7 @@ let _inspection = null;
 let _screen = 'home'; // home | truck-check | intake | precheck | step | review | photos
 let _syncStatus = 'local'; // local | synced | syncing | checkpoint | failed | offline | final-failed
 let _dirty = false;
+const ACTIVE_POSITION_KEY = 'inhausActivePosition';
 
 function cleanTimestamp(v) {
   if (v === null || v === undefined || v === '') return null;
@@ -28,6 +29,53 @@ export function setInspection(v) {
 // ── screen ──────────────────────────────────────────────────
 export function getScreen() { return _screen; }
 export function setScreen(v) { _screen = v; }
+
+// ── Active inspection position ─────────────────────────────
+// localStorage survives Safari reloads and service-worker cache restarts.
+export function saveActivePosition(inspection, stepIdx, screen) {
+  if (!inspection || inspection.status !== 'in-progress' || !inspection.inspectionId) return false;
+  try {
+    localStorage.setItem(ACTIVE_POSITION_KEY, JSON.stringify({
+      inspectionId: inspection.inspectionId,
+      stepIdx: Number.isInteger(Number(stepIdx)) ? Number(stepIdx) : 0,
+      screen: String(screen || 'step')
+    }));
+    return true;
+  } catch (err) {
+    console.warn('Could not save active inspection position:', err);
+    return false;
+  }
+}
+
+export function loadActivePosition() {
+  try {
+    const raw = localStorage.getItem(ACTIVE_POSITION_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.inspectionId) throw new Error('invalid_active_position');
+    return {
+      inspectionId: String(saved.inspectionId),
+      stepIdx: Number.isInteger(Number(saved.stepIdx)) ? Number(saved.stepIdx) : 0,
+      screen: String(saved.screen || 'step')
+    };
+  } catch (err) {
+    try { localStorage.removeItem(ACTIVE_POSITION_KEY); } catch (_) {}
+    return null;
+  }
+}
+
+export function clearActivePosition(inspectionId) {
+  try {
+    if (inspectionId) {
+      const saved = loadActivePosition();
+      if (saved && saved.inspectionId !== inspectionId) return false;
+    }
+    localStorage.removeItem(ACTIVE_POSITION_KEY);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
 
 // ── syncStatus ──────────────────────────────────────────────
 export function getSyncStatus() { return _syncStatus; }

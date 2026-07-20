@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=172';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=172';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=172';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=172';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=172';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=172';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=173';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=173';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=173';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=173';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=173';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=173';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=172';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=172';
-import { updatePhotoMetadata } from './supabase-photos.js?v=172';
+} from './findings.js?v=173';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=173';
+import { updatePhotoMetadata } from './supabase-photos.js?v=173';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=172';
+} from './comment-library.js?v=173';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -475,6 +475,7 @@ export function openSearch() {
 
 // ── Render ─────────────────────────────────────────────────
 export function render() {
+  if (ctx && typeof ctx.persistActivePosition === 'function') ctx.persistActivePosition();
   // Kill any body-level overlays that may have leaked across renders
   ['room-drawer-overlay', 'search-overlay'].forEach(id => {
     const el = document.getElementById(id);
@@ -677,6 +678,7 @@ export function renderInspCard(insp, canResume) {
       ui().el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
       ui().el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
         if (confirm('⚠️ Delete this inspection permanently?\n\nAll photos and data will be removed from this device.\n\nOnly delete after confirming your photos have been uploaded to Google Drive.\n\nThis cannot be undone.')) {
+          clearActivePosition(insp.inspectionId);
           window.DB.remove(insp.inspectionId).then(() => ctx.render());
         }
       }}, 'Delete')
@@ -3197,6 +3199,7 @@ export function renderReview() {
           submitBtn.textContent = '\u2713 Submit Inspection';
           return;
         }
+        clearActivePosition(ctx.inspection.inspectionId);
         setScreen('home'); ctx.inspection = null; setInspection(null); ctx.stopAutoSave(); ctx.render();
       });
     }}, '\u2713 Submit Inspection');
