@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 
 | Item | Value |
 |------|-------|
-| App version | v171 (restored production bridge and review photo API) |
+| App version | v172 (cloud photo metadata sync and photo-to-number capture) |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v71 full review API, photo recovery, checkpoint and team sync restore |
@@ -53,6 +53,17 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
 
 ---
+
+## v172 — Cloud Photo Metadata Sync and Photo-to-Number Capture
+**Date:** July 20, 2026
+
+- Fixed a field-test failure where photo files reached Supabase immediately but captions entered after capture remained only on the phone.
+- Added a dedicated authenticated photo-worker metadata endpoint so caption, room, task, and slot changes update the existing cloud photo row without re-uploading image bytes.
+- Photo Organization now sends metadata before its normal inspection checkpoint and reports a retryable local-only state if either save fails.
+- Verified the failure against Berta inspection `INH-20260720-X8S3U8`: four image files were present while both new captions were absent before this fix.
+- Added the existing photo-to-ID scanner to the office-prep water, PFAS, and microplastics identifiers and the field PFAS kit number.
+- Added an editable photo-to-number scanner for ATP pre-test and post-test RLU readings; failed scans fall back to manual numeric entry.
+- Left existing field sample-ID scanners and all Q-Trak readings unchanged.
 
 ## v171 — Restored Production Bridge and Review Photos
 **Date:** July 20, 2026

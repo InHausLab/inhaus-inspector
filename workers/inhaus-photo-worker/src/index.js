@@ -20,6 +20,7 @@ export default {
     try {
       const url = new URL(request.url);
       if (url.pathname === '/sign' && request.method === 'POST') return await handleSign(request, env);
+      if (url.pathname === '/metadata' && request.method === 'POST') return await handleMetadataUpdate(request, env);
       if (url.pathname === '/mirror' && request.method === 'POST') return await handleMirror(request, env);
       if (url.pathname === '/confirmed' && request.method === 'POST') return await handleConfirmed(request, env);
       if (url.pathname === '/inspection-status' && request.method === 'POST') return await handleInspectionStatus(request, env);
@@ -65,6 +66,23 @@ async function handleSign(request, env) {
   });
 
   return json({ signedUrl, storagePath });
+}
+
+async function handleMetadataUpdate(request, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
+  const body = await readJson(request);
+  validateSharedSecret(body, env);
+
+  const inspectionId = cleanId(body.inspectionId, 'inspectionId');
+  const photoId = cleanId(body.photoId, 'photoId');
+  const updated = await updatePhotoMetadata(env, inspectionId, photoId, {
+    room_name: String(body.roomName || ''),
+    step_name: String(body.stepName || ''),
+    caption: String(body.caption || ''),
+    slot: normalizeSlot(body.slot)
+  });
+
+  return json({ updated: true, inspectionId, photoId, photo: updated });
 }
 
 // Review-portal image delivery. Drive files in the Shared Drive cannot always
@@ -259,6 +277,27 @@ async function recordPhotoMetadata(env, payload) {
   const detail = await res.text().catch(() => '');
   if (/duplicate key|23505/i.test(detail)) return;
   throw new Error(`metadata_failed:${res.status}:${detail.slice(0, 200)}`);
+}
+
+async function updatePhotoMetadata(env, inspectionId, photoId, payload) {
+  const body = { ...payload };
+  if (body.slot === null) body.slot = null;
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('photo_id', `eq.${photoId}`);
+  const res = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
+    method: 'PATCH',
+    headers: serviceHeaders(env, {
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }),
+    body: JSON.stringify(body)
+  });
+  const detail = await res.text().catch(() => '');
+  if (!res.ok) throw new Error(`metadata_update_failed:${res.status}:${detail.slice(0, 200)}`);
+  const rows = detail ? JSON.parse(detail) : [];
+  if (!Array.isArray(rows) || !rows.length) throw new Error('metadata_not_found');
+  return rows[0];
 }
 
 async function getUnmirroredPhotoRows(env, inspectionId) {

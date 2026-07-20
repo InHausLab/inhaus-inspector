@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=171';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=171';
-import { ensureInspectionWorkspace } from './findings.js?v=171';
+import { getInspection } from './state.js?v=172';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=172';
+import { ensureInspectionWorkspace } from './findings.js?v=172';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];

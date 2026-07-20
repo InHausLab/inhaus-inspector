@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=171';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=171';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=171';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=171';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=171';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=171';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus } from './state.js?v=172';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=172';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=172';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=172';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=172';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=172';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,12 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=171';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=171';
+} from './findings.js?v=172';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=172';
+import { updatePhotoMetadata } from './supabase-photos.js?v=172';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=171';
+} from './comment-library.js?v=172';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1192,12 +1193,12 @@ export function renderIntake() {
       divider(),
       heading('Water Test Kit Preparation'),
       sel('waterPanelPlanned', 'Water panel test', ['Requested — collect on site', 'Not requested']),
-      text('waterSampleId', 'Water panel kit / sample ID', { placeholder: 'Enter or scan the pre-assigned kit number' }),
+      { type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Water panel kit / sample ID' },
       sel('pfasSetup', 'PFAS water test', ['Yes', 'No', 'Not requested']),
-      showIf(text('pfasKitNum', 'PFAS Kit #', { placeholder: 'e.g. WTK_PFAS_27099' }), 'pfasSetup', 'Yes'),
-      text('pfasSampleId', 'PFAS sample ID (if pre-assigned)'),
+      showIf({ type: 'sample-id-scanner', dataKey: 'pfasKitNum', label: 'PFAS Kit #' }, 'pfasSetup', 'Yes'),
+      { type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS sample ID (if pre-assigned)' },
       sel('microplasticsStatus', 'Microplastics test', ['Requested — collect on site', 'Not requested']),
-      text('microplasticsSampleId', 'Microplastics sample ID (if pre-assigned)'),
+      { type: 'sample-id-scanner', dataKey: 'microplasticsSampleId', label: 'Microplastics sample ID (if pre-assigned)' },
       textarea('officePrepNotes', 'Office preparation notes', { placeholder: 'Kit locations, special customer instructions, labels prepared, or anything the inspector needs to know.' })
     );
   }
@@ -2530,7 +2531,8 @@ export function renderPhotos() {
   let showAllPhotos = false;
   let photoSummaryRun = 0;
   let photoCloudSaveTimer = null;
-  async function savePhotoChangesToCloud() {
+  let pendingPhotoMetadata = null;
+  async function savePhotoChangesToCloud(photo) {
     if (photoCloudSaveTimer) {
       clearTimeout(photoCloudSaveTimer);
       photoCloudSaveTimer = null;
@@ -2540,16 +2542,28 @@ export function renderPhotos() {
       ui().showToast('Photo change could not be saved on this device');
       return false;
     }
+    let metadataSaved = true;
+    if (photo && photo.photoId && (photo.storagePath || photo._storedConfirmed || photo._driveConfirmed)) {
+      try {
+        await updatePhotoMetadata(photo, ctx.inspection.inspectionId);
+      } catch (metadataErr) {
+        metadataSaved = false;
+        console.warn('Photo metadata cloud update failed:', metadataErr);
+      }
+    }
     const cloudSaved = await checkpointToCloud(ctx.stepList);
-    if (!cloudSaved) ui().showToast('Photo change saved locally — cloud backup will retry');
-    return cloudSaved;
+    if (!cloudSaved || !metadataSaved) ui().showToast('Photo change saved locally — cloud backup will retry');
+    return cloudSaved && metadataSaved;
   }
-  function schedulePhotoCloudSave() {
+  function schedulePhotoCloudSave(photo) {
     scheduleSave();
+    pendingPhotoMetadata = photo || pendingPhotoMetadata;
     if (photoCloudSaveTimer) clearTimeout(photoCloudSaveTimer);
     photoCloudSaveTimer = setTimeout(() => {
       photoCloudSaveTimer = null;
-      savePhotoChangesToCloud();
+      const pendingPhoto = pendingPhotoMetadata;
+      pendingPhotoMetadata = null;
+      savePhotoChangesToCloud(pendingPhoto);
     }, 900);
   }
   const listHeader = ui().el('div', { className: 'photo-review-list-header' });
@@ -2630,7 +2644,7 @@ export function renderPhotos() {
       stepName: destination.stepName,
       source: ref.photo.placementSource
     });
-    const cloudSaved = await savePhotoChangesToCloud();
+    const cloudSaved = await savePhotoChangesToCloud(ref.photo);
     ui().showToast(
       cloudSaved
         ? 'Photo moved to ' + destination.label + ' and backed up'
@@ -2722,7 +2736,7 @@ export function renderPhotos() {
       }
       card.classList.toggle('has-comment', !!p.caption.trim());
       commentLabel.textContent = p.caption.trim() ? 'Inspector comment' : 'Add an optional comment';
-      schedulePhotoCloudSave();
+      schedulePhotoCloudSave(p);
     });
     body.appendChild(cap);
 

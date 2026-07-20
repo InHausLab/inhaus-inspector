@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=171';
-import { getInspection } from './state.js?v=171';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=172';
+import { getInspection } from './state.js?v=172';
 
 export function getEquipmentFields() {
   return [
@@ -86,7 +86,7 @@ export function getDeviceSetupFields() {
   return [
     heading('PFAS Water Test'),
     radio('pfasSetup', 'PFAS water test at kitchen faucet', ['Yes', 'No', 'Not requested']),
-    showIf(text('pfasKitNum', 'PFAS Kit #', { placeholder: 'e.g. WTK_PFAS_27099 (from registration card)' }), 'pfasSetup', 'Yes'),
+    showIf({ type: 'sample-id-scanner', dataKey: 'pfasKitNum', label: 'PFAS Kit #' }, 'pfasSetup', 'Yes'),
     showIf(photo('PFAS Kit Registration Card', '_pfasKitPhotos'), 'pfasSetup', 'Yes'),
     showIf(timer('pfasTimer', 'PFAS Drain Timer', 3600), 'pfasSetup', 'Yes'),
     showIf(info('Note: needs ~1 hour to drain'), 'pfasSetup', 'Yes'),
@@ -391,13 +391,13 @@ export function getAtpKitchenFields() {
     sel('atpSurface', 'Surface tested *', ['Kitchen counter', 'Kitchen sink', 'Bathroom counter', 'Bathroom sink', 'Other']),
     showIf(text('atpSurfaceOther', 'Describe surface', { placeholder: 'e.g. Laundry room sink', required: true }), 'atpSurface', 'Other'),
     info('\u26a0\ufe0f Both a Before photo and After photo are required for each ATP test.'),
-    num('atpPreRLU', 'Pre-test RLU reading', { unit: 'RLU' }),
+    { type: 'number-scanner', dataKey: 'atpPreRLU', label: 'Pre-test RLU reading', unit: 'RLU' },
     radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
     heading('Before Photo'),
     { type: 'photo', stepName: 'ATP Before', photoKey: '_atpBeforePhotos', hideLabel: true },
     divider(),
     yesno('atpCleaned', 'Surface cleaned with soap and water'),
-    num('atpPostRLU', 'Post-test RLU reading', { unit: 'RLU' }),
+    { type: 'number-scanner', dataKey: 'atpPostRLU', label: 'Post-test RLU reading', unit: 'RLU' },
     radio('atpPostStatus', 'Post-test status (Pass if below 100 RLU, Fail if 100 or more)', ['Pass', 'Fail']),
     heading('After Photo'),
     { type: 'photo', stepName: 'ATP After', photoKey: '_atpAfterPhotos', hideLabel: true },
@@ -730,7 +730,7 @@ function collectRequiredIssues(fields, data, missing) {
 
     if (!field.required) continue;
 
-    if (field.type === 'sample-id-scanner') {
+    if (field.type === 'sample-id-scanner' || field.type === 'number-scanner') {
       if (isBlank(data[field.dataKey || field.key])) missing.push(requiredLabel(field));
     } else if (field.type === 'photo') {
       if (!hasPhoto(data, field.photoKey)) missing.push(requiredLabel(field));
