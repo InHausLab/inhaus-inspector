@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=188';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=188';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=188';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=188';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=188';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=188';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=190';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=190';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=190';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=190';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=190';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=190';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=188';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=188';
-import { updatePhotoMetadata } from './supabase-photos.js?v=188';
+} from './findings.js?v=190';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=190';
+import { updatePhotoMetadata } from './supabase-photos.js?v=190';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=188';
+} from './comment-library.js?v=190';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -484,6 +484,8 @@ export function render() {
     if (el) el.remove();
   });
   window.inspection = ctx.inspection;
+  if (ctx.inspection) ui().startTimerAlarmManager(ctx.inspection, () => scheduleSave());
+  else ui().stopTimerAlarmManager();
   ctx.root.innerHTML = '';
   window.scrollTo(0, 0);
   switch (getScreen()) {
@@ -1703,7 +1705,7 @@ export function renderStep() {
   c.appendChild(buildAppHeader(step.name));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
 
-  const timersBar = ui().renderTimersBar(ctx.inspection);
+  const timersBar = ui().renderTimersBar(ctx.inspection, () => scheduleSave());
   if (timersBar) c.appendChild(timersBar);
 
   const currentPhase = step.phase;

@@ -1,4 +1,4 @@
-// InHaus Inspector Service Worker v188
+// InHaus Inspector Service Worker v190
 // Safe iOS Safari implementation - June 28 2026
 //
 // Rules:
@@ -9,28 +9,28 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v189';
+const CACHE_NAME = 'inhaus-v190';
 
 const APP_SHELL = [
   './',
   './index.html',
   './cache-reset.html',
-  './app.js?v=188',
-  './screens.js?v=188',
-  './sync.js?v=188',
-  './ui.js?v=188',
-  './steps.js?v=188',
-  './config.js?v=188',
-  './storage.js?v=188',
-  './fields.js?v=188',
-  './inspection.js?v=188',
-  './findings.js?v=188',
-  './photo-routing.js?v=188',
-  './comment-library.js?v=188',
+  './app.js?v=190',
+  './screens.js?v=190',
+  './sync.js?v=190',
+  './ui.js?v=190',
+  './steps.js?v=190',
+  './config.js?v=190',
+  './storage.js?v=190',
+  './fields.js?v=190',
+  './inspection.js?v=190',
+  './findings.js?v=190',
+  './photo-routing.js?v=190',
+  './comment-library.js?v=190',
   './comment-library-admin.html',
-  './comment-library-admin.js?v=188',
-  './db.js?v=188',
-  './state.js?v=188',
+  './comment-library-admin.js?v=190',
+  './db.js?v=190',
+  './state.js?v=190',
   './styles.css',
   './manifest.json',
 ];
@@ -131,4 +131,16 @@ self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// Timer notifications should reopen/focus the inspection when tapped.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      const existing = windowClients.find(client => 'focus' in client);
+      if (existing) return existing.focus();
+      return clients.openWindow('./');
+    })
+  );
 });

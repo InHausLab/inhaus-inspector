@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v188 |
+| App version | v190 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
@@ -51,6 +51,20 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v190 — Global Repeating Timer Alarms
+**Date:** July 20, 2026
+
+- Moved timer expiration out of the individual room field and into one app-wide alarm manager, so changing rooms or screens no longer disables the alarm.
+- Added a full-screen high-visibility alarm that sounds and attempts vibration every five seconds until the inspector taps **Stop Alarm**.
+- Unlocks Web Audio from the inspector's Start/Restart tap to improve alarm reliability on iPhone, requests notification permission from that same user action, and shows a lock-screen notification when the browser permits it.
+- Requests a screen wake lock while a timer is running and automatically releases it when no timers remain.
+- Checks all timers immediately when the app becomes visible again. If Safari was suspended or the phone was locked when a timer expired, the alarm starts immediately on reopen.
+- Tapping a timer notification focuses or reopens InHaus Inspector.
+
+**Platform limit:** iOS can suspend a web app while the phone is locked or the app is closed, and iPhone Safari does not expose vibration to web apps. Guaranteed lock-screen delivery requires a server-scheduled Web Push service and the Home Screen app with notifications enabled; sound, vibration, Focus, and silent-mode behavior remain controlled by iOS.
 
 ---
 

@@ -286,27 +286,214 @@
     }
   }
 
-  // ── Audio Alert ────────────────────────────────────────────
+  // ── Global Timer Alarm ─────────────────────────────────────
+  // Timer expiration cannot belong to a room's DOM: that DOM is destroyed as
+  // soon as the inspector navigates. This manager remains alive across screens,
+  // repeats until acknowledged, and checks overdue timers again after resume.
+  let timerAudioContext = null;
+  let timerAlarmInspection = null;
+  let timerAlarmOnSave = null;
+  let timerAlarmInterval = null;
+  let timerAlarmRepeatInterval = null;
+  let activeTimerAlarmId = '';
+  let timerWakeLock = null;
+  let timerWakeLockPending = false;
+
+  function getTimerAudioContext() {
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    if (!timerAudioContext || timerAudioContext.state === 'closed') timerAudioContext = new AudioContextCtor();
+    return timerAudioContext;
+  }
+
+  function primeTimerAudio() {
+    try {
+      const audioCtx = getTimerAudioContext();
+      if (!audioCtx) return Promise.resolve(false);
+      const ready = audioCtx.state === 'suspended' ? audioCtx.resume() : Promise.resolve();
+      return ready.then(() => {
+        // A silent oscillator created inside the Start/Restart tap unlocks Web
+        // Audio on iOS so the later alarm is allowed to make sound.
+        const oscillator = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.0001;
+        oscillator.connect(gain);
+        gain.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.02);
+        return true;
+      }).catch(() => false);
+    } catch (e) { return Promise.resolve(false); }
+  }
+
   function playAlert(prominent) {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioCtx = getTimerAudioContext();
+      if (!audioCtx) return false;
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
       function beep(freq, start, dur) {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.frequency.value = freq; g.gain.value = prominent ? 0.5 : 0.25;
-        o.start(ctx.currentTime + start);
-        o.stop(ctx.currentTime + start + dur);
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.connect(g); g.connect(audioCtx.destination);
+        o.frequency.value = freq; g.gain.value = prominent ? 0.65 : 0.5;
+        o.start(audioCtx.currentTime + start);
+        o.stop(audioCtx.currentTime + start + dur);
       }
       if (prominent) {
-        // Prominent repeating alarm for 10-minute timers
         beep(880, 0, 0.2); beep(880, 0.3, 0.2); beep(1100, 0.6, 0.25);
         beep(880, 1.1, 0.2); beep(880, 1.4, 0.2); beep(1100, 1.7, 0.25);
         beep(880, 2.2, 0.2); beep(880, 2.5, 0.2); beep(1100, 2.8, 0.4);
       } else {
-        beep(880, 0, 0.15); beep(880, 0.25, 0.15); beep(1100, 0.5, 0.3);
+        beep(880, 0, 0.18); beep(880, 0.3, 0.18); beep(1100, 0.65, 0.35);
       }
-    } catch (e) { /* no audio */ }
+      return true;
+    } catch (e) { return false; }
   }
+
+  async function requestTimerWakeLock() {
+    if (!navigator.wakeLock || document.hidden || timerWakeLock || timerWakeLockPending) return;
+    timerWakeLockPending = true;
+    try {
+      timerWakeLock = await navigator.wakeLock.request('screen');
+      timerWakeLock.addEventListener('release', () => { timerWakeLock = null; });
+    } catch (e) { timerWakeLock = null; }
+    finally { timerWakeLockPending = false; }
+  }
+
+  function hasRunningTimer(inspection) {
+    if (!inspection || !inspection.timers) return false;
+    return Object.values(inspection.timers).some(t => {
+      if (!t || !t.startedAt || t.alerted) return false;
+      return new Date(t.startedAt).getTime() + Number(t.durationMs || 0) > Date.now();
+    });
+  }
+
+  function requestTimerNotificationPermission() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    try {
+      const result = Notification.requestPermission();
+      if (result && typeof result.catch === 'function') result.catch(() => {});
+    } catch (e) { /* unsupported */ }
+  }
+
+  async function showTimerNotification(timerId, timer) {
+    if (!('Notification' in window) || Notification.permission !== 'granted' || timer.notificationShownAt) return;
+    timer.notificationShownAt = new Date().toISOString();
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.showNotification('\u23f0 ' + (timer.label || 'Inspection timer') + ' complete', {
+          body: 'Open InHaus Inspector and tap Stop Alarm.',
+          tag: 'inhaus-timer-' + timerId,
+          renotify: true,
+          requireInteraction: true,
+          vibrate: [700, 250, 700, 250, 700]
+        });
+      } else {
+        new Notification('\u23f0 ' + (timer.label || 'Inspection timer') + ' complete');
+      }
+    } catch (e) { /* visible alarm remains the source of truth */ }
+  }
+
+  function pulseTimerAlarm(timer) {
+    playAlert(true);
+    if (navigator.vibrate) navigator.vibrate([700, 250, 700, 250, 700]);
+    const overlay = document.getElementById('timer-alarm-overlay');
+    if (overlay) {
+      overlay.classList.remove('timer-alarm-pulse');
+      void overlay.offsetWidth;
+      overlay.classList.add('timer-alarm-pulse');
+    }
+  }
+
+  function stopActiveTimerAlarm(acknowledge) {
+    if (timerAlarmRepeatInterval) clearInterval(timerAlarmRepeatInterval);
+    timerAlarmRepeatInterval = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+    const timer = timerAlarmInspection && timerAlarmInspection.timers && timerAlarmInspection.timers[activeTimerAlarmId];
+    if (acknowledge && timer) {
+      timer.alerted = true;
+      timer.acknowledgedAt = new Date().toISOString();
+      timer.alerting = false;
+      if (typeof timerAlarmOnSave === 'function') timerAlarmOnSave();
+    }
+    activeTimerAlarmId = '';
+    const overlay = document.getElementById('timer-alarm-overlay');
+    if (overlay) overlay.remove();
+    setTimeout(checkExpiredTimers, 0);
+  }
+
+  function showTimerAlarm(timerId, timer) {
+    if (activeTimerAlarmId === timerId && document.getElementById('timer-alarm-overlay')) return;
+    if (activeTimerAlarmId) stopActiveTimerAlarm(false);
+    activeTimerAlarmId = timerId;
+    timer.alerting = true;
+
+    const overlay = el('div', { id: 'timer-alarm-overlay', className: 'timer-alarm-overlay', role: 'alertdialog', 'aria-modal': 'true' });
+    const panel = el('div', { className: 'timer-alarm-panel' });
+    panel.appendChild(el('div', { className: 'timer-alarm-icon' }, '\u23f0'));
+    panel.appendChild(el('div', { className: 'timer-alarm-title' }, 'TIMER COMPLETE'));
+    panel.appendChild(el('div', { className: 'timer-alarm-label' }, timer.label || 'Inspection timer'));
+    panel.appendChild(el('div', { className: 'timer-alarm-instructions' }, 'Alarm will repeat until you stop it.'));
+    panel.appendChild(el('button', {
+      type: 'button', className: 'btn btn-primary timer-alarm-stop',
+      onClick: () => {
+        primeTimerAudio();
+        stopActiveTimerAlarm(true);
+      }
+    }, 'Stop Alarm'));
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    pulseTimerAlarm(timer);
+    showTimerNotification(timerId, timer);
+    timerAlarmRepeatInterval = setInterval(() => pulseTimerAlarm(timer), 5000);
+  }
+
+  function checkExpiredTimers() {
+    const inspection = timerAlarmInspection;
+    if (!inspection || !inspection.timers) return;
+    if (activeTimerAlarmId) {
+      const active = inspection.timers[activeTimerAlarmId];
+      if (!active || active.alerted) stopActiveTimerAlarm(false);
+      else return;
+    }
+    const overdue = Object.entries(inspection.timers).find(([, timer]) => {
+      if (!timer || !timer.startedAt || timer.alerted) return false;
+      const endMs = new Date(timer.startedAt).getTime() + Number(timer.durationMs || 0);
+      return Number.isFinite(endMs) && endMs <= Date.now();
+    });
+    if (overdue) showTimerAlarm(overdue[0], overdue[1]);
+    else if (hasRunningTimer(inspection)) requestTimerWakeLock();
+    else if (timerWakeLock) {
+      timerWakeLock.release().catch(() => {});
+      timerWakeLock = null;
+    }
+  }
+
+  function startTimerAlarmManager(inspection, onSave) {
+    timerAlarmInspection = inspection || null;
+    timerAlarmOnSave = onSave || null;
+    if (!timerAlarmInterval) timerAlarmInterval = setInterval(checkExpiredTimers, 1000);
+    checkExpiredTimers();
+  }
+
+  function stopTimerAlarmManager() {
+    timerAlarmInspection = null;
+    timerAlarmOnSave = null;
+    if (timerAlarmInterval) clearInterval(timerAlarmInterval);
+    timerAlarmInterval = null;
+    stopActiveTimerAlarm(false);
+    if (timerWakeLock) timerWakeLock.release().catch(() => {});
+    timerWakeLock = null;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      if (timerAlarmInspection) {
+        primeTimerAudio();
+        checkExpiredTimers();
+      }
+    }
+  });
 
   // ── Format helpers ─────────────────────────────────────────
   function fmtDateOnly(iso) {
@@ -351,7 +538,6 @@
           if (rem <= 0) {
             display.textContent = '00:00 - COMPLETE';
             display.classList.add('timer-done');
-            if (!t.alerted) { playAlert(durationSec === 600); if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]); t.alerted = true; onSave(); }
             return false;
           }
           const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
@@ -365,15 +551,33 @@
 
         container.appendChild(el('button', {
           type: 'button', className: 'btn btn-small btn-outline',
-          onClick: () => { t.startedAt = new Date().toISOString(); t.alerted = false; onSave(); clearInterval(iv); build(); }
+          onClick: () => {
+            primeTimerAudio();
+            requestTimerNotificationPermission();
+            t.startedAt = new Date().toISOString();
+            t.alerted = false;
+            t.alerting = false;
+            t.acknowledgedAt = '';
+            t.notificationShownAt = '';
+            onSave();
+            requestTimerWakeLock();
+            checkExpiredTimers();
+            clearInterval(iv);
+            build();
+          }
         }, 'Restart'));
       } else {
         container.appendChild(el('div', { className: 'timer-display timer-idle' }, fmtDuration(durationSec)));
         container.appendChild(el('button', {
           type: 'button', className: 'btn btn-primary',
           onClick: () => {
+            primeTimerAudio();
+            requestTimerNotificationPermission();
             inspection.timers[timerId] = { startedAt: new Date().toISOString(), durationMs: durationSec * 1000, label: label, alerted: false };
-            onSave(); build();
+            onSave();
+            requestTimerWakeLock();
+            checkExpiredTimers();
+            build();
           }
         }, 'Start Timer'));
       }
@@ -383,7 +587,8 @@
   }
 
   // ── Active Timers Bar (floating) ───────────────────────────
-  function renderTimersBar(inspection) {
+  function renderTimersBar(inspection, onSave) {
+    startTimerAlarmManager(inspection, onSave);
     if (!inspection || !inspection.timers) return null;
     const entries = Object.entries(inspection.timers).filter(([, t]) => t.startedAt);
     if (!entries.length) return null;
@@ -2787,7 +2992,8 @@
     el, frag, lazyImage, renderField, renderProgressBar, renderStatusBar, renderTimersBar,
     renderText, renderTextarea, renderNumber, renderSelect, renderYesNo, renderRadio,
     renderCheck, renderChecklist, renderChips, renderReading, renderPhoto, renderTimer,
-    renderHeading, renderInfo, renderDivider, compressImage, playAlert, fmtDate, fmtDuration,
+    renderHeading, renderInfo, renderDivider, compressImage, playAlert, primeTimerAudio,
+    startTimerAlarmManager, stopTimerAlarmManager, checkExpiredTimers, fmtDate, fmtDuration,
     micBtn, showToast, flashUncheckedItems, updateShowIf, openAnnotationEditor
   };
 })();
