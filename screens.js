@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=197';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=197';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=197';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=197';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=197';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=197';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=199';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=199';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=199';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=199';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=199';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=199';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=197';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=197';
-import { updatePhotoMetadata } from './supabase-photos.js?v=197';
+} from './findings.js?v=199';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=199';
+import { updatePhotoMetadata } from './supabase-photos.js?v=199';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=197';
+} from './comment-library.js?v=199';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }

@@ -33,10 +33,10 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v197 |
+| App version | v199 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
+| Apps Script | v72 source committed on Hans / live deployment pending |
 | Apps Script URL | `https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
@@ -51,6 +51,23 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v199 — Immediate App Fix Delivery
+**Date:** July 20, 2026
+
+- Changed the feedback action to **Send to Matt** so inspectors know where the suggestion goes.
+- Successful suggestions now confirm they were sent directly to Matt and retained in **Things to Fix**.
+- Added Apps Script v72 source support to email every suggestion immediately to `matt@inhauslab.com`, including inspection context and private Drive links to its screenshot and voice note.
+- Email delivery is retry-safe: the spreadsheet row is preserved first, failed notifications retry, and completed notifications are not sent twice.
+
+---
+
+## v198 — Complete Photo Deletion
+**Date:** July 20, 2026
+
+- Deleting a photo now removes it from the IndexedDB vault, inspection step data, and the photo retry queue.
 
 ---
 
