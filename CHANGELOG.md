@@ -6,6 +6,29 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## ⚠️ APPS SCRIPT RULE — MANDATORY (July 20 2026)
+
+The Apps Script editor was wiped on July 20 2026 because Codex was editing the live script directly without saving to the repo. v52 through v64 were lost.
+
+**Before making ANY Apps Script change:**
+1. Edit `/Users/hans/inhaus-apps-script/Code.gs` first
+2. Commit and push that file to the repo
+3. THEN have Matt paste the new code into the editor and deploy
+4. Verify POST works with curl (GET success does NOT mean POST works)
+5. Update CHANGELOG with the new version number and URL
+
+**Never edit the Apps Script editor directly.** The file is the source of truth. The editor is just a deploy target.
+
+**POST verification command (required before calling any deploy done):**
+```
+curl -sL -X POST <new_url> -H "Content-Type: application/json" -d '{"syncSecret":"ihl-sync-2026","_checkpoint":true,"inspectionId":"INH-TEST-POST","status":"prepared"}' | python3 -m json.tool
+```
+Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
+
+---
+
+---
+
 ## Quick Reference — Current State (July 20 2026)
 
 | Item | Value |
