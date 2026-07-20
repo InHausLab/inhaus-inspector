@@ -36,7 +36,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | App version | v199 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v72 source committed on Hans / live deployment pending |
+| Apps Script | v73 source / Google deployment Version 82 — completed review list and App Fix email verified |
 | Apps Script URL | `https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
@@ -51,6 +51,18 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## Apps Script v73 — Completed Review List and App Fix Email
+**Date:** July 20, 2026
+
+- Deployed authoritative Hans source commit `8ac8539` to the existing production deployment ID as Google Apps Script **Version 82**.
+- `getReviewList()` now includes `prepared`, `field active`, `completed`, `needs review`, and `in-progress` inspections while continuing to hide test records.
+- Preserved the v72 App Fix feedback route, private Drive attachments, retry-safe email notification, and `appFeedback: true` capability.
+- Verified the production root reports `InHaus Inspector Bridge v70b is running`.
+- Verified the production list returns `INH-20260720-SHMXOQ` for Jo Archer at 369 Hillcrest Dr with status `needs review`.
+- Verified capabilities return `appFeedback: true` and a real POST checkpoint returned `checkpointed: true`.
 
 ---
 
