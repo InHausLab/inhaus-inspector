@@ -4,9 +4,9 @@ const WARN = 'warn';
 const FAIL = 'fail';
 const BLOCKED = 'blocked';
 const UNCHECKED = 'unchecked';
-const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec'; // Apps Script v70 — updated July 20 2026
+const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec'; // Apps Script v71 — updated July 20 2026
 const REVIEW_ACCESS_TOKEN = 'InHaus2026';
-const SAMPLE_INSPECTION_ID = 'INH-20260717-YZNHG0'; // Jay cabin — verified in the v70 bridge on July 20 2026
+const SAMPLE_INSPECTION_ID = 'INH-20260717-YZNHG0'; // Jay cabin — verified in the v71 bridge on July 20 2026
 const EXPECTED_PHOTO_COUNT = 34;
 
 const autoChecks = [
@@ -39,7 +39,7 @@ const autoChecks = [
   {
     id: 'apps-script-review-list',
     title: 'Apps Script review list',
-    detail: 'Live v64 bridge returns the real inspection in the review inventory.',
+    detail: 'Live v71 bridge returns the real inspection in the review inventory.',
     path: bridgeUrl({ action: 'list', token: REVIEW_ACCESS_TOKEN }),
     timeoutMs: 30000,
     expect: text => {
@@ -56,7 +56,7 @@ const autoChecks = [
   {
     id: 'apps-script-report-detail',
     title: 'Apps Script report detail',
-    detail: 'Live v64 bridge returns the complete 34-photo production inspection.',
+    detail: 'Live v71 bridge returns the complete 34-photo production inspection.',
     path: bridgeUrl({ action: 'get', id: SAMPLE_INSPECTION_ID, token: REVIEW_ACCESS_TOKEN }),
     timeoutMs: 30000,
     expect: text => {
@@ -75,7 +75,7 @@ const autoChecks = [
     detail: 'The current report-building portal is deployed with the approved-findings build.',
     path: 'https://inhauslab.github.io/inhaus-review/',
     timeoutMs: 15000,
-    expect: text => text.includes('InHaus') && text.includes('portal.js?v=20260719-11'),
+    expect: text => text.includes('InHaus') && text.includes('portal.js?v=20260720-12'),
     critical: true
   },
   {
@@ -459,7 +459,7 @@ function makeReport(summary) {
     `Status: ${summary.title}`,
     `Score: ${summary.score}%`,
     `Last run: ${state.lastRunAt ? formatDateTime(state.lastRunAt) : 'Not run'}`,
-    'Release: v171 / Apps Script v70',
+    'Release: v171 / Apps Script v71',
     '',
     '## Live Checks',
     ...summary.autoResults.map(({ check, result }) => `- ${statusLabel(result.status)}: ${check.title} - ${result.message || check.detail}`),
