@@ -513,6 +513,24 @@ export function render() {
     bottomNav.setAttribute('data-fixed-footer', 'true');
     document.body.appendChild(bottomNav);
   }
+  // Re-pin nav on Safari visual viewport resize (toolbar show/hide)
+  if (window.visualViewport && !window._vpNavListener) {
+    window._vpNavListener = true;
+    window.visualViewport.addEventListener('resize', () => {
+      const nav = document.getElementById('fixed-bottom-nav');
+      if (nav) {
+        const offset = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+        nav.style.bottom = Math.max(0, offset) + 'px';
+      }
+    });
+    window.visualViewport.addEventListener('scroll', () => {
+      const nav = document.getElementById('fixed-bottom-nav');
+      if (nav) {
+        const offset = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+        nav.style.bottom = Math.max(0, offset) + 'px';
+      }
+    });
+  }
 }
 
 // ── App Header (reused on all screens) ─────────────────────
