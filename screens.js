@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=184';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=184';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=184';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=184';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep } from './steps.js?v=184';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=184';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=188';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=188';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=188';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=188';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=188';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=188';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=184';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=184';
-import { updatePhotoMetadata } from './supabase-photos.js?v=184';
+} from './findings.js?v=188';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=188';
+import { updatePhotoMetadata } from './supabase-photos.js?v=188';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=184';
+} from './comment-library.js?v=188';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -292,9 +292,11 @@ export function buildRoomDrawer() {
       { label: '+ Add Room', section: 'lowest', prefix: null }
     ]},
     { label: 'Utility Room', phases: ['utility'] },
-    { label: 'Upper Level', phases: ['upper', 'rooms'], addRooms: [
-      { label: '+ Add Bedroom', section: 'additional', prefix: 'Bedroom' },
-      { label: '+ Add Bathroom', section: 'additional', prefix: 'Bathroom' }
+    { label: 'Bedrooms', phases: ['upper'], addRooms: [
+      { label: '+ Add Bedroom', section: 'bedrooms', prefix: null }
+    ]},
+    { label: 'Bathrooms', phases: ['rooms'], addRooms: [
+      { label: '+ Add Bathroom', section: 'bathrooms', prefix: null }
     ]},
     { label: 'Main Level', phases: ['main'] },
     { label: 'Additional Rooms', phases: ['supplementary'], addRooms: [
@@ -317,7 +319,7 @@ export function buildRoomDrawer() {
   DRAWER_GROUPS.forEach(group => {
     // All steps in this group's phases - no type restrictions (review included in Wrap-Up)
     const groupSteps = ctx.stepList.filter(s => group.phases.includes(s.phase));
-    if (!groupSteps.length) return;
+    if (!groupSteps.length && !(group.addRooms && group.addRooms.length)) return;
 
     scrollArea.appendChild(ui().el('div', { className: 'room-drawer-group-label' }, group.label));
 
@@ -1431,6 +1433,209 @@ export function renderPrecheck() {
   ctx.root.appendChild(c);
 }
 
+function roomDisplayName(step) {
+  return String(ctx.inspection.stepData?.[step.id]?.roomName || step.name || '').trim();
+}
+
+function bedroomSteps() {
+  return ctx.stepList.filter(step => step.type === 'bedroom');
+}
+
+function bathroomSteps() {
+  return ctx.stepList.filter(step => step.type === 'bathroom');
+}
+
+function bathroomRelationship(stepId) {
+  const relationships = ensureRoomRelationships(ctx.inspection);
+  if (!relationships[stepId]) {
+    relationships[stepId] = {
+      bathroomType: 'standalone',
+      linkedBedroomIds: [],
+      autoName: true
+    };
+  }
+  if (!Array.isArray(relationships[stepId].linkedBedroomIds)) {
+    relationships[stepId].linkedBedroomIds = [];
+  }
+  return relationships[stepId];
+}
+
+function rebuildAtStep(stepId) {
+  ctx.stepList = buildStepList(ctx.inspection);
+  const nextIndex = ctx.stepList.findIndex(step => step.id === stepId);
+  if (nextIndex >= 0) ctx.currentStepIdx = nextIndex;
+}
+
+function openStepById(stepId) {
+  rebuildAtStep(stepId);
+  setScreen('step');
+  ctx.render();
+  window.scrollTo(0, 0);
+}
+
+function linkPrivateBathroom(bedroomStep) {
+  const relationships = ensureRoomRelationships(ctx.inspection);
+  const alreadyLinked = bathroomSteps().find(bathroom =>
+    relationships[bathroom.id]?.bathroomType === 'ensuite' &&
+    Array.isArray(relationships[bathroom.id]?.linkedBedroomIds) &&
+    relationships[bathroom.id].linkedBedroomIds.includes(bedroomStep.id)
+  );
+  if (alreadyLinked) {
+    openStepById(alreadyLinked.id);
+    return;
+  }
+
+  // Reuse an unopened bathroom entered during office preparation before adding
+  // another bathroom. This keeps the property counts accurate and avoids a
+  // duplicate when the office already entered the home's bathroom count.
+  const available = bathroomSteps().find(bathroom => {
+    const relationship = relationships[bathroom.id];
+    const data = ctx.inspection.stepData?.[bathroom.id];
+    const linked = relationship && Array.isArray(relationship.linkedBedroomIds) && relationship.linkedBedroomIds.length;
+    return !linked && !(data && data._visited);
+  });
+
+  if (available) {
+    relationships[available.id] = {
+      bathroomType: 'ensuite',
+      linkedBedroomIds: [bedroomStep.id],
+      autoName: true,
+      createdAt: relationships[available.id]?.createdAt || new Date().toISOString()
+    };
+    rebuildAtStep(available.id);
+    scheduleSave();
+    ctx.render();
+    window.scrollTo(0, 0);
+    return;
+  }
+
+  ctx.addDynamicRoom('bathrooms', null, {
+    relationship: {
+      bathroomType: 'ensuite',
+      linkedBedroomIds: [bedroomStep.id],
+      autoName: true
+    }
+  });
+}
+
+function buildBedroomBathroomLinkCard(step) {
+  const card = ui().el('div', { className: 'card', style: 'border:2px solid var(--accent-light);margin-bottom:12px;' });
+  card.appendChild(ui().el('h3', { className: 'section-heading', style: 'margin-top:0;' }, 'Bathroom'));
+  const relationships = ensureRoomRelationships(ctx.inspection);
+  const privateBathroom = bathroomSteps().find(bathroom =>
+    relationships[bathroom.id]?.bathroomType === 'ensuite' &&
+    Array.isArray(relationships[bathroom.id]?.linkedBedroomIds) &&
+    relationships[bathroom.id].linkedBedroomIds.includes(step.id)
+  );
+  const sharedBathrooms = bathroomSteps().filter(bathroom =>
+    relationships[bathroom.id]?.bathroomType === 'shared' &&
+    Array.isArray(relationships[bathroom.id]?.linkedBedroomIds) &&
+    relationships[bathroom.id].linkedBedroomIds.includes(step.id)
+  );
+
+  if (privateBathroom) {
+    card.appendChild(ui().el('p', { className: 'text-muted', 'data-linked-bathroom-id': privateBathroom.id, 'data-link-kind': 'private-description' }, 'Private bathroom: ' + roomDisplayName(privateBathroom)));
+    card.appendChild(ui().el('button', {
+      type: 'button',
+      className: 'btn btn-outline btn-full',
+      'data-linked-bathroom-id': privateBathroom.id,
+      'data-link-kind': 'private-button',
+      onClick: () => openStepById(privateBathroom.id)
+    }, 'Open ' + roomDisplayName(privateBathroom)));
+  } else {
+    card.appendChild(ui().el('p', { className: 'text-muted' }, 'Only add this if the bedroom has its own private bathroom. Shared and hall bathrooms stay in the Bathrooms section.'));
+    card.appendChild(ui().el('button', {
+      type: 'button',
+      className: 'btn btn-primary btn-full',
+      onClick: () => linkPrivateBathroom(step)
+    }, '+ Add Private Bathroom'));
+  }
+  sharedBathrooms.forEach(bathroom => {
+    card.appendChild(ui().el('button', {
+      type: 'button',
+      className: 'btn btn-outline btn-full',
+      style: 'margin-top:8px;',
+      'data-linked-bathroom-id': bathroom.id,
+      'data-link-kind': 'shared-button',
+      onClick: () => openStepById(bathroom.id)
+    }, 'Open Shared Bathroom: ' + roomDisplayName(bathroom)));
+  });
+  return card;
+}
+
+function buildBathroomAssignmentCard(step) {
+  const relationship = bathroomRelationship(step.id);
+  const card = ui().el('div', { className: 'card', style: 'border:2px solid var(--accent-light);margin-bottom:12px;' });
+  card.appendChild(ui().el('h3', { className: 'section-heading', style: 'margin-top:0;' }, 'Bathroom Assignment'));
+  card.appendChild(ui().el('p', { className: 'text-muted' }, 'Keep this bathroom separate, then link it to a bedroom only when it is private or shared.'));
+
+  const typeLabel = ui().el('label', { className: 'field-label' }, 'Bathroom Type');
+  const typeSelect = ui().el('select', { className: 'field-select' });
+  [
+    { value: 'standalone', label: 'Hall / Guest / Standalone' },
+    { value: 'ensuite', label: 'Private / Ensuite' },
+    { value: 'shared', label: 'Shared by Bedrooms' }
+  ].forEach(option => {
+    const node = ui().el('option', { value: option.value }, option.label);
+    if (relationship.bathroomType === option.value) node.selected = true;
+    typeSelect.appendChild(node);
+  });
+  typeSelect.addEventListener('change', () => {
+    relationship.bathroomType = typeSelect.value;
+    if (relationship.bathroomType === 'standalone') relationship.linkedBedroomIds = [];
+    if (relationship.bathroomType === 'ensuite' && relationship.linkedBedroomIds.length > 1) {
+      relationship.linkedBedroomIds = relationship.linkedBedroomIds.slice(0, 1);
+    }
+    relationship.autoName = true;
+    rebuildAtStep(step.id);
+    scheduleSave();
+    ctx.render();
+  });
+  card.appendChild(typeLabel);
+  card.appendChild(typeSelect);
+
+  if (relationship.bathroomType !== 'standalone') {
+    card.appendChild(ui().el('div', { className: 'field-label', style: 'margin-top:14px;' }, relationship.bathroomType === 'shared' ? 'Bedrooms sharing this bathroom' : 'Bedroom with this private bathroom'));
+    bedroomSteps().forEach(bedroom => {
+      const checked = relationship.linkedBedroomIds.includes(bedroom.id);
+      const row = ui().el('label', { style: 'display:flex;align-items:center;gap:10px;padding:10px 0;font-weight:600;' });
+      const checkbox = ui().el('input', { type: relationship.bathroomType === 'ensuite' ? 'radio' : 'checkbox', name: relationship.bathroomType === 'ensuite' ? 'bathroom-bedroom-' + step.id : '' });
+      checkbox.checked = checked;
+      checkbox.addEventListener('change', () => {
+        if (relationship.bathroomType === 'ensuite') {
+          relationship.linkedBedroomIds = checkbox.checked ? [bedroom.id] : [];
+        } else if (checkbox.checked) {
+          if (!relationship.linkedBedroomIds.includes(bedroom.id)) relationship.linkedBedroomIds.push(bedroom.id);
+        } else {
+          relationship.linkedBedroomIds = relationship.linkedBedroomIds.filter(id => id !== bedroom.id);
+        }
+        relationship.autoName = true;
+        rebuildAtStep(step.id);
+        scheduleSave();
+        ctx.render();
+      });
+      row.appendChild(checkbox);
+      row.appendChild(document.createTextNode(roomDisplayName(bedroom)));
+      card.appendChild(row);
+    });
+  }
+
+  if (relationship.autoName === false && relationship.linkedBedroomIds.length) {
+    card.appendChild(ui().el('button', {
+      type: 'button',
+      className: 'btn btn-outline btn-full',
+      style: 'margin-top:10px;',
+      onClick: () => {
+        relationship.autoName = true;
+        rebuildAtStep(step.id);
+        scheduleSave();
+        ctx.render();
+      }
+    }, 'Use Linked Bedroom Name'));
+  }
+  return card;
+}
+
 export function renderStep() {
   const renderJob = ++_stepRenderJob;
   if (ctx.currentStepIdx >= ctx.stepList.length || (ctx.stepList[ctx.currentStepIdx] && ctx.stepList[ctx.currentStepIdx].type === 'review')) {
@@ -1648,6 +1853,8 @@ export function renderStep() {
 
   const stepHeading = ui().el('h1', { className: 'screen-title' }, data.roomName || step.name);
   c.appendChild(stepHeading);
+  if (step.type === 'bedroom') c.appendChild(buildBedroomBathroomLinkCard(step));
+  if (step.type === 'bathroom') c.appendChild(buildBathroomAssignmentCard(step));
 
   const fieldGen = STEP_FIELDS[step.type];
   let pendingFieldRender = null;
@@ -1666,6 +1873,21 @@ export function renderStep() {
         if (activeTab) activeTab.textContent = data.roomName;
         // Also update step.name so it persists if re-rendered
         step.name = data.roomName;
+        if (step.type === 'bathroom') {
+          bathroomRelationship(step.id).autoName = false;
+        }
+        if (step.type === 'bedroom') {
+          rebuildAtStep(step.id);
+          c.querySelectorAll('[data-linked-bathroom-id]').forEach(node => {
+            const linkedStep = ctx.stepList.find(candidate => candidate.id === node.getAttribute('data-linked-bathroom-id'));
+            if (!linkedStep) return;
+            const linkedName = roomDisplayName(linkedStep);
+            const kind = node.getAttribute('data-link-kind');
+            if (kind === 'private-description') node.textContent = 'Private bathroom: ' + linkedName;
+            else if (kind === 'private-button') node.textContent = 'Open ' + linkedName;
+            else if (kind === 'shared-button') node.textContent = 'Open Shared Bathroom: ' + linkedName;
+          });
+        }
       }
       // Change 3: Detect allSectionsComplete on post-assessment step
       if (step.type === 'post-assessment' && data.finalCheck &&
@@ -1709,13 +1931,13 @@ export function renderStep() {
   if (step.type === 'bedroom') {
     const bedroomSteps = ctx.stepList.filter(s => s.type === 'bedroom');
     if (step.id === bedroomSteps[bedroomSteps.length - 1].id) {
-      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('additional', 'Bedroom'); window.scrollTo(0, 0); } }, '+ Add Another Bedroom'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('bedrooms'); window.scrollTo(0, 0); } }, '+ Add Another Bedroom'));
     }
   }
   if (step.type === 'bathroom') {
     const bathroomSteps = ctx.stepList.filter(s => s.type === 'bathroom');
     if (step.id === bathroomSteps[bathroomSteps.length - 1].id) {
-      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('additional', 'Bathroom'); window.scrollTo(0, 0); } }, '+ Add Another Bathroom'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('bathrooms'); window.scrollTo(0, 0); } }, '+ Add Another Bathroom'));
     }
   }
   if (step.phase === 'supplementary' || (step.phase === 'main' && step.id === 'kitchen-air')) {

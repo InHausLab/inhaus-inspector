@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=184';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=184';
-import { ensureInspectionWorkspace } from './findings.js?v=184';
+import { getInspection } from './state.js?v=188';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=188';
+import { ensureInspectionWorkspace } from './findings.js?v=188';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -188,6 +188,7 @@ export function buildExportJSON(stepList) {
     collaboration: JSON.parse(JSON.stringify(inspection.collaboration || {})),
     auditTrail: JSON.parse(JSON.stringify(inspection.auditTrail || [])),
     photoTombstones: JSON.parse(JSON.stringify(inspection.photoTombstones || {})),
+    roomRelationships: JSON.parse(JSON.stringify(inspection.roomRelationships || { bathrooms: {} })),
     sharedDriveFolderId: SHARED_DRIVE_FOLDER_ID || '',
 
     // ── Key test identifiers & locations ────────────────────────
@@ -243,10 +244,40 @@ export function buildExportJSON(stepList) {
     if (roomTypes.includes(step.type)) {
       const d = inspection.stepData?.[step.id];
       if (d) {
-        exp.rooms.push({ roomName: d.roomName || step.name, type: step.type, level: step.phase, stepId: step.id, ...cleanStepData(d) });
+        const relationship = step.type === 'bathroom'
+          ? inspection.roomRelationships?.bathrooms?.[step.id]
+          : null;
+        const linkedBedroomIds = relationship && Array.isArray(relationship.linkedBedroomIds)
+          ? relationship.linkedBedroomIds.slice()
+          : [];
+        const linkedBedroomNames = linkedBedroomIds.map(id => {
+          const linkedStep = stepList.find(candidate => candidate.id === id);
+          return inspection.stepData?.[id]?.roomName || linkedStep?.name || '';
+        }).filter(Boolean);
+        exp.rooms.push({
+          roomName: d.roomName || step.name,
+          type: step.type,
+          roomCategory: step.type === 'bedroom' ? 'bedroom' : (step.type === 'bathroom' ? 'bathroom' : 'other'),
+          level: step.phase,
+          stepId: step.id,
+          ...cleanStepData(d),
+          ...(relationship ? {
+            bathroomType: relationship.bathroomType || 'standalone',
+            linkedBedroomIds,
+            linkedBedroomNames
+          } : {})
+        });
       }
     }
   });
+  // New report builders can use explicit groups while older builders continue
+  // using the unchanged combined rooms array. IDs keep this compact so cloud
+  // checkpoints do not duplicate every room's notes and photo metadata.
+  exp.roomGroups = {
+    bedrooms: exp.rooms.filter(room => room.roomCategory === 'bedroom').map(room => room.stepId),
+    bathrooms: exp.rooms.filter(room => room.roomCategory === 'bathroom').map(room => room.stepId),
+    otherRooms: exp.rooms.filter(room => room.roomCategory === 'other').map(room => room.stepId)
+  };
 
   const propDetailsData = inspection.stepData?.['property-details'] || {};
   exp.windowsOpen = propDetailsData.windowsOpen || '';

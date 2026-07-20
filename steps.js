@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=184';
-import { getInspection } from './state.js?v=184';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=188';
+import { getInspection } from './state.js?v=188';
 
 export function getEquipmentFields() {
   return [
@@ -606,9 +606,76 @@ export const PHASES = [
   { id: 'review', name: 'Review', icon: '\u2713' }
 ];
 
+// ── Bedroom / Bathroom Relationships ───────────────────────
+// Bathroom relationships live outside stepData so room answers and photos keep
+// their long-standing step IDs. This lets old inspections load unchanged while
+// new inspections can describe ensuite, shared, and standalone bathrooms.
+export function ensureRoomRelationships(insp) {
+  if (!insp || typeof insp !== 'object') return {};
+  if (!insp.roomRelationships || typeof insp.roomRelationships !== 'object') {
+    insp.roomRelationships = {};
+  }
+  if (!insp.roomRelationships.bathrooms || typeof insp.roomRelationships.bathrooms !== 'object') {
+    insp.roomRelationships.bathrooms = {};
+  }
+  return insp.roomRelationships.bathrooms;
+}
+
+function legacyAdditionalKind(room, data) {
+  const explicit = String(room?.roomType || room?.kind || '').toLowerCase();
+  if (explicit === 'bedroom' || explicit === 'bathroom') return explicit;
+  const name = String(data?.roomName || room?.name || '').trim();
+  if (/^bed\s*room\b/i.test(name)) return 'bedroom';
+  if (/^bath\s*room\b/i.test(name)) return 'bathroom';
+  return 'additional';
+}
+
+function linkedBathroomName(relationship, bedroomSteps, insp) {
+  const linkedIds = Array.isArray(relationship?.linkedBedroomIds)
+    ? relationship.linkedBedroomIds.filter(Boolean)
+    : [];
+  const names = linkedIds.map(id => {
+    const bedroom = bedroomSteps.find(step => step.id === id);
+    if (!bedroom) return '';
+    return String(insp.stepData?.[id]?.roomName || bedroom.name || '').trim();
+  }).filter(Boolean);
+  if (!names.length) return '';
+  if (relationship.bathroomType === 'shared' || names.length > 1) {
+    return names.join(' + ') + ' \u2014 Shared Bathroom';
+  }
+  return names[0] + ' \u2014 Bathroom';
+}
+
+function applyBathroomName(insp, step, bedroomSteps, relationships) {
+  const relationship = relationships[step.id];
+  if (!relationship || relationship.autoName === false) {
+    return insp.stepData?.[step.id]?.roomName || step.name;
+  }
+  const automaticName = linkedBathroomName(relationship, bedroomSteps, insp);
+  if (!automaticName) return insp.stepData?.[step.id]?.roomName || step.name;
+  if (!insp.stepData) insp.stepData = {};
+  if (!insp.stepData[step.id]) insp.stepData[step.id] = { _stepId: step.id };
+  insp.stepData[step.id].roomName = automaticName;
+  relationship.lastAutoName = automaticName;
+  return automaticName;
+}
+
 // ── Build Step List ────────────────────────────────────────
 export function buildStepList(insp) {
   const steps = [];
+  const relationships = ensureRoomRelationships(insp);
+  const additionalRooms = (insp.dynamicRooms && insp.dynamicRooms.additional) || [];
+  const legacyBedrooms = [];
+  const legacyBathrooms = [];
+  const supplementaryRooms = [];
+  additionalRooms.forEach((room, index) => {
+    const id = 'additional-' + index;
+    const kind = legacyAdditionalKind(room, insp.stepData && insp.stepData[id]);
+    const entry = { room, index, id };
+    if (kind === 'bedroom') legacyBedrooms.push(entry);
+    else if (kind === 'bathroom') legacyBathrooms.push(entry);
+    else supplementaryRooms.push(entry);
+  });
 
   // Setup
   steps.push({ id: 'equipment', type: 'equipment', phase: 'setup', name: 'Pre-Assessment Checklist' });
@@ -630,15 +697,33 @@ export function buildStepList(insp) {
   // Utility
   steps.push({ id: 'utility', type: 'utility', phase: 'utility', name: 'Utility Room' });
 
-  // Upper Level
+  // Bedrooms are their own report/navigation group. Existing fixed bedroom IDs
+  // are deliberately unchanged for backwards compatibility.
   const numBed = parseInt(insp.numberOfBedrooms) || 1;
   for (let i = 0; i < numBed; i++) {
-    steps.push({ id: 'bedroom-' + i, type: 'bedroom', phase: 'upper', name: 'Bedroom ' + (i + 1), index: i });
+    const id = 'bedroom-' + i;
+    steps.push({ id, type: 'bedroom', phase: 'upper', name: insp.stepData?.[id]?.roomName || 'Bedroom ' + (i + 1), index: i, roomCategory: 'bedroom' });
   }
+  legacyBedrooms.forEach(({ room, index, id }) => {
+    steps.push({ id, type: 'bedroom', phase: 'upper', name: insp.stepData?.[id]?.roomName || room.name, dynamic: 'additional', index, roomCategory: 'bedroom', legacyAdditional: true });
+  });
+
+  const bedroomSteps = steps.filter(step => step.type === 'bedroom');
+
+  // Bathrooms are independent records. They can optionally link back to one or
+  // more bedrooms, but are never embedded inside the bedroom record.
   const numBath = parseInt(insp.numberOfBathrooms) || 1;
   for (let i = 0; i < numBath; i++) {
-    steps.push({ id: 'bathroom-' + i, type: 'bathroom', phase: 'upper', name: 'Bathroom ' + (i + 1), index: i });
+    const id = 'bathroom-' + i;
+    const bathroom = { id, type: 'bathroom', phase: 'rooms', name: 'Bathroom ' + (i + 1), index: i, roomCategory: 'bathroom' };
+    bathroom.name = applyBathroomName(insp, bathroom, bedroomSteps, relationships);
+    steps.push(bathroom);
   }
+  legacyBathrooms.forEach(({ room, index, id }) => {
+    const bathroom = { id, type: 'bathroom', phase: 'rooms', name: insp.stepData?.[id]?.roomName || room.name, dynamic: 'additional', index, roomCategory: 'bathroom', legacyAdditional: true };
+    bathroom.name = applyBathroomName(insp, bathroom, bedroomSteps, relationships);
+    steps.push(bathroom);
+  });
 
   // Main Level / Kitchen
   steps.push({ id: 'living-area', type: 'living-area', phase: 'main', name: 'Main Living Area' });
@@ -648,9 +733,8 @@ export function buildStepList(insp) {
   steps.push({ id: 'kitchen-air', type: 'kitchen-air', phase: 'main', name: 'Kitchen Air Testing' });
 
   // Supplementary
-  const additionalRooms = (insp.dynamicRooms && insp.dynamicRooms.additional) || [];
-  additionalRooms.forEach((r, i) => {
-    steps.push({ id: 'additional-' + i, type: 'additional-room', phase: 'supplementary', name: r.name, dynamic: 'additional', index: i });
+  supplementaryRooms.forEach(({ room, index, id }) => {
+    steps.push({ id, type: 'additional-room', phase: 'supplementary', name: room.name, dynamic: 'additional', index, roomCategory: 'additional' });
   });
 
   // Wrap Up - Debrief first, then final departure checks

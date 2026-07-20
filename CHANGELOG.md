@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v184 |
+| App version | v188 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
@@ -51,6 +51,20 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## v188 — Separate Bedrooms and Bathrooms
+**Date:** July 20, 2026
+
+- Split bedrooms and bathrooms into separate navigation and progress groups. Bathrooms no longer appear under the bedroom/upper-level section.
+- Fixed `Add Bedroom` and `Add Bathroom` so they create true bedroom and bathroom steps instead of generic additional rooms.
+- Added a one-tap `Add Private Bathroom` action inside each bedroom. It reuses an unopened bathroom entered during office preparation before increasing the property bathroom count, which prevents duplicates.
+- Private bathrooms inherit the bedroom name (for example, `Bedroom 1 — Bathroom`) and continue following bedroom renames unless the bathroom name is manually customized.
+- Added bathroom types for private/ensuite, shared, and hall/guest/standalone. Shared bathrooms can link to multiple bedrooms while remaining a single bathroom record.
+- Preserved all existing `bedroom-*`, `bathroom-*`, and legacy `additional-*` step IDs so prior answers, findings, photos, and saved resume positions remain attached.
+- Added compact room groups and bathroom relationship metadata to the report-builder export without duplicating room data in cloud checkpoints.
+- Verified in the browser: separate navigation groups; reusing an office-prepared bathroom; creating an additional bedroom and private bathroom; automatic rename propagation; and one shared bathroom linked to two bedrooms.
 
 ---
 
