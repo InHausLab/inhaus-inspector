@@ -54,6 +54,14 @@ Must return `{"status": "ok", ...}`. HTML or 405 = deployment broken.
 
 ---
 
+## v174 — Checkpoint Modal Hotfix
+**Date:** July 20, 2026
+
+- Fixed checkpoint failure modal firing repeatedly during active inspections, interrupting inspectors in the field.
+- Modal now only shows if there has been no successful backup for 30+ minutes AND 10 minutes have passed since the last modal dismissal.
+- Network timeouts (AbortError, Failed to fetch) no longer trigger the modal at all -- they silently retry with exponential backoff (2min → 5min → 10min).
+- The top-of-screen sync banner is sufficient warning for transient network failures; the modal is reserved for genuine extended outages.
+
 ## v173 — Exact Inspection Position Restore
 **Date:** July 20, 2026
 

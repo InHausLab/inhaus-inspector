@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=173';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=173';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=174';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=174';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=173';
-import { scheduleSave } from './storage.js?v=173';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=173';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=173';
+         getBestCloudSyncAt } from './state.js?v=174';
+import { scheduleSave } from './storage.js?v=174';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=174';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=174';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -691,7 +691,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=173');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=174');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -1011,6 +1011,8 @@ export async function loadCloudInspection(inspectionId) {
 // Silent on failure - close-out export is still the authoritative save.
 let _checkpointFailCount = 0;
 let _lastCheckpointStepList = [];
+let _lastBackupModalShownAt = 0;
+let _checkpointBackoffMs = 0; // 0 = no backoff active
 
 export async function checkpointToCloud(stepList) {
   const inspection = getInspection();
@@ -1078,12 +1080,29 @@ export async function checkpointToCloud(stepList) {
     _checkpointFailCount++;
     const errorMsg = e && e.message ? e.message : String(e || 'Unknown error');
     updateSyncStatus('failed', errorMsg); // Change 2
-    // After 3 consecutive failures show a modal — data is not backed up
-    if (_checkpointFailCount >= 3) {
-      const lastOk = getBestCloudSyncAt ? getBestCloudSyncAt() : null;
-      const minAgo = lastOk ? Math.round((Date.now() - lastOk) / 60000) : null;
+
+    // Exponential backoff: 2min → 5min → 10min
+    if (_checkpointFailCount === 1) _checkpointBackoffMs = 120000;
+    else if (_checkpointFailCount === 2) _checkpointBackoffMs = 300000;
+    else _checkpointBackoffMs = 600000;
+
+    // Only show the modal if:
+    // 1. It has been 30+ minutes since last successful backup
+    // 2. It has been 10+ minutes since we last showed it
+    // 3. The error was a server rejection (not a network timeout)
+    const isNetworkTimeout = errorMsg.includes('timed out') || errorMsg.includes('AbortError') ||
+      errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError') || errorMsg.includes('timeout');
+    const lastOk = getBestCloudSyncAt ? getBestCloudSyncAt() : null;
+    const minSinceBackup = lastOk ? Math.round((Date.now() - lastOk) / 60000) : null;
+    const minSinceModal = Math.round((Date.now() - _lastBackupModalShownAt) / 60000);
+    const backupOverdue = minSinceBackup === null || minSinceBackup >= 30;
+    const modalCooledDown = (Date.now() - _lastBackupModalShownAt) > 600000; // 10 min cooldown
+
+    if (!isNetworkTimeout && backupOverdue && modalCooledDown) {
+      _lastBackupModalShownAt = Date.now();
+      const minAgo = minSinceBackup !== null ? 'Last successful backup: ' + minSinceBackup + ' min ago.\n\n' : 'No successful backup yet.\n\n';
       const msg = 'Your inspection data is NOT being backed up to the cloud.\n\n' +
-        (minAgo !== null ? 'Last successful backup: ' + minAgo + ' min ago.\n\n' : 'No successful backup yet.\n\n') +
+        minAgo +
         'Last error: ' + errorMsg + '\n\n' +
         'Keep this app open and on screen. Do not force-close your browser.\n\nTap OK to retry.';
       if (confirm(msg)) { checkpointToCloud(stepList); }
