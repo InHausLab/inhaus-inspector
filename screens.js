@@ -3231,22 +3231,54 @@ export function renderReview() {
     leaveStatus.className = 'leave-status leave-' + tone;
     leaveStatus.textContent = title;
     leaveDetail.textContent = blockers.length ? blockers.join(' | ') : (warnings.length ? warnings.join(' | ') : 'Photos, backup, checklist, and required fields are clear.');
-    leaveMetrics.innerHTML = '';
-    leaveMetrics.appendChild(leaveMetric('Photos', health.missing ? health.missing + ' missing' : (health.pending ? health.pending + ' waiting' : health.total + ' safe'), health.missing ? 'bad' : (health.pending ? 'wait' : 'good')));
-    leaveMetrics.appendChild(leaveMetric('Cloud', getCloudLabel(), lastCloud ? ((syncStatus === 'failed' || syncStatus === 'final-failed') ? 'wait' : 'good') : 'bad'));
-    const requiredMetric = leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good');
-    if (reviewIssues.length) {
-      requiredMetric.style.cursor = 'pointer';
-      requiredMetric.title = 'Tap to see required items';
-      requiredMetric.addEventListener('click', () => {
-        const issueCard = document.querySelector('.review-issues-card');
-        if (issueCard) issueCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+    function makeMetricTappable(el, onClick) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', onClick);
+      return el;
     }
+    function scrollToIssues() {
+      const issueCard = document.querySelector('.review-issues-card');
+      if (issueCard) issueCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    leaveMetrics.innerHTML = '';
+    // Photos tile → open Photos screen
+    leaveMetrics.appendChild(makeMetricTappable(
+      leaveMetric('Photos', health.missing ? health.missing + ' missing' : (health.pending ? health.pending + ' waiting' : health.total + ' safe'), health.missing ? 'bad' : (health.pending ? 'wait' : 'good')),
+      () => { _photosReturnScreen = 'review'; setScreen('photos'); ctx.render(); }
+    ));
+    // Cloud tile → trigger cloud check
+    leaveMetrics.appendChild(makeMetricTappable(
+      leaveMetric('Cloud', getCloudLabel(), lastCloud ? ((syncStatus === 'failed' || syncStatus === 'final-failed') ? 'wait' : 'good') : 'bad'),
+      async () => { const result = window.runCloudPreflight ? await window.runCloudPreflight() : { ok: false }; refreshLeaveStatus(); if (!result.ok) ui().showToast('Cloud check: ' + (result.message || 'failed')); }
+    ));
+    // Required tile → scroll to issues list
+    const requiredMetric = leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good');
+    if (reviewIssues.length) makeMetricTappable(requiredMetric, scrollToIssues);
     leaveMetrics.appendChild(requiredMetric);
-    leaveMetrics.appendChild(leaveMetric('Findings', pendingFindingCount ? pendingFindingCount + ' open' : 'Ready', pendingFindingCount ? 'bad' : 'good'));
-    leaveMetrics.appendChild(leaveMetric('Before leaving', departureDone ? 'Done' : 'Open', departureDone ? 'good' : 'bad'));
-    if (health.vaultOnly > 0) leaveMetrics.appendChild(leaveMetric('Rescue vault', String(health.vaultOnly), 'wait'));
+    // Findings tile → scroll to issues list
+    leaveMetrics.appendChild(makeMetricTappable(
+      leaveMetric('Findings', pendingFindingCount ? pendingFindingCount + ' open' : 'Ready', pendingFindingCount ? 'bad' : 'good'),
+      scrollToIssues
+    ));
+    // Before Leaving tile → go to final-checks step
+    const beforeLeavingMetric = leaveMetric('Before leaving', departureDone ? 'Done' : 'Open', departureDone ? 'good' : 'bad');
+    if (!departureDone) makeMetricTappable(beforeLeavingMetric, () => {
+      const fcIdx = ctx.stepList.findIndex(s => s.id === 'final-checks');
+      if (fcIdx >= 0) goToStep(fcIdx);
+    });
+    leaveMetrics.appendChild(beforeLeavingMetric);
+    // Rescue Vault tile → trigger rescue
+    if (health.vaultOnly > 0) leaveMetrics.appendChild(makeMetricTappable(
+      leaveMetric('Rescue vault', String(health.vaultOnly), 'wait'),
+      async () => { if (window.exportLocalPhotoBackup) await window.exportLocalPhotoBackup(); }
+    ));
+    // Not Yet / status title → scroll to issues
+    if (reviewIssues.length) {
+      leaveStatus.style.cursor = 'pointer';
+      leaveStatus.onclick = scrollToIssues;
+      leaveDetail.style.cursor = 'pointer';
+      leaveDetail.onclick = scrollToIssues;
+    }
   }
   refreshLeaveStatus();
 
