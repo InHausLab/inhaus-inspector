@@ -36,7 +36,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | App version | v180 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
-| Apps Script | v68 source / Google deployment Version 78 — prepared handoff verified |
+| Apps Script | v69 source / Google deployment Version 79 — large checkpoints verified |
 | Apps Script URL | `https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec` |
 | Apps Script project | https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit |
 | Repo | /Users/hans/inhaus-update/ |
@@ -51,6 +51,18 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 | Feature flag | USE_SUPABASE_PHOTOS (config.js) |
 | Files changed (branch) | config.js, supabase-photos.js (new), sync.js, app.js, screens.js |
 | Clean-pass inspection | INH-20260705-P11PU1 — 5 photos, "safe to leave" verified |
+
+---
+
+## Apps Script v69 — Large Cloud Checkpoints
+**Date:** July 20, 2026
+
+- Fixed checkpoint failures caused by Google Sheets' 50,000-character limit per cell.
+- Checkpoint JSON larger than 40,000 characters is now split across multiple cells and reassembled transparently when listed or restored.
+- Existing single-cell checkpoint rows remain readable; smaller updates also clear any stale chunk cells from an older large checkpoint.
+- Deployed to the existing production Apps Script URL as Google deployment Version 79.
+- Verified a 120,000-character checkpoint returned `checkpointed: true`, then read back all 120,000 characters with its complete `resumeData` intact.
+- Reverified that `INH-20260720-SHMXOQ` (369 Hillcrest Dr, Dave) remains available and test checkpoints stay hidden.
 
 ---
 
