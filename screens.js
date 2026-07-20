@@ -1445,6 +1445,8 @@ export function renderStep() {
   const data = getStepData(step.id);
   if (!data._enteredAt) data._enteredAt = new Date().toISOString();
   data._roomName = step.name;
+  // Auto-populate roomName from step name if blank
+  if (!data.roomName && step.name) { data.roomName = step.name; }
 
   if (step.type === 'debrief') {
     setTimeout(() => {
@@ -1657,7 +1659,12 @@ export function renderStep() {
       scheduleSave();
       ui().updateShowIf(card, data);
       // Update heading live when inspector types a room name
-      if (fieldKey === 'roomName' && data.roomName) stepHeading.textContent = data.roomName;
+      if (fieldKey === 'roomName' && data.roomName) {
+        stepHeading.textContent = data.roomName;
+        // Sync the subnav tab label to match
+        const activeTab = document.querySelector('.subnav-tab.active, .phase-tab.active, .room-tab.active');
+        if (activeTab) activeTab.textContent = data.roomName;
+      }
       // Change 3: Detect allSectionsComplete on post-assessment step
       if (step.type === 'post-assessment' && data.finalCheck &&
           data.finalCheck.allSectionsComplete === true &&
