@@ -796,6 +796,7 @@ async function continueCloudInspection(item, button) {
     _workspaceReturnScreen = wasPrepared ? 'precheck' : 'step';
     setScreen(needsTeamIdentity ? 'team' : _workspaceReturnScreen);
     ctx.startAutoSave();
+    if (ctx.persistActivePosition) ctx.persistActivePosition();
     ctx.render();
     if (needsTeamIdentity) {
       ui().showToast('Select your name before starting team work');

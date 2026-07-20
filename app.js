@@ -600,7 +600,7 @@ import { initScreens, render } from './screens.js?v=180';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v181',
+      appVersion: 'v182',
       success: success
     };
   }
