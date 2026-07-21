@@ -29,6 +29,42 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 ---
 
+## Quick Reference — Current State (July 21 2026)
+
+| Item | Value |
+|------|-------|
+| App version | v200 (commit bbbcd6d) — assessmentType field live |
+| Apps Script | v74 source — NOT YET DEPLOYED. Paste Code.gs into editor + deploy as new version before testing. |
+
+---
+
+## July 21 2026 — Assessment Type / Test Mode
+
+### What changed
+- **New intake field: Assessment Type** — selector with two options: `Home Health Assessment` (default) and `Test / Training`
+- Field appears at top of intake form, above Inspector Name
+- Value saved to inspection object and included in sync payload (`buildExportJSON`)
+
+### Apps Script v74 changes (NOT YET DEPLOYED)
+- New constant: `TEST_ASSESSMENTS_FOLDER_ID` — paste the `_Test Assessments/` folder ID here before deploying
+- `processInspection()` branches on `data.assessmentType === 'Test / Training'`
+- Test path (`createTestInspectionSheet`): no tracker row write, no assessment number, folder lands in `_Test Assessments/` with name `TEST — YYYY-MM-DD — INH-ID`
+- Real path (`Home Health Assessment` or field missing): zero behavior change
+- Sheet inside test folder still named `InHaus Inspection — INH-ID` (standard naming)
+
+### Before deploying Apps Script v74
+1. Get the `_Test Assessments/` Drive folder ID (from Matt's Drive link)
+2. Paste it into `TEST_ASSESSMENTS_FOLDER_ID` in Code.gs
+3. Commit, then paste into Apps Script editor and deploy as new version
+4. Verify with checkpoint POST, then a test-mode full sync
+
+### Files changed
+- `screens.js` (commit bbbcd6d): ASSESSMENT_TYPE_OPTIONS, assessmentType data init, sel() field added to intake
+- `inspection.js` (commit bbbcd6d): assessmentType included in buildExportJSON
+- `Code.gs` (commit 4e71b31, `/Users/hans/inhaus-apps-script/`): TEST_ASSESSMENTS_FOLDER_ID constant + createTestInspectionSheet function
+
+---
+
 ## Quick Reference — Current State (July 20 2026)
 
 | Item | Value |
