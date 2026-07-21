@@ -1,6 +1,6 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400'
 };
@@ -24,6 +24,8 @@ export default {
       if (url.pathname === '/mirror' && request.method === 'POST') return await handleMirror(request, env);
       if (url.pathname === '/confirmed' && request.method === 'POST') return await handleConfirmed(request, env);
       if (url.pathname === '/inspection-status' && request.method === 'POST') return await handleInspectionStatus(request, env);
+      if (url.pathname === '/inspection-photos' && request.method === 'GET') return await handleInspectionPhotos(url, env);
+      if (url.pathname === '/delete' && request.method === 'POST') return await handleDelete(request, env);
       if (url.pathname === '/photo' && request.method === 'GET') return await handleReviewPhoto(url, env);
       return json({ error: 'not_found' }, 404);
     } catch (err) {
@@ -83,6 +85,61 @@ async function handleMetadataUpdate(request, env) {
   });
 
   return json({ updated: true, inspectionId, photoId, photo: updated });
+}
+
+async function handleDelete(request, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
+  const body = await readJson(request);
+  validateSharedSecret(body, env);
+  const inspectionId = cleanId(body.inspectionId, 'inspectionId');
+  const photoId = cleanId(body.photoId, 'photoId');
+  const storagePath = storagePathFor(inspectionId, photoId);
+
+  const objectResponse = await fetch(normalizeSupabaseUrl(env, `/storage/v1/object/${encodeURIComponent(env.SUPABASE_BUCKET)}`), {
+    method: 'DELETE',
+    headers: serviceHeaders(env, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ prefixes: [storagePath] })
+  });
+  if (!objectResponse.ok && objectResponse.status !== 404) {
+    throw new Error(`photo_storage_delete_failed:${objectResponse.status}:${(await objectResponse.text()).slice(0, 120)}`);
+  }
+
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('photo_id', `eq.${photoId}`);
+  const metadataResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
+    method: 'DELETE', headers: serviceHeaders(env)
+  });
+  if (!metadataResponse.ok) {
+    throw new Error(`photo_metadata_delete_failed:${metadataResponse.status}:${(await metadataResponse.text()).slice(0, 120)}`);
+  }
+  return json({ deleted: true, inspectionId, photoId });
+}
+
+async function handleInspectionPhotos(url, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY']);
+  const inspectionId = cleanId(url.searchParams.get('inspectionId'), 'inspectionId');
+  const token = String(url.searchParams.get('token') || '');
+  if (!token || token !== inspectionId.toLowerCase()) throw new Error('unauthorized');
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('select', 'photo_id,room_name,step_name,caption,slot,storage_path,drive_url,created_at');
+  params.set('order', 'created_at.asc');
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), { headers: serviceHeaders(env) });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`photo_list_failed:${response.status}:${text.slice(0, 120)}`);
+  const rows = text ? JSON.parse(text) : [];
+  return json({ photos: rows.map(row => ({
+    photoId: row.photo_id,
+    roomName: row.room_name || '',
+    stepName: row.step_name || '',
+    caption: row.caption || '',
+    slot: row.slot || '',
+    storagePath: row.storage_path || '',
+    driveUrl: row.drive_url || '',
+    timestamp: row.created_at || '',
+    url: `${url.origin}/photo?inspectionId=${encodeURIComponent(inspectionId)}&photoId=${encodeURIComponent(row.photo_id)}&token=${encodeURIComponent(inspectionId.toLowerCase())}`
+  })) });
 }
 
 // Review-portal image delivery. Drive files in the Shared Drive cannot always

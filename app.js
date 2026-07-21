@@ -1,12 +1,13 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=199';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=199';
-import { initStorage, saveNow, scheduleSave } from './storage.js?v=199';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=199';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=199';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=199';
-import { initScreens, render } from './screens.js?v=199';
-import { initAppFeedback } from './feedback.js?v=199';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=200';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=200';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=200';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=200';
+import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=200';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=200';
+import { initScreens, render } from './screens.js?v=200';
+import { initAppFeedback } from './feedback.js?v=200';
+import { deletePhotoFromSupabase } from './supabase-photos.js?v=200';
 
 (function () {
   'use strict';
@@ -55,6 +56,7 @@ import { initAppFeedback } from './feedback.js?v=199';
   let _finalSyncTriggeredId = null;      // tracks which inspection triggered final sync
 
   const root = document.getElementById('app');
+  window.deletePhotoFromSupabase = deletePhotoFromSupabase;
   const RESTORABLE_SCREENS = new Set([
     'truck-check', 'intake', 'cloud-resume', 'precheck', 'step',
     'photos', 'rapid-capture', 'findings', 'team', 'my-work', 'recovery'
@@ -627,7 +629,7 @@ import { initAppFeedback } from './feedback.js?v=199';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v199',
+      appVersion: 'v200',
       success: success
     };
   }

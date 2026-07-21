@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=199';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=200';
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
   const controller = new AbortController();
@@ -126,6 +126,16 @@ export async function updatePhotoMetadata(photo, inspectionId) {
     })
   }, 30000, 'Photo metadata update');
   return parseJsonResponse(resp, 'Photo metadata update failed');
+}
+
+export async function deletePhotoFromSupabase(inspectionId, photoId) {
+  if (!inspectionId || !photoId) throw new Error('Missing photo delete identifiers');
+  const resp = await fetchWithTimeout(workerUrl('/delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inspectionId, photoId, sharedSecret: PHOTO_UPLOAD_SECRET })
+  }, 30000, 'Photo delete');
+  return parseJsonResponse(resp, 'Photo delete failed');
 }
 
 export async function mirrorPhotosToDrive(payload) {

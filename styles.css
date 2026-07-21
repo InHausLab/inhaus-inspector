@@ -643,6 +643,12 @@ body {
 .photo-btn-row { display: flex; gap: 8px; }
 .photo-btn-row .photo-add-btn { flex: 1; font-size: 1rem; }
 .photo-add-btn { width: 100%; font-size: 1.1rem; }
+.remediation-photo-pair { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 16px; }
+.remediation-photo-pair .photo-section { margin:0; padding:8px; border:1px solid var(--border); border-radius:10px; }
+.remediation-photo-pair .photo-btn-row { display:block; }
+.remediation-photo-pair .photo-add-btn { min-height:44px; padding:8px; font-size:.9rem; }
+.remediation-photo-pair .photo-btn-row .photo-add-btn + .photo-add-btn { margin-top:6px; }
+.photo-context-label { display:block; width:100%; margin-bottom:4px; }
 .photo-card .input-row { padding: 0; }
 .photo-card .mic-btn {
   width: 44px; height: 44px; min-width: 44px;

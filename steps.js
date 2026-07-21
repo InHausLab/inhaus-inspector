@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=199';
-import { getInspection } from './state.js?v=199';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=200';
+import { getInspection } from './state.js?v=200';
 
 export function getEquipmentFields() {
   return [
@@ -325,15 +325,19 @@ export function getKitchenApplianceFields() {
     heading('Under Refrigerator'),
     check('fridgeChecked', 'Checked'),
     check('fridgeCleaned', 'Cleaned'),
+    { type: 'remediation-photo-pair', key: 'fridge', label: 'Under Refrigerator' },
     heading('Under Dishwasher'),
     check('dishwasherChecked', 'Checked'),
     check('dishwasherCleaned', 'Cleaned'),
+    { type: 'remediation-photo-pair', key: 'dishwasher', label: 'Under Dishwasher' },
     heading('Dishwasher Filter'),
     check('dishwasherFilterChecked', 'Checked'),
     check('dishwasherFilterCleaned', 'Cleaned'),
+    { type: 'remediation-photo-pair', key: 'dishwasherFilter', label: 'Dishwasher Filter' },
     heading('Under Sink'),
     check('underSinkChecked', 'Checked'),
     check('underSinkCleaned', 'Cleaned'),
+    { type: 'remediation-photo-pair', key: 'underSink', label: 'Under Sink' },
     yesnona('iceMakerPresent', 'Ice maker present?'),
     showIf(check('iceMakerChecked', 'Checked'), 'iceMakerPresent', 'Yes'),
     showIf(check('iceMakerCleaned', 'Cleaned'), 'iceMakerPresent', 'Yes'),
@@ -342,6 +346,7 @@ export function getKitchenApplianceFields() {
     heading('Above Stove Vent'),
     check('stoveVentChecked', 'Checked'),
     check('stoveVentCleaned', 'Cleaned'),
+    { type: 'remediation-photo-pair', key: 'stoveVent', label: 'Above Stove Vent' },
     textarea('applianceFindings', 'Notable findings'),
     photo('Appliance Inspection'),
     divider(),
@@ -389,17 +394,12 @@ export function getAtpKitchenFields() {
   return [
     sel('atpSurface', 'Surface tested *', ['Kitchen counter', 'Kitchen sink', 'Bathroom counter', 'Bathroom sink', 'Other']),
     showIf(text('atpSurfaceOther', 'Describe surface', { placeholder: 'e.g. Laundry room sink', required: true }), 'atpSurface', 'Other'),
-    info('\u26a0\ufe0f Both a Before photo and After photo are required for each ATP test.'),
     { type: 'number-scanner', dataKey: 'atpPreRLU', label: 'Pre-test RLU reading', unit: 'RLU' },
     radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
-    heading('Before Photo'),
-    { type: 'photo', stepName: 'ATP Before', photoKey: '_atpBeforePhotos', hideLabel: true },
     divider(),
     yesno('atpCleaned', 'Surface cleaned with soap and water'),
     { type: 'number-scanner', dataKey: 'atpPostRLU', label: 'Post-test RLU reading', unit: 'RLU' },
     radio('atpPostStatus', 'Post-test status (Pass if below 100 RLU, Fail if 100 or more)', ['Pass', 'Fail']),
-    heading('After Photo'),
-    { type: 'photo', stepName: 'ATP After', photoKey: '_atpAfterPhotos', hideLabel: true },
     textarea('notes', 'Notes')
   ];
 }
@@ -455,6 +455,7 @@ export function getPropertyDetailsFields() {
     showIf(textarea('occupancyActivities', 'Describe occupant activities (e.g. cooking, cleaning, watching TV)', { placeholder: 'e.g. Owner was cooking in kitchen during assessment' }), 'occupancyDuringInspection', 'Occupied - Active'),
     showIf(textarea('occupancyActivities', 'Describe occupant activities', { placeholder: 'e.g. Owner present but resting in bedroom' }), 'occupancyDuringInspection', 'Occupied - Passive'),
     text('weatherConditions', 'Weather conditions'),
+    text('particulateMatter', 'Particulate matter (PM2.5 / PM10)'),
     { type: 'weather-link' }
   ];
 }
@@ -474,23 +475,6 @@ export function getFinalChecksFields() {
       { key: 'photosUploaded', label: 'All photos uploaded/captured' },
       { key: 'boulderBlueRegistered', label: 'Boulder Blue filter registered on Jonah Ventures portal' }
     ]},
-    divider(),
-    heading('Tests Conducted - Confirm for Tanner'),
-    info('Check every test actually performed so Tanner knows exactly what lab results to expect.'),
-    checklist('testsConfirmed', null, [
-      { key: 'testBreeze', label: 'Breeze ET mold spore traps - collected' },
-      { key: 'testBoulderBlue', label: 'Boulder Blue allergen filter - collected' },
-      { key: 'testWaterPanel', label: 'Water panel - collected' },
-      { key: 'testPFAS', label: 'PFAS test - collected' },
-      { key: 'testMicroplastics', label: 'Microplastics test - collected' },
-      { key: 'testRadon', label: 'Radon monitor - placed (48hr test running)' },
-      { key: 'testATP', label: 'ATP surface test - performed' },
-      { key: 'testMoldSwabs', label: 'Mold swab samples - collected' }
-    ]),
-    text('breezeSampleCount', 'Number of Breeze ET spore traps collected', { placeholder: 'e.g. 4' }),
-    text('moldSwabSampleCount', 'Number of mold swab samples collected', { placeholder: 'e.g. 2 (only if visible mold found)' }),
-    text('atpTestCount', 'Number of ATP tests performed', { placeholder: 'e.g. 3 - kitchen sink, dishwasher, ice maker' }),
-    textarea('testsNotConducted', 'Tests NOT performed - note reason', { placeholder: 'e.g. PFAS not requested by client. Microplastics kit not in truck.' }),
   ];
 }
 
@@ -594,7 +578,7 @@ export const PHASES = [
   { id: 'setup', name: 'Setup', icon: '1' },
   { id: 'arrival', name: 'Arrival', icon: '2' },
   { id: 'exterior', name: 'Exterior', icon: '3' },
-  { id: 'lowest', name: 'Lowest Livable Level (e.g. Basement)', icon: '4' },
+  { id: 'lowest', name: 'Lowest Level', icon: '4' },
   { id: 'utility', name: 'Utility', icon: '5' },
   { id: 'upper', name: 'Bed Rm', icon: '6' },
   { id: 'rooms', name: 'Bath Rm', icon: '6.5' },
@@ -715,7 +699,8 @@ export function buildStepList(insp) {
   const numBath = parseInt(insp.numberOfBathrooms) || 1;
   for (let i = 0; i < numBath; i++) {
     const id = 'bathroom-' + i;
-    const bathroom = { id, type: 'bathroom', phase: 'rooms', name: 'Bathroom ' + (i + 1), index: i, roomCategory: 'bathroom' };
+    const defaultBathroomName = i === 2 ? 'Primary Bathroom' : 'Bathroom ' + (i + 1);
+    const bathroom = { id, type: 'bathroom', phase: 'rooms', name: defaultBathroomName, index: i, roomCategory: 'bathroom' };
     bathroom.name = applyBathroomName(insp, bathroom, bedroomSteps, relationships);
     steps.push(bathroom);
   }
@@ -832,11 +817,6 @@ export function validateStep(stepDef, existingData) {
   const missing = [];
   const fieldGen = STEP_FIELDS[stepDef.type];
   if (fieldGen) collectRequiredIssues(fieldGen(), data, missing);
-
-  if (stepDef.type === 'atp-kitchen') {
-    if (!hasPhoto(data, '_atpBeforePhotos')) missing.push('ATP Before photo is required');
-    if (!hasPhoto(data, '_atpAfterPhotos')) missing.push('ATP After photo is required');
-  }
 
   return missing;
 }

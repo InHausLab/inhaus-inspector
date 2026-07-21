@@ -33,7 +33,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 | Item | Value |
 |------|-------|
-| App version | v199 |
+| App version | v200 |
 | Live URL | https://inhaus-inspector.netlify.app |
 | GitHub Pages | BROKEN — use Netlify only |
 | Apps Script | v73 source / Google deployment Version 82 — completed review list and App Fix email verified |
@@ -63,6 +63,24 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 - Verified the production root reports `InHaus Inspector Bridge v70b is running`.
 - Verified the production list returns `INH-20260720-SHMXOQ` for Jo Archer at 369 Hillcrest Dr with status `needs review`.
 - Verified capabilities return `appFeedback: true` and a real POST checkpoint returned `checkpointed: true`.
+
+---
+
+## v200 — Field Workflow and Photo Reliability Pass
+**Date:** July 20, 2026
+
+- Preserved and regression-tested the v199 fixed iPhone footer behavior on the Photos screen.
+- Completed photo deletion end to end: photo cards and the Photos screen now remove the IndexedDB record and call the authenticated Photo Worker to delete the Supabase object and metadata row.
+- Renamed the third default bathroom to **Primary Bathroom** and moved each bedroom's private-bathroom controls to the bottom of the page.
+- Removed the first Lowest Level room-name field and shortened the phase label to **Lowest Level**.
+- Removed the broken Priority Laboratory order-portal link and hid the redundant in-app dictation hint on iOS.
+- Added visible inspector-context fields to photo cards and includes that context in AI caption generation.
+- Added compact Before/After camera controls for each kitchen remediation area; captured photos inherit the area and Before/After labels.
+- Removed redundant ATP Before/After photo sections and their validation gate because the RLU scanners already capture the meter images.
+- Fixed weather auto-fill to target `weatherConditions` directly instead of a nearby notes field. Added live PM2.5 and PM10 data from Open-Meteo to a dedicated particulate-matter field.
+- Moved **Tests Conducted — Confirm for Tanner** out of the inspector's final field checklist; the review portal owns this confirmation.
+- Added Photo Worker endpoints for cloud deletion and authenticated per-inspection photo listing so the review portal can recover photos when Apps Script metadata lags.
+- Updated the review portal to merge Worker/Supabase photos and display ATP surface, pre/post RLU, cleaning status, pass/fail status, notes, and reviewer confirmation in the same order as the app.
 
 ---
 

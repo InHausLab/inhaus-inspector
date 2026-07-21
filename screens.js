@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=199';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=199';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=199';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=199';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=199';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=199';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=200';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=200';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=200';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=200';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=200';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=200';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -12,13 +12,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=199';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=199';
-import { updatePhotoMetadata } from './supabase-photos.js?v=199';
+} from './findings.js?v=200';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=200';
+import { updatePhotoMetadata } from './supabase-photos.js?v=200';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=199';
+} from './comment-library.js?v=200';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1899,13 +1899,14 @@ export function renderStep() {
 
   const stepHeading = ui().el('h1', { className: 'screen-title' }, data.roomName || step.name);
   c.appendChild(stepHeading);
-  if (step.type === 'bedroom') c.appendChild(buildBedroomBathroomLinkCard(step));
   if (step.type === 'bathroom') c.appendChild(buildBathroomAssignmentCard(step));
 
   const fieldGen = STEP_FIELDS[step.type];
   let pendingFieldRender = null;
   if (fieldGen) {
-    const fields = fieldGen();
+    const fields = fieldGen().filter(field => !(
+      step.dynamic === 'lowest' && step.index === 0 && field && field.key === 'roomName'
+    ));
     const card = ui().el('div', { className: 'card' });
     const onFieldChange = fieldKey => {
       markStepUpdated(ctx.inspection, step.id, step.name, fieldKey);
@@ -1979,6 +1980,7 @@ export function renderStep() {
     if (step.id === bedroomSteps[bedroomSteps.length - 1].id) {
       c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', style: 'margin-top:8px', onClick: () => { ctx.addDynamicRoom('bedrooms'); window.scrollTo(0, 0); } }, '+ Add Another Bedroom'));
     }
+    c.appendChild(buildBedroomBathroomLinkCard(step));
   }
   if (step.type === 'bathroom') {
     const bathroomSteps = ctx.stepList.filter(s => s.type === 'bathroom');
@@ -3096,6 +3098,10 @@ export function renderPhotos() {
       // Remove from IndexedDB vault
       if (p.photoId && window.DB && window.DB.removePhoto) {
         try { await window.DB.removePhoto(p.photoId); } catch (e) { console.warn('vault remove failed', e); }
+      }
+      if (p.photoId && window.deletePhotoFromSupabase) {
+        try { await window.deletePhotoFromSupabase(ctx.inspection.inspectionId, p.photoId); }
+        catch (e) { console.warn('cloud photo delete failed', e); ui().showToast('Removed locally; cloud cleanup needs retry'); }
       }
       await saveNow();
       ui().showToast('Photo deleted');

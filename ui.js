@@ -146,23 +146,10 @@
   }
 
   function micBtn(onResult) {
+    // iOS already has keyboard dictation. Do not render a second mic that only
+    // opens an instructional toast and looks like a separate recording tool.
+    if (isIOS) return null;
     if (!hasSpeech) {
-      if (isIOS) {
-        // On iOS: no native SR — prompt to use keyboard mic
-        const wrap = document.createElement('span');
-        const hint = el('button', {
-          type: 'button', className: 'mic-hint-btn', 'aria-label': 'Voice input: use mic in your keyboard',
-          title: 'Tap the 🎙 mic key in your iPhone keyboard for voice input',
-          onClick: (e) => {
-            e.preventDefault();
-            showToast('Tap the \ud83c\udf99 mic in your iPhone keyboard to dictate \u2014 read back and fix before saving', 4000);
-            const inp = e.target.closest('.input-row, .textarea-row');
-            if (inp) { const field = inp.querySelector('input, textarea'); if (field) field.focus(); }
-          }
-        }, '\ud83c\udf99');
-        wrap.appendChild(hint);
-        return wrap;
-      }
       return null;
     }
     let rec = null, active = false;
@@ -1407,7 +1394,8 @@
           card.appendChild(assignment);
         }
 
-        const capRow = el('div', { className: 'input-row' });
+        const capRow = el('div', { className: 'input-row', style: 'display:block;' });
+        capRow.appendChild(el('label', { className: 'field-label photo-context-label' }, 'Inspector context'));
         const capInp = el('textarea', {
           className: 'field-input photo-caption-input', rows: '2',
           placeholder: 'Optional comment — why does this photo matter?'
@@ -1446,6 +1434,7 @@
                 ' Do not use alarming language. Be matter-of-fact and helpful.' +
                 (roomName ? ' Room: ' + roomName + '.' : '') +
                 (stepName ? ' Section: ' + stepName + '.' : '') +
+                (capInp.value.trim() ? ' Inspector context: ' + capInp.value.trim() + '. Use this context to improve accuracy, while correcting grammar and avoiding unsupported claims.' : '') +
                 ' Return ONLY the caption text, no quotes, no labels, no extra formatting.';
               const resp = await fetchWithTimeout(PROXY_URL, {
                 method: 'POST',
@@ -1484,8 +1473,11 @@
           onClick: async () => {
             if (confirm('Delete this photo?')) {
               if (window.DB && p.photoId) {
-                if (window.DB.trashPhoto) await window.DB.trashPhoto(p, inspectionId, 'Deleted from photo card');
-                else if (window.DB.removePhoto) await window.DB.removePhoto(p.photoId);
+                if (window.DB.removePhoto) await window.DB.removePhoto(p.photoId);
+              }
+              if (p.photoId && inspectionId && window.deletePhotoFromSupabase) {
+                try { await window.deletePhotoFromSupabase(inspectionId, p.photoId); }
+                catch (e) { console.warn('cloud photo delete failed', e); }
               }
               photos.splice(idx, 1);
               onUpdate();
@@ -1662,8 +1654,6 @@
             const humidity = parseInt(cc.humidity);
             const windMph = parseInt(cc.windspeedMiles);
             const windDir = cc.winddir16Point || '';
-            const uvIndex = parseInt(cc.uvIndex || 0);
-            const visibility = parseInt(cc.visibility || 10);
             // Temp description
             const tempStr = tempF + '°F';
             // Sky/condition
@@ -1680,12 +1670,7 @@
             const precip = sky.includes('rain') || sky.includes('storm') || sky.includes('drizzle') || sky.includes('shower')
               ? 'active precipitation present'
               : 'dry conditions with no meaningful precipitation';
-            // AQI proxy from UV + visibility
-            let aqiDesc;
-            if (visibility >= 10 && uvIndex <= 5) aqiDesc = 'very good outdoor air quality with low particulate and ozone levels (AQI within the \'Good\' range)';
-            else if (visibility >= 7) aqiDesc = 'good outdoor air quality (AQI within the \'Good\' range)';
-            else aqiDesc = 'moderate outdoor air quality; visibility reduced';
-            return tempStr + ' and ' + sky + '; ' + humDesc + ' with ' + windDesc + '; ' + precip + '; ' + aqiDesc + '.';
+            return tempStr + ' and ' + sky + '; ' + humDesc + ' with ' + windDesc + '; ' + precip + '.';
           }
           try {
             const pos = await new Promise((resolve, reject) => {
@@ -1694,35 +1679,31 @@
             });
             const lat = pos.coords.latitude.toFixed(4);
             const lon = pos.coords.longitude.toFixed(4);
-            const resp = await fetch('https://wttr.in/' + lat + ',' + lon + '?format=j1');
-            if (!resp.ok) throw new Error('weather fetch failed');
-            const wx = await resp.json();
+            const [weatherResp, particulateResp] = await Promise.all([
+              fetch('https://wttr.in/' + lat + ',' + lon + '?format=j1'),
+              fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + lat + '&longitude=' + lon + '&current=pm2_5,pm10')
+            ]);
+            if (!weatherResp.ok) throw new Error('weather fetch failed');
+            const wx = await weatherResp.json();
             const cc = wx.current_condition && wx.current_condition[0];
             if (!cc) throw new Error('no weather data');
             const summary = formatWeatherSummary(cc);
-            // Find the weatherConditions textarea and populate it
             const container = btn.closest('.card') || btn.parentElement;
-            const allCards = document.querySelectorAll('.card');
-            let targetInput = null;
-            allCards.forEach(card => {
-              const inputs = card.querySelectorAll('textarea, input[type="text"]');
-              inputs.forEach(inp => {
-                const label = inp.closest('.field-wrap, .field-row, div');
-                const labelEl = label && label.querySelector('label, .field-label');
-                if (labelEl && labelEl.textContent && labelEl.textContent.toLowerCase().includes('weather')) targetInput = inp;
-              });
-            });
-            // Also try by proximity — the textarea directly above this button
-            if (!targetInput) {
-              const allInputs = document.querySelectorAll('textarea');
-              allInputs.forEach(inp => {
-                if (inp.getBoundingClientRect().bottom < btn.getBoundingClientRect().top + 200) targetInput = inp;
-              });
-            }
+            const targetInput = container.querySelector('[data-field-key="weatherConditions"]') || document.querySelector('[data-field-key="weatherConditions"]');
+            const particulateInput = container.querySelector('[data-field-key="particulateMatter"]') || document.querySelector('[data-field-key="particulateMatter"]');
             if (targetInput) {
               targetInput.value = summary;
               targetInput.dispatchEvent(new Event('input', { bubbles: true }));
               targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+              if (particulateResp.ok && particulateInput) {
+                const air = await particulateResp.json();
+                const current = air && air.current;
+                if (current && Number.isFinite(current.pm2_5) && Number.isFinite(current.pm10)) {
+                  particulateInput.value = 'PM2.5: ' + current.pm2_5 + ' µg/m³; PM10: ' + current.pm10 + ' µg/m³';
+                  particulateInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  particulateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              }
               btn.textContent = '✅ Weather filled';
               btn.style.background = '#4caf50';
             } else {
@@ -1737,6 +1718,22 @@
           }
         };
         return btn;
+      }
+      case 'remediation-photo-pair': {
+        const wrap = el('div', { className: 'remediation-photo-pair' });
+        const baseKey = String(f.key || 'remediation');
+        const beforeKey = '_' + baseKey + 'BeforePhotos';
+        const afterKey = '_' + baseKey + 'AfterPhotos';
+        if (!Array.isArray(data[beforeKey])) data[beforeKey] = [];
+        if (!Array.isArray(data[afterKey])) data[afterKey] = [];
+        const room = data.roomName || '';
+        wrap.appendChild(renderPhoto(data[beforeKey], changed, room, f.label + ' — Before', inspection && inspection.inspectionId, {
+          label: 'Before', addLabel: '📷 Before', addAnotherLabel: '📷 Add another before', compact: true
+        }));
+        wrap.appendChild(renderPhoto(data[afterKey], changed, room, f.label + ' — After', inspection && inspection.inspectionId, {
+          label: 'After', addLabel: '📷 After', addAnotherLabel: '📷 Add another after', compact: true
+        }));
+        return wrap;
       }
       case 'boulder-blue-duration': {
         // Auto-calculates duration from start time (arrival step) + end time (current data)
