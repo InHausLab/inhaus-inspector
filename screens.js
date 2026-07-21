@@ -1139,6 +1139,8 @@ const OFFICE_PREP_FIELDS = [
   'pfasSampleId', 'officePrepNotes', 'teamInspectorNames'
 ];
 
+const ASSESSMENT_TYPE_OPTIONS = ['Home Health Assessment', 'Test / Training'];
+
 function applyOfficePreparation(inspection, data) {
   ensureInspectionWorkspace(inspection);
   if (!inspection.stepData) inspection.stepData = {};
@@ -1189,6 +1191,7 @@ export function renderIntake() {
     clientConcerns: ctx.inspection.clientConcerns || '',
     blueprintNotes: ctx.inspection.blueprintNotes || '',
     inspectorEmail: ctx.inspection.inspectorEmail || '',
+    assessmentType: ctx.inspection.assessmentType || 'Home Health Assessment',
     pfasSetup: existingDevice.pfasSetup || '',
     pfasKitNum: existingDevice.pfasKitNum || '',
     waterPanelPlanned: existingWater.waterPanelPlanned || '',
@@ -1214,6 +1217,7 @@ export function renderIntake() {
     wifiPassword: '',
     clientConcerns: '',
     blueprintNotes: '',
+    assessmentType: 'Home Health Assessment',
     pfasSetup: '',
     pfasKitNum: '',
     waterPanelPlanned: '',
@@ -1240,6 +1244,7 @@ export function renderIntake() {
   const card = ui().el('div', { className: 'card' });
   const fields = [
     { ...text('inspectionId', 'Inspection ID'), disabled: true },
+    sel('assessmentType', 'Assessment Type *', ASSESSMENT_TYPE_OPTIONS),
     text('inspectorName', 'Inspector Name *'),
     text('inspectorEmail', 'Inspector Email'),
     date('inspectionDate', 'Inspection Date'),

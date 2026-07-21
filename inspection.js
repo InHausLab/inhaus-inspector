@@ -155,6 +155,7 @@ export function buildExportJSON(stepList) {
     inspectorName: inspection.inspectorName,
     inspectionDate: inspection.inspectionDate,
     clientName: inspection.clientName,
+    assessmentType: inspection.assessmentType || 'Home Health Assessment',
     numberOfLevels: inspection.numberOfLevels,
     numberOfBedrooms: inspection.numberOfBedrooms,
     numberOfBathrooms: inspection.numberOfBathrooms,
