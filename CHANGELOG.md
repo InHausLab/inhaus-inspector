@@ -70,7 +70,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 **Date:** July 20, 2026
 
 - Preserved and regression-tested the v199 fixed iPhone footer behavior on the Photos screen.
-- Completed photo deletion end to end: photo cards and the Photos screen now remove the IndexedDB record and call the authenticated Photo Worker to delete the Supabase object and metadata row.
+- Completed photo deletion end to end: photo cards and the Photos screen now remove the IndexedDB record and call the authenticated Photo Worker to delete the Supabase object. Because production intentionally denies table-row DELETE, metadata is safely tombstoned with the existing UPDATE grant and excluded from all photo reads, mirroring, and confirmation checks.
 - Renamed the third default bathroom to **Primary Bathroom** and moved each bedroom's private-bathroom controls to the bottom of the page.
 - Removed the first Lowest Level room-name field and shortened the phase label to **Lowest Level**.
 - Removed the broken Priority Laboratory order-portal link and hid the redundant in-app dictation hint on iOS.

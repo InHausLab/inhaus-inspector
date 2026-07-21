@@ -111,9 +111,20 @@ async function handleDelete(request, env) {
     method: 'DELETE', headers: serviceHeaders(env)
   });
   if (!metadataResponse.ok) {
-    throw new Error(`photo_metadata_delete_failed:${metadataResponse.status}:${(await metadataResponse.text()).slice(0, 120)}`);
+    // Production intentionally grants UPDATE but not DELETE on this table.
+    // Tombstone the existing row without a schema change, then exclude it from
+    // every read/mirror/confirmation query below.
+    const tombstoneResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
+      method: 'PATCH',
+      headers: serviceHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ source_system: 'deleted', drive_url: null, caption: '', room_name: '', step_name: '', slot: null })
+    });
+    if (!tombstoneResponse.ok) {
+      throw new Error(`photo_metadata_tombstone_failed:${tombstoneResponse.status}:${(await tombstoneResponse.text()).slice(0, 120)}`);
+    }
+    return json({ deleted: true, metadata: 'tombstoned', inspectionId, photoId });
   }
-  return json({ deleted: true, inspectionId, photoId });
+  return json({ deleted: true, metadata: 'deleted', inspectionId, photoId });
 }
 
 async function handleInspectionPhotos(url, env) {
@@ -123,6 +134,7 @@ async function handleInspectionPhotos(url, env) {
   if (!token || token !== inspectionId.toLowerCase()) throw new Error('unauthorized');
   const params = new URLSearchParams();
   params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('source_system', 'neq.deleted');
   params.set('select', 'photo_id,room_name,step_name,caption,slot,storage_path,drive_url,created_at');
   params.set('order', 'created_at.asc');
   const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), { headers: serviceHeaders(env) });
@@ -155,6 +167,7 @@ async function handleReviewPhoto(url, env) {
   const params = new URLSearchParams();
   params.set('inspection_id', `eq.${inspectionId}`);
   params.set('photo_id', `eq.${photoId}`);
+  params.set('source_system', 'neq.deleted');
   params.set('select', 'storage_path');
   params.set('limit', '1');
   const metadataResponse = await fetch(
@@ -361,6 +374,7 @@ async function getUnmirroredPhotoRows(env, inspectionId) {
   const params = new URLSearchParams();
   params.set('inspection_id', `eq.${inspectionId}`);
   params.set('drive_url', 'is.null');
+  params.set('source_system', 'neq.deleted');
   params.set('select', 'photo_id,inspection_id,room_name,step_name,caption,slot,storage_path,drive_url');
 
   const res = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
@@ -575,7 +589,7 @@ async function handleConfirmed(request, env) {
   const body = await readJson(request);
   validateSharedSecret(body, env);
   const inspectionId = cleanId(body.inspectionId, 'inspectionId');
-  const queryString = 'inspection_id=eq.' + encodeURIComponent(inspectionId) + '&select=photo_id&storage_path=not.is.null';
+  const queryString = 'inspection_id=eq.' + encodeURIComponent(inspectionId) + '&source_system=neq.deleted&select=photo_id&storage_path=not.is.null';
   const res = await fetch(env.SUPABASE_URL + '/rest/v1/inspector_photo_uploads?' + queryString, {
     headers: {
       'apikey': env.SUPABASE_SERVICE_KEY,
@@ -657,6 +671,7 @@ async function assessmentExistsForInspection(env, inspectionId) {
 async function getPhotoRowsForInspection(env, inspectionId) {
   const params = new URLSearchParams();
   params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('source_system', 'neq.deleted');
   params.set('select', 'photo_id,drive_url,storage_path');
   const res = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
     headers: serviceHeaders(env)
