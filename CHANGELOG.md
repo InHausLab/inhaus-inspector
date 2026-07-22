@@ -27,6 +27,17 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 
 ---
 
+## July 22 2026 — Review Portal Cloud Save
+
+- Added isolated Supabase table `public.review_data` with `inspection_id`, JSONB `field_data`, and `updated_at`.
+- Enabled RLS, revoked browser roles, and granted only `service_role` read/insert/update access. Existing photo and Tanner tables were not changed.
+- Added authenticated Photo Worker endpoints `POST /save-review` and `GET /get-review`; the Worker keeps the Supabase service key private and validates the portal review token from the Authorization header.
+- Installed the Worker secret `REVIEW_ACCESS_TOKEN` and deployed `inhaus-photo-worker` version `7cf697cc-2a8e-4344-9429-876fade25529`.
+- Updated `InHausLab/inhaus-review` commit `41e3ea2` so field edits still save locally for recovery, then persist through the Photo Worker and reload from Supabase on another device.
+- Bumped the review portal asset URL to `portal.js?v=20260722-01` for GitHub Pages cache invalidation.
+- Verified production behavior: unauthenticated reads return `401`; authenticated field save and read-back return the same JSON; review portal CORS preflight returns `204` with `Authorization` and `Content-Type` allowed. The smoke-test row was deleted after verification.
+- Apps Script, `config.js`, `inspector_photo_uploads`, Tanner's tables, and clasp were not changed.
+
 ---
 
 ## Quick Reference — Current State (July 21 2026)

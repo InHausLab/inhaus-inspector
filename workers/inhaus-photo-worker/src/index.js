@@ -27,6 +27,8 @@ export default {
       if (url.pathname === '/inspection-photos' && request.method === 'GET') return await handleInspectionPhotos(url, env);
       if (url.pathname === '/delete' && request.method === 'POST') return await handleDelete(request, env);
       if (url.pathname === '/photo' && request.method === 'GET') return await handleReviewPhoto(url, env);
+      if (url.pathname === '/save-review' && request.method === 'POST') return await handleSaveReview(request, env);
+      if (url.pathname === '/get-review' && request.method === 'GET') return await handleGetReview(request, url, env);
       return json({ error: 'not_found' }, 404);
     } catch (err) {
       return json({ error: err && err.message ? err.message : String(err) }, 500);
@@ -230,6 +232,110 @@ async function handleMirror(request, env) {
   }
 
   return json({ mirrored: results.length, skipped: 0, hasMore, remaining: allRows.length - rows.length, folderId: folder.id, folderName: folder.name, photos: results });
+}
+
+// Review edits use the same global review token as the portal's Apps Script
+// reads, but keep that value in a Worker secret so Supabase's service key is
+// never exposed to the browser. Only the Worker can access review_data.
+async function handleSaveReview(request, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'REVIEW_ACCESS_TOKEN']);
+  const body = await readJson(request);
+  if (!isReviewAuthorized(request, body.token, env)) return json({ error: 'unauthorized' }, 401);
+
+  const inspectionId = cleanId(body.inspectionId, 'inspectionId');
+  const field = body.field && typeof body.field === 'object' ? body.field : null;
+  if (!field) return json({ error: 'missing_field' }, 400);
+
+  const stepId = cleanReviewKey(field.stepId, 'stepId');
+  const fieldKey = cleanReviewKey(field.key, 'fieldKey');
+  const current = await getReviewRow(env, inspectionId);
+  const fieldData = isPlainObject(current && current.field_data)
+    ? structuredClone(current.field_data)
+    : {};
+
+  if (stepId === 'summary' || stepId === 'post') {
+    fieldData[fieldKey] = field.value;
+    if (isPlainObject(fieldData[stepId])) {
+      delete fieldData[stepId][fieldKey];
+      if (!Object.keys(fieldData[stepId]).length) delete fieldData[stepId];
+    }
+  } else {
+    if (!isPlainObject(fieldData[stepId])) fieldData[stepId] = {};
+    fieldData[stepId][fieldKey] = field.value;
+  }
+
+  const updatedAt = new Date().toISOString();
+  const params = new URLSearchParams();
+  params.set('on_conflict', 'inspection_id');
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
+    method: 'POST',
+    headers: serviceHeaders(env, {
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=representation'
+    }),
+    body: JSON.stringify({
+      inspection_id: inspectionId,
+      field_data: fieldData,
+      updated_at: updatedAt
+    })
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`review_save_failed:${response.status}:${text.slice(0, 200)}`);
+  const rows = text ? JSON.parse(text) : [];
+  const saved = Array.isArray(rows) && rows.length ? rows[0] : null;
+  return json({
+    saved: true,
+    inspectionId,
+    fieldData: saved && isPlainObject(saved.field_data) ? saved.field_data : fieldData,
+    updatedAt: saved && saved.updated_at ? saved.updated_at : updatedAt
+  });
+}
+
+async function handleGetReview(request, url, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'REVIEW_ACCESS_TOKEN']);
+  if (!isReviewAuthorized(request, url.searchParams.get('token'), env)) {
+    return json({ error: 'unauthorized' }, 401);
+  }
+
+  const inspectionId = cleanId(url.searchParams.get('inspectionId'), 'inspectionId');
+  const row = await getReviewRow(env, inspectionId);
+  return json({
+    inspectionId,
+    fieldData: row && isPlainObject(row.field_data) ? row.field_data : {},
+    updatedAt: row && row.updated_at ? row.updated_at : null
+  });
+}
+
+async function getReviewRow(env, inspectionId) {
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('select', 'inspection_id,field_data,updated_at');
+  params.set('limit', '1');
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
+    headers: serviceHeaders(env)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`review_get_failed:${response.status}:${text.slice(0, 200)}`);
+  const rows = text ? JSON.parse(text) : [];
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+function isReviewAuthorized(request, fallbackToken, env) {
+  const authorization = String(request.headers.get('Authorization') || '');
+  const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const provided = bearerToken || String(fallbackToken || '');
+  return !!provided && provided === String(env.REVIEW_ACCESS_TOKEN || '');
+}
+
+function cleanReviewKey(value, fieldName) {
+  const text = String(value || '').trim();
+  if (!text) throw new Error(`missing_${fieldName}`);
+  if (text.length > 160 || !/^[A-Za-z0-9_.:-]+$/.test(text)) throw new Error(`invalid_${fieldName}`);
+  return text;
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 async function readJson(request) {
