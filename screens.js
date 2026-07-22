@@ -3278,7 +3278,6 @@ export function renderReview() {
     if (healthError) blockers.push('Photo check failed');
     if (health.missing > 0) blockers.push(health.missing + ' missing photo' + (health.missing === 1 ? '' : 's'));
     if (reviewIssues.length) blockers.push(reviewIssues.length + ' required item' + (reviewIssues.length === 1 ? '' : 's'));
-    if (pendingFindingCount) blockers.push(pendingFindingCount + ' finding' + (pendingFindingCount === 1 ? '' : 's') + ' need review');
     if (!departureDone) blockers.push('Leave checklist open');
     if (!lastCloud) blockers.push('No cloud backup yet');
     if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' waiting to upload');
@@ -3321,10 +3320,12 @@ export function renderReview() {
     const requiredMetric = leaveMetric('Required', reviewIssues.length ? reviewIssues.length + ' open' : 'Clear', reviewIssues.length ? 'bad' : 'good');
     if (reviewIssues.length) makeMetricTappable(requiredMetric, scrollToIssues);
     leaveMetrics.appendChild(requiredMetric);
-    // Findings tile → scroll to issues list
-    leaveMetrics.appendChild(makeMetricTappable(
-      leaveMetric('Findings', pendingFindingCount ? pendingFindingCount + ' open' : 'Ready', pendingFindingCount ? 'bad' : 'good'),
-      scrollToIssues
+    // Finding approval belongs in the desktop review portal. Pending findings
+    // remain in the export but never block the inspector from leaving/submitting.
+    leaveMetrics.appendChild(leaveMetric(
+      'Findings',
+      pendingFindingCount ? pendingFindingCount + ' for portal' : 'Ready',
+      'good'
     ));
     // Before Leaving tile → go to final-checks step
     const beforeLeavingMetric = leaveMetric('Before leaving', departureDone ? 'Done' : 'Open', departureDone ? 'good' : 'bad');
@@ -3404,13 +3405,13 @@ export function renderReview() {
     ui().el('div', null, [
       ui().el('h3', { className: 'section-heading' }, 'Smart Findings'),
       ui().el('p', { className: 'text-muted' }, pendingFindingCount
-        ? pendingFindingCount + ' finding' + (pendingFindingCount === 1 ? '' : 's') + ' still need cleaned wording or approval.'
+        ? pendingFindingCount + ' finding' + (pendingFindingCount === 1 ? '' : 's') + ' will be reviewed in the desktop review portal.'
         : ctx.inspection.findings.filter(item => item.status === 'approved').length + ' findings are ready for the report builder.')
     ]),
     ui().el('button', {
       className: pendingFindingCount ? 'btn btn-primary' : 'btn btn-outline',
       onClick: () => openInspectionWorkspace('findings', 'review')
-    }, pendingFindingCount ? 'Review Findings' : 'Open Findings')
+    }, pendingFindingCount ? 'Review Here (Optional)' : 'Open Findings')
   ]));
   c.appendChild(findingReviewCard);
 
@@ -3580,12 +3581,6 @@ export function renderReview() {
 
   if (ctx.inspection.status !== 'completed') {
     const submitBtn = ui().el('button', { className: 'btn btn-primary btn-full', onClick: () => {
-      const openFindings = ctx.inspection.findings.filter(item => item.status === 'needs_review');
-      if (openFindings.length) {
-        alert(openFindings.length + ' finding' + (openFindings.length === 1 ? '' : 's') + ' still need review. Clean, approve, or exclude each finding before submitting.');
-        openInspectionWorkspace('findings', 'review');
-        return;
-      }
       const allIssues = formatIssueList(collectInspectionIssues());
       if (allIssues.length) {
         const names = allIssues.join('\n\u2022 ');

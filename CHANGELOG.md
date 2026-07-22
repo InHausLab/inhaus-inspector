@@ -6,6 +6,17 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v201 — Move Finding Review to the Review Portal
+**Date:** July 22, 2026
+
+- Removed the phone-side submission gate that required inspectors to clean, approve, or exclude every Smart Finding before completing an inspection.
+- Pending findings remain unchanged in the inspection export and continue syncing to the cloud; no findings or photo captions are deleted or auto-approved.
+- The phone's Final Review now labels pending findings as queued for the desktop review portal and keeps phone review available only as an optional action.
+- Removed pending findings from the **Can I Leave?** blocker count. Required inspection fields, departure checklist, cloud backup, and missing-photo safety checks remain enforced.
+- Bumped the PWA cache and visible badge to `v201` so iPhones receive the updated submission workflow without changing active inspection data.
+
+---
+
 ## ⚠️ APPS SCRIPT RULE — MANDATORY (July 20 2026)
 
 The Apps Script editor was wiped on July 20 2026 because Codex was editing the live script directly without saving to the repo. v52 through v64 were lost.

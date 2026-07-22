@@ -5,7 +5,7 @@ import { initStorage, saveNow, scheduleSave } from './storage.js?v=200';
 import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=200';
 import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=200';
 import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=200';
-import { initScreens, render } from './screens.js?v=200';
+import { initScreens, render } from './screens.js?v=201';
 import { initAppFeedback } from './feedback.js?v=200';
 import { deletePhotoFromSupabase } from './supabase-photos.js?v=200';
 
@@ -629,7 +629,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=200';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v200',
+      appVersion: 'v201',
       success: success
     };
   }
