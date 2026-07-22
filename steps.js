@@ -1,9 +1,43 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=200';
-import { getInspection } from './state.js?v=200';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=202';
+import { getInspection } from './state.js?v=202';
+
+export const REQUIRED_TEST_OPTIONS = [
+  'Breeze ET mold spore traps',
+  'Boulder Blue allergen filter',
+  'Water panel',
+  'PFAS water test',
+  'Microplastics water test',
+  'Radon monitor',
+  'ATP surface testing',
+  'Mold swabs'
+];
+
+export function deriveRequiredTests(insp) {
+  if (!insp || typeof insp !== 'object') return [];
+  const required = new Set(Array.isArray(insp.requiredTests) ? insp.requiredTests.filter(Boolean) : []);
+  const device = insp.stepData?.['device-setup'] || {};
+  const water = insp.stepData?.['water-sample'] || {};
+
+  if (device.pfasSetup === 'Yes' || water.pfasStatus === 'Requested — collect on site' || water.pfasStatus === 'Collected') {
+    required.add('PFAS water test');
+  }
+  if (water.waterPanelPlanned === 'Requested — collect on site' || water.waterPanelCollected === 'Yes') {
+    required.add('Water panel');
+  }
+  if (water.microplasticsStatus === 'Requested — collect on site' || water.microplasticsStatus === 'Collected') {
+    required.add('Microplastics water test');
+  }
+
+  return REQUIRED_TEST_OPTIONS.filter(label => required.has(label));
+}
 
 export function getEquipmentFields() {
+  const requiredTests = deriveRequiredTests(getInspection());
   return [
+    info(requiredTests.length
+      ? 'Required tests from office intake: ' + requiredTests.join(' • ')
+      : 'No required tests were selected during office intake. Confirm the work order before starting.'),
     info('Equipment was already verified at the truck. Complete these on-site steps before starting.'),
     link('\uD83D\uDCCB Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
     checklist('preAssessment', 'Before You Start', [
@@ -374,6 +408,7 @@ export function getWaterSampleFields() {
     divider(),
     heading('Water Panel'),
     yesno('waterPanelCollected', 'Water panel collected'),
+    showIf(sel('waterSampleType', 'Water test sample type', ['Unfiltered', 'Filtered', 'Both filtered and unfiltered']), 'waterPanelCollected', 'Yes'),
     showIf({ type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Water Panel Sample ID' }, 'waterPanelCollected', 'Yes'),
     showIf(text('waterFaucetLocation', 'Faucet location'), 'waterPanelCollected', 'Yes'),
     showIf(photo('Water Panel'), 'waterPanelCollected', 'Yes'),
@@ -711,7 +746,6 @@ export function buildStepList(insp) {
   });
 
   // Main Level / Kitchen
-  steps.push({ id: 'living-area', type: 'living-area', phase: 'main', name: 'Main Living Area' });
   steps.push({ id: 'kitchen-appliance', type: 'kitchen-appliance', phase: 'main', name: 'Kitchen Inspection' });
   steps.push({ id: 'water-sample', type: 'water-sample', phase: 'main', name: 'Water Samples' });
   steps.push({ id: 'atp-kitchen', type: 'atp-kitchen', phase: 'main', name: 'ATP Testing' });

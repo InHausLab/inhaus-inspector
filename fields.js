@@ -106,7 +106,6 @@ export function observationFields() {
   return [
     chips('observations', 'Observations', OBS_TAGS),
     textarea('notes', 'Notes', { placeholder: 'Enter observations, notes, or comments... (tap \uD83C\uDF99 mic in your iPhone keyboard, then read back and fix errors)' }),
-    check('voiceReviewed', '\u2713 Voice-dictated notes reviewed and corrected'),
     divider(),
     photo('Photos', '_photos', { mergePhotoKeys: ['_beforePhotos', '_afterPhotos'] })
   ];

@@ -26,6 +26,7 @@ export default {
       if (url.pathname === '/inspection-status' && request.method === 'POST') return await handleInspectionStatus(request, env);
       if (url.pathname === '/inspection-photos' && request.method === 'GET') return await handleInspectionPhotos(url, env);
       if (url.pathname === '/delete' && request.method === 'POST') return await handleDelete(request, env);
+      if (url.pathname === '/delete-review-photo' && request.method === 'POST') return await handleReviewPhotoDelete(request, env);
       if (url.pathname === '/photo' && request.method === 'GET') return await handleReviewPhoto(url, env);
       if (url.pathname === '/save-review' && request.method === 'POST') return await handleSaveReview(request, env);
       if (url.pathname === '/get-review' && request.method === 'GET') return await handleGetReview(request, url, env);
@@ -95,6 +96,19 @@ async function handleDelete(request, env) {
   validateSharedSecret(body, env);
   const inspectionId = cleanId(body.inspectionId, 'inspectionId');
   const photoId = cleanId(body.photoId, 'photoId');
+  return await deletePhotoRecord(env, inspectionId, photoId);
+}
+
+async function handleReviewPhotoDelete(request, env) {
+  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY', 'REVIEW_ACCESS_TOKEN']);
+  const body = await readJson(request);
+  if (!isReviewAuthorized(request, body.token, env)) return json({ error: 'unauthorized' }, 401);
+  const inspectionId = cleanId(body.inspectionId, 'inspectionId');
+  const photoId = cleanId(body.photoId, 'photoId');
+  return await deletePhotoRecord(env, inspectionId, photoId);
+}
+
+async function deletePhotoRecord(env, inspectionId, photoId) {
   const storagePath = storagePathFor(inspectionId, photoId);
 
   const objectResponse = await fetch(normalizeSupabaseUrl(env, `/storage/v1/object/${encodeURIComponent(env.SUPABASE_BUCKET)}`), {

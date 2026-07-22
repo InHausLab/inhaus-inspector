@@ -6,7 +6,8 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
-## Unreleased — Safe Checkpoints and Two-Inspector Identity
+## v202 — Safe Checkpoints, Intake-Driven Tests, and Portal Photo Delete
+**Date:** July 22, 2026
 **Branch:** `codex/safe-checkpoints-collaboration`
 
 - Cloud-loaded inspections now flatten all nested `resumeData` checkpoints before opening, preserving complete older steps underneath a partial outer checkpoint.
@@ -15,7 +16,19 @@ This file is the authoritative record of every significant change, decision, bug
 - Team inspections now require explicit per-browser-session inspector identity confirmation, including local resume and restored active positions.
 - Starting assigned work waits for a successful cloud team sync and shows a verified join receipt instead of entering the inspection after a fire-and-forget request.
 - Added five automated regression tests for checkpoint flattening, two-device field preservation, explicit identity confirmation, capability parsing, and flat checkpoint receipts.
-- This branch is not deployed and does not modify the Riverside production inspection.
+- Removed the standalone **Main Living Area** step from new inspection flows without deleting that step's saved data from older inspections or recovery checkpoints.
+- Added an office-intake **Required tests for this inspection** selector. The Pre-Assessment Checklist automatically displays the selected tests and also derives Water Panel, PFAS, and Microplastics requirements from prepared kit choices.
+- Added a persisted **Water test sample type** selection for Unfiltered, Filtered, or Both, visible in office preparation and the Water Samples step.
+- Removed the inspector-phone `voiceReviewed` checkbox while preserving the field key and the existing review-portal room-note confirmation controls.
+- Added an authenticated review-portal photo-delete route to the Photo Worker plus a portal **Delete Photo** control. Deleted IDs are saved with the review so stale Apps Script photo metadata cannot make a deleted photo reappear.
+- Reverified the earlier v200 fixes in a real browser: fixed iPhone footer marker, Primary Bathroom at Step 13, no Main Living Area search result, filtered/unfiltered water controls, portal voice-review controls, annotation colors, rotation, and the new delete control.
+- Added six July 22 workflow/Worker regressions; the full suite now contains 11 passing tests.
+- The Riverside production inspection and its recovery snapshot were not modified during these tests.
+
+### Follow-up requiring workflow clarification
+
+- The handoff says only **“Step 6 — move to near end.”** In the current three-bedroom/three-bath flow, Step 6 is **Lowest Level — Room 1**. Moving it alone would split it from the Step 5 Radon Monitor Setup while the phase navigation still treats both as one Lowest Level phase. Its intended destination or whether the whole Lowest Level phase should move must be confirmed before changing this order.
+- Required tests now auto-load from fields entered in the app's office intake. Auto-import from a separate external intake system will require that system's authoritative test-order field names and read endpoint; no external intake contract is currently present in this repo.
 
 ---
 

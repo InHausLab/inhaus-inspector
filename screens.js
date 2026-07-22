@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=200';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=200';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=200';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=200';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=200';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=200';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=202';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=202';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=202';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=202';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=202';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=202';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,13 +13,13 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=200';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=200';
-import { updatePhotoMetadata } from './supabase-photos.js?v=200';
+} from './findings.js?v=202';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=202';
+import { updatePhotoMetadata } from './supabase-photos.js?v=202';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=200';
+} from './comment-library.js?v=202';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1149,13 +1149,14 @@ export function renderTruckCheck() {
 const OFFICE_PREP_FIELDS = [
   'pfasSetup', 'pfasKitNum', 'waterPanelPlanned', 'waterSampleId',
   'microplasticsStatus', 'microplasticsSampleId', 'pfasStatus',
-  'pfasSampleId', 'officePrepNotes', 'teamInspectorNames'
+  'pfasSampleId', 'waterSampleType', 'requiredTests', 'officePrepNotes', 'teamInspectorNames'
 ];
 
 const ASSESSMENT_TYPE_OPTIONS = ['Home Health Assessment', 'Test / Training'];
 
 function applyOfficePreparation(inspection, data) {
   ensureInspectionWorkspace(inspection);
+  inspection.requiredTests = Array.isArray(data.requiredTests) ? data.requiredTests.slice() : [];
   if (!inspection.stepData) inspection.stepData = {};
   inspection.stepData['device-setup'] = Object.assign({}, inspection.stepData['device-setup'] || {}, {
     pfasSetup: data.pfasSetup || '',
@@ -1164,6 +1165,7 @@ function applyOfficePreparation(inspection, data) {
   inspection.stepData['water-sample'] = Object.assign({}, inspection.stepData['water-sample'] || {}, {
     waterPanelPlanned: data.waterPanelPlanned || '',
     waterSampleId: data.waterSampleId || '',
+    waterSampleType: data.waterSampleType || '',
     microplasticsStatus: data.microplasticsStatus || '',
     microplasticsSampleId: data.microplasticsSampleId || '',
     pfasStatus: data.pfasStatus || '',
@@ -1209,6 +1211,8 @@ export function renderIntake() {
     pfasKitNum: existingDevice.pfasKitNum || '',
     waterPanelPlanned: existingWater.waterPanelPlanned || '',
     waterSampleId: existingWater.waterSampleId || '',
+    waterSampleType: existingWater.waterSampleType || '',
+    requiredTests: Array.isArray(ctx.inspection.requiredTests) ? ctx.inspection.requiredTests.slice() : [],
     microplasticsStatus: existingWater.microplasticsStatus || '',
     microplasticsSampleId: existingWater.microplasticsSampleId || '',
     pfasStatus: existingWater.pfasStatus || '',
@@ -1235,6 +1239,8 @@ export function renderIntake() {
     pfasKitNum: '',
     waterPanelPlanned: '',
     waterSampleId: '',
+    waterSampleType: '',
+    requiredTests: [],
     microplasticsStatus: '',
     microplasticsSampleId: '',
     pfasStatus: '',
@@ -1286,7 +1292,9 @@ export function renderIntake() {
       textarea('teamInspectorNames', 'Additional inspectors', { placeholder: 'One inspector name per line. Each person will select their name when opening the inspection.' }),
       divider(),
       heading('Water Test Kit Preparation'),
+      chips('requiredTests', 'Required tests for this inspection', REQUIRED_TEST_OPTIONS),
       sel('waterPanelPlanned', 'Water panel test', ['Requested — collect on site', 'Not requested']),
+      sel('waterSampleType', 'Water test sample type', ['Unfiltered', 'Filtered', 'Both filtered and unfiltered', 'Not determined']),
       { type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Water panel kit / sample ID' },
       sel('pfasSetup', 'PFAS water test', ['Yes', 'No', 'Not requested']),
       showIf({ type: 'sample-id-scanner', dataKey: 'pfasKitNum', label: 'PFAS Kit #' }, 'pfasSetup', 'Yes'),
