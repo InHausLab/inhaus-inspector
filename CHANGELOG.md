@@ -35,7 +35,7 @@ Must return `{"status": "ok", ...}`. Do not add `-X POST`: preserving POST acros
 - Installed the Worker secret `REVIEW_ACCESS_TOKEN` and deployed `inhaus-photo-worker` version `7cf697cc-2a8e-4344-9429-876fade25529`.
 - Updated `InHausLab/inhaus-review` commit `41e3ea2` so field edits still save locally for recovery, then persist through the Photo Worker and reload from Supabase on another device.
 - Bumped the review portal asset URL to `portal.js?v=20260722-01` for GitHub Pages cache invalidation.
-- Verified production behavior: unauthenticated reads return `401`; authenticated field save and read-back return the same JSON; review portal CORS preflight returns `204` with `Authorization` and `Content-Type` allowed. The smoke-test row was deleted after verification.
+- Verified production behavior: unauthenticated reads return `401`; authenticated field save and read-back return the same JSON; review portal CORS preflight returns `204` with `Authorization` and `Content-Type` allowed. A temporary report-note value saved from the live GitHub Pages UI, survived a full reload from Supabase, and was then restored to its original blank value. The separate smoke-test row was deleted after verification.
 - Apps Script, `config.js`, `inspector_photo_uploads`, Tanner's tables, and clasp were not changed.
 
 ---
