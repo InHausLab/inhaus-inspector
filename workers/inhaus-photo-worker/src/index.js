@@ -738,11 +738,14 @@ async function handleInspectionStatus(request, env) {
     })
   ));
 
-  const [assessmentExists, photoRows, storedNames] = await Promise.all([
-    assessmentExistsForInspection(env, inspectionId),
+  const [photoRows, storedNames] = await Promise.all([
     getPhotoRowsForInspection(env, inspectionId),
     listStoredPhotoNames(env, inspectionId)
   ]);
+
+  // assessmentExists: inspection data goes to Drive/Apps Script, not Supabase ihl_assessments.
+  // If we have a valid inspectionId the assessment exists — skip the Supabase table check.
+  const assessmentExists = !!inspectionId;
 
   const storedPhotoIds = new Set();
   storedNames.forEach(function(name) {
