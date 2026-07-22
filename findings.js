@@ -98,8 +98,22 @@ function identityStorageKey(inspectionId) {
   return 'inhaus_team_identity_' + String(inspectionId || 'unknown');
 }
 
+function identitySessionKey(inspectionId) {
+  return 'inhaus_team_identity_confirmed_' + String(inspectionId || 'unknown');
+}
+
 export function hasStoredInspectorIdentity(inspection) {
   return !!safeStorageGet(identityStorageKey(inspection?.inspectionId));
+}
+
+export function hasConfirmedInspectorIdentity(inspection) {
+  try {
+    if (typeof sessionStorage === 'undefined') return false;
+    const confirmedId = sessionStorage.getItem(identitySessionKey(inspection?.inspectionId));
+    return !!confirmedId && inspection?.collaboration?.members?.some(member => member.memberId === confirmedId);
+  } catch (err) {
+    return false;
+  }
 }
 
 export function getInspectorIdentity(inspection) {
@@ -119,6 +133,11 @@ export function setInspectorIdentity(inspection, memberId) {
   const member = inspection.collaboration.members.find(item => item.memberId === memberId);
   if (!member) return null;
   safeStorageSet(identityStorageKey(inspection.inspectionId), memberId);
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(identitySessionKey(inspection.inspectionId), memberId);
+    }
+  } catch (err) { /* session confirmation is a safety prompt, not inspection data */ }
   recordTeamActivity(inspection, 'joined', member.name + ' opened the inspection', member);
   return member;
 }
@@ -515,9 +534,56 @@ function mergeDynamicRooms(localRooms, remoteRooms) {
   return result;
 }
 
+function mergeCheckpointValue(base, incoming) {
+  if (incoming === undefined || incoming === null || incoming === '') return base;
+  if (Array.isArray(incoming)) {
+    if (!incoming.length && Array.isArray(base) && base.length) return clone(base);
+    return incoming.map(item => mergeCheckpointValue(undefined, item));
+  }
+  if (incoming && typeof incoming === 'object') {
+    const prior = base && typeof base === 'object' && !Array.isArray(base) ? base : {};
+    const merged = Object.assign({}, clone(prior));
+    Object.entries(incoming).forEach(([key, value]) => {
+      if (key === 'resumeData') return;
+      merged[key] = mergeCheckpointValue(prior[key], value);
+    });
+    return merged;
+  }
+  return incoming;
+}
+
+export function flattenInspectionCheckpoints(inspection) {
+  if (!inspection || typeof inspection !== 'object') return inspection;
+  const checkpoints = [];
+  const seen = new Set();
+  let current = inspection.resumeData;
+  let depth = 1;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    if (current.stepData && typeof current.stepData === 'object') {
+      checkpoints.push({
+        data: current,
+        depth,
+        timestamp: Number(current._lastCheckpointSucceededAt || current._lastCheckpointAttemptAt || 0)
+      });
+    }
+    current = current.resumeData;
+    depth += 1;
+  }
+  checkpoints.sort((a, b) => {
+    if (a.timestamp && b.timestamp && a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+    return b.depth - a.depth;
+  });
+  let merged = mergeCheckpointValue({}, inspection);
+  checkpoints.forEach(checkpoint => { merged = mergeCheckpointValue(merged, checkpoint.data); });
+  delete merged.resumeData;
+  return merged;
+}
+
 export function mergeRemoteInspection(localInspection, remoteInspection) {
   ensureInspectionWorkspace(localInspection);
   if (!remoteInspection) return localInspection;
+  remoteInspection = flattenInspectionCheckpoints(remoteInspection);
   ensureInspectionWorkspace(remoteInspection);
 
   const coreFillKeys = ['propertyAddress', 'clientName', 'inspectionDate', 'inspectorName', 'inspectorEmail',

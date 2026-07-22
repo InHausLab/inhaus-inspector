@@ -983,6 +983,14 @@ async function fetchCloudInspectionJson(url, context) {
 }
 
 let _bridgeCapabilities = null;
+export function normalizeBridgeCapabilities(data) {
+  if (!data || typeof data !== 'object') return {};
+  const nested = data.capabilities && typeof data.capabilities === 'object'
+    ? data.capabilities
+    : {};
+  return Object.assign({}, data, nested);
+}
+
 async function loadBridgeCapabilities() {
   if (_bridgeCapabilities) return _bridgeCapabilities;
   try {
@@ -990,7 +998,10 @@ async function loadBridgeCapabilities() {
     url.searchParams.set('action', 'capabilities');
     url.searchParams.set('token', FIELD_RESUME_TOKEN);
     const data = await fetchCloudInspectionJson(url, 'Cloud capabilities');
-    _bridgeCapabilities = data.capabilities || {};
+    // Production currently returns teamFieldMerge at the top level while older
+    // deployments wrapped capabilities under `capabilities`. Accept both so
+    // team devices always use the server's field-level merge route.
+    _bridgeCapabilities = normalizeBridgeCapabilities(data);
   } catch (err) {
     _bridgeCapabilities = {};
   }

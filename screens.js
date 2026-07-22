@@ -8,7 +8,8 @@ import { text, textarea, date, sel, chips, photo, heading, divider, showIf } fro
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
-  getInspectorIdentity, hasStoredInspectorIdentity, setInspectorIdentity,
+  getInspectorIdentity, setInspectorIdentity,
+  hasConfirmedInspectorIdentity, flattenInspectionCheckpoints,
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
@@ -730,6 +731,14 @@ export async function editPreparedInspection(id) {
 
 export async function resumeInsp(id) {
   if (ctx.restoreActivePosition && await ctx.restoreActivePosition(id)) {
+    const restored = ctx.inspection;
+    const needsTeamIdentity = restored?.collaboration?.enabled &&
+      restored.collaboration.members?.length > 1 &&
+      !hasConfirmedInspectorIdentity(restored);
+    if (needsTeamIdentity) {
+      _workspaceReturnScreen = 'step';
+      setScreen('team');
+    }
     ctx.render();
     return;
   }
@@ -739,7 +748,11 @@ export async function resumeInsp(id) {
   ctx.stepList = buildStepList(ctx.inspection);
   const lastVisited = ctx.inspection._lastStepIdx || 0;
   ctx.currentStepIdx = Math.min(lastVisited, ctx.stepList.length - 1);
-  setScreen('step');
+  const needsTeamIdentity = ctx.inspection.collaboration?.enabled &&
+    ctx.inspection.collaboration.members.length > 1 &&
+    !hasConfirmedInspectorIdentity(ctx.inspection);
+  _workspaceReturnScreen = 'step';
+  setScreen(needsTeamIdentity ? 'team' : 'step');
   ctx.startAutoSave();
   ctx.render();
 }
@@ -789,7 +802,7 @@ export function inspectionFromCloudRecord(cloudRecord) {
   if (!source || !source.inspectionId) {
     throw new Error('This inspection could not be loaded. No inspection data found.');
   }
-  const inspection = JSON.parse(JSON.stringify(source));
+  const inspection = flattenInspectionCheckpoints(JSON.parse(JSON.stringify(source)));
   inspection.inspectionId = inspection.inspectionId || cloudRecord.inspectionId || cloudRecord.id;
   inspection.stepData = inspection.stepData || {};
   inspection.timers = inspection.timers || {};
@@ -824,7 +837,7 @@ async function continueCloudInspection(item, button) {
     _intakeMode = 'field';
     const wasPrepared = String(cloudRecord?.resumeData?.status || '').toLowerCase() === 'prepared';
     const needsTeamIdentity = inspection.collaboration.enabled &&
-      inspection.collaboration.members.length > 1 && !hasStoredInspectorIdentity(inspection);
+      inspection.collaboration.members.length > 1 && !hasConfirmedInspectorIdentity(inspection);
     _workspaceReturnScreen = wasPrepared ? 'precheck' : 'step';
     setScreen(needsTeamIdentity ? 'team' : _workspaceReturnScreen);
     ctx.startAutoSave();
@@ -2472,7 +2485,7 @@ export function renderTeamWorkspace() {
   ensureInspectionWorkspace(ctx.inspection);
   const collaboration = ctx.inspection.collaboration;
   const identity = getInspectorIdentity(ctx.inspection);
-  const identityStored = hasStoredInspectorIdentity(ctx.inspection) || collaboration.members.length === 1;
+  const identityStored = hasConfirmedInspectorIdentity(ctx.inspection) || collaboration.members.length === 1;
   const c = ui().el('div', { className: 'screen team-screen' });
   c.appendChild(buildAppHeader('Inspection Team'));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
@@ -2571,9 +2584,14 @@ export function renderTeamWorkspace() {
     const target = myAssignments.find(step => !ctx.inspection.stepData?.[step.id]?._visited) || myAssignments[0];
     if (target) ctx.currentStepIdx = Math.max(0, ctx.stepList.findIndex(step => step.id === target.id));
     await saveNow();
-    checkpointToCloud(ctx.stepList);
+    const joined = await checkpointToCloud(ctx.stepList);
+    if (!joined) {
+      ui().showToast('Team join was not confirmed in the cloud. Stay on this screen and retry Sync Team Now.');
+      return;
+    }
     setScreen(_workspaceReturnScreen === 'precheck' ? 'precheck' : 'step');
     ctx.render();
+    ui().showToast('Joined as ' + identity.name + ' — team sync verified');
   } }, !identityStored ? 'Select Your Name Above' : (myAssignments.length ? 'Start My ' + myAssignments.length + ' Assigned Sections' : 'Continue Inspection as ' + identity.name));
   startButton.disabled = !identityStored;
   c.appendChild(startButton);

@@ -6,6 +6,19 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Unreleased — Safe Checkpoints and Two-Inspector Identity
+**Branch:** `codex/safe-checkpoints-collaboration`
+
+- Cloud-loaded inspections now flatten all nested `resumeData` checkpoints before opening, preserving complete older steps underneath a partial outer checkpoint.
+- New checkpoints use resume schema v2, never embed the prior checkpoint, and include a receipt with checkpoint ID, timestamp, schema version, step count, captured-field count, and unique-photo count.
+- Fixed capability detection so both the live top-level `teamFieldMerge` response and the older nested response select the server's field-level merge route.
+- Team inspections now require explicit per-browser-session inspector identity confirmation, including local resume and restored active positions.
+- Starting assigned work waits for a successful cloud team sync and shows a verified join receipt instead of entering the inspection after a fire-and-forget request.
+- Added five automated regression tests for checkpoint flattening, two-device field preservation, explicit identity confirmation, capability parsing, and flat checkpoint receipts.
+- This branch is not deployed and does not modify the Riverside production inspection.
+
+---
+
 ## v201 — Move Finding Review to the Review Portal
 **Date:** July 22, 2026
 

@@ -105,8 +105,44 @@ function exportPhotoArray(arr) {
   }));
 }
 
-function buildResumeData(inspection) {
+function buildCheckpointReceipt(resume, createdAt) {
+  const photoIds = new Set();
+  let capturedFieldCount = 0;
+  const seen = new Set();
+  function walk(value, key = '') {
+    if (value === undefined || value === null || value === '' || seen.has(value)) return;
+    if (value && typeof value === 'object') seen.add(value);
+    if (Array.isArray(value)) {
+      value.forEach(item => walk(item, key));
+      return;
+    }
+    if (typeof value !== 'object') {
+      if (!key.startsWith('_')) capturedFieldCount += 1;
+      return;
+    }
+    if (value.photoId) photoIds.add(String(value.photoId));
+    Object.entries(value).forEach(([childKey, child]) => {
+      if (['dataUrl', 'imageData', 'thumbnailDataUrl', 'wifiPassword', 'resumeData'].includes(childKey)) return;
+      walk(child, childKey);
+    });
+  }
+  walk(resume);
+  return {
+    checkpointId: `${resume.inspectionId || 'inspection'}-${Date.parse(createdAt)}-${Math.random().toString(36).slice(2, 8)}`,
+    checkpointCreatedAt: createdAt,
+    schemaVersion: 2,
+    stepCount: Object.keys(resume.stepData || {}).length,
+    capturedFieldCount,
+    uniquePhotoCount: photoIds.size
+  };
+}
+
+export function buildResumeData(inspection) {
   const resume = JSON.parse(JSON.stringify(inspection || {}));
+  // Never place an earlier checkpoint inside a newer checkpoint. Nested
+  // resumeData caused a partial outer record to hide the complete Riverside
+  // inspection until the portal learned to unwrap it.
+  delete resume.resumeData;
   function sanitize(value) {
     if (!value || typeof value !== 'object') return;
     if (Array.isArray(value)) {
@@ -123,7 +159,9 @@ function buildResumeData(inspection) {
     });
   }
   sanitize(resume);
-  resume.resumeSchemaVersion = 1;
+  const createdAt = new Date().toISOString();
+  resume.resumeSchemaVersion = 2;
+  resume.checkpointReceipt = buildCheckpointReceipt(resume, createdAt);
   return resume;
 }
 
