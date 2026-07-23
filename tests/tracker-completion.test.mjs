@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const screens = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../ui.js', import.meta.url), 'utf8');
+const feedback = readFileSync(new URL('../feedback.js', import.meta.url), 'utf8');
 
 test('redundant in-app microphone is disabled on every platform', () => {
   assert.match(ui, /function micBtn\(\) \{[\s\S]*?return null;\s*\}/);
@@ -20,4 +21,10 @@ test('local photo backup is understandable and can restore detached photos', () 
   assert.match(screens, /Local Photo Backup/);
   assert.match(screens, /Restore to Photos/);
   assert.match(screens, /openInspectionWorkspace\('recovery', 'review'\)/);
+});
+
+test('app feedback points Tanner to the shared tracker', () => {
+  assert.match(feedback, /shared Things to Fix tracker that Tanner monitors/);
+  assert.match(feedback, /Saved in the shared Things to Fix tracker for Tanner/);
+  assert.doesNotMatch(feedback, /Send to Matt/);
 });

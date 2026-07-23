@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v208 / Review Portal V26 — Shared Feedback Tracker
+**Date:** July 23, 2026
+
+- Confirmed both the inspector app and Review Portal use the same Apps Script feedback intake that writes to the shared **Things to Fix** spreadsheet Tanner monitors.
+- Review Portal submissions remain clearly tagged with a `REVIEW-FEEDBACK` ID, `[REVIEW PORTAL]` suggestion prefix, portal version, inspection ID, address, page URL, and screenshot link.
+- Updated both feedback dialogs to say **Send Suggestion** and confirm the item was saved in Tanner's shared tracker instead of saying it was sent directly to Matt.
+- Preserved the inspector app's offline feedback retry queue and the existing private Drive storage for screenshots and voice notes.
+
 ## v206 / Review Portal V23 — Tracker Completion Pass
 **Date:** July 23, 2026
 

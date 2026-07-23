@@ -1,7 +1,7 @@
 // InHaus Inspector - App improvement feedback capture and durable retry queue
-import { getInspection, getScreen } from './state.js?v=206';
-import { scriptFetch } from './sync.js?v=206';
-import { GOOGLE_SCRIPT_URL } from './config.js?v=206';
+import { getInspection, getScreen } from './state.js?v=208';
+import { scriptFetch } from './sync.js?v=208';
+import { GOOGLE_SCRIPT_URL } from './config.js?v=208';
 
 let initialized = false;
 let retryInProgress = false;
@@ -221,9 +221,12 @@ function openFeedbackOverlay() {
     UI.el('label', { className: 'field-label' }, 'Voice note'),
     recordButton, voiceStatus, audioPreview
   ]));
+  panel.appendChild(UI.el('p', { className: 'app-feedback-help' },
+    'Suggestions are saved in the shared Things to Fix tracker that Tanner monitors.'
+  ));
 
   const sendStatus = UI.el('div', { className: 'app-feedback-send-status', role: 'status' });
-  const sendButton = UI.el('button', { type: 'button', className: 'btn btn-primary btn-full' }, 'Send to Matt');
+  const sendButton = UI.el('button', { type: 'button', className: 'btn btn-primary btn-full' }, 'Send Suggestion');
   sendButton.addEventListener('click', async () => {
     if (activeRecorder && activeRecorder.state === 'recording') {
       sendStatus.textContent = 'Stop the voice recording before sending.';
@@ -249,7 +252,7 @@ function openFeedbackOverlay() {
     sendStatus.textContent = '';
     try {
       await sendFeedback(feedback);
-      sendStatus.textContent = '\u2713 Sent directly to Matt and saved in Things to Fix';
+      sendStatus.textContent = '\u2713 Saved in the shared Things to Fix tracker for Tanner';
       sendButton.textContent = 'Sent';
       setTimeout(closeFeedbackOverlay, 900);
     } catch (err) {
