@@ -6,6 +6,17 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## URGENT PRODUCTION CORRECTION — Apps Script v86 + Review Portal V14
+**Date:** July 23, 2026
+
+- The configured Apps Script deployment was rolled back from v87 to v86 after production review reads regressed to a thin 13-key summary that omitted the complete checkpoint and findings.
+- The stable `/exec` URL in `config.js` was preserved. **Apps Script v86 is the current production deployment. Do not redeploy v87 or repository `HEAD` until the review-read path is reconstructed and passes full parity tests.**
+- No authoritative inspection or photo data was deleted or overwritten. The complete preserved Riverside checkpoint (27 steps, 52 findings) was backed up into the inspection's isolated authenticated Review Portal recovery record, after first backing up the current reviewer edits.
+- Review Portal V14 now merges that preserved checkpoint underneath the live Apps Script summary. Live values remain authoritative while missing steps, findings, rooms, tests, and summaries are restored.
+- Fixed the photo merge regression: Apps Script returned 59 Drive photo records without photo IDs while the Worker returned the same 59 photos with IDs. The portal previously concatenated both sets and deduplicated by URL, producing 118 cards. V14 matches exact room/step/caption/timestamp metadata first.
+- Production verification passed on GitHub Pages: `V14`, 27 saved app steps, 1,594 captured values, 17 data groups, and exactly 59 photo cards with 59 unique photo IDs and zero duplicate IDs. Heating and Zebra Room AI-summary data render and no portal load error is present.
+- Review Portal commit: `2a8f9af` (`fix: restore complete inspection and dedupe photos`).
+
 ## v203 — Report Workflow Repair
 **Date:** July 23, 2026
 
