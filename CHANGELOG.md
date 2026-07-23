@@ -27,6 +27,7 @@ This file is the authoritative record of every significant change, decision, bug
 - Restored `InHausLab/inhaus-apps-script` as a private GitHub repository and pushed the complete `main` history through commit `823da21`.
 - Verified the local `Code.gs`, committed `HEAD`, and `origin/main` were byte-for-byte identical before updating the Apps Script editor.
 - Deployed production Apps Script version `87` and updated the existing configured deployment `AKfycbwWz...LEXqQ` from version 86 to version 87. `config.js` and its stable web-app URL were not changed.
+- Archived the temporary duplicate v87 deployment created during the migration; the original configured deployment remains the single intended production endpoint.
 - Required production POST verification returned `{"status":"ok","checkpointed":true}`. A read-only production list check returned HTTP 200 JSON and still included the Riverside inspection.
 - The pre-existing local `.clasp.json` modification was not staged, committed, pushed, or used for deployment.
 
