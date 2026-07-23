@@ -22,10 +22,13 @@ This file is the authoritative record of every significant change, decision, bug
 - Apps Script source now assigns idempotent assessment/report/client/home IDs, writes tracker columns A:K with the initial `Waiting on Labs` status, creates the canonical assessment folder name, links that folder in tracker column AO, creates `Technician Photos`, and always writes `Photo Log`.
 - Address normalization now standardizes Tanner's preferred `Street, City ST ZIP` format, fills known local Colorado ZIP codes when omitted, and stops submission with a clear format error when an address cannot be safely completed.
 
-### Apps Script deployment requirement
+### Apps Script v87 deployment
 
-- Apps Script source commits `f4338a2` and `b6aeaf5` are committed on the Mac mini but cannot be pushed because the configured `InHausLab/inhaus-apps-script` GitHub remote returns `Repository not found`.
-- Per the mandatory Apps Script safety rule below, the repository access/location must be repaired first; then `Code.gs` must be pasted into the production Apps Script editor and deployed as a new version by Matt. Do not use clasp or edit an uncommitted live script.
+- Restored `InHausLab/inhaus-apps-script` as a private GitHub repository and pushed the complete `main` history through commit `823da21`.
+- Verified the local `Code.gs`, committed `HEAD`, and `origin/main` were byte-for-byte identical before updating the Apps Script editor.
+- Deployed production Apps Script version `87` and updated the existing configured deployment `AKfycbwWz...LEXqQ` from version 86 to version 87. `config.js` and its stable web-app URL were not changed.
+- Required production POST verification returned `{"status":"ok","checkpointed":true}`. A read-only production list check returned HTTP 200 JSON and still included the Riverside inspection.
+- The pre-existing local `.clasp.json` modification was not staged, committed, pushed, or used for deployment.
 
 ## v202 — Safe Checkpoints, Intake-Driven Tests, and Portal Photo Delete
 **Date:** July 22, 2026
