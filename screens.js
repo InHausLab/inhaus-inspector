@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=205';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=205';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=205';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=205';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=205';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=205';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=206';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=206';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=206';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=206';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=206';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=206';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=205';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=205';
-import { updatePhotoMetadata } from './supabase-photos.js?v=205';
-import { FIELD_RESUME_TOKEN } from './config.js?v=205';
+} from './findings.js?v=206';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=206';
+import { updatePhotoMetadata } from './supabase-photos.js?v=206';
+import { FIELD_RESUME_TOKEN } from './config.js?v=206';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=205';
+} from './comment-library.js?v=206';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -293,7 +293,6 @@ export function buildRoomDrawer() {
     { label: 'Lowest Level', phases: ['lowest'], addRooms: [
       { label: '+ Add Room', section: 'lowest', prefix: null }
     ]},
-    { label: 'Utility Room', phases: ['utility'] },
     { label: 'Bedrooms', phases: ['upper'], addRooms: [
       { label: '+ Add Bedroom', section: 'bedrooms', prefix: null }
     ]},
@@ -304,6 +303,7 @@ export function buildRoomDrawer() {
     { label: 'Additional Rooms', phases: ['supplementary'], addRooms: [
       { label: '+ Add Room', section: 'additional', prefix: null }
     ]},
+    { label: 'Utility Room', phases: ['utility'] },
     { label: 'Wrap-Up', phases: ['wrapup', 'propdetails', 'post', 'review'] }
   ];
 
@@ -2458,7 +2458,9 @@ export function renderFindingsInbox() {
         className: 'field-textarea', rows: 3,
         placeholder: 'Clean the dictation, preserve the facts, and remove property-specific details before approving.'
       });
-      cleaned.value = finding.cleanedComment || '';
+      // Start with the inspector's existing words in the editable field. The
+      // source comment remains displayed above and preserved separately.
+      cleaned.value = finding.cleanedComment || finding.rawComment || '';
       cleaned.addEventListener('input', () => {
         updateFinding(ctx.inspection, finding.findingId, { cleanedComment: cleaned.value, status: finding.status === 'excluded' ? 'needs_review' : finding.status });
         scheduleFindingCloudSave();
@@ -2491,17 +2493,11 @@ export function renderFindingsInbox() {
       card.appendChild(controls);
 
       const actions = ui().el('div', { className: 'finding-actions' });
-      if (!String(finding.cleanedComment || '').trim() && String(finding.rawComment || '').trim()) {
-        actions.appendChild(ui().el('button', { className: 'btn btn-outline', onClick: () => {
-          const draftText = String(finding.rawComment || '').trim();
-          updateFinding(ctx.inspection, finding.findingId, { cleanedComment: draftText });
-          cleaned.value = draftText;
-          scheduleFindingCloudSave(250);
-          ui().showToast('Original copied — fine-tune it before approval');
-        } }, 'Copy Original to Edit'));
-      }
       if (finding.status !== 'approved') {
         actions.appendChild(ui().el('button', { className: 'btn btn-primary', onClick: async () => {
+          // Persist the visible draft even when the reviewer approves it
+          // without typing first.
+          updateFinding(ctx.inspection, finding.findingId, { cleanedComment: cleaned.value });
           if (!approveFinding(ctx.inspection, finding.findingId)) { ui().showToast('Add or clean the report comment first'); return; }
           renderList();
           const cloudSaved = await saveFindingChangesToCloud();
@@ -2792,6 +2788,32 @@ export function renderRecoveryCenter() {
   snapshotsCard.appendChild(snapshotList);
   c.appendChild(snapshotsCard);
 
+  const vaultCard = ui().el('div', { className: 'card recovery-vault-card' });
+  vaultCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Local Photo Backup'));
+  vaultCard.appendChild(ui().el('p', { className: 'text-muted' },
+    'This is the Rescue Vault: a protected copy of photos stored on this device. Photos already attached to the inspection are labeled below. Any detached photo can be restored to the Photos screen without deleting or replacing the backup.'
+  ));
+  const vaultActions = ui().el('div', { className: 'recovery-vault-actions' });
+  vaultActions.appendChild(ui().el('button', {
+    className: 'btn btn-outline',
+    onClick: async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = 'Preparing…';
+      try {
+        const ok = window.exportLocalPhotoBackup ? await window.exportLocalPhotoBackup() : false;
+        ui().showToast(ok ? 'Local photo backup prepared' : 'No local photo backup was available');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Download Photo Backup';
+      }
+    }
+  }, 'Download Photo Backup'));
+  vaultCard.appendChild(vaultActions);
+  const vaultList = ui().el('div', { className: 'recovery-photo-list' }, 'Checking local photo backup…');
+  vaultCard.appendChild(vaultList);
+  c.appendChild(vaultCard);
+
   const deletedCard = ui().el('div', { className: 'card recovery-deleted-card' });
   deletedCard.appendChild(ui().el('h2', { className: 'section-heading' }, 'Recently Deleted Photos'));
   deletedCard.appendChild(ui().el('p', { className: 'text-muted' }, 'Deleted photos remain recoverable on this device for 30 days unless permanently removed.'));
@@ -2845,6 +2867,78 @@ export function renderRecoveryCenter() {
         ]));
       });
     }).catch(() => { snapshotList.textContent = 'Restore points unavailable on this device.'; });
+  }
+
+  if (window.DB?.getPhotosForInspection) {
+    window.DB.getPhotosForInspection(ctx.inspection.inspectionId).then(records => {
+      if (getScreen() !== 'recovery') return;
+      vaultList.innerHTML = '';
+      if (!records.length) {
+        vaultList.appendChild(ui().el('p', { className: 'text-muted' }, 'No photos are stored in the local backup on this device.'));
+        return;
+      }
+
+      const referencedIds = new Set(collectInspectionPhotoRefs().map(ref => ref.photo.photoId));
+      records
+        .slice()
+        .sort((a, b) => String(b.timestamp || b.updatedAt || '').localeCompare(String(a.timestamp || a.updatedAt || '')))
+        .forEach(photoItem => {
+          const attached = referencedIds.has(photoItem.photoId);
+          const row = ui().el('div', { className: 'recovery-photo-row' });
+          const preview = getPhotoPreviewSrc(photoItem);
+          row.appendChild(preview
+            ? ui().el('img', { src: preview, alt: photoItem.caption || 'Local backup photo' })
+            : ui().el('div', { className: 'photo-review-placeholder' }, 'Photo'));
+          row.appendChild(ui().el('div', null, [
+            ui().el('strong', null, formatPhotoDestination(photoItem.roomName, photoItem.stepName)),
+            ui().el('span', null, photoItem.caption || 'No caption'),
+            ui().el('span', { className: attached ? 'vault-status-attached' : 'vault-status-detached' },
+              attached ? 'Attached to inspection' : 'Needs recovery'
+            )
+          ]));
+          const actions = ui().el('div', { className: 'recovery-photo-actions' });
+          if (attached) {
+            actions.appendChild(ui().el('button', {
+              className: 'btn btn-small btn-outline',
+              onClick: () => {
+                _photosReturnScreen = 'recovery';
+                setScreen('photos');
+                ctx.render();
+              }
+            }, 'Open Photos'));
+          } else {
+            actions.appendChild(ui().el('button', {
+              className: 'btn btn-small btn-primary',
+              onClick: async event => {
+                const button = event.currentTarget;
+                button.disabled = true;
+                if (!Array.isArray(ctx.inspection.sparePhotos)) ctx.inspection.sparePhotos = [];
+                const restored = {
+                  ...photoItem,
+                  _vaultSaved: true,
+                  deletedAt: undefined
+                };
+                if (!ctx.inspection.sparePhotos.some(item => item.photoId === restored.photoId)) {
+                  ctx.inspection.sparePhotos.push(restored);
+                }
+                recordAuditEvent(ctx.inspection, 'vault_photo_restored', 'Local backup photo restored to Photos', {
+                  photoId: restored.photoId,
+                  roomName: restored.roomName || '',
+                  stepName: restored.stepName || ''
+                });
+                await saveNow();
+                await checkpointToCloud(ctx.stepList);
+                ui().showToast('Photo restored to the Photos screen and backed up');
+                ctx.render();
+              }
+            }, 'Restore to Photos'));
+          }
+          row.appendChild(actions);
+          vaultList.appendChild(row);
+        });
+    }).catch(() => {
+      vaultList.textContent = 'The local photo backup is unavailable on this device.';
+    });
   }
 
   if (window.DB?.getDeletedPhotos) {
@@ -2908,7 +3002,11 @@ export function renderPhotos() {
   topActions.appendChild(ui().el('button', {
     className: 'btn btn-outline',
     onClick: () => { setScreen(_photosReturnScreen || 'review'); ctx.render(); }
-  }, _photosReturnScreen === 'my-work' ? 'Back to My Work' : 'Back to Review'));
+  }, _photosReturnScreen === 'my-work'
+    ? 'Back to My Work'
+    : _photosReturnScreen === 'recovery'
+      ? 'Back to Recovery'
+      : 'Back to Review'));
   const rescueBtn = ui().el('button', {
     className: 'btn btn-secondary',
     onClick: async () => {
@@ -3430,10 +3528,11 @@ export function renderReview() {
       if (fcIdx >= 0) goToStep(fcIdx);
     });
     leaveMetrics.appendChild(beforeLeavingMetric);
-    // Rescue Vault tile → informational, tap shows explanation
+    // Local photo backup tile → open Recovery & History where detached vault
+    // photos can be inspected and restored to the inspection.
     if (health.vaultOnly > 0) leaveMetrics.appendChild(makeMetricTappable(
-      leaveMetric('Rescue vault', String(health.vaultOnly) + ' saved', 'wait'),
-      () => { ui().showToast('Photos saved locally as backup — they are safe on this device. Sync will retry automatically.', 4000); }
+      leaveMetric('Local photo backup', String(health.vaultOnly) + ' to recover', 'wait'),
+      () => openInspectionWorkspace('recovery', 'review')
     ));
     // Not Yet / status title → scroll to issues
     if (reviewIssues.length) {

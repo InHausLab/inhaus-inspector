@@ -6,6 +6,18 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v206 / Review Portal V23 — Tracker Completion Pass
+**Date:** July 23, 2026
+
+- Moved the stable `utility` step to the end of the room walkthrough, immediately before Customer Debrief, without changing its step ID or detaching saved Utility Room data and photos.
+- Removed the redundant in-app microphone button on every platform. Native phone-keyboard dictation remains available.
+- Smart Finding report text now opens with the inspector's original wording already inside the editable field. Reviewers can revise it in place and approve without copying or rewriting it.
+- Renamed the confusing Rescue Vault metric to **Local photo backup** and linked it directly to Recovery & History.
+- Added a Local Photo Backup browser that distinguishes attached photos from detached photos, restores detached photos to the Photos screen, checkpoints the recovery, and can download the protected device backup.
+- Review Portal follow-up timing and watch items now live inside each room card. Existing saved follow-up rows are matched to their room and remain in the same canonical `followUpItems` review data.
+- Removed the duplicate standalone Follow-Up Items card. The remaining post-assessment editor is explicitly labeled for inspection-wide follow-ups only.
+- Preserved all existing inspection source data, photo records, step IDs, reviewer edits, and submission state.
+
 ## Review Portal V22 — Permanent Room Photo Routing
 **Date:** July 23, 2026
 

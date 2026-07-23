@@ -145,42 +145,10 @@
     document.body.appendChild(overlay);
   }
 
-  function micBtn(onResult) {
-    // iOS already has keyboard dictation. Do not render a second mic that only
-    // opens an instructional toast and looks like a separate recording tool.
-    if (isIOS) return null;
-    if (!hasSpeech) {
-      return null;
-    }
-    let rec = null, active = false;
-    const btn = el('button', { type: 'button', className: 'mic-btn', 'aria-label': 'Voice input' }, '\uD83C\uDF99');
-    function startRecording() {
-      rec = new SR();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = 'en-US';
-      rec.onresult = e => {
-        const transcript = e.results[0][0].transcript;
-        active = false;
-        btn.classList.remove('recording');
-        // Show confirmation before committing
-        showDictationConfirm(
-          transcript,
-          (accepted) => { onResult(accepted); },
-          () => { startRecording(); } // redo: restart recording
-        );
-      };
-      rec.onend = () => { active = false; btn.classList.remove('recording'); };
-      rec.onerror = () => { active = false; btn.classList.remove('recording'); };
-      rec.start();
-      active = true;
-      btn.classList.add('recording');
-    }
-    btn.addEventListener('click', () => {
-      if (active && rec) { rec.stop(); return; }
-      startRecording();
-    });
-    return btn;
+  function micBtn() {
+    // Phone keyboards already provide dictation. Keep all text fields native
+    // and remove the redundant in-app microphone on every platform.
+    return null;
   }
 
   // ── Image Compression ─────────────────────────────────────

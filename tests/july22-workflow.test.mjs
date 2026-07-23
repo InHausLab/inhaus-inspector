@@ -28,6 +28,24 @@ test('new step lists omit Main Living Area and retain Primary Bathroom naming', 
   assert.equal(insp.stepData['living-area'].notes, 'legacy data remains preserved');
 });
 
+test('Utility Room appears after the room walkthrough and before wrap-up', () => {
+  const steps = buildStepList(inspection({
+    dynamicRooms: {
+      lowest: [{ name: 'Lowest Level — Room 1' }],
+      additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }]
+    }
+  }));
+  const utilityIndex = steps.findIndex(step => step.id === 'utility');
+  const kitchenAirIndex = steps.findIndex(step => step.id === 'kitchen-air');
+  const lastAdditionalIndex = Math.max(...steps
+    .map((step, index) => step.type === 'additional-room' ? index : -1));
+  const debriefIndex = steps.findIndex(step => step.id === 'debrief');
+
+  assert.ok(utilityIndex > kitchenAirIndex);
+  assert.ok(utilityIndex > lastAdditionalIndex);
+  assert.ok(utilityIndex < debriefIndex);
+});
+
 test('required tests combine explicit office selections with prepared kit choices', () => {
   const required = deriveRequiredTests(inspection({
     requiredTests: ['Radon monitor', 'ATP surface testing'],

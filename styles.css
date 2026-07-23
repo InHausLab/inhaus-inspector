@@ -1965,6 +1965,9 @@ body {
 .recovery-photo-row > div { display: grid; gap: 3px; }
 .recovery-photo-row span { color: var(--text-muted); font-size: 0.76rem; }
 .recovery-photo-actions { display: flex !important; flex-wrap: wrap; justify-content: flex-end; gap: 6px !important; }
+.recovery-vault-actions { display:flex; justify-content:flex-end; margin:10px 0 6px; }
+.vault-status-attached { color:#166534 !important; font-weight:700; }
+.vault-status-detached { color:#b45309 !important; font-weight:800; }
 
 .library-admin-shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 60px; }
 .library-admin-header { display: flex; align-items: center; gap: 18px; color: var(--primary); margin-bottom: 20px; }
