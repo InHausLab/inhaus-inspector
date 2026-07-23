@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hans — The Stack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 60px 24px;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #3b82f6;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 42px;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    font-size: 17px;
+    color: #64748b;
+    margin-bottom: 48px;
+    line-height: 1.5;
+  }
+
+  .stack-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stack-item {
+    background: #111827;
+    border: 1px solid #1e2740;
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .stack-item:hover {
+    border-color: #2a3450;
+    background: #131b2e;
+  }
+
+  .stack-icon {
+    font-size: 26px;
+    text-align: center;
+    line-height: 1;
+  }
+
+  .stack-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 3px;
+  }
+
+  .stack-desc {
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .stack-cost {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .section-divider {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #334155;
+    padding: 24px 0 8px;
+  }
+
+  .total-bar {
+    margin-top: 40px;
+    background: #111827;
+    border: 1px solid #1e3a5f;
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .total-label {
+    font-size: 14px;
+    color: #94a3b8;
+  }
+
+  .total-amount {
+    font-size: 20px;
+    font-weight: 800;
+    color: #3b82f6;
+    white-space: nowrap;
+  }
+
+  .footer {
+    margin-top: 48px;
+    text-align: center;
+    font-size: 13px;
+    color: #334155;
+  }
+
+  .footer a {
+    color: #475569;
+    text-decoration: none;
+  }
+
+  .footer a:hover { color: #94a3b8; }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 30px; }
+    .stack-item { grid-template-columns: 36px 1fr; }
+    .stack-cost { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="eyebrow">Hans — AI Agent</div>
+  <h1>The Stack</h1>
+  <p class="subtitle">Every technology layer running right now. Built for one small business. Runs like a production engineering team.</p>
+
+  <div class="stack-grid">
+
+    <div class="section-divider">Core AI</div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🧠</div>
+      <div>
+        <div class="stack-name">Claude (Anthropic)</div>
+        <div class="stack-desc">The brain — reasons, writes, strategizes, and makes judgment calls.</div>
+      </div>
+      <div class="stack-cost">$200–300/mo</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">⚡</div>
+      <div>
+        <div class="stack-name">Claude Code</div>
+        <div class="stack-desc">Agentic coding tool that writes and deploys real software end-to-end from a single instruction.</div>
+      </div>
+      <div class="stack-cost">Included</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🦞</div>
+      <div>
+        <div class="stack-name">OpenClaw</div>
+        <div class="stack-desc">The operating system connecting everything — gives Hans persistent memory, tools, scheduling, and messaging.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🗂️</div>
+      <div>
+        <div class="stack-name">Memory Files</div>
+        <div class="stack-desc">Plain text files on the Mac mini that Hans reads every session — every decision, every person, every project. No starting over.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="section-divider">Hardware & Networking</div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🖥️</div>
+      <div>
+        <div class="stack-name">Mac Mini (Apple Silicon)</div>
+        <div class="stack-desc">Always-on local server — the physical computer Hans lives on. My hardware, my data.</div>
+      </div>
+      <div class="stack-cost">Hardware (owned)</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🌐</div>
+      <div>
+        <div class="stack-name">Cloudflare Tunnel</div>
+        <div class="stack-desc">Permanent public URL so Hans is accessible from anywhere in the world — no port forwarding, handles HTTPS automatically.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🔒</div>
+      <div>
+        <div class="stack-name">Tailscale</div>
+        <div class="stack-desc">VPN mesh network for secure SSH access to the Mac mini from anywhere.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🇩🇪</div>
+      <div>
+        <div class="stack-name">Hetzner VPS</div>
+        <div class="stack-desc">Backup server in Germany — monitors the primary tunnel and activates failover automatically in under 5 minutes.</div>
+      </div>
+      <div class="stack-cost">~$10/mo</div>
+    </div>
+
+    <div class="section-divider">Google Suite</div>
+
+    <div class="stack-item">
+      <div class="stack-icon">📬</div>
+      <div>
+        <div class="stack-name">Google Suite</div>
+        <div class="stack-desc">Gmail, Drive, Docs, Sheets, Calendar — all readable and writable. Hans doesn't just draft emails, he sends them.</div>
+      </div>
+      <div class="stack-cost">Workspace plan</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">⚙️</div>
+      <div>
+        <div class="stack-name">Google Apps Script — v73</div>
+        <div class="stack-desc">Serverless backend bridge — receives inspection data, creates Drive folders, logs to Sheets, and sends email alerts. No servers.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="section-divider">Inspector App</div>
+
+    <div class="stack-item">
+      <div class="stack-icon">📋</div>
+      <div>
+        <div class="stack-name">Inspector App (PWA) — v199</div>
+        <div class="stack-desc">Field data capture tool for inspectors — runs in a browser, installs on iPhone, works offline. Built entirely by AI.</div>
+      </div>
+      <div class="stack-cost">Free (Netlify)</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🐘</div>
+      <div>
+        <div class="stack-name">Supabase</div>
+        <div class="stack-desc">PostgreSQL database and photo storage — inspector photos upload here first, then mirror to Drive.</div>
+      </div>
+      <div class="stack-cost">~$25/mo</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">☁️</div>
+      <div>
+        <div class="stack-name">Cloudflare Worker</div>
+        <div class="stack-desc">Edge function that proxies Claude API calls from the inspector app — keeps API keys off the client.</div>
+      </div>
+      <div class="stack-cost">Free tier</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🚀</div>
+      <div>
+        <div class="stack-name">Netlify</div>
+        <div class="stack-desc">Hosts the inspector app — auto-deploys on every GitHub push.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="section-divider">Communication & Input</div>
+
+    <div class="stack-item">
+      <div class="stack-icon">💬</div>
+      <div>
+        <div class="stack-name">WhatsApp + Whisper Flow</div>
+        <div class="stack-desc">Voice-to-task interface — think out loud into WhatsApp and Hans handles the rest.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">💼</div>
+      <div>
+        <div class="stack-name">Slack</div>
+        <div class="stack-desc">Team communication surface — Hans runs as a bot here for team-facing work.</div>
+      </div>
+      <div class="stack-cost">Existing plan</div>
+    </div>
+
+    <div class="section-divider">Infrastructure</div>
+
+    <div class="stack-item">
+      <div class="stack-icon">🐙</div>
+      <div>
+        <div class="stack-name">GitHub (InHausLab org)</div>
+        <div class="stack-desc">Code hosting, version control, CI/CD, and deployment pipeline for all InHaus software.</div>
+      </div>
+      <div class="stack-cost">Free</div>
+    </div>
+
+    <div class="stack-item">
+      <div class="stack-icon">💾</div>
+      <div>
+        <div class="stack-name">Backblaze</div>
+        <div class="stack-desc">Continuous cloud backup of the entire Mac mini — insurance against hardware failure.</div>
+      </div>
+      <div class="stack-cost">~$9/mo</div>
+    </div>
+
+  </div>
+
+  <div class="total-bar">
+    <div class="total-label">Total monthly infrastructure cost (everything except AI API calls)</div>
+    <div class="total-amount">~$44/mo</div>
+  </div>
+
+  <div class="footer">
+    <p>Full story: <a href="https://inhaus-inspector.netlify.app/hans-story.html">inhaus-inspector.netlify.app/hans-story.html</a></p>
+    <p style="margin-top: 8px;">Built by Hans — AI agent running on OpenClaw + Claude</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -944,7 +944,7 @@
                          │ POST JSON (inspection data)
                          ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│              GOOGLE APPS SCRIPT BRIDGE (v50)                     │
+│              GOOGLE APPS SCRIPT BRIDGE (v73)                     │
 │   - Creates Drive folders    - Writes Google Sheets              │
 │   - Email alerts on error    - Posts to Supabase                │
 │   - Free, no servers         - 6-minute execution limit ⚠️       │
@@ -1014,13 +1014,25 @@
           <td>$200–300/mo (API)</td>
         </tr>
         <tr>
-          <td>Inspector App (PWA)</td>
-          <td>Field data capture tool for inspectors. Runs in a browser, installs on iPhone.</td>
-          <td>No App Store, no Xcode, no maintenance. Works offline. Deploy via GitHub Pages.</td>
-          <td>Free (GitHub Pages)</td>
+          <td>Claude Code</td>
+          <td>Agentic coding tool that writes and deploys real software end-to-end from a single instruction.</td>
+          <td>Handles large engineering tasks autonomously — no copy-paste, no back-and-forth.</td>
+          <td>Included (API)</td>
         </tr>
         <tr>
-          <td>Google Apps Script</td>
+          <td>Memory Files</td>
+          <td>Plain text files on the Mac mini that Hans reads every session to remember decisions, people, and projects.</td>
+          <td>Solves the #1 problem with AI assistants: forgetting everything. No database needed.</td>
+          <td>Free (local disk)</td>
+        </tr>
+        <tr>
+          <td>Inspector App (PWA) — v199</td>
+          <td>Field data capture tool for inspectors. Runs in a browser, installs on iPhone.</td>
+          <td>No App Store, no Xcode, no maintenance. Works offline. Deployed via Netlify.</td>
+          <td>Free (Netlify)</td>
+        </tr>
+        <tr>
+          <td>Google Apps Script — v73</td>
           <td>Serverless backend. Receives data, writes Drive/Sheets, sends alerts.</td>
           <td>Free, tight Google Workspace integration, no server to manage.</td>
           <td>Free (Google)</td>
@@ -1033,7 +1045,7 @@
         </tr>
         <tr>
           <td>Supabase</td>
-          <td>PostgreSQL database. Future canonical data store for structured inspection data.</td>
+          <td>PostgreSQL database and photo storage. Live photo pipeline — inspector photos go here first, then mirror to Drive.</td>
           <td>Open source, generous free tier, built-in auth, RLS, edge functions, storage.</td>
           <td>Pro plan (~$25/mo)</td>
         </tr>
@@ -1078,6 +1090,12 @@
           <td>Team communication. Hans runs as a bot here for team-facing interactions.</td>
           <td>Already the team communication tool. Hans integrates rather than adding another surface.</td>
           <td>Existing subscription</td>
+        </tr>
+        <tr>
+          <td>WhatsApp + Whisper Flow</td>
+          <td>Voice-to-task interface — Matt thinks out loud into WhatsApp and Hans handles the rest.</td>
+          <td>Fastest possible input: no typing, no context switching, works from anywhere.</td>
+          <td>Free</td>
         </tr>
         <tr>
           <td>Backblaze</td>
