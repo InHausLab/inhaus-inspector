@@ -221,10 +221,12 @@ async function handleMirror(request, env) {
   const allRows = await getUnmirroredPhotoRows(env, inspectionId);
   if (!allRows.length) return json({ mirrored: 0, skipped: 0, hasMore: false, folderId: body.driveFolderId || '' });
 
-  // CF Workers have a 50 subrequest limit per invocation.
-  // Each photo costs 3 subrequests (Supabase download + Drive upload + Drive permission).
-  // Cap at 14 photos per call (~42 subrequests) and return hasMore so the app can loop.
-  const BATCH_SIZE = 14;
+  // CF Workers have a 50 subrequest limit per invocation. Each photo currently
+  // costs four subrequests (Supabase download + Drive upload + Drive permission
+  // + Supabase metadata update), in addition to auth/folder/query overhead.
+  // Keep this deliberately small: Google Drive uploads can follow redirects,
+  // and every redirect also consumes a Worker subrequest.
+  const BATCH_SIZE = 3;
   const rows = allRows.slice(0, BATCH_SIZE);
   const hasMore = allRows.length > BATCH_SIZE;
 

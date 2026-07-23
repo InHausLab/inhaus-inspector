@@ -141,12 +141,12 @@ export async function deletePhotoFromSupabase(inspectionId, photoId) {
 export async function mirrorPhotosToDrive(payload) {
   if (!payload || !payload.inspectionId) throw new Error('Missing inspectionId for Drive mirror');
 
-  // The Worker batches 14 photos per invocation to stay under CF's 50 subrequest limit.
+  // The Worker batches 3 photos per invocation to stay under CF's subrequest limit.
   // Loop until hasMore is false (all photos mirrored).
   let totalMirrored = 0;
   let folderId = payload.driveFolderId || '';
   let folderName = '';
-  const MAX_BATCHES = 20; // safety cap (20 × 14 = 280 photos max)
+  const MAX_BATCHES = 20; // safety cap (20 × 3 = 60 photos max)
   let batch = 0;
 
   while (batch < MAX_BATCHES) {
