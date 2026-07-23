@@ -6,6 +6,18 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V19 — Editable Inspector Notes and AI Summaries
+**Date:** July 23, 2026
+
+- Replaced the read-only Inspector Notes and AI Summary blocks in every room card with editable portal fields.
+- All 17 Riverside room records receive both editors, including rooms whose source note or AI summary is blank.
+- Edits persist through the existing Review Portal cloud-save path under the room's step ID and become the working values used by room review counts, completeness checks, and Smart Pre-Fill.
+- Original inspector text remains preserved in the source checkpoint. When a portal edit differs, the room card offers a collapsed original-text reference instead of overwriting source.
+- Adding or removing inspector notes immediately updates the room's review status and the room-note completeness gate.
+- Existing voice-review confirmations now reload from review data as well as source step data.
+- Local rendered verification on Riverside: V19, 17 room cards, 17 Inspector Notes editors, 17 AI Summary editors, 34 editable fields total, 59 unique photos, and the complete 27-step / 17-room source checkpoint unchanged.
+- Review Portal commit: `171da4e` (`feat: edit room notes and AI summaries`).
+
 ## v205 + Review Portal V18 — Photo-Only Rapid Capture and Full Riverside Parity
 **Date:** July 23, 2026
 
