@@ -6,6 +6,19 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V21 — Submission Gate Repair
+**Date:** July 23, 2026
+
+- Fixed a live submission blocker where portal-saved test confirmations were stored under `reviewedData.tests` but both the test table and completeness gate read only source-level `testsConfirmed`.
+- Riverside's saved ATP confirmation now reloads as checked and satisfies the test-confirmation gate.
+- Fixed the test-location gate so a room recorded as **Breeze: No** does not require a fabricated Breeze location. Locations remain required for tests actually conducted.
+- Gate rows now show exact progress counts for room-note reviews, required locations, confirmed tests, and photo decisions.
+- Added one **Include all unreviewed photos** action. It saves the current photo-ID set in one review field, remains reversible per photo, and avoids 59 individual Include clicks.
+- Both top and bottom Submit buttons now use the same enabled, submitting, failure, and submitted states.
+- Safe isolated workflow verification passed: nested ATP confirmation counted, bulk photo review reached 12/12, remaining room confirmations plus report notes produced **Ready to submit**, and both Submit buttons unlocked. No real submission was triggered.
+- Riverside read-only verification before deployment: corrected gate showed 2 legitimate blockers—room notes 3/5 and photos 0/59—while locations passed 13/13 and one saved test confirmation passed.
+- Review Portal commit: `72daf7e` (`fix: repair review submission gate`).
+
 ## Review Portal V20 — Photo Editor Auto-Save on Close
 **Date:** July 23, 2026
 
