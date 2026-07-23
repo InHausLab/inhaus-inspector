@@ -6,6 +6,19 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v204 + Review Portal V17 — Completed Phone Access and Honest Record Counts
+**Date:** July 23, 2026
+
+- Audited Riverside's large Complete Inspector Data counts: 27 saved steps, 17 room records, and 52 source findings. The previous 255/246/871 labels counted flattened raw fields, not separate records.
+- Confirmed 49 unique findings and three exact duplicate source records after ignoring record IDs, editor identity, and timestamps.
+- Review Portal V17 now separates record counts from raw field counts, explains repeated room/step presentation, and hides the three exact duplicate findings in the display only. No source record is deleted or rewritten.
+- Fixed phone access for completed cloud inspections. The v203 cloud screen filtered out `needs review` records, leaving no route when Safari's local IndexedDB copy was unavailable.
+- Inspector v204 renames the home action to **Continue or Review Cloud Inspection**, lists completed/needs-review records beside active work, and opens completed records read-only in the Review Portal.
+- Completed cloud records are never downloaded into or written over the phone's inspector database. Active `field active` records retain the existing **Continue on This Device** behavior.
+- Production verification: Inspector `v204` listed four cloud records; Riverside appeared as `needs review` with **Open Full Review**; that action opened Review Portal `V17` with 27 steps, 17 rooms, 52 source findings (49 unique), and all 59 photos.
+- Automated suite: 16/16 tests passed.
+- Commits: inspector `dd8160a` (`v204: add read-only completed inspection access`); portal `1ea2ecc` (`fix: clarify unique inspection record counts`).
+
 ## Review Portal V16 — Inspection Date and Before Leaving
 **Date:** July 23, 2026
 
