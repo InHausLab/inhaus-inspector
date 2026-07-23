@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import {
   buildStepList,
   deriveRequiredTests,
-  getWaterSampleFields
+  getStepFields,
+  getWaterSampleFields,
+  validateStep
 } from '../steps.js';
 import { observationFields } from '../fields.js';
 
@@ -26,6 +28,21 @@ test('new step lists omit Main Living Area and retain Primary Bathroom naming', 
   assert.equal(steps.some(step => step.id === 'living-area'), false);
   assert.equal(steps.find(step => step.id === 'bathroom-2')?.name, 'Primary Bathroom');
   assert.equal(insp.stepData['living-area'].notes, 'legacy data remains preserved');
+});
+
+test('first Lowest Level room has no room-name field anywhere in the workflow', () => {
+  const firstLowest = {
+    id: 'lowest-room-0',
+    type: 'room-test',
+    dynamic: 'lowest',
+    index: 0,
+    name: 'Lowest Level — Room 1'
+  };
+  const secondLowest = { ...firstLowest, id: 'lowest-room-1', index: 1, name: 'Lowest Level — Room 2' };
+
+  assert.equal(getStepFields(firstLowest).some(field => field?.key === 'roomName'), false);
+  assert.equal(getStepFields(secondLowest).some(field => field?.key === 'roomName'), true);
+  assert.equal(validateStep(firstLowest, {}).some(issue => /Room Name/.test(issue)), false);
 });
 
 test('Utility Room appears after the room walkthrough and before wrap-up', () => {

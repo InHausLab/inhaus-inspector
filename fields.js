@@ -83,7 +83,6 @@ export function bathroomLeakFields() {
 export function breezeFields(timerKey) {
   return [
     heading('Breeze ET Mold Test'),
-    link('📋 Open Priority Lab app', 'https://app.prioritylaboratory.com'),
     yesno('breezeDone', 'Breeze ET test performed'),
     showIf(timer(timerKey || 'breezeTimer', 'Breeze ET Timer (10 min)', 600), 'breezeDone', 'Yes'),
     showIf(text('breezeLocation', 'Spore trap location in this room', { placeholder: 'e.g. Center of room, tripod at 60", north corner' }), 'breezeDone', 'Yes')

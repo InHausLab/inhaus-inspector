@@ -5,10 +5,16 @@ import { readFileSync } from 'node:fs';
 const screens = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../ui.js', import.meta.url), 'utf8');
 const feedback = readFileSync(new URL('../feedback.js', import.meta.url), 'utf8');
+const fields = readFileSync(new URL('../fields.js', import.meta.url), 'utf8');
 
 test('redundant in-app microphone is disabled on every platform', () => {
   assert.match(ui, /function micBtn\(\) \{[\s\S]*?return null;\s*\}/);
   assert.doesNotMatch(ui, /className: 'mic-btn'/);
+});
+
+test('Priority Lab links are removed from the inspector workflow', () => {
+  assert.doesNotMatch(fields, /Open Priority Lab/);
+  assert.doesNotMatch(fields, /app\.prioritylaboratory\.com/);
 });
 
 test('finding review starts with the inspector wording in the editable field', () => {

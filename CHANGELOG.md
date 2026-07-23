@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v209 — Complete Outstanding Tracker Removals
+**Date:** July 23, 2026
+
+- Completed the Lowest Level room-name removal across the entire inspector workflow. The first stable Lowest Level room no longer exposes or requires the old `roomName` field in data entry, validation, search, or Final Review.
+- Preserved the actual Lowest Level inspection phase, Radon Monitor Setup, basement/lowest-level observations, saved legacy room names, and all existing inspection data.
+- Removed the remaining **Open Priority Lab app** button from every Breeze ET section. The chain-of-custody checklist still names Priority Lab where operationally relevant.
+- Added regression tests for both tracker requirements.
+
 ## v208 / Review Portal V26 — Shared Feedback Tracker
 **Date:** July 23, 2026
 

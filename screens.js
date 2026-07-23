@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=208';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=208';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=208';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=208';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=208';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=208';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=209';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=209';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=209';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=209';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=209';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=209';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=208';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=208';
-import { updatePhotoMetadata } from './supabase-photos.js?v=208';
-import { FIELD_RESUME_TOKEN } from './config.js?v=208';
+} from './findings.js?v=209';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=209';
+import { updatePhotoMetadata } from './supabase-photos.js?v=209';
+import { FIELD_RESUME_TOKEN } from './config.js?v=209';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=208';
+} from './comment-library.js?v=209';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -387,14 +387,11 @@ export function openSearch() {
     if (s.type === 'review') return;
     const sIdx = ctx.stepList.indexOf(s);
     searchIndex.push({ label: s.name, stepIdx: sIdx, context: '' });
-    const fieldGen = STEP_FIELDS[s.type];
-    if (fieldGen) {
-      fieldGen().forEach(f => {
-        if (!f.label || !f.key) return;
-        if (['heading', 'info', 'divider', 'photo', 'timer', 'link'].includes(f.type)) return;
-        searchIndex.push({ label: f.label, stepIdx: sIdx, context: s.name, key: f.key });
-      });
-    }
+    getStepFields(s).forEach(f => {
+      if (!f.label || !f.key) return;
+      if (['heading', 'info', 'divider', 'photo', 'timer', 'link'].includes(f.type)) return;
+      searchIndex.push({ label: f.label, stepIdx: sIdx, context: s.name, key: f.key });
+    });
   });
 
   const overlay = ui().el('div', { id: 'search-overlay', className: 'search-overlay active' });
@@ -1961,12 +1958,9 @@ export function renderStep() {
   c.appendChild(stepHeading);
   if (step.type === 'bathroom') c.appendChild(buildBathroomAssignmentCard(step));
 
-  const fieldGen = STEP_FIELDS[step.type];
+  const fields = getStepFields(step);
   let pendingFieldRender = null;
-  if (fieldGen) {
-    const fields = fieldGen().filter(field => !(
-      step.dynamic === 'lowest' && step.index === 0 && field && field.key === 'roomName'
-    ));
+  if (fields.length) {
     const card = ui().el('div', { className: 'card' });
     const onFieldChange = fieldKey => {
       markStepUpdated(ctx.inspection, step.id, step.name, fieldKey);
@@ -3713,9 +3707,8 @@ export function renderReview() {
         ui().el('div', { className: 'review-step-issue' }, issue)
       )));
     }
-    const fieldGen = STEP_FIELDS[step.type];
-    if (fieldGen && visited) {
-      const fields = fieldGen();
+    const fields = getStepFields(step);
+    if (fields.length && visited) {
       fields.forEach(f => {
         if (!f.key || f.type === 'heading' || f.type === 'info' || f.type === 'divider' || f.type === 'photo' || f.type === 'timer') return;
         const val = data[f.key];

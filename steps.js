@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=208';
-import { getInspection } from './state.js?v=208';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=209';
+import { getInspection } from './state.js?v=209';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -608,6 +608,20 @@ export const STEP_FIELDS = {
   'post-assessment': getPostAssessmentFields
 };
 
+// Return the fields that actually belong to this specific step instance.
+// The first Lowest Level room uses its stable default name, so its old required
+// Room Name field must stay absent everywhere: entry, search, review, and
+// validation. Saved legacy roomName data remains untouched.
+export function getStepFields(stepDef) {
+  const fieldGen = STEP_FIELDS[stepDef?.type];
+  if (!fieldGen) return [];
+  const fields = fieldGen();
+  if (stepDef?.dynamic === 'lowest' && stepDef?.index === 0) {
+    return fields.filter(field => !(field && field.key === 'roomName'));
+  }
+  return fields;
+}
+
 // ── Phases ─────────────────────────────────────────────────
 export const PHASES = [
   { id: 'setup', name: 'Setup', icon: '1' },
@@ -852,8 +866,7 @@ export function validateStep(stepDef, existingData) {
   }
 
   const missing = [];
-  const fieldGen = STEP_FIELDS[stepDef.type];
-  if (fieldGen) collectRequiredIssues(fieldGen(), data, missing);
+  collectRequiredIssues(getStepFields(stepDef), data, missing);
 
   return missing;
 }
