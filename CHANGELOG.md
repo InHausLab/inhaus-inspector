@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V16 — Inspection Date and Before Leaving
+**Date:** July 23, 2026
+
+- Fixed the blank editable Inspection Date field. Apps Script returns a long JavaScript date string that the summary formatter accepted but the HTML date input rejected; V16 normalizes it to `YYYY-MM-DD`.
+- Added a dedicated, editable Before Leaving card with the ten standard final checks plus the two saved departure tasks.
+- Preserved source truth in the checklist UI: app-recorded answers are labeled `Saved by inspector`, portal answers are labeled `Saved in portal`, and missing source answers are labeled `Not recorded in app`.
+- Riverside production verification: live `V16`, date input `2026-07-22`, 12 checklist rows, 2 checked inspector-saved departure tasks, and 10 missing app answers visibly identified. Particulate matter remained visible and the photo grid remained exactly 59 unique photos.
+- Review Portal commit: `5345a82` (`fix: restore inspection date and before leaving checklist`).
+
 ## Review Portal V15 — Particulate Matter Display
 **Date:** July 23, 2026
 
