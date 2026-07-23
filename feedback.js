@@ -1,7 +1,7 @@
 // InHaus Inspector - App improvement feedback capture and durable retry queue
-import { getInspection, getScreen } from './state.js?v=203';
-import { scriptFetch } from './sync.js?v=203';
-import { GOOGLE_SCRIPT_URL } from './config.js?v=203';
+import { getInspection, getScreen } from './state.js?v=204';
+import { scriptFetch } from './sync.js?v=204';
+import { GOOGLE_SCRIPT_URL } from './config.js?v=204';
 
 let initialized = false;
 let retryInProgress = false;

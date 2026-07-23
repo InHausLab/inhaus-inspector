@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=203';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=203';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=203';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=203';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=203';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=203';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=204';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=204';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=204';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=204';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=204';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=204';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,13 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=203';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=203';
-import { updatePhotoMetadata } from './supabase-photos.js?v=203';
+} from './findings.js?v=204';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=204';
+import { updatePhotoMetadata } from './supabase-photos.js?v=204';
+import { FIELD_RESUME_TOKEN } from './config.js?v=204';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=203';
+} from './comment-library.js?v=204';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -601,7 +602,7 @@ export function renderHome() {
   handoffActions.appendChild(ui().el('button', {
     className: 'btn btn-outline btn-full',
     onClick: () => { setScreen('cloud-resume'); ctx.render(); }
-  }, 'Continue Inspection'));
+  }, 'Continue or Review Cloud Inspection'));
   c.appendChild(handoffActions);
 
   // ── Inspector mode toggle ─────────────────────────────────
@@ -772,6 +773,31 @@ function isContinuableCloudInspection(item) {
   return status === 'prepared' || status === 'field active';
 }
 
+export function isReviewableCloudInspection(item) {
+  const status = String(item?.status || '').trim().toLowerCase();
+  return status === 'needs review' || status === 'completed' ||
+    status === 'submitted to tanner' || status === 'report complete' ||
+    status === 'synced';
+}
+
+export function cloudReviewUrl(item) {
+  const id = item?.inspectionId || item?.id;
+  if (!id) return '';
+  const url = new URL('https://inhauslab.github.io/inhaus-review/review.html');
+  url.searchParams.set('id', id);
+  url.searchParams.set('token', FIELD_RESUME_TOKEN);
+  return url.toString();
+}
+
+function openCloudReview(item) {
+  const url = cloudReviewUrl(item);
+  if (!url) {
+    alert('This cloud inspection has no inspection ID.');
+    return;
+  }
+  window.location.assign(url);
+}
+
 function cloudSearchText(item) {
   return [
     item?.propertyAddress,
@@ -860,14 +886,14 @@ async function continueCloudInspection(item, button) {
 
 export function renderCloudResume() {
   const c = ui().el('div', { className: 'screen cloud-resume-screen' });
-  c.appendChild(buildAppHeader('Continue Inspection'));
+  c.appendChild(buildAppHeader('Cloud Inspections'));
   c.appendChild(ui().el('button', {
     className: 'btn btn-outline',
     onClick: () => { setScreen('home'); ctx.render(); }
   }, '← Home'));
   c.appendChild(ui().el('div', { className: 'cloud-resume-intro' }, [
-    ui().el('h1', { className: 'screen-title' }, 'Select a Prepared Inspection'),
-    ui().el('p', null, 'All prepared inspections are shown below. Use search only if you want to narrow the list.')
+    ui().el('h1', { className: 'screen-title' }, 'Continue or Review an Inspection'),
+    ui().el('p', null, 'Continue active field work on this device, or open a completed inspection read-only in the Review Portal.')
   ]));
 
   const search = ui().el('input', {
@@ -881,12 +907,12 @@ export function renderCloudResume() {
   const loadingSpinner = ui().el('span', {
     className: 'cloud-resume-spinner',
     role: 'status',
-    'aria-label': 'Loading prepared inspections'
+    'aria-label': 'Loading cloud inspections'
   });
   const status = ui().el('div', {
     className: 'cloud-resume-status',
     'aria-live': 'polite'
-  }, [loadingSpinner, ui().el('span', null, 'Loading prepared inspections…')]);
+  }, [loadingSpinner, ui().el('span', null, 'Loading cloud inspections…')]);
   const list = ui().el('div', { className: 'cloud-resume-list' });
   c.appendChild(status);
   c.appendChild(list);
@@ -899,27 +925,35 @@ export function renderCloudResume() {
     list.innerHTML = '';
     status.textContent = matches.length
       ? matches.length + ' inspection' + (matches.length === 1 ? '' : 's') + ' available'
-      : (query ? 'No prepared inspections match that search.' : 'No inspections prepared yet');
+      : (query ? 'No cloud inspections match that search.' : 'No cloud inspections are available.');
     matches.forEach(item => {
-      const continueBtn = ui().el('button', { className: 'btn btn-primary btn-full' }, 'Continue on This Device');
-      continueBtn.addEventListener('click', () => continueCloudInspection(item, continueBtn));
+      const canContinue = isContinuableCloudInspection(item);
+      const continueBtn = ui().el(
+        'button',
+        { className: 'btn btn-primary btn-full' },
+        canContinue ? 'Continue on This Device' : 'Open Full Review'
+      );
+      const openItem = () => canContinue
+        ? continueCloudInspection(item, continueBtn)
+        : openCloudReview(item);
+      continueBtn.addEventListener('click', openItem);
       const card = ui().el('div', {
         className: 'card cloud-resume-card',
         role: 'button',
         tabindex: '0',
         onClick: event => {
           if (event.target.closest('button')) return;
-          continueCloudInspection(item, continueBtn);
+          openItem();
         },
         onKeyDown: event => {
           if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
-          continueCloudInspection(item, continueBtn);
+          openItem();
         }
       }, [
         ui().el('div', { className: 'cloud-resume-card-top' }, [
           ui().el('strong', null, item.propertyAddress || 'Address not entered'),
-          ui().el('span', { className: 'badge prepared' }, item.status || 'Prepared')
+          ui().el('span', { className: 'badge ' + (canContinue ? 'prepared' : 'completed') }, item.status || 'Prepared')
         ]),
         ui().el('div', { className: 'cloud-resume-details' }, [
           ui().el('span', null, 'Client: ' + (item.clientName || '—')),
@@ -936,11 +970,11 @@ export function renderCloudResume() {
   search.addEventListener('input', renderMatches);
   listCloudInspections().then(items => {
     inspections = items
-      .filter(isContinuableCloudInspection)
+      .filter(item => isContinuableCloudInspection(item) || isReviewableCloudInspection(item))
       .sort((a, b) => cloudInspectionSortTime(b) - cloudInspectionSortTime(a));
     renderMatches();
   }).catch(err => {
-    status.textContent = 'Could not load prepared inspections.';
+    status.textContent = 'Could not load cloud inspections.';
     list.appendChild(ui().el('div', { className: 'cloud-resume-error' }, [
       ui().el('strong', null, err?.message || String(err)),
       ui().el('span', null, 'Check the internet connection and try again.')
