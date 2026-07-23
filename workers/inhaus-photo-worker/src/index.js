@@ -217,9 +217,19 @@ async function handleMirror(request, env) {
   validateSharedSecret(body, env);
 
   const inspectionId = cleanId(body.inspectionId, 'inspectionId');
-  const inspectionName = String(body.inspectionName || body.folderName || inspectionId).trim();
+  const driveFolderId = String(body.driveFolderId || '').trim();
+  if (!driveFolderId) throw new Error('missing_drive_folder_id');
   const allRows = await getUnmirroredPhotoRows(env, inspectionId);
-  if (!allRows.length) return json({ mirrored: 0, skipped: 0, hasMore: false, folderId: body.driveFolderId || '' });
+  if (!allRows.length) {
+    return json({
+      mirrored: 0,
+      skipped: 0,
+      hasMore: false,
+      folderId: driveFolderId,
+      driveFolderId,
+      photoFolderId: String(body.photoFolderId || '')
+    });
+  }
 
   // CF Workers have a 50 subrequest limit per invocation. Each photo currently
   // costs four subrequests (Supabase download + Drive upload + Drive permission
@@ -231,23 +241,33 @@ async function handleMirror(request, env) {
   const hasMore = allRows.length > BATCH_SIZE;
 
   const accessToken = await getGoogleAccessToken(env);
-  const folder = body.driveFolderId
-    ? { id: String(body.driveFolderId), name: inspectionName }
-    : await getOrCreateDriveFolder(accessToken, env.DRIVE_FOLDER_ID, inspectionName);
+  const photoFolder = body.photoFolderId
+    ? { id: String(body.photoFolderId), name: 'Technician Photos' }
+    : await getOrCreateDriveFolder(accessToken, driveFolderId, 'Technician Photos');
 
   const results = [];
   for (const row of rows) {
     const storagePath = row.storage_path || storagePathFor(row.inspection_id || inspectionId, row.photo_id);
     const fileBlob = await downloadSupabaseObject(env, storagePath);
     const fileName = fileNameForPhoto(row);
-    const driveFile = await uploadDriveFile(accessToken, folder.id, fileName, fileBlob);
+    const driveFile = await uploadDriveFile(accessToken, photoFolder.id, fileName, fileBlob);
     await setDriveFilePublic(accessToken, driveFile.id);
     const driveUrl = `https://drive.google.com/file/d/${encodeURIComponent(driveFile.id)}/view`;
     await updatePhotoDriveUrl(env, row.photo_id, row.inspection_id || inspectionId, driveUrl);
     results.push({ photoId: row.photo_id, driveUrl });
   }
 
-  return json({ mirrored: results.length, skipped: 0, hasMore, remaining: allRows.length - rows.length, folderId: folder.id, folderName: folder.name, photos: results });
+  return json({
+    mirrored: results.length,
+    skipped: 0,
+    hasMore,
+    remaining: allRows.length - rows.length,
+    folderId: driveFolderId,
+    driveFolderId,
+    photoFolderId: photoFolder.id,
+    photoFolderName: photoFolder.name,
+    photos: results
+  });
 }
 
 // Review edits use the same global review token as the portal's Apps Script
@@ -497,7 +517,7 @@ async function getUnmirroredPhotoRows(env, inspectionId) {
   params.set('inspection_id', `eq.${inspectionId}`);
   params.set('drive_url', 'is.null');
   params.set('source_system', 'neq.deleted');
-  params.set('select', 'photo_id,inspection_id,room_name,step_name,caption,slot,storage_path,drive_url');
+  params.set('select', 'photo_id,inspection_id,room_name,step_name,caption,slot,storage_path,drive_url,created_at');
 
   const res = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
     headers: serviceHeaders(env)
@@ -551,8 +571,21 @@ function normalizeSlot(value) {
 }
 
 function fileNameForPhoto(row) {
-  const pieces = [row.slot ? `slot-${row.slot}` : '', row.photo_id || 'photo'].filter(Boolean);
-  return `${pieces.join('-')}.jpg`;
+  const room = safeDriveNamePart(row.room_name, 55) || 'Unassigned';
+  const step = safeDriveNamePart(row.step_name, 45);
+  const caption = safeDriveNamePart(row.caption, 70) || 'Photo';
+  const pieces = [room];
+  if (step && step.toLowerCase() !== 'photos' && step.toLowerCase() !== room.toLowerCase()) pieces.push(step);
+  pieces.push(caption, row.photo_id || 'photo');
+  return `${pieces.join(' - ')}.jpg`;
+}
+
+function safeDriveNamePart(value, maxLength) {
+  return String(value || '')
+    .replace(/[\u0000-\u001f/\\:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
 }
 
 async function getGoogleAccessToken(env) {

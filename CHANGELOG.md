@@ -6,6 +6,23 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v203 — Report Workflow Repair
+**Date:** July 23, 2026
+
+- Repaired Riverside assessment `INH-20260722-VCMSTE` downstream artifacts without changing the preserved inspection payload or Supabase originals.
+- Added assessment `018` to `Home Health Report_Tracker` row 26 with `C-0017`, `H-0017`, and `RPT-018`.
+- Consolidated the two Riverside Drive folders into `018 – 2026-07-22 – Michelle – 230 Riverside Dr`; preserved the interrupted recovery duplicate inside an archived subfolder rather than deleting data.
+- Created `Technician Photos`, moved all 60 preserved Drive files into it, and renamed them from opaque slot IDs to room/step/caption/photo-ID names. The 60 files represent 59 unique photos plus one clearly labeled recovery duplicate.
+- Created and populated the inspection spreadsheet's `Photo Log` with all 59 unique Supabase photo records.
+- The inspector app now includes a lightweight photo manifest in the final Apps Script payload so `Photo Log` can be built even though binary photos use Supabase.
+- The Photo Worker now requires the assessment folder ID, mirrors only into its `Technician Photos` child, and refuses to create a second top-level fallback folder.
+- Worker Drive filenames now use room, step, caption, and photo ID instead of `slot-0-p-*`.
+- Apps Script v75 source now assigns idempotent assessment/report/client/home IDs, writes tracker columns B:K, creates the canonical assessment folder name, creates `Technician Photos`, and always writes `Photo Log`.
+
+### Apps Script deployment requirement
+
+- Per the mandatory Apps Script safety rule below, `Code.gs` must be pasted into the production Apps Script editor and deployed as a new version by Matt. Do not use clasp or edit an uncommitted live script.
+
 ## v202 — Safe Checkpoints, Intake-Driven Tests, and Portal Photo Delete
 **Date:** July 22, 2026
 **Branch:** `codex/safe-checkpoints-collaboration`

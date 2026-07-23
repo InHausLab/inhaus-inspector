@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=202';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=203';
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
   const controller = new AbortController();
@@ -140,12 +140,14 @@ export async function deletePhotoFromSupabase(inspectionId, photoId) {
 
 export async function mirrorPhotosToDrive(payload) {
   if (!payload || !payload.inspectionId) throw new Error('Missing inspectionId for Drive mirror');
+  if (!payload.driveFolderId) throw new Error('Missing assessment Drive folder for photo mirror');
 
   // The Worker batches 3 photos per invocation to stay under CF's subrequest limit.
   // Loop until hasMore is false (all photos mirrored).
   let totalMirrored = 0;
-  let folderId = payload.driveFolderId || '';
-  let folderName = '';
+  let driveFolderId = payload.driveFolderId;
+  let photoFolderId = payload.photoFolderId || '';
+  let photoFolderName = '';
   const MAX_BATCHES = 20; // safety cap (20 × 3 = 60 photos max)
   let batch = 0;
 
@@ -157,18 +159,28 @@ export async function mirrorPhotosToDrive(payload) {
       body: JSON.stringify({
         inspectionId: payload.inspectionId,
         inspectionName: payload.inspectionName || '',
-        driveFolderId: folderId,
+        driveFolderId,
+        photoFolderId,
         sharedSecret: PHOTO_UPLOAD_SECRET
       })
     }, 90000, 'Drive photo mirror');
     const result = await parseJsonResponse(resp, 'Drive mirror failed');
     totalMirrored += (result.mirrored || 0);
-    if (result.folderId) folderId = result.folderId;
-    if (result.folderName) folderName = result.folderName;
+    if (result.driveFolderId || result.folderId) driveFolderId = result.driveFolderId || result.folderId;
+    if (result.photoFolderId) photoFolderId = result.photoFolderId;
+    if (result.photoFolderName) photoFolderName = result.photoFolderName;
     if (!result.hasMore) break;
   }
 
-  return { mirrored: totalMirrored, skipped: 0, hasMore: false, folderId, folderName };
+  return {
+    mirrored: totalMirrored,
+    skipped: 0,
+    hasMore: false,
+    folderId: driveFolderId,
+    driveFolderId,
+    photoFolderId,
+    photoFolderName
+  };
 }
 
 // Check which photos for an inspection are already confirmed in Supabase.

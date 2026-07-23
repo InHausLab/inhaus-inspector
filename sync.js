@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=202';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=202';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=203';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=203';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=202';
-import { scheduleSave } from './storage.js?v=202';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=202';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=202';
+         getBestCloudSyncAt } from './state.js?v=203';
+import { scheduleSave } from './storage.js?v=203';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=203';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=203';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -233,6 +233,9 @@ function rememberDriveResult(result, fingerprint, source) {
   }
   if (result.spreadsheetId) inspection._spreadsheetId = result.spreadsheetId;
   if (result.spreadsheetUrl) inspection._spreadsheetUrl = result.spreadsheetUrl;
+  if (result.technicianPhotosFolderId) {
+    inspection._technicianPhotoFolderId = result.technicianPhotosFolderId;
+  }
   if (fingerprint) inspection._lastMainPayloadFingerprint = fingerprint;
   inspection._dataSyncedToDrive = true;
   inspection._driveMetadataSource = source || inspection._driveMetadataSource || 'sync';
@@ -703,7 +706,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=202');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=203');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -791,8 +794,13 @@ async function mirrorSupabasePhotosToDrive(exportData, inspection) {
   const result = await mirrorPhotosToDrive({
     inspectionId: exportData.inspectionId,
     inspectionName: getMirrorInspectionName(exportData, inspection),
-    driveFolderId: getKnownDriveFolderId(inspection, exportData)
+    driveFolderId: getKnownDriveFolderId(inspection, exportData),
+    photoFolderId: inspection && inspection._technicianPhotoFolderId || ''
   });
+  if (inspection && result && result.photoFolderId) {
+    inspection._technicianPhotoFolderId = result.photoFolderId;
+    scheduleSave({ markDirty: false });
+  }
   if (result && result.mirrored > 0) {
     showUploadBanner('success', 'Mirrored ' + result.mirrored + ' photo' + (result.mirrored === 1 ? '' : 's') + ' to Drive');
   }
@@ -832,9 +840,20 @@ async function verifyFinalSync(exportData, allPhotos, inspection) {
 export async function sendToGoogleScript(exportData) {
   const inspection = getInspection();
   // Always strip photos from main payload - send data first, then photos separately
-  const mainPayload = stripPhotosFromExport(exportData);
-  const mainPayloadFingerprint = payloadFingerprint(mainPayload);
   const allPhotos = extractAllPhotosFromExport(exportData);
+  const mainPayload = stripPhotosFromExport(exportData);
+  // Keep lightweight photo metadata in the main save so Apps Script can build a
+  // complete Photo Log even though binary photo data now travels through Supabase.
+  mainPayload.photoManifest = allPhotos.map(function(photo) {
+    return {
+      photoId: photo.photoId || '',
+      roomName: photo.roomName || '',
+      stepName: photo.stepName || '',
+      caption: photo.caption || '',
+      timestamp: photo.timestamp || ''
+    };
+  });
+  const mainPayloadFingerprint = payloadFingerprint(mainPayload);
   const photosToUpload = allPhotos.filter(photoNeedsUpload);
 
   if (photosToUpload.length > 0 && !USE_SUPABASE_PHOTOS) {
