@@ -6,6 +6,20 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v205 + Review Portal V18 — Photo-Only Rapid Capture and Full Riverside Parity
+**Date:** July 23, 2026
+
+- Rapid Capture now supports a true photo-only workflow. **Unassigned — add room and details later** is available alongside every room/step destination.
+- Room, finding type, and comment are optional. A photo saved without a comment is preserved in `sparePhotos` with `routingStatus: needs_placement` and does not create an empty or duplicate finding.
+- Unassigned Rapid Capture photos stay in Photo Organization for later placement; photos captured from a known step retain automatic room/step routing.
+- Recovered in-progress Rapid Capture drafts use the same rule, so a photo-only draft is preserved without manufacturing a finding during Final Review.
+- Review Portal V18 moves exact ATP and water source records out of the collapsed optional editor and into the always-visible Tests & Samples section.
+- Riverside's visible ATP record now shows: Kitchen counter, pre-test 28 / Pass, cleaned Yes, post-test 0 / Pass.
+- Added a visible source checkpoint summary separating record counts from captured values.
+- Full source-to-render audit for Riverside passed with zero missing values across 255 saved step values, 246 room values, all property and named section values, 21 test/sample rows, 12 before-leaving rows, and 59 unique photos.
+- Three exact duplicate findings remain preserved in source and hidden only from the display; no inspection or photo source data was rewritten.
+- Automated inspector suite: 18/18 tests passed, including new photo-only Rapid Capture coverage.
+
 ## v204 + Review Portal V17 — Completed Phone Access and Honest Record Counts
 **Date:** July 23, 2026
 

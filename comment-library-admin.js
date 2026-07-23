@@ -1,4 +1,4 @@
-import { scriptFetch } from './sync.js?v=204';
+import { scriptFetch } from './sync.js?v=205';
 
 const tokenInput = document.getElementById('admin-token');
 const loadButton = document.getElementById('load-library');

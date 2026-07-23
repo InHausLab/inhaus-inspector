@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=204';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=204';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=204';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=204';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=204';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=204';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=205';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=205';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=205';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=205';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=205';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=205';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=204';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=204';
-import { updatePhotoMetadata } from './supabase-photos.js?v=204';
-import { FIELD_RESUME_TOKEN } from './config.js?v=204';
+} from './findings.js?v=205';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=205';
+import { updatePhotoMetadata } from './supabase-photos.js?v=205';
+import { FIELD_RESUME_TOKEN } from './config.js?v=205';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=204';
+} from './comment-library.js?v=205';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -2122,8 +2122,30 @@ function findingPhotoById(photoId) {
   return ref ? ref.photo : null;
 }
 
+const RAPID_CAPTURE_UNASSIGNED_DESTINATION = {
+  roomName: '',
+  stepName: '',
+  label: 'Unassigned — add room and details later'
+};
+
+export function rapidCapturePhotoRouting(roomName, stepName) {
+  const normalizedRoom = String(roomName || '').trim();
+  const normalizedStep = String(stepName || '').trim();
+  const assigned = !!(normalizedRoom || normalizedStep);
+  return {
+    roomName: normalizedRoom,
+    stepName: normalizedStep,
+    placementSource: assigned ? 'rapid_capture_context' : 'rapid_capture_unassigned',
+    routingStatus: assigned ? 'auto' : 'needs_placement'
+  };
+}
+
+export function rapidCaptureCreatesFinding(comment) {
+  return !!String(comment || '').trim();
+}
+
 function rapidCaptureDestinationOptions() {
-  const options = collectPhotoDestinations();
+  const options = [RAPID_CAPTURE_UNASSIGNED_DESTINATION, ...collectPhotoDestinations()];
   if (_rapidCaptureContext && (_rapidCaptureContext.roomName || _rapidCaptureContext.stepName)) {
     const key = String(_rapidCaptureContext.roomName || '').toLowerCase() + '|' + String(_rapidCaptureContext.stepName || '').toLowerCase();
     if (!options.some(item => String(item.roomName).toLowerCase() + '|' + String(item.stepName).toLowerCase() === key)) {
@@ -2170,11 +2192,11 @@ export function renderRapidCapture() {
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
   c.appendChild(ui().el('div', { className: 'rapid-capture-intro' }, [
     ui().el('strong', null, 'Stay in camera mode and capture everything.'),
-    ui().el('span', null, 'Photos and comments become a finding for review. Nothing enters the reusable library until an inspector cleans and approves it.')
+    ui().el('span', null, 'Room, finding type, and comments are optional. Unassigned photos stay safely in Photo Organization until someone places them.')
   ]));
 
   const contextCard = ui().el('div', { className: 'card rapid-context-card' });
-  const contextLabel = ui().el('label', { className: 'field-label' }, 'Where are you working?');
+  const contextLabel = ui().el('label', { className: 'field-label' }, 'Room or step (optional)');
   const contextSelect = ui().el('select', { className: 'field-input' });
   destinations.forEach((destination, index) => {
     contextSelect.appendChild(ui().el('option', { value: String(index) }, destination.label));
@@ -2187,12 +2209,14 @@ export function renderRapidCapture() {
     draft.roomName = destination.roomName;
     draft.stepName = destination.stepName;
     draft.reportSection = destination.stepName;
+    const routing = rapidCapturePhotoRouting(destination.roomName, destination.stepName);
     draft.photos.forEach(photoItem => {
-      photoItem.roomName = destination.roomName;
-      photoItem.stepName = destination.stepName;
-      photoItem.placementSource = 'rapid_capture_context';
+      Object.assign(photoItem, routing);
       if (window.DB?.updatePhoto) window.DB.updatePhoto(photoItem.photoId, {
-        roomName: destination.roomName, stepName: destination.stepName, placementSource: 'rapid_capture_context'
+        roomName: routing.roomName,
+        stepName: routing.stepName,
+        placementSource: routing.placementSource,
+        routingStatus: routing.routingStatus
       });
     });
     scheduleSave();
@@ -2242,9 +2266,9 @@ export function renderRapidCapture() {
   const photoHost = ui().renderPhoto(
     draft.photos,
     () => {
+      const routing = rapidCapturePhotoRouting(draft.roomName, draft.stepName);
       draft.photos.forEach(photoItem => {
-        photoItem.roomName = draft.roomName;
-        photoItem.stepName = draft.stepName;
+        Object.assign(photoItem, routing);
         photoItem.capturedBy = getInspectorIdentity(ctx.inspection).name;
       });
       scheduleSave();
@@ -2265,37 +2289,45 @@ export function renderRapidCapture() {
     }
     if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
     const existingIds = new Set(ctx.inspection.sparePhotos.map(photoItem => photoItem.photoId));
+    const routing = rapidCapturePhotoRouting(draft.roomName, draft.stepName);
     draft.photos.forEach((photoItem, index) => {
-      photoItem.roomName = draft.roomName;
-      photoItem.stepName = draft.stepName;
+      Object.assign(photoItem, routing);
       photoItem.capturedBy = getInspectorIdentity(ctx.inspection).name;
       if (comment && !photoItem.caption && index === 0) photoItem.caption = comment;
       if (!existingIds.has(photoItem.photoId)) ctx.inspection.sparePhotos.push(photoItem);
     });
-    const finding = createFinding(ctx.inspection, {
-      roomName: draft.roomName,
-      stepName: draft.stepName,
-      reportSection: draft.reportSection,
-      severity: draft.severity,
-      rawComment: comment,
-      photoIds: draft.photos.map(photoItem => photoItem.photoId),
-      source: 'rapid_capture'
-    });
-    draft.photos.forEach(photoItem => { photoItem.findingId = finding.findingId; });
+    let finding = null;
+    if (rapidCaptureCreatesFinding(comment)) {
+      finding = createFinding(ctx.inspection, {
+        roomName: draft.roomName,
+        stepName: draft.stepName,
+        reportSection: draft.reportSection,
+        severity: draft.severity,
+        rawComment: comment,
+        photoIds: draft.photos.map(photoItem => photoItem.photoId),
+        source: 'rapid_capture'
+      });
+      draft.photos.forEach(photoItem => { photoItem.findingId = finding.findingId; });
+    }
     const savedRoom = draft.roomName;
     ctx.inspection.rapidCaptureDraft = null;
     await saveNow();
     const cloudSaved = await checkpointToCloud(ctx.stepList);
+    const savedLabel = finding
+      ? 'Finding saved to ' + (savedRoom || 'Findings Inbox')
+      : (routing.routingStatus === 'needs_placement'
+        ? 'Photos saved — add room and details later'
+        : 'Photos saved to ' + (savedRoom || draft.stepName));
     ui().showToast(
       cloudSaved
-        ? 'Finding saved to ' + (savedRoom || 'Findings Inbox') + ' and backed up'
-        : 'Finding saved locally — cloud backup will retry'
+        ? savedLabel + ' and backed up'
+        : savedLabel + ' locally — cloud backup will retry'
     );
     if (captureAnother) {
       _rapidCaptureContext = { roomName: draft.roomName, stepName: draft.stepName };
       ctx.render();
     } else {
-      openInspectionWorkspace('findings', _workspaceReturnScreen);
+      returnFromInspectionWorkspace();
     }
     return true;
   }
@@ -2309,7 +2341,7 @@ export function renderRapidCapture() {
   }, '← Finish'));
   actions.appendChild(ui().el('button', {
     className: 'btn btn-primary', onClick: () => saveRapidFinding(true)
-  }, 'Save & Capture Another'));
+  }, 'Save Photos & Capture Another'));
   c.appendChild(actions);
   ctx.root.appendChild(c);
   window.scrollTo(0, 0);
@@ -3233,19 +3265,23 @@ export function renderReview() {
   if (recoveredDraft && (String(recoveredDraft.rawComment || '').trim() || recoveredDraft.photos?.length)) {
     if (!ctx.inspection.sparePhotos) ctx.inspection.sparePhotos = [];
     const existingPhotoIds = new Set(ctx.inspection.sparePhotos.map(photoItem => photoItem.photoId));
+    const routing = rapidCapturePhotoRouting(recoveredDraft.roomName, recoveredDraft.stepName);
     (recoveredDraft.photos || []).forEach(photoItem => {
+      Object.assign(photoItem, routing);
       if (!existingPhotoIds.has(photoItem.photoId)) ctx.inspection.sparePhotos.push(photoItem);
     });
-    const recoveredFinding = createFinding(ctx.inspection, {
-      roomName: recoveredDraft.roomName,
-      stepName: recoveredDraft.stepName,
-      reportSection: recoveredDraft.reportSection,
-      severity: recoveredDraft.severity,
-      rawComment: recoveredDraft.rawComment,
-      photoIds: (recoveredDraft.photos || []).map(photoItem => photoItem.photoId),
-      source: 'rapid_capture_recovered'
-    });
-    (recoveredDraft.photos || []).forEach(photoItem => { photoItem.findingId = recoveredFinding.findingId; });
+    if (rapidCaptureCreatesFinding(recoveredDraft.rawComment)) {
+      const recoveredFinding = createFinding(ctx.inspection, {
+        roomName: recoveredDraft.roomName,
+        stepName: recoveredDraft.stepName,
+        reportSection: recoveredDraft.reportSection,
+        severity: recoveredDraft.severity,
+        rawComment: recoveredDraft.rawComment,
+        photoIds: (recoveredDraft.photos || []).map(photoItem => photoItem.photoId),
+        source: 'rapid_capture_recovered'
+      });
+      (recoveredDraft.photos || []).forEach(photoItem => { photoItem.findingId = recoveredFinding.findingId; });
+    }
     ctx.inspection.rapidCaptureDraft = null;
     scheduleSave();
   }
