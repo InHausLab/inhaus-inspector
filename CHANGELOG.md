@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V15 — Particulate Matter Display
+**Date:** July 23, 2026
+
+- Restored the saved Property Details particulate-matter reading to the visible Inspection Summary.
+- Added the same source reading to the unified Tests & Samples summary as a recorded Particulate Matter measurement.
+- The renderer reads the preserved nested app field when the thin Apps Script summary does not promote that value to the inspection top level.
+- Production Riverside verification: live `V15` displays `PM2.5: 6.1 µg/m³; PM10: 8 µg/m³` in both sections, retains all 27 saved app steps and 1,595 captured values, and still renders exactly 59 photo cards with 59 unique photo IDs.
+- Review Portal commit: `c53a55a` (`fix: show particulate matter in review portal`).
+
 ## URGENT PRODUCTION CORRECTION — Apps Script v86 + Review Portal V14
 **Date:** July 23, 2026
 
