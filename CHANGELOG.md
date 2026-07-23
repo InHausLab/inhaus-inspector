@@ -6,6 +6,18 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V20 — Photo Editor Auto-Save on Close
+**Date:** July 23, 2026
+
+- Closing the photo editor now automatically saves pending caption and annotation changes before dismissing the modal.
+- The same save-before-close path is used by the X button, Escape key, and backdrop click.
+- Arrows, circles, undo/clear changes, and captions no longer require the reviewer to press either manual Save button.
+- Rotation continues to save immediately. Manual controls remain available as optional **Save now** actions.
+- Reopening a photo resolves its current caption from the canonical photo record, preventing a duplicate thumbnail's older closure value from reopening stale text.
+- Delete intentionally bypasses close-time persistence for the photo being removed.
+- Safe browser verification used isolated demo data: caption and annotation changes survived close/reopen through the X; Escape also auto-saved; no Riverside review data was changed.
+- Review Portal commit: `3fceed3` (`feat: auto-save photo edits on close`).
+
 ## Review Portal V19 — Editable Inspector Notes and AI Summaries
 **Date:** July 23, 2026
 
