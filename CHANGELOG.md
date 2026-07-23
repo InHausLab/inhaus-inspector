@@ -14,13 +14,13 @@ This file is the authoritative record of every significant change, decision, bug
 - Consolidated the two Riverside Drive folders into `018 – 2026-07-22 – Hubbard – 230 Riverside Dr`; preserved the interrupted recovery duplicate inside an archived subfolder rather than deleting data.
 - Created `Technician Photos`, moved all 60 preserved Drive files into it, and renamed them from opaque slot IDs to room/step/caption/photo-ID names. The 60 files represent 59 unique photos plus one clearly labeled recovery duplicate.
 - Created and populated the inspection spreadsheet's `Photo Log` with all 59 unique Supabase photo records.
-- Completed Tanner's tracker handoff for assessment `018`: column A is `Waiting on Labs`, the address is normalized to `230 Riverside Dr, Basalt, CO 81621`, and column AO is a verified clickable link to the canonical assessment folder.
+- Completed Tanner's tracker handoff for assessment `018`: column A is `Waiting on Labs`, the address is normalized to `230 Riverside Dr, Basalt CO 81621`, and column AO is a verified clickable link to the canonical assessment folder.
 - Corrected the same normalized address in the customer/home ID record, inspection Summary, and CSV Output.
 - The inspector app now includes a lightweight photo manifest in the final Apps Script payload so `Photo Log` can be built even though binary photos use Supabase.
 - The Photo Worker now requires the assessment folder ID, mirrors only into its `Technician Photos` child, and refuses to create a second top-level fallback folder.
 - Worker Drive filenames now use room, step, caption, and photo ID instead of `slot-0-p-*`.
 - Apps Script source now assigns idempotent assessment/report/client/home IDs, writes tracker columns A:K with the initial `Waiting on Labs` status, creates the canonical assessment folder name, links that folder in tracker column AO, creates `Technician Photos`, and always writes `Photo Log`.
-- Address normalization now standardizes `Street, City, ST ZIP`, fills known local Colorado ZIP codes when omitted, and stops submission with a clear format error when an address cannot be safely completed.
+- Address normalization now standardizes Tanner's preferred `Street, City ST ZIP` format, fills known local Colorado ZIP codes when omitted, and stops submission with a clear format error when an address cannot be safely completed.
 
 ### Apps Script deployment requirement
 
