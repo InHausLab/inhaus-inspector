@@ -6,6 +6,20 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V22 — Permanent Room Photo Routing
+**Date:** July 23, 2026
+
+- Replaced independent fuzzy room matching with one deterministic alias owner per room name, so a photo can render in exactly one room card.
+- Canonical room names remain highest priority; saved previous names and explicit room aliases are supported.
+- Private-bathroom routing now reads `roomRelationships.bathrooms`, including `lastAutoName` and linked-bedroom names. Riverside's three `Primary Bedroom — Bathroom` photos now render under the renamed `Primary Bathroom`.
+- Generic indexed capture labels such as `Bedroom 2`, `Bedroom 3`, and `Additional Room 3` continue to resolve to their canonical renamed rooms without duplicating photos.
+- Valid step rooms omitted from the exported `rooms` array are added when they contain photos. Riverside now has photo-backed cards for `Utility Room` and `Exterior Assessment`.
+- Any future named photo room that matches neither a canonical room, relationship alias, nor saved step automatically receives one stable photo-only room card instead of disappearing.
+- Added a runtime invariant on the Rooms container that records named, assigned, and unmatched counts and displays a visible warning if an assigned photo cannot be routed.
+- Riverside browser verification: 59 photo cards, 59 room placements, 59 unique photo IDs, zero duplicate placements, zero unmatched assigned photos, 19 rendered room cards, Primary Bathroom 3 photos, Utility Room 1, and Exterior Assessment 22.
+- Future-room regression verification: a synthetic `Future Bonus Room` automatically received one room card and its photo; 13/13 named photos routed with zero unmatched.
+- Review Portal commit: `9fb692b` (`fix: route every assigned photo to one room`).
+
 ## Review Portal V21 — Submission Gate Repair
 **Date:** July 23, 2026
 
