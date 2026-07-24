@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InHaus Inspector — Tanner Handoff</title>
+<style>
+  :root {
+    --brand: #1a1a2e;
+    --accent: #e94560;
+    --accent2: #0f3460;
+    --green: #16a34a;
+    --yellow: #d97706;
+    --blue: #2563eb;
+    --purple: #7c3aed;
+    --orange: #ea580c;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --tag-bg: #f1f5f9;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--brand); color: white;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 32px; height: 56px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  nav .logo { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; }
+  nav .logo span { color: var(--accent); }
+  nav .pill {
+    margin-left: auto;
+    background: rgba(255,255,255,0.12);
+    border-radius: 999px; padding: 3px 12px;
+    font-size: 12px; color: rgba(255,255,255,0.85);
+  }
+
+  .hero {
+    background: linear-gradient(135deg, var(--brand) 0%, var(--accent2) 100%);
+    color: white; padding: 72px 32px 64px; text-align: center;
+  }
+  .hero .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .hero h1 { font-size: clamp(28px, 5vw, 48px); font-weight: 800; line-height: 1.15; margin-bottom: 16px; letter-spacing: -1px; }
+  .hero p { font-size: 18px; color: rgba(255,255,255,0.75); max-width: 600px; margin: 0 auto 32px; }
+  .hero .meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.55); }
+
+  .tabs {
+    background: white; border-bottom: 1px solid var(--border);
+    display: flex; overflow-x: auto; padding: 0 32px;
+    position: sticky; top: 56px; z-index: 99;
+  }
+  .tabs a {
+    display: flex; align-items: center; gap: 6px;
+    padding: 14px 18px; font-size: 13px; font-weight: 500;
+    color: var(--muted); text-decoration: none;
+    border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.15s;
+  }
+  .tabs a:hover { color: var(--text); }
+  .tabs a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+  section { margin-bottom: 80px; scroll-margin-top: 120px; }
+
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 32px; padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-header .num {
+    width: 36px; height: 36px; background: var(--accent); color: white;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; flex-shrink: 0;
+  }
+  .section-header h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+  .section-header .sub { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+  h3 { font-size: 16px; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+  p { color: var(--muted); margin-bottom: 12px; font-size: 15px; }
+  p strong { color: var(--text); }
+
+  /* ALERT BOX */
+  .alert {
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 20px;
+    display: flex; gap: 14px; align-items: flex-start;
+    font-size: 14px;
+  }
+  .alert-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .alert strong { display: block; margin-bottom: 4px; }
+  .alert span { color: inherit; opacity: 0.85; }
+  .alert.red { background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }
+  .alert.yellow { background: #fef9c3; color: #713f12; border: 1px solid #fde68a; }
+  .alert.blue { background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 16px;
+  }
+  .card h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .card p { margin-bottom: 0; font-size: 14px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card.accent-left { border-left: 4px solid var(--accent); }
+  .card.accent-green { border-left: 4px solid var(--green); }
+  .card.accent-blue { border-left: 4px solid var(--blue); }
+  .card.accent-yellow { border-left: 4px solid var(--yellow); }
+  .card.accent-purple { border-left: 4px solid var(--purple); }
+  .card.accent-orange { border-left: 4px solid var(--orange); }
+
+  .stack-table, .timeline, .ref-table {
+    width: 100%; border-collapse: collapse; font-size: 14px;
+    background: white; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border); margin-bottom: 24px;
+  }
+  .stack-table th, .timeline th, .ref-table th {
+    background: var(--brand); color: rgba(255,255,255,0.85);
+    padding: 12px 16px; text-align: left;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .stack-table td, .timeline td, .ref-table td {
+    padding: 14px 16px; border-top: 1px solid var(--border);
+    vertical-align: top; color: var(--muted);
+  }
+  .stack-table td:first-child, .timeline td:first-child, .ref-table td:first-child {
+    font-weight: 600; color: var(--text);
+  }
+  .stack-table tr:hover td, .timeline tr:hover td, .ref-table tr:hover td { background: var(--bg); }
+  .ref-table a { color: var(--blue); text-decoration: none; word-break: break-all; }
+  .ref-table a:hover { text-decoration: underline; }
+
+  .flow {
+    background: var(--brand); border-radius: 12px;
+    padding: 28px; color: white; margin-bottom: 24px;
+  }
+  .flow h4 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.5); margin-bottom: 20px; }
+  .flow-steps { display: flex; flex-direction: column; }
+  .flow-step { display: flex; gap: 16px; align-items: flex-start; position: relative; }
+  .flow-step:not(:last-child)::before {
+    content: ''; position: absolute; left: 15px; top: 36px; bottom: -12px;
+    width: 2px; background: rgba(255,255,255,0.1);
+  }
+  .flow-dot {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0; margin-top: 2px;
+  }
+  .flow-content { padding-bottom: 24px; }
+  .flow-content strong { display: block; font-size: 14px; margin-bottom: 4px; }
+  .flow-content span { font-size: 13px; color: rgba(255,255,255,0.55); }
+
+  .scale-cards { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .scale-card {
+    background: white; border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; display: grid;
+    grid-template-columns: 140px 1fr auto; align-items: center; gap: 20px;
+  }
+  .scale-label { font-size: 13px; font-weight: 700; }
+  .scale-desc { font-size: 14px; color: var(--muted); }
+  .scale-badge { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-yellow { background: #fef9c3; color: #854d0e; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-black { background: #1e293b; color: white; }
+
+  .breaks { list-style: none; margin: 16px 0 24px; }
+  .breaks li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--muted); }
+  .breaks li:last-child { border-bottom: none; }
+  .breaks li strong { color: var(--text); }
+  .breaks .icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+  .checklist { list-style: none; margin: 16px 0 24px; }
+  .checklist li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist .box { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; flex-shrink: 0; margin-top: 1px; }
+
+  /* INDEPENDENCE GRID */
+  .independence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .indep-col { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .indep-col .col-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding: 4px 10px; border-radius: 6px; display: inline-block; }
+  .col-label.tanner { background: #dcfce7; color: #166534; }
+  .col-label.matt { background: #fee2e2; color: #991b1b; }
+  .indep-col ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .indep-col ul li { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: flex-start; }
+  .indep-col ul li::before { content: '→'; flex-shrink: 0; }
+
+  /* MIGRATION STEPS */
+  .migration { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .migration-item {
+    background: white; border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px;
+    display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start;
+  }
+  .migration-item h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .migration-item p { font-size: 14px; margin-bottom: 0; }
+  .m-badge { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .m-now { background: #fee2e2; color: #991b1b; }
+  .m-soon { background: #fef9c3; color: #854d0e; }
+  .m-later { background: #f1f5f9; color: #475569; }
+
+  .roadmap { display: flex; flex-direction: column; gap: 16px; }
+  .roadmap-item {
+    background: white; border: 1px solid var(--border); border-radius: 12px; padding: 24px;
+    display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start;
+  }
+  .roadmap-item h4 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .roadmap-item p { font-size: 14px; margin-bottom: 12px; }
+  .roadmap-item ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .roadmap-item ul li { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: flex-start; }
+  .roadmap-item ul li::before { content: '→'; color: var(--accent); flex-shrink: 0; }
+  .priority-badge { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .p-high { background: #fee2e2; color: #991b1b; }
+  .p-med { background: #fef9c3; color: #854d0e; }
+  .p-low { background: #f1f5f9; color: #475569; }
+
+  .rules { list-style: none; counter-reset: rule; }
+  .rules li {
+    counter-increment: rule; display: flex; gap: 16px;
+    padding: 16px 0; border-bottom: 1px solid var(--border);
+    font-size: 14px; align-items: flex-start;
+  }
+  .rules li:last-child { border-bottom: none; }
+  .rules li::before {
+    content: counter(rule); width: 28px; height: 28px;
+    background: var(--accent); color: white; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; flex-shrink: 0;
+  }
+  .rules li strong { color: var(--text); display: block; margin-bottom: 2px; }
+  .rules li span { color: var(--muted); }
+
+  .handoff-steps { display: flex; flex-direction: column; gap: 12px; }
+  .handoff-step { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+  .handoff-step .step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .step-num {
+    width: 32px; height: 32px; background: var(--accent2); color: white;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; flex-shrink: 0;
+  }
+  .handoff-step h4 { font-size: 15px; font-weight: 700; }
+  .handoff-step .tag { margin-left: auto; padding: 3px 10px; background: var(--tag-bg); border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .handoff-step p { font-size: 14px; }
+
+  code { background: #f1f5f9; border-radius: 4px; padding: 2px 6px; font-size: 12px; font-family: monospace; color: var(--text); }
+
+  @media (max-width: 640px) {
+    .scale-card, .roadmap-item, .migration-item, .independence-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">InHaus <span>Lab</span></div>
+  <div class="pill">Inspector Platform — Tanner Handoff — July 2026</div>
+</nav>
+
+<div class="tabs">
+  <a href="#what-we-built" class="active">What We Built</a>
+  <a href="#the-stack">The Stack</a>
+  <a href="#scale">Scale Limits</a>
+  <a href="#independence">Independence Plan</a>
+  <a href="#handoff">Handoff Steps</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#rules">Critical Rules</a>
+  <a href="#ref">Quick Ref</a>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">Engineering Brief — v2 (Codex Reviewed)</div>
+  <h1>Inspector App &amp; Review Portal</h1>
+  <p>Everything we built, how far it can take us, and how Tanner takes full ownership — no Hans required.</p>
+  <div class="meta">
+    <span>📱 v205 Live</span>
+    <span>🔍 Review Portal V22</span>
+    <span>📅 July 24, 2026</span>
+    <span>✅ Reviewed by Codex</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- SECTION 1 -->
+  <section id="what-we-built">
+    <div class="section-header">
+      <div class="num">1</div>
+      <div>
+        <h2>What We Built</h2>
+        <div class="sub">Two tools. One complete inspection workflow.</div>
+      </div>
+    </div>
+
+    <div class="card-grid">
+      <div class="card accent-left">
+        <h4>📱 Inspector App</h4>
+        <p>Mobile-first PWA in Safari on iPhone. Dave uses it on-site, room by room. No App Store, no Xcode — pure HTML + JavaScript. Zero app store delays, instant updates.</p>
+        <p style="margin-top:10px"><strong>Live:</strong> <a href="https://inhaus-inspector.netlify.app" style="color:var(--blue)">inhaus-inspector.netlify.app</a></p>
+      </div>
+      <div class="card accent-green">
+        <h4>🔍 Review Portal</h4>
+        <p>Internal web tool for Tanner and Matt. After submit, shows every room, finding, photo, and test. Edit, annotate, confirm, submit review. Multi-device, cloud-saved.</p>
+        <p style="margin-top:10px"><strong>Live:</strong> <a href="https://inhauslab.github.io/inhaus-review/" style="color:var(--blue)">inhauslab.github.io/inhaus-review</a></p>
+      </div>
+    </div>
+
+    <div class="flow">
+      <h4>Inspection Lifecycle</h4>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-dot">🏢</div>
+          <div class="flow-content">
+            <strong>Office Prep</strong>
+            <span>Staff enters client, address, tests ordered, layout notes. Dave opens on phone as prepared inspection.</span>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-dot">🚶</div>
+          <div class="flow-content">
+            <strong>On-Site Walkthrough</strong>
+            <span>Room by room: notes, CO2, particulate matter, FLIR thermal, ATP tests, water samples. Rapid Capture for fast photo bursts.</span>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-dot">📸</div>
+          <div class="flow-content">
+            <strong>Photos → Supabase (per photo, not batch)</strong>
+            <span>Each photo uploads immediately to Supabase Storage. AI captions auto-label via Claude Vision proxy. No waiting until the end.</span>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-dot">☁️</div>
+          <div class="flow-content">
+            <strong>Cloud Checkpoint Every 3 Minutes</strong>
+            <span>Full inspection JSON saves to cloud automatically. Inspector can lose the phone and nothing is lost.</span>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-dot">✅</div>
+          <div class="flow-content">
+            <strong>Submit</strong>
+            <span>Final photo flush. Apps Script creates Drive folder, tracker row, Photo Log. CF Worker mirrors photos from Supabase to Drive (best-effort). Inspector sees receipt.</span>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-dot">🔍</div>
+          <div class="flow-content">
+            <strong>Review Portal</strong>
+            <span>Appears as "Needs Review." Tanner edits rooms, photos, findings, tests. Cloud-saved to Supabase review_data via Photo Worker. Submit marks complete.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Everything Built — Timeline</h3>
+    <table class="timeline">
+      <thead><tr><th>Build</th><th>What it was</th><th>Why it mattered</th></tr></thead>
+      <tbody>
+        <tr><td>Base app</td><td>Room forms, notes, submit</td><td>Replaced paper inspection sheets</td></tr>
+        <tr><td>Photo pipeline v1</td><td>Base64 → Apps Script → Drive</td><td>First photo capture. Proved unreliable at scale — retired.</td></tr>
+        <tr><td>Sync status overhaul</td><td>7-state indicator, blocking submit overlay</td><td>Inspectors had no idea if data was saved</td></tr>
+        <tr><td>Photo accountability</td><td>Every photo must be assigned or dismissed</td><td>Removed unresolved photo ambiguity from reviews</td></tr>
+        <tr><td>Completion score (0–100)</td><td>Photos/obs/actions/checklist → letter grade A+→F</td><td>Quality enforcement without manual review</td></tr>
+        <tr><td>Same-day bonus</td><td>Score ≥ 85 submitted same day</td><td>Speed incentive for inspectors</td></tr>
+        <tr><td>Performance dashboard</td><td>Monthly cards, comp adjustments</td><td>Tanner/Matt visibility into inspector quality</td></tr>
+        <tr><td>AI captions (Claude Vision)</td><td>Auto-label photos during capture</td><td>Speeds up review; catches what inspector missed</td></tr>
+        <tr><td>AI room summary</td><td>Synthesize all room data into a paragraph</td><td>Draft text for client reports</td></tr>
+        <tr><td>Photo pipeline v2 (Supabase)</td><td>Binary upload → signed URLs → Drive mirror</td><td>Fixed reliability ceiling. Now handles 60+ photos cleanly.</td></tr>
+        <tr><td>Multi-inspector mode</td><td>Named team, section assignments, atomic field merge</td><td>Two inspectors can work the same property simultaneously</td></tr>
+        <tr><td>Rapid Capture</td><td>Quick photo + voice note flow into Findings Inbox</td><td>Capture findings fast without leaving flow</td></tr>
+        <tr><td>Smart Findings</td><td>Structured model: severity, approval queue</td><td>Review portal owns final wording, not inspector</td></tr>
+        <tr><td>Office preparation</td><td>Pre-populate inspection before site visit</td><td>Reduces on-site setup time</td></tr>
+        <tr><td>Company comment library</td><td>Approved standard wording for findings</td><td>Consistency across inspectors</td></tr>
+        <tr><td>Review portal cloud save</td><td>Supabase-backed review_data, multi-device</td><td>Tanner and Matt can work review from any device</td></tr>
+        <tr><td>Photo editor</td><td>Annotate, rotate, caption, delete in portal</td><td>Full photo control without a separate tool</td></tr>
+        <tr><td>Review submission gate</td><td>Completeness check before marking done</td><td>Nothing leaves without a full review</td></tr>
+        <tr><td>Assessment type / Test mode</td><td>Flags test inspections, routes to separate Drive folder</td><td>Keeps test data out of production tracker</td></tr>
+        <tr><td>Apps Script GitHub repo</td><td>Code.gs now in version control</td><td>v52–v64 were lost in an editor wipe July 20 — this prevents recurrence</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SECTION 2 -->
+  <section id="the-stack">
+    <div class="section-header">
+      <div class="num">2</div>
+      <div>
+        <h2>The Full Stack</h2>
+        <div class="sub">Every piece, what it does, and what Tanner needs to know about it.</div>
+      </div>
+    </div>
+
+    <div class="alert yellow">
+      <div class="alert-icon">⚠️</div>
+      <div>
+        <strong>Apps Script: production is v86, NOT v87</strong>
+        <span>The repo HEAD is v87 source, but production is pinned to v86. v87 broke the review-read path (returned a thin 13-key summary instead of the full checkpoint). Do not paste HEAD into the editor and deploy until the review-read path is rebuilt and passes parity tests. This is an open engineering debt item.</span>
+      </div>
+    </div>
+
+    <table class="stack-table">
+      <thead><tr><th>Component</th><th>What it is</th><th>What Tanner needs to know</th></tr></thead>
+      <tbody>
+        <tr><td>Inspector App</td><td>Vanilla JS PWA (inhaus-update/ repo)</td><td>No build step. Edit file, push, Netlify auto-deploys. Service worker caching: bump CACHE_NAME in service-worker.js every version or iPhones won't update.</td></tr>
+        <tr><td>Review Portal</td><td>Vanilla JS static site (inhaus-review/ repo)</td><td>portal.js is ~3,700+ lines, no module boundaries. Deeply coupled to Apps Script response shape and Photo Worker. A change to either can break portal.js silently.</td></tr>
+        <tr><td>Google Apps Script (v86 live / v87 HEAD)</td><td>Server-side Google script</td><td>⚠️ Production = v86. Do not deploy HEAD. Two save paths for review data exist (Apps Script Sheet + Supabase via Worker) — both are active.</td></tr>
+        <tr><td>Google Drive</td><td>Cloud storage — Matt's personal account</td><td>⚠️ Currently in Matt's personal Drive. Must move to InHaus Shared Drive before handoff is complete (see Independence Plan).</td></tr>
+        <tr><td>Google Sheets (Tracker)</td><td>Home Health Report Tracker</td><td>One row per inspection. Tanner manages. Apps Script writes columns A:K on submit.</td></tr>
+        <tr><td>Supabase (inhaus-lab)</td><td>Postgres + Storage</td><td>Key tables: inspector_photo_uploads (app photos), ihl_assessments (minimal row written by Worker on /sign), review_data (portal edits). Tombstone pattern: deleted photos set source_system='deleted', never hard-deleted. All photo queries must filter this.</td></tr>
+        <tr><td>CF Worker (inhaus-photo-worker)</td><td>Edge function — InHaus CF account</td><td>Handles signed uploads, Drive mirror (best-effort, not guaranteed), review save/load, photo deletion. Keeps Supabase service key private. Tanner owns this account.</td></tr>
+        <tr><td>CF Worker (inhaus-vision-proxy)</td><td>Edge function — Matt's personal CF account</td><td>⚠️ NOT on InHaus CF account. Tanner cannot redeploy or rotate the API key without Matt. Must migrate to InHaus account (see Independence Plan).</td></tr>
+        <tr><td>Netlify</td><td>Hosting for inspector app</td><td>Auto-deploys from main branch. Staging previews on feature branches.</td></tr>
+        <tr><td>GitHub Pages</td><td>Hosting for review portal</td><td>Deploys from InHausLab/inhaus-review repo. Cache invalidation via asset URL versioning.</td></tr>
+        <tr><td>IndexedDB</td><td>On-device browser storage</td><td>Survives reloads and offline periods. iOS Safari can fail writes in Private mode or strict privacy settings — known limitation.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Key Architectural Decisions</h3>
+    <div class="card-grid">
+      <div class="card accent-left">
+        <h4>Vanilla JS, No Framework</h4>
+        <p>No build step. Edit a file, push, deploys in seconds. Tradeoff: portal.js is 3,700+ lines with no module boundaries — hard to navigate at first.</p>
+      </div>
+      <div class="card accent-green">
+        <h4>PWA, Not Native App</h4>
+        <p>Zero App Store delays. Updates on next Safari open. Works offline. Tradeoff: iOS kills background timers when phone locks. No reliable vibration.</p>
+      </div>
+      <div class="card accent-blue">
+        <h4>Supabase for Photos</h4>
+        <p>Replaced base64 → Apps Script → Drive which failed at scale (slow, unreliable, produced 178 duplicate folders in one incident). Supabase handles binary per-photo, idempotent uploads.</p>
+      </div>
+      <div class="card accent-yellow">
+        <h4>Cloudflare Workers</h4>
+        <p>Edge speed, keeps Supabase service key private. Note: SYNC_SECRET and PHOTO_UPLOAD_SECRET are committed in config.js — visible to anyone with repo access. Not rotated.</p>
+      </div>
+      <div class="card accent-purple">
+        <h4>Apps Script for Drive/Sheets</h4>
+        <p>Only serverless path to Drive without OAuth complexity. Hard constraints: 6-minute execution limit per run, LockService queues concurrent submits, clasp breaks the web app URL.</p>
+      </div>
+    </div>
+
+    <h3>Supabase Schema — Tables Tanner Needs to Know</h3>
+    <table class="stack-table">
+      <thead><tr><th>Table</th><th>Owner</th><th>What it holds</th><th>Key constraint</th></tr></thead>
+      <tbody>
+        <tr><td>inspector_photo_uploads</td><td>App (Hans/Tanner)</td><td>Photo metadata: photo_id, inspection_id, room, caption, slot, storage_path</td><td>No hard DELETE in production. Tombstone via source_system='deleted'. All reads must filter this.</td></tr>
+        <tr><td>ihl_assessments</td><td>Tanner's schema</td><td>Minimal row written by Worker on /sign, richer data upserted by Apps Script on submit</td><td>Worker writes first so the FK exists before Apps Script runs</td></tr>
+        <tr><td>review_data</td><td>App (Hans/Tanner)</td><td>Portal review edits, saved via Photo Worker. JSONB field_data per inspection_id.</td><td>Service role only — browser cannot read/write directly</td></tr>
+        <tr><td>ihl_photos, ihl_lab_results, etc.</td><td>Tanner's schema</td><td>Tanner's existing data model. inspector_photo_uploads is a staging table meant to eventually reconcile into ihl_photos.</td><td>ihl_photos.inspection_id is FK to ihl_assessments — any direct write needs parent row first</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SECTION 3 -->
+  <section id="scale">
+    <div class="section-header">
+      <div class="num">3</div>
+      <div>
+        <h2>How Far This Can Take Us</h2>
+        <div class="sub">Real capacity numbers — corrected by Codex review.</div>
+      </div>
+    </div>
+
+    <div class="scale-cards">
+      <div class="scale-card">
+        <div><div class="scale-label">1–3 inspectors</div><div style="font-size:13px;color:var(--muted)">5–15/week</div></div>
+        <div class="scale-desc">Works cleanly. This is what the system was designed and tested for.</div>
+        <div class="scale-badge badge-green">✓ Comfortable</div>
+      </div>
+      <div class="scale-card">
+        <div><div class="scale-label">4–6 inspectors</div><div style="font-size:13px;color:var(--muted)">15–25/week</div></div>
+        <div class="scale-desc">Multi-inspector mode works. Apps Script starts showing occasional timeouts at the high end. Note: a single large inspection (60+ photos, 30+ rooms) can hit the 6-minute Apps Script execution limit at any volume — not just at scale.</div>
+        <div class="scale-badge badge-yellow">⚡ Stretched</div>
+      </div>
+      <div class="scale-card">
+        <div><div class="scale-label">7+ inspectors</div><div style="font-size:13px;color:var(--muted)">30+/week</div></div>
+        <div class="scale-desc">Apps Script LockService queues concurrent submits — 3+ simultaneous field submissions will see lock timeouts. Drive API rate limits fire. Review portal slows on large payloads. Single Drive account is one failure point.</div>
+        <div class="scale-badge badge-red">⚠ Breaking</div>
+      </div>
+      <div class="scale-card">
+        <div><div class="scale-label">Real ceiling</div><div style="font-size:13px;color:var(--muted)">~25–30/week (not 50)</div></div>
+        <div class="scale-desc">Codex flagged the 50/week estimate as optimistic. Drive folder scan timeouts already exist at current test-folder volume. The LockService concurrency limit means burst submits fail before weekly volume becomes the bottleneck. Real practical ceiling before Backend Build (Roadmap #2) is closer to 25–30/week.</div>
+        <div class="scale-badge badge-black">🔴 Must Rebuild</div>
+      </div>
+    </div>
+
+    <h3>What Breaks First</h3>
+    <ul class="breaks">
+      <li><div class="icon">🔒</div><div><strong>Apps Script LockService (most immediate)</strong> — 3+ inspectors submitting simultaneously queue behind a 30-second lock. Burst failures happen before weekly volume limits are reached.</div></li>
+      <li><div class="icon">⏱️</div><div><strong>Apps Script 6-minute execution limit</strong> — A single large inspection (60+ photos, large JSON) can hit this at any volume. Symptom: submission silently fails, inspector gets no receipt.</div></li>
+      <li><div class="icon">📁</div><div><strong>Drive folder scan timeout</strong> — Already confirmed at current test-folder volumes. Workaround is in place but not permanent.</div></li>
+      <li><div class="icon">🖼️</div><div><strong>Drive photo mirror is best-effort, not guaranteed</strong> — If the CF Worker /mirror call times out or hits Drive rate limits, photos exist in Supabase but are permanently absent from Drive. At 2,000–5,000 photos/week this becomes a real failure mode.</div></li>
+      <li><div class="icon">👤</div><div><strong>Single Drive account (Matt's personal)</strong> — All data is in Matt's personal Google account. One failure point, shared quota. Must move to Shared Drive before handoff is real.</div></li>
+    </ul>
+  </section>
+
+  <!-- SECTION 4: INDEPENDENCE -->
+  <section id="independence">
+    <div class="section-header">
+      <div class="num">4</div>
+      <div>
+        <h2>Tanner Independence Plan</h2>
+        <div class="sub">The goal: Tanner operates the full stack without any access to Hans, Mac mini, or Matt's personal accounts.</div>
+      </div>
+    </div>
+
+    <div class="alert red">
+      <div class="alert-icon">🚨</div>
+      <div>
+        <strong>This is not done yet</strong>
+        <span>Currently, three things depend on Matt's personal accounts: (1) Assessments Drive folder lives in Matt's personal Google Drive, (2) vision proxy CF Worker lives on Matt's personal Cloudflare account, (3) App secrets in config.js are committed but unrotated. None of these block Tanner from building — but they block full independence. These must be resolved before handoff is complete.</span>
+      </div>
+    </div>
+
+    <h3>What Tanner Can Do Today vs. What Requires Matt</h3>
+    <div class="independence-grid">
+      <div class="indep-col">
+        <div class="col-label tanner">✓ Tanner Can Do Independently</div>
+        <ul>
+          <li>Build and deploy inspector app (Netlify auto-deploys on push)</li>
+          <li>Build and deploy review portal (GitHub Pages)</li>
+          <li>Edit Code.gs, commit to repo, paste into Apps Script editor</li>
+          <li>Manage Supabase: all tables, storage, RLS, service key</li>
+          <li>Manage CF Worker (inhaus-photo-worker) on InHaus CF account</li>
+          <li>Read and write to Assessments Drive folder (shared access)</li>
+          <li>View and edit Home Health Report Tracker</li>
+          <li>Run POST verification curl command against Apps Script</li>
+        </ul>
+      </div>
+      <div class="indep-col">
+        <div class="col-label matt">✗ Currently Requires Matt</div>
+        <ul>
+          <li>Vision proxy CF Worker — on Matt's personal CF account. Tanner cannot redeploy or rotate API key.</li>
+          <li>Assessments folder ownership — lives in Matt's personal Drive, not InHaus Shared Drive</li>
+          <li>Anthropic API key — powers AI captions. On Matt's billing account.</li>
+          <li>SYNC_SECRET / PHOTO_UPLOAD_SECRET rotation — committed to repo, unrotated</li>
+          <li>Mac mini / Hans / OpenClaw infrastructure — Tanner has no need for this</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Migration Steps to Achieve Full Independence</h3>
+    <div class="migration">
+      <div class="migration-item">
+        <div>
+          <h4>1. Move Assessments Drive folder to InHaus Shared Drive</h4>
+          <p>All historical inspection data (Drive folders, Photo Logs, spreadsheet rows) currently lives in Matt's personal Google account. This is the biggest single-point-of-failure. Move to an InHaus-owned Shared Drive so Tanner and the Google service account can manage it independently. Apps Script needs updating to write to the Shared Drive ID instead of Matt's personal root.</p>
+        </div>
+        <div class="m-badge m-now">Do First</div>
+      </div>
+      <div class="migration-item">
+        <div>
+          <h4>2. Migrate vision proxy Worker to InHaus Cloudflare account</h4>
+          <p>The AI caption worker (<code>inhaus-vision-proxy.mjordanjay.workers.dev</code>) lives on Matt's personal CF account. Move it to the InHaus CF account (bbf861ec...) so Tanner can manage it, rotate the Anthropic API key, and monitor usage without involving Matt. The Worker code is straightforward — it's a simple Claude Vision proxy.</p>
+        </div>
+        <div class="m-badge m-now">Do First</div>
+      </div>
+      <div class="migration-item">
+        <div>
+          <h4>3. Resolve the v86/v87 Apps Script regression</h4>
+          <p>Production is pinned to v86. The repo HEAD is v87 which broke review reads. Before Tanner can safely deploy any Apps Script update, this debt must be cleared: rebuild the review-read path in v87 so it passes parity with v86, verify with the POST curl test, then deploy. Until this is done, Tanner cannot safely deploy any Code.gs change.</p>
+        </div>
+        <div class="m-badge m-now">Do First</div>
+      </div>
+      <div class="migration-item">
+        <div>
+          <h4>4. Document a test/staging environment</h4>
+          <p>Currently there's no documented path for testing a code change end-to-end without touching production data. Apps Script has Test mode (routes to _Test Assessments/ folder) but there's no Supabase staging project or CF Worker staging deployment. Before Tanner's first owned build, document: where to test, what "clean" test data looks like, and how to verify without real inspections.</p>
+        </div>
+        <div class="m-badge m-soon">Before First Build</div>
+      </div>
+      <div class="migration-item">
+        <div>
+          <h4>5. Rotate SYNC_SECRET and PHOTO_UPLOAD_SECRET</h4>
+          <p>Both are committed in plaintext in <code>config.js</code> and visible to anyone with repo access. Low urgency while the repo is private and access is controlled, but should be rotated before any external contractors or inspectors get repo access.</p>
+        </div>
+        <div class="m-badge m-later">Before External Access</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5: HANDOFF -->
+  <section id="handoff">
+    <div class="section-header">
+      <div class="num">5</div>
+      <div>
+        <h2>Handoff Steps</h2>
+        <div class="sub">In order. Don't skip the migration steps.</div>
+      </div>
+    </div>
+
+    <div class="handoff-steps">
+      <div class="handoff-step">
+        <div class="step-header"><div class="step-num">1</div><h4>Grant Access</h4><div class="tag">Do Now</div></div>
+        <ul class="checklist">
+          <li><div class="box"></div>Add Tanner as admin: InHausLab/inhaus-inspector (GitHub)</li>
+          <li><div class="box"></div>Add Tanner as admin: InHausLab/inhaus-review (GitHub)</li>
+          <li><div class="box"></div>Add Tanner as admin: InHausLab/inhaus-apps-script (GitHub)</li>
+          <li><div class="box"></div>Add Tanner to InHaus Cloudflare account as admin (account: bbf861ec...)</li>
+          <li><div class="box"></div>Share Apps Script project editor access: script.google.com/d/1p0QPkfC6w-eaB...</li>
+          <li><div class="box"></div>Confirm Tanner has Assessments Drive folder access</li>
+        </ul>
+      </div>
+
+      <div class="handoff-step">
+        <div class="step-header"><div class="step-num">2</div><h4>Execute the Migration Steps</h4><div class="tag">Before Handoff</div></div>
+        <p>Complete the three "Do First" items in the Independence Plan above: move Drive folder, migrate vision proxy, resolve v86/v87 regression. These are prerequisites for Tanner to operate independently. Do not hand off until they are done.</p>
+      </div>
+
+      <div class="handoff-step">
+        <div class="step-header"><div class="step-num">3</div><h4>Context — Read and Walk Through</h4><div class="tag">First Week</div></div>
+        <p>Read <strong>CHANGELOG.md</strong> in InHausLab/inhaus-inspector — it is the engineering ground truth. Walk through one live inspection together: office prep → field → submit → review portal → Drive folder → Supabase. Tanner should see the full path with real data.</p>
+      </div>
+
+      <div class="handoff-step">
+        <div class="step-header"><div class="step-num">4</div><h4>First Owned Build</h4><div class="tag">Week 2</div></div>
+        <p>Pick a small, testable feature. Tanner makes the change in the repo, runs it against the test environment (Assessment Type = Test), verifies with the POST curl command, and deploys. Goal: Tanner completes a full deploy cycle without Hans involved.</p>
+      </div>
+
+      <div class="handoff-step">
+        <div class="step-header"><div class="step-num">5</div><h4>Full Transfer</h4><div class="tag">Ongoing</div></div>
+        <p>Tanner fields Codex handoff briefs for all app work. Hans is available for infrastructure questions only (Mac mini, gateway, OpenClaw). The apps are Tanner's.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 6: ROADMAP -->
+  <section id="roadmap">
+    <div class="section-header">
+      <div class="num">6</div>
+      <div>
+        <h2>What to Build Next</h2>
+        <div class="sub">Ordered by impact and urgency.</div>
+      </div>
+    </div>
+
+    <div class="roadmap">
+      <div class="roadmap-item">
+        <div>
+          <h4>Build 1 — Client Report Generation</h4>
+          <p>The biggest gap. Everything is captured and organized — but producing the client deliverable still requires writing a report by hand. This closes that loop.</p>
+          <ul>
+            <li>Review portal exports structured JSON (rooms, findings, tests, photos)</li>
+            <li>JSON → Claude (Sonnet) with report template prompt</li>
+            <li>Returns draft sections: executive summary, room-by-room, recommendations, lab interpretation</li>
+            <li>Renders in existing report viewer with Export PDF button</li>
+          </ul>
+        </div>
+        <div class="priority-badge p-high">HIGH — Do Next</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div>
+          <h4>Build 2 — Real Backend (Replace Apps Script for Data)</h4>
+          <p>Apps Script + Drive is the bottleneck. Hard quotas, 6-min execution limit, LockService concurrency, lives in Matt's personal account. Needs replacement before 20+/week reliably.</p>
+          <ul>
+            <li>Move inspection data sync from Apps Script to Supabase directly (Tanner's schema is already there)</li>
+            <li>Apps Script becomes a legacy adapter for Drive/Sheets only</li>
+            <li>CF Worker handles inspection sync to Supabase</li>
+            <li>Removes Apps Script quota ceiling entirely</li>
+          </ul>
+        </div>
+        <div class="priority-badge p-med">MEDIUM — Before 20/wk</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div>
+          <h4>Build 3 — Auth and Inspector Accounts</h4>
+          <p>No login exists. Dave is trusted by convention. External or contract inspectors require real accounts and role-based access.</p>
+          <ul>
+            <li>Supabase Auth — already in the project, ready to use</li>
+            <li>Inspector account creation in review portal (Tanner creates accounts)</li>
+            <li>Login screen before inspection list in the app</li>
+            <li>All sync payloads include authenticated user ID</li>
+          </ul>
+        </div>
+        <div class="priority-badge p-med">MEDIUM — Before External Inspectors</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div>
+          <h4>Build 4 — Lab Result Integration</h4>
+          <p>Lab results (SimpleLab water panels, ATP) currently entered manually. The app knows what tests were ordered and scans sample IDs. Results should flow back automatically.</p>
+          <ul>
+            <li>SimpleLab API or email parsing (n8n exists but was pointed at wrong Supabase project and is dormant)</li>
+            <li>Match by kit/sample ID scanned in the app</li>
+            <li>Results appear in review portal Tests section with pass/fail</li>
+          </ul>
+        </div>
+        <div class="priority-badge p-med">MEDIUM — Removes Last Manual Step</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div>
+          <h4>Build 5 — Offline Hardening</h4>
+          <p>iOS kills background timers when phone locks. Sync pauses in background. Matters in basements, crawlspaces, rural properties.</p>
+          <ul>
+            <li>Push notifications for timer expiry (requires Home Screen install)</li>
+            <li>Background sync via service worker (limited iOS support)</li>
+            <li>Smarter conflict resolution for multi-device inspections</li>
+          </ul>
+        </div>
+        <div class="priority-badge p-low">LOW — Remote Locations</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div>
+          <h4>Build 6 — Admin Dashboard</h4>
+          <p>Currently monitoring happens across Sheets, review portal, and performance dashboard separately. One view for everything at scale.</p>
+          <ul>
+            <li>Inspections in flight, pending review, overdue</li>
+            <li>Inspector performance and revenue by week</li>
+            <li>Outstanding labs, portal submissions</li>
+            <li>Supabase views + vanilla JS on Netlify — Tanner has the schema</li>
+          </ul>
+        </div>
+        <div class="priority-badge p-low">LOW — Nice to Have</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 7: RULES -->
+  <section id="rules">
+    <div class="section-header">
+      <div class="num">7</div>
+      <div>
+        <h2>Critical Rules</h2>
+        <div class="sub">Every one of these exists because something broke without it.</div>
+      </div>
+    </div>
+
+    <div class="alert red">
+      <div class="alert-icon">🚨</div>
+      <div>
+        <strong>Rule 0 — Do not deploy Apps Script HEAD to production right now</strong>
+        <span>v87 is the repo HEAD. v86 is what's live. v87 broke review reads. Do not paste Code.gs into the editor and deploy until the review-read path is rebuilt and verified. This will break active inspections.</span>
+      </div>
+    </div>
+
+    <ol class="rules">
+      <li>
+        <div>
+          <strong>Never deploy Apps Script via clasp</strong>
+          <span>Clasp changes the web app deployment URL, which breaks the live app. Always paste Code.gs into the editor UI and deploy as a new version. This is the only safe path.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Always edit Code.gs in the repo first, then deploy</strong>
+          <span>The Apps Script editor was wiped July 20 and v52–v64 were lost permanently. The GitHub repo is the source of truth. Never edit the editor directly.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>CHANGELOG.md is the engineering ground truth</strong>
+          <span>Update it every time something changes. When handing to Codex, include it. This document is a summary — CHANGELOG has the full detail including known regressions and open debt.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Verify every Apps Script deploy with a POST, not GET</strong>
+          <span>GET success does not mean POST works. Run the curl command in CHANGELOG.md. Must return <code>{"status":"ok",...}</code>. A GET-only check has caused missed failures before.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Photos are the highest-risk component</strong>
+          <span>Before any inspection or demo, trace the full path: capture → Supabase upload → Drive mirror → Photo Log. Do not call the system ready based on endpoint checks alone. The Drive mirror is best-effort — photos can be in Supabase but absent from Drive.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Bump CACHE_NAME on every version that changes app behavior</strong>
+          <span>iOS Safari PWA instances cache aggressively. If you push a change without bumping CACHE_NAME in service-worker.js, Dave's phone won't get the update until he closes all tabs and reopens. Every significant release needs a cache bump.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>All photo queries must filter tombstoned records</strong>
+          <span>Deleted photos are not hard-deleted from inspector_photo_uploads. They're tombstoned with source_system='deleted'. Any new query that reads photos without this filter will resurrect deleted photos. Filter: <code>WHERE source_system != 'deleted'</code></span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- SECTION 8: QUICK REF -->
+  <section id="ref">
+    <div class="section-header">
+      <div class="num">8</div>
+      <div>
+        <h2>Quick Reference</h2>
+        <div class="sub">Every URL and config in one place.</div>
+      </div>
+    </div>
+    <table class="ref-table">
+      <thead><tr><th>Item</th><th>Value / Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Inspector App</td><td><a href="https://inhaus-inspector.netlify.app">inhaus-inspector.netlify.app</a> — v205 live</td></tr>
+        <tr><td>Review Portal</td><td><a href="https://inhauslab.github.io/inhaus-review/">inhauslab.github.io/inhaus-review</a> — Token: InHaus2026</td></tr>
+        <tr><td>Report Viewer</td><td><a href="https://inhaus-inspector.netlify.app/reports">inhaus-inspector.netlify.app/reports</a></td></tr>
+        <tr><td>Apps Script (live)</td><td><a href="https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec">...AKfycbwWz.../exec</a> — ⚠️ v86 live, not v87</td></tr>
+        <tr><td>Apps Script Project</td><td><a href="https://script.google.com/d/1p0QPkfC6w-eaB_gxEO4SZAtGHgXt0X0aguqiht9xDuGEAY_9UMIxSYTu/edit">script.google.com/d/1p0QPkfC6w...</a></td></tr>
+        <tr><td>Apps Script Repo</td><td>InHausLab/inhaus-apps-script — edit Code.gs here first</td></tr>
+        <tr><td>Inspector App Repo</td><td>InHausLab/inhaus-inspector — CHANGELOG.md is in here</td></tr>
+        <tr><td>Review Portal Repo</td><td>InHausLab/inhaus-review</td></tr>
+        <tr><td>Supabase</td><td>inhaus-lab (kvpaqvieacccojkkxqul) — Tanner owns</td></tr>
+        <tr><td>CF Worker (photos)</td><td>inhaus-photo-worker — InHaus CF account (bbf861ec...) — Tanner owns</td></tr>
+        <tr><td>CF Worker (AI captions)</td><td>inhaus-vision-proxy.mjordanjay.workers.dev — ⚠️ Matt's personal CF, must migrate</td></tr>
+        <tr><td>CHANGELOG</td><td>InHausLab/inhaus-inspector/CHANGELOG.md — read this before touching anything</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<script>
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('.tabs a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`.tabs a[href="#${e.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-120px 0px -60% 0px' });
+  sections.forEach(s => observer.observe(s));
+  links.forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelector(link.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>
