@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=210';
-import { getInspection } from './state.js?v=210';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=211';
+import { getInspection } from './state.js?v=211';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -33,11 +33,7 @@ export function deriveRequiredTests(insp) {
 }
 
 export function getEquipmentFields() {
-  const requiredTests = deriveRequiredTests(getInspection());
   return [
-    info(requiredTests.length
-      ? 'Required tests from office intake: ' + requiredTests.join(' • ')
-      : 'No required tests were selected during office intake. Confirm the work order before starting.'),
     info('Equipment was already verified at the truck. Complete these on-site steps before starting.'),
     link('\uD83D\uDCCB Open Technician Form', 'https://docs.google.com/forms/d/e/1FAIpQLSdHZK80pgunf4IwWNpH5qcFNRPJFyXw0yeSB4mUBbgyszP0qA/viewform?usp=header'),
     checklist('preAssessment', 'Before You Start', [
@@ -100,7 +96,7 @@ export function getArrivalFields() {
       { key: 'allergenPlacement', label: 'If allergen concerns: placed in client-requested location' }
     ]},
     text('boulderBlueSampleId', 'Boulder Blue Sample ID', { placeholder: 'e.g. B2BJC43G' }),
-    text('boulderBlueTestLocation', 'Boulder Blue Test Location', { placeholder: 'e.g. Living Room' }),
+    { key: 'boulderBlueTestLocation', type: 'inspection-room-select', label: 'Boulder Blue Test Location' },
     timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (2 hrs needed)'),
     timer('boulderBlueTimer', 'Boulder Blue Timer (2 hours)', 7200),
     divider(),
@@ -371,7 +367,6 @@ export function getKitchenApplianceFields() {
     heading('Under Sink'),
     check('underSinkChecked', 'Checked'),
     check('underSinkCleaned', 'Cleaned'),
-    { type: 'remediation-photo-pair', key: 'underSink', label: 'Under Sink' },
     yesnona('iceMakerPresent', 'Ice maker present?'),
     showIf(check('iceMakerChecked', 'Checked'), 'iceMakerPresent', 'Yes'),
     showIf(check('iceMakerCleaned', 'Cleaned'), 'iceMakerPresent', 'Yes'),
@@ -454,7 +449,6 @@ export function getKitchenAirFields() {
 export function getAdditionalRoomFields() {
   return [
     text('roomName', 'Room Name', { required: true }),
-    textarea('reasonForInclusion', 'Reason for inclusion'),
     ...flirFields(),
     ...breezeFields(),
     ...qtrakSection(),
@@ -540,16 +534,28 @@ export function getDebriefFields() {
   ];
 }
 
+function trackingNumberScanner(dataKey) {
+  return {
+    type: 'sample-id-scanner',
+    dataKey,
+    label: 'Tracking number',
+    scanLabel: 'Scan tracking label',
+    confirmLabel: 'Confirm tracking number \u2014 correct if needed',
+    placeholder: 'Enter tracking number',
+    prompt: 'Read the shipping tracking number printed on this label. Preserve every letter and digit exactly. Return JSON with one key: sampleId (string). Return ONLY the JSON object. If unreadable, return {"sampleId": null}.'
+  };
+}
+
 // ── #7: Post-Assessment (new) ──────────────────────────────
 export function getPostAssessmentFields() {
   return [
     heading('Sample Shipping'),
     checklist('shipping', 'Shipping Checklist', [
-      { key: 'breezeST', label: 'Breeze ST spore traps \u2014 packed for FedEx overnight', subFields: [{ key: 'breezeTracking', label: 'Tracking number' }] },
-      { key: 'boulderBlueShip', label: 'Boulder Blue filter \u2014 packed for UPS to Jonah Ventures, 5485 Conestoga Ct #210, Boulder CO 80301', subFields: [{ key: 'boulderBlueTracking', label: 'Tracking number' }] },
-      { key: 'waterPanelShip', label: 'Water panel \u2014 prepaid label + package sent', subFields: [{ key: 'waterTracking', label: 'Tracking number' }] },
-      { key: 'pfasShip', label: 'PFAS (Cyclopure) \u2014 prepaid label + package sent', subFields: [{ key: 'pfasTracking', label: 'Tracking number' }] },
-      { key: 'microplasticsShip', label: 'Microplastics (Brooks Applied Labs) \u2014 packaged and shipped', subFields: [{ key: 'microTracking', label: 'Tracking number' }] },
+      { key: 'breezeST', label: 'Breeze ST spore traps \u2014 packed for FedEx overnight', subFields: [trackingNumberScanner('breezeTracking')] },
+      { key: 'boulderBlueShip', label: 'Boulder Blue filter \u2014 packed for UPS to Jonah Ventures, 5485 Conestoga Ct #210, Boulder CO 80301', subFields: [trackingNumberScanner('boulderBlueTracking')] },
+      { key: 'waterPanelShip', label: 'Water panel \u2014 prepaid label + package sent', subFields: [trackingNumberScanner('waterTracking')] },
+      { key: 'pfasShip', label: 'PFAS (Cyclopure) \u2014 prepaid label + package sent', subFields: [trackingNumberScanner('pfasTracking')] },
+      { key: 'microplasticsShip', label: 'Microplastics (Brooks Applied Labs) \u2014 packaged and shipped', subFields: [trackingNumberScanner('microTracking')] },
       { key: 'chainOfCustody', label: 'Chain of custody forms completed (SafeHome, Cyclopure, Brooks Applied Labs, Priority Lab)' }
     ]),
     divider(),

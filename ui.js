@@ -768,6 +768,10 @@
             box.className = 'check-box' + (data[ik] ? ' checked' : '');
             box.textContent = data[ik] ? '\u2713' : '';
             onChange(data);
+            if (item.subFields && item.subFields.length) {
+              build();
+              return;
+            }
             // Update toggle button text
             const btn = g.querySelector('.btn-check-all');
             if (btn) {
@@ -787,8 +791,9 @@
         // Sub-fields for checklist items
         if (item.subFields && data[ik]) {
           item.subFields.forEach(sf => {
-            const subVal = data[sf.key] || '';
-            const sub = renderText(sf.key, sf.label, subVal, v => { data[sf.key] = v; onChange(data); }, sf);
+            const subField = sf.type ? sf : Object.assign({ type: 'text' }, sf);
+            const sub = renderField(subField, data, () => onChange(data), null, null);
+            if (!sub) return;
             sub.classList.add('sub-field');
             g.appendChild(sub);
           });
@@ -1808,6 +1813,10 @@
         // f.label: display label (e.g. 'Sample ID')
         const dataKey = f.dataKey || 'sampleId';
         const labelText = f.label || 'Sample ID';
+        const scanLabel = f.scanLabel || 'Scan Sample Label';
+        const confirmLabel = f.confirmLabel || 'Confirm ID \u2014 correct if needed';
+        const inputPlaceholder = f.placeholder || 'e.g. WP-123456';
+        const scanPrompt = f.prompt || 'This is a water test kit label with a barcode. Ignore the barcode stripes. Read the human-readable text printed below or near the barcode \u2014 it is the sample ID or kit number (e.g. wtk_pfas_27079 or WP-123456). Return JSON with one key: sampleId (string). Return ONLY the JSON object. If you cannot find readable text, return {"sampleId": null}.';
 
         const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
         const wrap = document.createElement('div');
@@ -1838,7 +1847,7 @@
         const shootBtn = document.createElement('button');
         shootBtn.type = 'button';
         shootBtn.style = 'width:100%;padding:10px;background:#1e40af;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:0.9rem;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;';
-        shootBtn.innerHTML = '\uD83D\uDCF7 Scan Sample Label';
+        shootBtn.innerHTML = '\uD83D\uDCF7 ' + scanLabel;
 
         // Status
         const status = document.createElement('div');
@@ -1854,12 +1863,12 @@
         confirmRow.style = 'margin-top:4px;' + (data[dataKey] ? '' : 'display:none;');
         const confirmLbl = document.createElement('div');
         confirmLbl.style = 'font-size:11px;font-weight:600;color:#1e40af;margin-bottom:3px;';
-        confirmLbl.textContent = 'Confirm ID \u2014 correct if needed';
+        confirmLbl.textContent = confirmLabel;
         const confirmInp = document.createElement('input');
         confirmInp.type = 'text';
         confirmInp.style = 'width:100%;padding:9px 12px;border:2px solid #93c5fd;border-radius:8px;font-size:1rem;font-weight:700;letter-spacing:.5px;background:#fff;box-sizing:border-box;';
         confirmInp.value = data[dataKey] || '';
-        confirmInp.placeholder = 'e.g. WP-123456';
+        confirmInp.placeholder = inputPlaceholder;
         confirmInp.addEventListener('input', () => { data[dataKey] = confirmInp.value; changed(); });
         confirmRow.appendChild(confirmLbl); confirmRow.appendChild(confirmInp);
 
@@ -1877,11 +1886,10 @@
             preview.src = dataUrl;
             previewWrap.style.display = '';
             shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
-            const prompt = 'This is a water test kit label with a barcode. Ignore the barcode stripes. Read the human-readable text printed below or near the barcode — it is the sample ID or kit number (e.g. wtk_pfas_27079 or WP-123456). Return JSON with one key: sampleId (string). Return ONLY the JSON object. If you cannot find readable text, return {"sampleId": null}.';
             const resp = await fetchWithTimeout(PROXY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ imageBase64: dataUrl.split(',')[1], mimeType: 'image/jpeg', prompt })
+              body: JSON.stringify({ imageBase64: dataUrl.split(',')[1], mimeType: 'image/jpeg', prompt: scanPrompt })
             }, 60000, 'AI label scan');
             const result = await resp.json();
             const txt = result.content && result.content[0] && result.content[0].text;
@@ -2599,6 +2607,32 @@
       case 'number': return renderNumber(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);
       case 'date': return renderDate(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); });
       case 'select': return renderSelect(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f.choices);
+      case 'inspection-room-select': {
+        const choices = [];
+        const seen = new Set();
+        const addChoice = value => {
+          const label = String(value || '').trim();
+          if (!label || seen.has(label.toLowerCase())) return;
+          seen.add(label.toLowerCase());
+          choices.push(label);
+        };
+        Object.entries((inspection && inspection.stepData) || {}).forEach(([stepId, stepData]) => {
+          if (!/^(lowest-room-|bedroom-|bathroom-|additional-room-)/.test(stepId)) return;
+          addChoice(stepData?.roomName);
+          addChoice(stepData?._roomName);
+        });
+        ((inspection && inspection.dynamicRooms && inspection.dynamicRooms.lowest) || []).forEach(room => addChoice(room?.name));
+        ((inspection && inspection.dynamicRooms && inspection.dynamicRooms.additional) || []).forEach(room => addChoice(room?.name));
+        const bedroomCount = Math.max(0, Number.parseInt(inspection?.numberOfBedrooms, 10) || 0);
+        const bathroomCount = Math.max(0, Number.parseInt(inspection?.numberOfBathrooms, 10) || 0);
+        for (let index = 0; index < bedroomCount; index += 1) addChoice('Bedroom ' + (index + 1));
+        for (let index = 0; index < bathroomCount; index += 1) {
+          addChoice(index === 2 ? 'Primary Bathroom' : 'Bathroom ' + (index + 1));
+        }
+        ['Kitchen', 'Utility Room', 'Attic', 'Crawl Space'].forEach(addChoice);
+        if (data[f.key]) addChoice(data[f.key]);
+        return renderSelect(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, choices);
+      }
       case 'yesno': return renderYesNo(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, 'yesno');
       case 'yesnona': return renderYesNo(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, 'yesnona');
       case 'radio': return renderRadio(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f.choices);

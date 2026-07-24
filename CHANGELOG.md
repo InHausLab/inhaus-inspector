@@ -6,6 +6,19 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v211 / Review Portal V29 — July 24 Feedback Completion
+**Date:** July 24, 2026
+
+- Added an on-site required-test editor to the Pre-Inspection Checklist so an inspector can add work the office missed or a customer requests in the field.
+- Changed Boulder Blue test location to a room dropdown populated from the inspection's actual and expected rooms.
+- Auto-fills a blank Q-Trak reading location from the current room while preserving any saved inspector-entered value.
+- Removed the redundant Under Sink before/after photo pair and the confusing Reason for inclusion field; saved legacy values and photos remain untouched.
+- Added photo-to-text tracking-label capture for each shipping tracking number, with an editable confirmation field.
+- Review Portal Before Leaving now maps the four saved Post-Assessment answers that were previously reported as missing: Breeze shipped, Boulder Blue shipped, Q-Trak exported, and all samples shipped.
+- Review Portal photo placement now separates real rooms from tasks, removes misleading Room/Task prefixes, and no longer lists setup/testing steps such as Radon Monitor Setup as rooms.
+- Consolidated July 24 app and review feedback into the canonical `Things to Fix on the App` sheet. Moved that sheet into the feedback service's required Drive folder, archived the duplicate trackers, and verified a production feedback POST returned the canonical sheet ID.
+- Preserved all existing inspection data, photo metadata, review edits, and old feedback rows.
+
 ## v210 — Follow-Up Plan Moved to Review Portal
 **Date:** July 24, 2026
 
