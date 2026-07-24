@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=209';
-import { getInspection } from './state.js?v=209';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=210';
+import { getInspection } from './state.js?v=210';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -536,9 +536,7 @@ export function getDebriefFields() {
     yesno('debriefCompleted', 'Debrief completed'),
     yesno('radonPickupReminder', 'Homeowner reminded about radon pickup'),
     yesno('reportDateCommunicated', 'Expected report date communicated'),
-    textarea('debriefNotes', 'Notes from debrief'),
-    divider(),
-    { type: 'ai-followup-plan' }
+    textarea('debriefNotes', 'Notes from debrief')
   ];
 }
 

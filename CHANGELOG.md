@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v210 — Follow-Up Plan Moved to Review Portal
+**Date:** July 24, 2026
+
+- Removed the AI **Generate Follow-Up Plan** control from the inspector app Customer Debrief step.
+- Preserved room-level follow-up recommendations, timeframes, notes, photos, and any follow-up plan already saved in an older inspection.
+- The editable plan generator now belongs to the Review Portal, where Tanner can review it before client handoff.
+
 ## v209 — Complete Outstanding Tracker Removals
 **Date:** July 23, 2026
 
