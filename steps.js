@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=211';
-import { getInspection } from './state.js?v=211';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=212';
+import { getInspection } from './state.js?v=212';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -613,7 +613,7 @@ export const STEP_FIELDS = {
 };
 
 // Return the fields that actually belong to this specific step instance.
-// The first Lowest Level room uses its stable default name, so its old required
+// The first Radon/lower-level room uses its stable default name, so its old required
 // Room Name field must stay absent everywhere: entry, search, review, and
 // validation. Saved legacy roomName data remains untouched.
 export function getStepFields(stepDef) {
@@ -631,7 +631,7 @@ export const PHASES = [
   { id: 'setup', name: 'Setup', icon: '1' },
   { id: 'arrival', name: 'Arrival', icon: '2' },
   { id: 'exterior', name: 'Exterior', icon: '3' },
-  { id: 'lowest', name: 'Lowest Level', icon: '4' },
+  { id: 'lowest', name: 'Radon', icon: '4' },
   { id: 'utility', name: 'Utility', icon: '5' },
   { id: 'upper', name: 'Bed Rm', icon: '6' },
   { id: 'rooms', name: 'Bath Rm', icon: '6.5' },
@@ -724,9 +724,9 @@ export function buildStepList(insp) {
   // Exterior Assessment (#2)
   steps.push({ id: 'exterior', type: 'exterior', phase: 'exterior', name: 'Exterior Assessment' });
 
-  // Lowest Level
+  // Radon / lower-level room context
   steps.push({ id: 'radon', type: 'radon', phase: 'lowest', name: 'Radon Monitor Setup' });
-  const lowestRooms = (insp.dynamicRooms && insp.dynamicRooms.lowest) || [{ name: 'Lowest Level \u2014 Room 1' }];
+  const lowestRooms = (insp.dynamicRooms && insp.dynamicRooms.lowest) || [{ name: 'Radon - Room 1' }];
   lowestRooms.forEach((r, i) => {
     steps.push({ id: 'lowest-room-' + i, type: 'room-test', phase: 'lowest', name: r.name, dynamic: 'lowest', index: i });
   });

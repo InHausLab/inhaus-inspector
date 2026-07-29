@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=211';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=211';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=211';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=211';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=211';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=211';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=212';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=212';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=212';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=212';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=212';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=212';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=211';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=211';
-import { updatePhotoMetadata } from './supabase-photos.js?v=211';
-import { FIELD_RESUME_TOKEN } from './config.js?v=211';
+} from './findings.js?v=212';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=212';
+import { updatePhotoMetadata } from './supabase-photos.js?v=212';
+import { FIELD_RESUME_TOKEN } from './config.js?v=212';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=211';
+} from './comment-library.js?v=212';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -290,7 +290,7 @@ export function buildRoomDrawer() {
   const DRAWER_GROUPS = [
     { label: 'Setup', phases: ['setup', 'arrival'] },
     { label: 'Exterior', phases: ['exterior'] },
-    { label: 'Lowest Level', phases: ['lowest'], addRooms: [
+    { label: 'Radon', phases: ['lowest'], addRooms: [
       { label: '+ Add Room', section: 'lowest', prefix: null }
     ]},
     { label: 'Bedrooms', phases: ['upper'], addRooms: [
@@ -355,7 +355,7 @@ export function buildRoomDrawer() {
       ]));
     });
 
-    // Per-section add-room buttons (Lowest Level, Upper Level, Additional Rooms)
+    // Per-section add-room buttons (Radon, Upper Level, Additional Rooms)
     if (group.addRooms && group.addRooms.length) {
       const addRow = ui().el('div', { className: 'room-drawer-section-add' });
       group.addRooms.forEach(addDef => {
@@ -829,7 +829,7 @@ export function inspectionFromCloudRecord(cloudRecord) {
   inspection.inspectionId = inspection.inspectionId || cloudRecord.inspectionId || cloudRecord.id;
   inspection.stepData = inspection.stepData || {};
   inspection.timers = inspection.timers || {};
-  inspection.dynamicRooms = inspection.dynamicRooms || { lowest: [{ name: 'Lowest Level — Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] };
+  inspection.dynamicRooms = inspection.dynamicRooms || { lowest: [{ name: 'Radon - Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] };
   inspection.truckCheck = inspection.truckCheck || {};
   inspection.status = 'in-progress';
   inspection.reviewStatus = 'Field Active';
@@ -1386,7 +1386,7 @@ export function renderIntake() {
             reviewStatus: 'Prepared',
             stepData: {},
             timers: {},
-            dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
+            dynamicRooms: { lowest: [{ name: 'Radon - Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
             _lastStepIdx: 0,
             truckCheck: {}
           };
@@ -1435,7 +1435,7 @@ export function renderIntake() {
           reviewStatus: 'Field Active',
           stepData: {},
           timers: {},
-          dynamicRooms: { lowest: [{ name: 'Lowest Level \u2014 Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
+          dynamicRooms: { lowest: [{ name: 'Radon - Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
           _lastStepIdx: 0,
           truckCheck: Object.assign({}, ctx._truckCheck)
         };
@@ -2063,7 +2063,7 @@ export function renderStep() {
   if (step.dynamic === 'lowest') {
     const lowestSteps = ctx.stepList.filter(s => s.dynamic === 'lowest');
     if (step.id === lowestSteps[lowestSteps.length - 1].id) {
-      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('lowest'); window.scrollTo(0, 0); } }, '+ Add Another Room (Lowest Level)'));
+      c.appendChild(ui().el('button', { className: 'btn btn-outline btn-full', onClick: () => { ctx.addDynamicRoom('lowest'); window.scrollTo(0, 0); } }, '+ Add Another Radon Area'));
     }
   }
   if (step.type === 'bedroom') {
