@@ -29,6 +29,12 @@ test('local photo backup is understandable and can restore detached photos', () 
   assert.match(screens, /openInspectionWorkspace\('recovery', 'review'\)/);
 });
 
+test('photo capture keeps high-resolution source images for review', () => {
+  assert.match(ui, /const MAX = opts\.maxSize \|\| 2400/);
+  assert.match(ui, /let q = opts\.quality \|\| 0\.82/);
+  assert.match(ui, /maxDataUrlLength \|\| 3200000/);
+});
+
 test('app feedback points Tanner to the shared tracker', () => {
   assert.match(feedback, /shared Things to Fix tracker that Tanner monitors/);
   assert.match(feedback, /Saved in the shared Things to Fix tracker for Tanner/);

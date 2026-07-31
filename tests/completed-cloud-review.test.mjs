@@ -42,10 +42,20 @@ test('phone cloud continue can open a prepared inspection directly by ID', () =>
   assert.match(screensSource, /Open prepared inspection/);
   assert.match(screensSource, /openCloudInspectionById/);
   assert.match(screensSource, /loadCloudInspection\(id\)/);
-  assert.match(screensSource, /direct inspection ID opens faster/);
+  assert.match(screensSource, /direct inspection ID lookup is the fastest backup path/);
 });
 
-test('slow cloud list has a phone-safe timeout', () => {
-  assert.match(syncSource, /CLOUD_LIST_TIMEOUT_MS = 90000/);
+test('phone cloud list uses the fast active-only endpoint', () => {
+  assert.match(syncSource, /CLOUD_LIST_TIMEOUT_MS = 15000/);
+  assert.match(syncSource, /url\.searchParams\.set\('action', 'listActive'\)/);
   assert.match(syncSource, /listCloudInspections[\s\S]*CLOUD_LIST_TIMEOUT_MS/);
+  assert.doesNotMatch(screensSource, /Show Completed Review History/);
+});
+
+test('office preparation requires a start-shell receipt before phone handoff', () => {
+  assert.match(syncSource, /export async function ensureStartInspectionShell/);
+  assert.match(syncSource, /payload\.action = 'startInspectionShell'/);
+  assert.match(syncSource, /Assessment shell is not ready/);
+  assert.match(screensSource, /ensureStartInspectionShell\(ctx\.stepList, \{ force: !isEdit \}\)/);
+  assert.match(screensSource, /Do not send this to the phone yet/);
 });

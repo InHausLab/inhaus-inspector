@@ -159,7 +159,7 @@
       reader.onload = e => {
         const img = new Image();
         img.onload = () => {
-          const MAX = 1200;
+          const MAX = opts.maxSize || 2400;
           let w = img.width, h = img.height;
           if (w > MAX || h > MAX) {
             if (w > h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; }
@@ -171,9 +171,10 @@
           const c = document.createElement('canvas');
           c.width = w; c.height = h;
           c.getContext('2d').drawImage(img, 0, 0, w, h);
-          let q = 0.65;
+          let q = opts.quality || 0.82;
           let url = c.toDataURL('image/jpeg', q);
-          while (url.length > 680000 && q > 0.25) { q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+          const maxDataUrlLength = opts.maxDataUrlLength || 3200000;
+          while (url.length > maxDataUrlLength && q > 0.72) { q -= 0.05; url = c.toDataURL('image/jpeg', q); }
           resolve(url);
         };
         img.onerror = reject;

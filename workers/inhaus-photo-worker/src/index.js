@@ -778,9 +778,7 @@ async function handleInspectionStatus(request, env) {
     listStoredPhotoNames(env, inspectionId)
   ]);
 
-  // assessmentExists: inspection data goes to Drive/Apps Script, not Supabase ihl_assessments.
-  // If we have a valid inspectionId the assessment exists — skip the Supabase table check.
-  const assessmentExists = !!inspectionId;
+  const assessmentExists = await assessmentExistsForInspection(env, inspectionId);
 
   const storedPhotoIds = new Set();
   storedNames.forEach(function(name) {

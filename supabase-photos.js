@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes and Drive
 // mirroring.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=214';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=215';
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
   const controller = new AbortController();
@@ -148,8 +148,9 @@ export async function mirrorPhotosToDrive(payload) {
   let driveFolderId = payload.driveFolderId;
   let photoFolderId = payload.photoFolderId || '';
   let photoFolderName = '';
-  const MAX_BATCHES = 20; // safety cap (20 × 3 = 60 photos max)
+  const MAX_BATCHES = 50; // safety cap (50 × 3 = 150 photos max)
   let batch = 0;
+  let hasMore = false;
 
   while (batch < MAX_BATCHES) {
     batch++;
@@ -169,7 +170,12 @@ export async function mirrorPhotosToDrive(payload) {
     if (result.driveFolderId || result.folderId) driveFolderId = result.driveFolderId || result.folderId;
     if (result.photoFolderId) photoFolderId = result.photoFolderId;
     if (result.photoFolderName) photoFolderName = result.photoFolderName;
-    if (!result.hasMore) break;
+    hasMore = result.hasMore === true;
+    if (!hasMore) break;
+  }
+
+  if (hasMore) {
+    throw new Error('Drive mirror still has photos pending after ' + (MAX_BATCHES * 3) + ' photos. Retry submit to continue the Drive package.');
   }
 
   return {

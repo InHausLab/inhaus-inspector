@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=214';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=214';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=215';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=215';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=214';
-import { scheduleSave } from './storage.js?v=214';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=214';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=214';
+         getBestCloudSyncAt } from './state.js?v=215';
+import { scheduleSave } from './storage.js?v=215';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=215';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=215';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -18,7 +18,7 @@ const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
 const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
 const CLOUD_POST_TIMEOUT_MS = 45000;
 const CLOUD_GET_TIMEOUT_MS = 30000;
-const CLOUD_LIST_TIMEOUT_MS = 90000;
+const CLOUD_LIST_TIMEOUT_MS = 15000;
 let _photoRetryTimer = null;
 let _photoRetryDueAt = 0;
 let _photoRetryInProgress = false;
@@ -237,11 +237,143 @@ function rememberDriveResult(result, fingerprint, source) {
   if (result.technicianPhotosFolderId) {
     inspection._technicianPhotoFolderId = result.technicianPhotosFolderId;
   }
+  if (result.assessmentNumber) {
+    inspection._assessmentNumber = result.assessmentNumber;
+    inspection.assessmentNumber = result.assessmentNumber;
+  }
+  if (result.trackerRow) {
+    inspection._trackerRow = result.trackerRow;
+    inspection.trackerRow = result.trackerRow;
+  }
+  if (result.trackerUrl) {
+    inspection._trackerUrl = result.trackerUrl;
+    inspection.trackerUrl = result.trackerUrl;
+  }
+  if (result.trackerStatus) {
+    inspection._trackerStatus = result.trackerStatus;
+    inspection.trackerStatus = result.trackerStatus;
+  }
   if (fingerprint) inspection._lastMainPayloadFingerprint = fingerprint;
   inspection._dataSyncedToDrive = true;
   inspection._driveMetadataSource = source || inspection._driveMetadataSource || 'sync';
   inspection._driveMetadataUpdatedAt = new Date().toISOString();
   scheduleSave();
+}
+
+function isTestTrainingInspection(inspection) {
+  if (!inspection) return false;
+  if (inspection.is_test === true || inspection.isTest === true || inspection.testTraining === true || inspection.isTestTraining === true) return true;
+  const explicit = [
+    inspection.inspectionType,
+    inspection.assessmentType,
+    inspection.assessmentPurpose,
+    inspection.inspectionMode,
+    inspection.reportType
+  ].filter(Boolean).join(' ');
+  if (/test|training|practice|demo/i.test(explicit)) return true;
+  return /(^|\b)(test|training|practice|demo)(\b|$)/i.test([
+    inspection.inspectionId,
+    inspection.clientName,
+    inspection.propertyAddress
+  ].filter(Boolean).join(' '));
+}
+
+function shellReceiptIsReady(inspection) {
+  if (!inspection) return false;
+  if (isTestTrainingInspection(inspection)) {
+    return inspection._startInspectionShellStatus === 'skipped_test_training' ||
+      inspection._startInspectionShellReceipt?.status === 'skipped_test_training';
+  }
+  return !!(
+    inspection._startInspectionShellStatus === 'ready' &&
+    (inspection.driveFolderId || inspection._driveFolderId || inspection.folderId) &&
+    (inspection.trackerRow || inspection._trackerRow) &&
+    (inspection.trackerUrl || inspection._trackerUrl) &&
+    (inspection.assessmentNumber || inspection._assessmentNumber)
+  );
+}
+
+function rememberStartInspectionShellResult(result) {
+  const inspection = getInspection();
+  if (!inspection || !result) return;
+  inspection._startInspectionShellReceipt = result;
+  inspection._startInspectionShellStatus = result.status || (result.isTestTraining ? 'skipped_test_training' : 'ready');
+  inspection._startInspectionShellUpdatedAt = result.updatedAt || new Date().toISOString();
+  inspection._startInspectionShellError = result.error || '';
+  if (result.isTestTraining === true) {
+    inspection.isTestTraining = true;
+    inspection.isTest = true;
+    inspection.is_test = true;
+  }
+  rememberDriveResult(result, '', 'start-inspection-shell');
+}
+
+function attachKnownShellMetadata(exportData) {
+  const inspection = getInspection();
+  if (!inspection || !exportData) return exportData;
+  const folderId = inspection.driveFolderId || inspection._driveFolderId || inspection.folderId || exportData.folderId || exportData.driveFolderId || '';
+  const folderUrl = inspection.driveFolderUrl || inspection._driveFolderUrl || inspection.folderUrl || exportData.folderUrl || exportData.driveFolderUrl || driveFolderUrlFromId(folderId);
+  exportData.assessmentNumber = inspection.assessmentNumber || inspection._assessmentNumber || exportData.assessmentNumber || '';
+  exportData.folderId = folderId;
+  exportData.driveFolderId = folderId;
+  exportData.folderUrl = folderUrl;
+  exportData.driveFolderUrl = folderUrl;
+  exportData.trackerRow = inspection.trackerRow || inspection._trackerRow || exportData.trackerRow || '';
+  exportData.trackerUrl = inspection.trackerUrl || inspection._trackerUrl || exportData.trackerUrl || '';
+  exportData.trackerStatus = inspection.trackerStatus || inspection._trackerStatus || exportData.trackerStatus || '';
+  exportData.startInspectionShell = inspection._startInspectionShellReceipt || exportData.startInspectionShell || null;
+  return exportData;
+}
+
+export async function ensureStartInspectionShell(stepList, options = {}) {
+  const inspection = getInspection();
+  if (!inspection) return { ok: false, skipped: true, message: 'No active inspection' };
+  if (shellReceiptIsReady(inspection) && !options.force) {
+    return { ok: true, cached: true, receipt: inspection._startInspectionShellReceipt || null };
+  }
+  if (isTestTrainingInspection(inspection)) {
+    const skipped = {
+      status: 'skipped_test_training',
+      isTestTraining: true,
+      inspectionId: inspection.inspectionId || '',
+      trackerStatus: 'skipped_test_training',
+      updatedAt: new Date().toISOString(),
+      error: ''
+    };
+    rememberStartInspectionShellResult(skipped);
+    scheduleSave({ markDirty: false });
+    return { ok: true, skipped: true, receipt: skipped };
+  }
+  if (!navigator.onLine) {
+    inspection._startInspectionShellStatus = 'failed';
+    inspection._startInspectionShellError = 'Offline';
+    inspection._startInspectionShellFailedAt = new Date().toISOString();
+    scheduleSave();
+    return { ok: false, message: 'Offline' };
+  }
+
+  const exportData = buildExportJSON(Array.isArray(stepList) ? stepList : []);
+  const payload = stripPhotosFromExport(exportData);
+  payload.action = 'startInspectionShell';
+  payload.requestedBy = 'inspector-app';
+  payload.startedAt = payload.startedAt || inspection.startedAt || new Date().toISOString();
+  updateSyncStatus('syncing', 'creating assessment shell');
+  try {
+    const result = await scriptFetch(payload);
+    rememberStartInspectionShellResult(result);
+    setLastCheckpointSucceededAt(Date.now());
+    updateSyncStatus('checkpoint', 'assessment shell ready');
+    scheduleSave({ markDirty: false });
+    return { ok: true, receipt: result };
+  } catch (err) {
+    const message = err && err.message ? err.message : String(err || 'Start inspection shell failed');
+    inspection._startInspectionShellStatus = 'failed';
+    inspection._startInspectionShellError = message;
+    inspection._startInspectionShellFailedAt = new Date().toISOString();
+    scheduleSave();
+    updateSyncStatus('failed', message);
+    return { ok: false, message };
+  }
 }
 
 async function recoverDriveMetadataFromReviewApi(inspectionId, fingerprint) {
@@ -707,7 +839,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=214');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=215');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -832,6 +964,10 @@ async function verifyFinalSync(exportData, allPhotos, inspection) {
     }
     throw new Error('Cloud verification failed: ' + missingCount + ' photo' + (missingCount === 1 ? '' : 's') + ' missing from storage.');
   }
+  if (status.reviewPortalReady !== true) {
+    const missingMirrorCount = Array.isArray(status.missingMirrorPhotoIds) ? status.missingMirrorPhotoIds.length : expectedPhotoIds.length;
+    throw new Error('Drive photo package is not ready: ' + missingMirrorCount + ' photo' + (missingMirrorCount === 1 ? '' : 's') + ' still need Drive mirroring.');
+  }
   return status;
 }
 
@@ -839,6 +975,7 @@ async function verifyFinalSync(exportData, allPhotos, inspection) {
 // The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
 // for the review portal to display them. This is a known workaround - see issue tracker.
 export async function sendToGoogleScript(exportData) {
+  attachKnownShellMetadata(exportData);
   const inspection = getInspection();
   // Always strip photos from main payload - send data first, then photos separately
   const allPhotos = extractAllPhotosFromExport(exportData);
@@ -1031,9 +1168,9 @@ async function loadBridgeCapabilities() {
 export async function listCloudInspections() {
   if (!GOOGLE_SCRIPT_URL) throw new Error('Cloud inspection service is not configured.');
   const url = new URL(GOOGLE_SCRIPT_URL);
-  url.searchParams.set('action', 'list');
+  url.searchParams.set('action', 'listActive');
   url.searchParams.set('token', FIELD_RESUME_TOKEN);
-  const data = await fetchCloudInspectionJson(url, 'Cloud inspection list', CLOUD_LIST_TIMEOUT_MS);
+  const data = await fetchCloudInspectionJson(url, 'Active cloud inspection list', CLOUD_LIST_TIMEOUT_MS);
   return Array.isArray(data.inspections) ? data.inspections : [];
 }
 
@@ -1072,11 +1209,16 @@ export async function checkpointToCloud(stepList) {
   setLastCheckpointAttemptAt(Date.now()); // Change 1
   try {
     ensureInspectionWorkspace(inspection);
+    const shellResult = await ensureStartInspectionShell(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
+    if (!shellResult || shellResult.ok !== true) {
+      throw new Error('Assessment shell is not ready: ' + (shellResult?.message || 'folder/tracker receipt missing'));
+    }
     let usedServerTeamMerge = false;
     if (inspection.collaboration?.enabled && inspection.inspectionId) {
       const capabilities = await loadBridgeCapabilities();
       if (capabilities.teamFieldMerge === true) {
         const teamExport = buildExportJSON(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
+        attachKnownShellMetadata(teamExport);
         const teamPayload = stripPhotosFromExport(teamExport);
         teamPayload._checkpoint = true;
         updateSyncStatus('syncing');
@@ -1113,6 +1255,7 @@ export async function checkpointToCloud(stepList) {
       return true;
     }
     const exportData = buildExportJSON(Array.isArray(stepList) ? stepList : _lastCheckpointStepList);
+    attachKnownShellMetadata(exportData);
     const payload = stripPhotosFromExport(exportData);
     payload._checkpoint = true;
     updateSyncStatus('syncing'); // Change 2
@@ -1168,6 +1311,11 @@ export async function submitInspection(exportData) {
   showUploadBanner('pending', 'Saving assessment to cloud\u2026');
   try {
     const activeInspection = getInspection();
+    const shellResult = await ensureStartInspectionShell([], { force: false });
+    if (!shellResult || shellResult.ok !== true) {
+      throw new Error('Assessment shell is not ready: ' + (shellResult?.message || 'folder/tracker receipt missing'));
+    }
+    attachKnownShellMetadata(exportData);
     if (activeInspection?.collaboration?.enabled && activeInspection.inspectionId) {
       try {
         const cloudRecord = await loadCloudInspection(activeInspection.inspectionId);

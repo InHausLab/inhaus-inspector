@@ -17,6 +17,17 @@ test('Drive mirror requires the assessment folder and targets Technician Photos'
   assert.match(photoClient, /photoFolderId/);
 });
 
+test('final verification requires the real assessment row and Drive mirror readiness', () => {
+  assert.match(worker, /const assessmentExists = await assessmentExistsForInspection\(env, inspectionId\)/);
+  assert.match(sync, /status\.reviewPortalReady !== true/);
+  assert.match(sync, /Drive photo package is not ready/);
+});
+
+test('Drive mirror supports hundred-photo homes without a false complete receipt', () => {
+  assert.match(photoClient, /const MAX_BATCHES = 50/);
+  assert.match(photoClient, /Drive mirror still has photos pending/);
+});
+
 test('Drive filenames use inspection context instead of slot identifiers', () => {
   assert.match(worker, /safeDriveNamePart\(row\.room_name/);
   assert.match(worker, /safeDriveNamePart\(row\.caption/);

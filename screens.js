@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=214';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=214';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=214';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=214';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=214';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=214';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=215';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=215';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=215';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=215';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=215';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=215';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=214';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=214';
-import { updatePhotoMetadata } from './supabase-photos.js?v=214';
-import { FIELD_RESUME_TOKEN } from './config.js?v=214';
+} from './findings.js?v=215';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=215';
+import { updatePhotoMetadata } from './supabase-photos.js?v=215';
+import { FIELD_RESUME_TOKEN } from './config.js?v=215';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=214';
+} from './comment-library.js?v=215';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -940,18 +940,12 @@ export function renderCloudResume() {
   }, '← Home'));
   c.appendChild(ui().el('div', { className: 'cloud-resume-intro' }, [
     ui().el('h1', { className: 'screen-title' }, 'Continue Active Inspection'),
-    ui().el('p', null, 'Only prepared and active field inspections show here. Completed reports are hidden unless you choose to view them.')
+    ui().el('p', null, 'Only prepared and active field inspections show here. Completed reports stay in the review portal.')
   ]));
-
-  const reviewToggle = ui().el('button', {
-    className: 'btn btn-outline btn-full',
-    style: 'margin-bottom:10px;'
-  }, 'Show Completed Review History');
-  c.appendChild(reviewToggle);
 
   const directCard = ui().el('div', { className: 'card cloud-direct-card' });
   directCard.appendChild(ui().el('strong', null, 'Open prepared inspection'));
-  directCard.appendChild(ui().el('p', { className: 'text-sm' }, 'Use the inspection ID shown on the laptop if the cloud list is slow.'));
+  directCard.appendChild(ui().el('p', { className: 'text-sm' }, 'Use the inspection ID shown on the laptop if the active list is unavailable.'));
   const directInput = ui().el('input', {
     className: 'field-input',
     type: 'text',
@@ -996,23 +990,16 @@ export function renderCloudResume() {
   ctx.root.appendChild(c);
 
   let inspections = [];
-  let showReviewHistory = false;
   function renderMatches() {
     const query = search.value.trim().toLowerCase();
-    const visible = inspections.filter(item => showReviewHistory
-      ? isReviewableCloudInspection(item)
-      : isContinuableCloudInspection(item)
-    );
+    const visible = inspections.filter(item => isContinuableCloudInspection(item));
     const matches = visible.filter(item => !query || cloudSearchText(item).includes(query));
     list.innerHTML = '';
-    reviewToggle.textContent = showReviewHistory ? 'Show Active Inspections' : 'Show Completed Review History';
     status.textContent = matches.length
-      ? matches.length + ' ' + (showReviewHistory ? 'completed/review' : 'active') + ' inspection' + (matches.length === 1 ? '' : 's')
+      ? matches.length + ' active inspection' + (matches.length === 1 ? '' : 's')
       : (query
-        ? 'No ' + (showReviewHistory ? 'completed/review' : 'active') + ' inspections match that search.'
-        : (showReviewHistory
-          ? 'No completed review inspections are available.'
-          : 'No active cloud inspections. Use Start New Inspection for a new test/training job.'));
+        ? 'No active inspections match that search.'
+        : 'No active cloud inspections. Start one or open by inspection ID above.');
     matches.forEach(item => {
       const canContinue = isContinuableCloudInspection(item);
       const continueBtn = ui().el(
@@ -1055,11 +1042,6 @@ export function renderCloudResume() {
   }
 
   search.addEventListener('input', renderMatches);
-  reviewToggle.addEventListener('click', () => {
-    showReviewHistory = !showReviewHistory;
-    search.value = '';
-    renderMatches();
-  });
   function loadCloudList() {
     status.innerHTML = '';
     status.appendChild(loadingSpinner);
@@ -1071,10 +1053,10 @@ export function renderCloudResume() {
       .sort((a, b) => cloudInspectionSortTime(b) - cloudInspectionSortTime(a));
     renderMatches();
   }).catch(err => {
-    status.textContent = 'Cloud list timed out. Use the inspection ID above, or retry.';
+    status.textContent = 'Active cloud list unavailable. Use the inspection ID above, or retry.';
     list.appendChild(ui().el('div', { className: 'cloud-resume-error' }, [
       ui().el('strong', null, err?.message || String(err)),
-      ui().el('span', null, 'The list can be slow because it comes from Apps Script. A direct inspection ID opens faster.'),
+      ui().el('span', null, 'A direct inspection ID lookup is the fastest backup path.'),
       ui().el('button', {
         className: 'btn btn-outline btn-full',
         onClick: () => loadCloudList()
@@ -1507,6 +1489,13 @@ export function renderIntake() {
           submitBtn.disabled = false;
           submitBtn.textContent = isEdit ? 'Update for Inspector' : 'Save for Inspector';
           alert('This inspection could not be saved locally. If another InHaus Inspector tab is open, close it, then tap Save for Inspector again.');
+          return;
+        }
+        const shellReady = await ensureStartInspectionShell(ctx.stepList, { force: !isEdit });
+        if (!shellReady || shellReady.ok !== true) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = isEdit ? 'Update for Inspector' : 'Save for Inspector';
+          alert('Saved on this computer, but the assessment folder/tracker setup failed. Do not send this to the phone yet. Error: ' + (shellReady?.message || 'folder/tracker receipt missing'));
           return;
         }
         const cloudSaved = await checkpointToCloud(ctx.stepList);
