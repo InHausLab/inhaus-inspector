@@ -77,3 +77,12 @@ test('office preparation requires a start-shell receipt before phone handoff', (
   assert.match(screensSource, /ensureStartInspectionShell\(ctx\.stepList, \{ force: !isEdit \}\)/);
   assert.match(screensSource, /Do not send this to the phone yet/);
 });
+
+test('test training preparation still creates a cloud pickup shell', () => {
+  const start = syncSource.indexOf('export async function ensureStartInspectionShell');
+  const end = syncSource.indexOf('async function recoverDriveMetadataFromReviewApi', start);
+  const ensureShell = syncSource.slice(start, end);
+  assert.match(ensureShell, /payload\.action = 'startInspectionShell'/);
+  assert.doesNotMatch(ensureShell, /return \{ ok: true, skipped: true/);
+  assert.match(syncSource, /inspection\._startInspectionShellStatus === 'ready'[\s\S]*inspection\.driveFolderId/);
+});
