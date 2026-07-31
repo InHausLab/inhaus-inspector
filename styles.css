@@ -163,6 +163,11 @@ body {
 .cloud-resume-intro p { color: var(--text-muted); margin: 0; }
 
 .cloud-resume-search { margin: 8px 0 12px; }
+.cloud-hidden-controls {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
 .cloud-resume-status {
   align-items: center;
   color: var(--text-muted);
@@ -189,6 +194,9 @@ body {
   margin: 0;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
+.cloud-resume-card.is-hidden {
+  opacity: 0.82;
+}
 .cloud-resume-card:hover { border-color: var(--accent); }
 .cloud-resume-card:focus-visible {
   outline: 3px solid var(--accent);
@@ -211,6 +219,9 @@ body {
   font-size: 0.92rem;
   gap: 5px;
   margin: 12px 0;
+}
+.cloud-hide-btn {
+  margin-top: 8px;
 }
 .cloud-resume-error {
   background: #fff1f2;

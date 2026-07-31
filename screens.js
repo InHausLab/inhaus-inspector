@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=215';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=215';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=215';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=215';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=215';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=215';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=216';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=216';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=216';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=216';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=216';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=216';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=215';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=215';
-import { updatePhotoMetadata } from './supabase-photos.js?v=215';
-import { FIELD_RESUME_TOKEN } from './config.js?v=215';
+} from './findings.js?v=216';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=216';
+import { updatePhotoMetadata } from './supabase-photos.js?v=216';
+import { FIELD_RESUME_TOKEN } from './config.js?v=216';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=215';
+} from './comment-library.js?v=216';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -777,6 +777,49 @@ export function isReviewableCloudInspection(item) {
     status === 'synced';
 }
 
+const HIDDEN_CLOUD_INSPECTIONS_KEY = 'inhausHiddenCloudInspectionIds';
+
+function cloudInspectionKey(item) {
+  return String(item?.inspectionId || item?.id || '').trim().toUpperCase();
+}
+
+export function getHiddenCloudInspectionIdsForPhone() {
+  try {
+    const raw = localStorage.getItem(HIDDEN_CLOUD_INSPECTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function setHiddenCloudInspectionIdsForPhone(ids) {
+  try {
+    const unique = Array.from(new Set((ids || []).map(id => String(id || '').trim().toUpperCase()).filter(Boolean)));
+    localStorage.setItem(HIDDEN_CLOUD_INSPECTIONS_KEY, JSON.stringify(unique));
+    return unique;
+  } catch (err) {
+    return [];
+  }
+}
+
+export function isCloudInspectionHiddenForPhone(item) {
+  const key = cloudInspectionKey(item);
+  return !!key && getHiddenCloudInspectionIdsForPhone().includes(key);
+}
+
+export function hideCloudInspectionForPhone(item) {
+  const key = cloudInspectionKey(item);
+  if (!key) return getHiddenCloudInspectionIdsForPhone();
+  return setHiddenCloudInspectionIdsForPhone(getHiddenCloudInspectionIdsForPhone().concat(key));
+}
+
+export function restoreCloudInspectionForPhone(item) {
+  const key = cloudInspectionKey(item);
+  if (!key) return getHiddenCloudInspectionIdsForPhone();
+  return setHiddenCloudInspectionIdsForPhone(getHiddenCloudInspectionIdsForPhone().filter(id => id !== key));
+}
+
 function cloudRecordStatus(cloudRecord) {
   return String(
     cloudRecord?.status ||
@@ -984,35 +1027,67 @@ export function renderCloudResume() {
     className: 'cloud-resume-status',
     'aria-live': 'polite'
   }, [loadingSpinner, ui().el('span', null, 'Loading cloud inspections…')]);
+  const hiddenControls = ui().el('div', { className: 'cloud-hidden-controls' });
   const list = ui().el('div', { className: 'cloud-resume-list' });
   c.appendChild(status);
+  c.appendChild(hiddenControls);
   c.appendChild(list);
   ctx.root.appendChild(c);
 
   let inspections = [];
+  let showHidden = false;
   function renderMatches() {
     const query = search.value.trim().toLowerCase();
-    const visible = inspections.filter(item => isContinuableCloudInspection(item));
+    const active = inspections.filter(item => isContinuableCloudInspection(item));
+    const hidden = active.filter(item => isCloudInspectionHiddenForPhone(item));
+    const visible = active.filter(item => showHidden || !isCloudInspectionHiddenForPhone(item));
     const matches = visible.filter(item => !query || cloudSearchText(item).includes(query));
     list.innerHTML = '';
+    hiddenControls.innerHTML = '';
+    if (hidden.length > 0) {
+      hiddenControls.appendChild(ui().el('button', {
+        className: 'btn btn-outline btn-full',
+        onClick: () => {
+          showHidden = !showHidden;
+          renderMatches();
+        }
+      }, showHidden ? 'Hide Hidden Inspections' : 'Show Hidden Inspections (' + hidden.length + ')'));
+    }
     status.textContent = matches.length
-      ? matches.length + ' active inspection' + (matches.length === 1 ? '' : 's')
+      ? matches.length + (showHidden ? ' total' : ' active') + ' inspection' + (matches.length === 1 ? '' : 's')
       : (query
         ? 'No active inspections match that search.'
-        : 'No active cloud inspections. Start one or open by inspection ID above.');
+        : (showHidden
+          ? 'No hidden inspections.'
+          : 'No active cloud inspections. Start one or open by inspection ID above.'));
     matches.forEach(item => {
       const canContinue = isContinuableCloudInspection(item);
+      const isHidden = isCloudInspectionHiddenForPhone(item);
       const continueBtn = ui().el(
         'button',
         { className: 'btn btn-primary btn-full' },
         canContinue ? 'Continue on This Device' : 'Open Full Review'
       );
+      const hideBtn = ui().el('button', {
+        className: 'btn btn-outline btn-full cloud-hide-btn',
+        onClick: event => {
+          event.stopPropagation();
+          if (isHidden) {
+            restoreCloudInspectionForPhone(item);
+            ui().showToast('Inspection restored to active list');
+          } else {
+            hideCloudInspectionForPhone(item);
+            ui().showToast('Inspection hidden on this phone');
+          }
+          renderMatches();
+        }
+      }, isHidden ? 'Restore to Active List' : 'Hide from This Phone');
       const openItem = () => canContinue
         ? continueCloudInspection(item, continueBtn)
         : openCloudReview(item);
       continueBtn.addEventListener('click', openItem);
       const card = ui().el('div', {
-        className: 'card cloud-resume-card',
+        className: 'card cloud-resume-card' + (isHidden ? ' is-hidden' : ''),
         role: 'button',
         tabindex: '0',
         onClick: event => {
@@ -1027,7 +1102,7 @@ export function renderCloudResume() {
       }, [
         ui().el('div', { className: 'cloud-resume-card-top' }, [
           ui().el('strong', null, item.propertyAddress || 'Address not entered'),
-          ui().el('span', { className: 'badge ' + (canContinue ? 'prepared' : 'completed') }, item.status || 'Prepared')
+          ui().el('span', { className: 'badge ' + (isHidden ? 'completed' : (canContinue ? 'prepared' : 'completed')) }, isHidden ? 'Hidden' : (item.status || 'Prepared'))
         ]),
         ui().el('div', { className: 'cloud-resume-details' }, [
           ui().el('span', null, 'Client: ' + (item.clientName || '—')),
@@ -1035,7 +1110,8 @@ export function renderCloudResume() {
           ui().el('span', null, 'Date: ' + (item.inspectionDate || '—')),
           ui().el('span', null, 'ID: ' + (item.inspectionId || item.id || '—'))
         ]),
-        continueBtn
+        continueBtn,
+        hideBtn
       ]);
       list.appendChild(card);
     });

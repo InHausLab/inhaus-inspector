@@ -2,17 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+const localStore = new Map();
 globalThis.localStorage = {
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {}
+  getItem: key => localStore.has(key) ? localStore.get(key) : null,
+  setItem: (key, value) => localStore.set(key, String(value)),
+  removeItem: key => localStore.delete(key),
+  clear: () => localStore.clear()
 };
 globalThis.sessionStorage = globalThis.localStorage;
 
 const {
   isContinuableCloudInspection,
   isReviewableCloudInspection,
-  cloudReviewUrl
+  cloudReviewUrl,
+  hideCloudInspectionForPhone,
+  restoreCloudInspectionForPhone,
+  isCloudInspectionHiddenForPhone
 } = await import('../screens.js');
 
 const screensSource = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
@@ -50,6 +55,19 @@ test('phone cloud list uses the fast active-only endpoint', () => {
   assert.match(syncSource, /url\.searchParams\.set\('action', 'listActive'\)/);
   assert.match(syncSource, /listCloudInspections[\s\S]*CLOUD_LIST_TIMEOUT_MS/);
   assert.doesNotMatch(screensSource, /Show Completed Review History/);
+});
+
+test('phone cloud list can hide old active inspections without deleting cloud data', () => {
+  localStorage.clear();
+  const oldItem = { inspectionId: 'INH-OLD-123', status: 'Field Active' };
+  assert.equal(isCloudInspectionHiddenForPhone(oldItem), false);
+  hideCloudInspectionForPhone(oldItem);
+  assert.equal(isCloudInspectionHiddenForPhone(oldItem), true);
+  restoreCloudInspectionForPhone(oldItem);
+  assert.equal(isCloudInspectionHiddenForPhone(oldItem), false);
+  assert.match(screensSource, /Hide from This Phone/);
+  assert.match(screensSource, /Show Hidden Inspections/);
+  assert.doesNotMatch(screensSource, /deleteCloudInspection/);
 });
 
 test('office preparation requires a start-shell receipt before phone handoff', () => {
