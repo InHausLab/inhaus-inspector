@@ -9,9 +9,17 @@ globalThis.localStorage = {
 globalThis.sessionStorage = globalThis.localStorage;
 
 const {
+  isContinuableCloudInspection,
   isReviewableCloudInspection,
   cloudReviewUrl
 } = await import('../screens.js');
+
+test('active cloud continue list excludes completed review inspections by default', () => {
+  assert.equal(isContinuableCloudInspection({ status: 'prepared' }), true);
+  assert.equal(isContinuableCloudInspection({ status: 'Field Active' }), true);
+  assert.equal(isContinuableCloudInspection({ status: 'completed' }), false);
+  assert.equal(isContinuableCloudInspection({ status: 'Submitted to Tanner' }), false);
+});
 
 test('completed cloud statuses open read-only review instead of field continuation', () => {
   assert.equal(isReviewableCloudInspection({ status: 'needs review' }), true);

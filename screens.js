@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=212';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=212';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=212';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=212';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=212';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=212';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=213';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=213';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=213';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=213';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=213';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=213';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=212';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=212';
-import { updatePhotoMetadata } from './supabase-photos.js?v=212';
-import { FIELD_RESUME_TOKEN } from './config.js?v=212';
+} from './findings.js?v=213';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=213';
+import { updatePhotoMetadata } from './supabase-photos.js?v=213';
+import { FIELD_RESUME_TOKEN } from './config.js?v=213';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=212';
+} from './comment-library.js?v=213';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -599,7 +599,7 @@ export function renderHome() {
   handoffActions.appendChild(ui().el('button', {
     className: 'btn btn-outline btn-full',
     onClick: () => { setScreen('cloud-resume'); ctx.render(); }
-  }, 'Continue or Review Cloud Inspection'));
+  }, 'Continue Active Cloud Inspection'));
   c.appendChild(handoffActions);
 
   // ── Inspector mode toggle ─────────────────────────────────
@@ -765,7 +765,7 @@ export async function viewInsp(id) {
   ctx.render();
 }
 
-function isContinuableCloudInspection(item) {
+export function isContinuableCloudInspection(item) {
   const status = String(item?.status || '').trim().toLowerCase();
   return status === 'prepared' || status === 'field active';
 }
@@ -889,9 +889,15 @@ export function renderCloudResume() {
     onClick: () => { setScreen('home'); ctx.render(); }
   }, '← Home'));
   c.appendChild(ui().el('div', { className: 'cloud-resume-intro' }, [
-    ui().el('h1', { className: 'screen-title' }, 'Continue or Review an Inspection'),
-    ui().el('p', null, 'Continue active field work on this device, or open a completed inspection read-only in the Review Portal.')
+    ui().el('h1', { className: 'screen-title' }, 'Continue Active Inspection'),
+    ui().el('p', null, 'Only prepared and active field inspections show here. Completed reports are hidden unless you choose to view them.')
   ]));
+
+  const reviewToggle = ui().el('button', {
+    className: 'btn btn-outline btn-full',
+    style: 'margin-bottom:10px;'
+  }, 'Show Completed Review History');
+  c.appendChild(reviewToggle);
 
   const search = ui().el('input', {
     className: 'field-input cloud-resume-search',
@@ -916,13 +922,23 @@ export function renderCloudResume() {
   ctx.root.appendChild(c);
 
   let inspections = [];
+  let showReviewHistory = false;
   function renderMatches() {
     const query = search.value.trim().toLowerCase();
-    const matches = inspections.filter(item => !query || cloudSearchText(item).includes(query));
+    const visible = inspections.filter(item => showReviewHistory
+      ? isReviewableCloudInspection(item)
+      : isContinuableCloudInspection(item)
+    );
+    const matches = visible.filter(item => !query || cloudSearchText(item).includes(query));
     list.innerHTML = '';
+    reviewToggle.textContent = showReviewHistory ? 'Show Active Inspections' : 'Show Completed Review History';
     status.textContent = matches.length
-      ? matches.length + ' inspection' + (matches.length === 1 ? '' : 's') + ' available'
-      : (query ? 'No cloud inspections match that search.' : 'No cloud inspections are available.');
+      ? matches.length + ' ' + (showReviewHistory ? 'completed/review' : 'active') + ' inspection' + (matches.length === 1 ? '' : 's')
+      : (query
+        ? 'No ' + (showReviewHistory ? 'completed/review' : 'active') + ' inspections match that search.'
+        : (showReviewHistory
+          ? 'No completed review inspections are available.'
+          : 'No active cloud inspections. Use Start New Inspection for a new test/training job.'));
     matches.forEach(item => {
       const canContinue = isContinuableCloudInspection(item);
       const continueBtn = ui().el(
@@ -965,6 +981,11 @@ export function renderCloudResume() {
   }
 
   search.addEventListener('input', renderMatches);
+  reviewToggle.addEventListener('click', () => {
+    showReviewHistory = !showReviewHistory;
+    search.value = '';
+    renderMatches();
+  });
   listCloudInspections().then(items => {
     inspections = items
       .filter(item => isContinuableCloudInspection(item) || isReviewableCloudInspection(item))
