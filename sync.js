@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=213';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=213';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=214';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=214';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=213';
-import { scheduleSave } from './storage.js?v=213';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=213';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=213';
+         getBestCloudSyncAt } from './state.js?v=214';
+import { scheduleSave } from './storage.js?v=214';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=214';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=214';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -18,6 +18,7 @@ const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
 const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
 const CLOUD_POST_TIMEOUT_MS = 45000;
 const CLOUD_GET_TIMEOUT_MS = 30000;
+const CLOUD_LIST_TIMEOUT_MS = 90000;
 let _photoRetryTimer = null;
 let _photoRetryDueAt = 0;
 let _photoRetryInProgress = false;
@@ -706,7 +707,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=213');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=214');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -982,12 +983,12 @@ export async function sendToGoogleScript(exportData) {
   }
 }
 
-async function fetchCloudInspectionJson(url, context) {
+async function fetchCloudInspectionJson(url, context, timeoutMs) {
   const resp = await fetchWithTimeout(url.toString(), {
     method: 'GET',
     cache: 'no-store',
     headers: { Accept: 'application/json' }
-  }, CLOUD_GET_TIMEOUT_MS, context);
+  }, timeoutMs || CLOUD_GET_TIMEOUT_MS, context);
   const text = await resp.text();
   let data;
   try {
@@ -1032,7 +1033,7 @@ export async function listCloudInspections() {
   const url = new URL(GOOGLE_SCRIPT_URL);
   url.searchParams.set('action', 'list');
   url.searchParams.set('token', FIELD_RESUME_TOKEN);
-  const data = await fetchCloudInspectionJson(url, 'Cloud inspection list');
+  const data = await fetchCloudInspectionJson(url, 'Cloud inspection list', CLOUD_LIST_TIMEOUT_MS);
   return Array.isArray(data.inspections) ? data.inspections : [];
 }
 

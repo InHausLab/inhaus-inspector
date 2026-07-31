@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=213';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=213';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=213';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=213';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=213';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=213';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=214';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=214';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=214';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection } from './sync.js?v=214';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=214';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=214';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=213';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=213';
-import { updatePhotoMetadata } from './supabase-photos.js?v=213';
-import { FIELD_RESUME_TOKEN } from './config.js?v=213';
+} from './findings.js?v=214';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=214';
+import { updatePhotoMetadata } from './supabase-photos.js?v=214';
+import { FIELD_RESUME_TOKEN } from './config.js?v=214';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=213';
+} from './comment-library.js?v=214';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -777,6 +777,28 @@ export function isReviewableCloudInspection(item) {
     status === 'synced';
 }
 
+function cloudRecordStatus(cloudRecord) {
+  return String(
+    cloudRecord?.status ||
+    cloudRecord?.resumeData?.reviewStatus ||
+    cloudRecord?.resumeData?.status ||
+    ''
+  ).trim();
+}
+
+function cloudItemFromRecord(cloudRecord, fallbackId) {
+  const resume = cloudRecord?.resumeData || {};
+  return {
+    inspectionId: cloudRecord?.inspectionId || cloudRecord?.id || resume.inspectionId || fallbackId,
+    id: cloudRecord?.id || cloudRecord?.inspectionId || resume.inspectionId || fallbackId,
+    clientName: cloudRecord?.clientName || resume.clientName || '',
+    propertyAddress: cloudRecord?.propertyAddress || resume.propertyAddress || '',
+    inspectionDate: cloudRecord?.inspectionDate || resume.inspectionDate || '',
+    inspectorName: cloudRecord?.inspectorName || resume.inspectorName || '',
+    status: cloudRecordStatus(cloudRecord)
+  };
+}
+
 export function cloudReviewUrl(item) {
   const id = item?.inspectionId || item?.id;
   if (!id) return '';
@@ -839,7 +861,7 @@ export function inspectionFromCloudRecord(cloudRecord) {
   return inspection;
 }
 
-async function continueCloudInspection(item, button) {
+async function continueCloudInspection(item, button, preloadedRecord) {
   const id = item.inspectionId || item.id;
   const local = await window.DB.get(id);
   if (local && local.status === 'in-progress') {
@@ -850,7 +872,7 @@ async function continueCloudInspection(item, button) {
   button.disabled = true;
   button.textContent = 'Downloading…';
   try {
-    const cloudRecord = await loadCloudInspection(id);
+    const cloudRecord = preloadedRecord || await loadCloudInspection(id);
     const inspection = inspectionFromCloudRecord(cloudRecord);
     ctx.inspection = inspection;
     setInspection(inspection);
@@ -881,6 +903,34 @@ async function continueCloudInspection(item, button) {
   }
 }
 
+async function openCloudInspectionById(rawId, button) {
+  const id = String(rawId || '').trim();
+  if (!id) {
+    alert('Enter the inspection ID from the office preparation screen.');
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'Opening…';
+  try {
+    const cloudRecord = await loadCloudInspection(id);
+    const item = cloudItemFromRecord(cloudRecord, id);
+    if (isContinuableCloudInspection(item)) {
+      await continueCloudInspection(item, button, cloudRecord);
+      return;
+    }
+    if (isReviewableCloudInspection(item)) {
+      openCloudReview(item);
+      return;
+    }
+    throw new Error('This inspection is not marked prepared or active. Current status: ' + (item.status || 'unknown'));
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = 'Open Inspection';
+    alert('Could not open this inspection: ' + (err?.message || String(err)));
+  }
+}
+
 export function renderCloudResume() {
   const c = ui().el('div', { className: 'screen cloud-resume-screen' });
   c.appendChild(buildAppHeader('Cloud Inspections'));
@@ -898,6 +948,30 @@ export function renderCloudResume() {
     style: 'margin-bottom:10px;'
   }, 'Show Completed Review History');
   c.appendChild(reviewToggle);
+
+  const directCard = ui().el('div', { className: 'card cloud-direct-card' });
+  directCard.appendChild(ui().el('strong', null, 'Open prepared inspection'));
+  directCard.appendChild(ui().el('p', { className: 'text-sm' }, 'Use the inspection ID shown on the laptop if the cloud list is slow.'));
+  const directInput = ui().el('input', {
+    className: 'field-input',
+    type: 'text',
+    placeholder: 'INH-YYYYMMDD-XXXXXX',
+    autocomplete: 'off',
+    autocapitalize: 'characters',
+    spellcheck: 'false'
+  });
+  const directBtn = ui().el('button', {
+    className: 'btn btn-primary btn-full',
+    onClick: () => openCloudInspectionById(directInput.value, directBtn)
+  }, 'Open Inspection');
+  directInput.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    openCloudInspectionById(directInput.value, directBtn);
+  });
+  directCard.appendChild(directInput);
+  directCard.appendChild(directBtn);
+  c.appendChild(directCard);
 
   const search = ui().el('input', {
     className: 'field-input cloud-resume-search',
@@ -986,18 +1060,29 @@ export function renderCloudResume() {
     search.value = '';
     renderMatches();
   });
-  listCloudInspections().then(items => {
+  function loadCloudList() {
+    status.innerHTML = '';
+    status.appendChild(loadingSpinner);
+    status.appendChild(ui().el('span', null, 'Loading active cloud inspections…'));
+    list.innerHTML = '';
+    return listCloudInspections().then(items => {
     inspections = items
       .filter(item => isContinuableCloudInspection(item) || isReviewableCloudInspection(item))
       .sort((a, b) => cloudInspectionSortTime(b) - cloudInspectionSortTime(a));
     renderMatches();
   }).catch(err => {
-    status.textContent = 'Could not load cloud inspections.';
+    status.textContent = 'Cloud list timed out. Use the inspection ID above, or retry.';
     list.appendChild(ui().el('div', { className: 'cloud-resume-error' }, [
       ui().el('strong', null, err?.message || String(err)),
-      ui().el('span', null, 'Check the internet connection and try again.')
+      ui().el('span', null, 'The list can be slow because it comes from Apps Script. A direct inspection ID opens faster.'),
+      ui().el('button', {
+        className: 'btn btn-outline btn-full',
+        onClick: () => loadCloudList()
+      }, 'Retry Cloud List')
     ]));
   });
+  }
+  loadCloudList();
 }
 
 // ── TRUCK CHECK SCREEN ────────────────────────────────────
