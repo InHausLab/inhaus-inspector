@@ -21,6 +21,30 @@ const activeFiles = [
 const activeSource = activeFiles
   .map(path => readFileSync(new URL(path, import.meta.url), 'utf8'))
   .join('\n');
+const releaseGraphFiles = [
+  '../index.html',
+  '../service-worker.js',
+  '../app.js',
+  '../screens.js',
+  '../sync.js',
+  '../ui.js',
+  '../steps.js',
+  '../config.js',
+  '../storage.js',
+  '../fields.js',
+  '../inspection.js',
+  '../findings.js',
+  '../photo-routing.js',
+  '../comment-library.js',
+  '../feedback.js',
+  '../comment-library-admin.js',
+  '../db.js',
+  '../state.js',
+  '../supabase-photos.js'
+];
+const releaseGraphSource = releaseGraphFiles
+  .map(path => readFileSync(new URL(path, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('all deployed app tools use the Worker and contain no Apps Script endpoint', () => {
   assert.doesNotMatch(activeSource, /script\.google\.com/);
@@ -34,4 +58,10 @@ test('all deployed app tools use the Worker and contain no Apps Script endpoint'
   assert.doesNotMatch(activeSource, /Synced to Drive|Syncing to Drive/);
   assert.match(activeSource, /Backed up to cloud/);
   assert.match(activeSource, /Backing up to cloud/);
+});
+
+test('deployed module graph uses one release cache version', () => {
+  assert.doesNotMatch(releaseGraphSource, /\?v=(?!223\b)\d+/);
+  assert.match(releaseGraphSource, /\?v=223/);
+  assert.match(releaseGraphSource, /inhaus-v223/);
 });
