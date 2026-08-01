@@ -170,3 +170,44 @@ test('review field save moves a synced assessment to In Review', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('submitted review status updates the assessment inventory status', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = String(url);
+    const method = options.method || 'GET';
+    requests.push({ requestUrl, method, body: options.body || '' });
+    if (method === 'GET' && requestUrl.includes('/rest/v1/review_data?')) {
+      return Response.json([{ inspection_id: 'INH-TEST-123', field_data: { status: 'In Review' }, updated_at: null }]);
+    }
+    if (method === 'POST' && requestUrl.includes('/rest/v1/review_data?')) {
+      const payload = JSON.parse(options.body);
+      return Response.json([{ ...payload, updated_at: '2026-08-01T20:00:00.000Z' }]);
+    }
+    if (method === 'GET' && requestUrl.includes('/rest/v1/ihl_assessments?')) {
+      return Response.json([{ inspection_id: 'INH-TEST-123', status: 'In Review', raw_jsonb: {} }]);
+    }
+    if (method === 'PATCH' && requestUrl.includes('/rest/v1/ihl_assessments?')) {
+      assert.match(options.body, /Submitted to Tanner/);
+      return Response.json([{ inspection_id: 'INH-TEST-123', status: 'Submitted to Tanner' }]);
+    }
+    throw new Error(`unexpected request: ${requestUrl}`);
+  };
+  try {
+    const response = await worker.fetch(reviewRequest('/save-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        inspectionId: 'INH-TEST-123',
+        field: { stepId: 'summary', key: 'status', value: 'Submitted to Tanner' }
+      })
+    }), ENV);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.reviewStatus, 'Submitted to Tanner');
+    assert.equal(result.fieldData.status, 'Submitted to Tanner');
+    assert.deepEqual(requests.map(item => item.method), ['GET', 'POST', 'GET', 'PATCH']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

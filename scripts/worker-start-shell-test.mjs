@@ -534,7 +534,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w10', 'health exposes Worker version');
+  assert(data.version === 'handoff-w11', 'health exposes Worker version');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
   assert(data.dependencies.supabaseBucket === true, 'health checks Supabase bucket config');

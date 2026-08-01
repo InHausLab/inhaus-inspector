@@ -26,7 +26,7 @@ const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w10';
+const WORKER_VERSION = 'handoff-w11';
 
 export default {
   async fetch(request, env, ctx) {
@@ -1585,8 +1585,13 @@ async function handleSaveReview(request, env) {
   if (!response.ok) throw new Error(`review_save_failed:${response.status}:${text.slice(0, 200)}`);
   const rows = text ? JSON.parse(text) : [];
   const saved = Array.isArray(rows) && rows.length ? rows[0] : null;
-  const reviewStatus = markInReview
-    ? await setAssessmentReviewStatus(env, inspectionId, 'In Review')
+  const explicitReviewStatus = stepId === 'summary' && fieldKey === 'status' &&
+    /^(in review|submitted to tanner|report complete)$/i.test(String(field.value || '').trim())
+    ? String(field.value).trim()
+    : '';
+  const requestedReviewStatus = explicitReviewStatus || (markInReview ? 'In Review' : '');
+  const reviewStatus = requestedReviewStatus
+    ? await setAssessmentReviewStatus(env, inspectionId, requestedReviewStatus)
     : '';
   return json({
     saved: true,
