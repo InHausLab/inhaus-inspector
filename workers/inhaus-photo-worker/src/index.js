@@ -7,7 +7,9 @@ const CORS_HEADERS = {
 
 const JSON_HEADERS = {
   ...CORS_HEADERS,
-  'Content-Type': 'application/json; charset=utf-8'
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+  'Pragma': 'no-cache'
 };
 
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -26,7 +28,7 @@ const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w11';
+const WORKER_VERSION = 'handoff-w12';
 
 export default {
   async fetch(request, env, ctx) {
