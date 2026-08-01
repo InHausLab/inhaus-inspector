@@ -330,8 +330,8 @@ export function updateSyncStatus(state, detail) {
   setSyncStatus(state);
   var LABELS = {
     local: 'Saved locally',
-    synced: 'Synced to Drive ✓',
-    syncing: 'Syncing to Drive…',
+    synced: 'Backed up to cloud ✓',
+    syncing: 'Backing up to cloud…',
     checkpoint: 'Checkpoint saved ✓',
     failed: 'Sync failed — tap to retry',
     offline: 'Offline — saving locally',

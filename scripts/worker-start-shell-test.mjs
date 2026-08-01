@@ -517,7 +517,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w7', 'health exposes Worker version');
+  assert(data.version === 'handoff-w8', 'health exposes Worker version');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
   assert(data.dependencies.supabaseBucket === true, 'health checks Supabase bucket config');
@@ -2055,7 +2055,7 @@ async function testDueRunnerSkipsActivelyLockedJob() {
       attempt_count: 2,
       next_run_at: '',
       locked_at: lockedAt,
-      locked_by: 'handoff-w7',
+      locked_by: 'handoff-w8',
       requested_by: 'review-portal',
       requested_at: '2026-08-01T15:00:00.000Z',
       payload: {},

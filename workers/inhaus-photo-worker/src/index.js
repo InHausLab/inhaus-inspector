@@ -26,7 +26,7 @@ const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w7';
+const WORKER_VERSION = 'handoff-w8';
 
 export default {
   async fetch(request, env, ctx) {
@@ -565,7 +565,9 @@ async function saveInspectionAssessment(env, source, knownRow = null) {
     isTestTraining ? inspectionId : ''
   );
   if (!assessmentNumber) throw new Error('missing_assessment_number_reservation');
-  const status = normalizeAssessmentStatus(source.status || resume.status || (row && row.status) || 'In Progress');
+  const status = normalizeAssessmentStatus(
+    source.reviewStatus || resume.reviewStatus || source.status || resume.status || (row && row.status) || 'In Progress'
+  );
   const payload = {
     inspection_id: inspectionId,
     assessment_num: String(assessmentNumber),
@@ -614,8 +616,10 @@ function normalizeAssessmentStatus(value) {
   const raw = String(value || '').trim();
   if (/^prepared$/i.test(raw)) return 'prepared';
   if (/field active|in[-\s]?progress/i.test(raw)) return 'In Progress';
+  if (/report complete/i.test(raw)) return 'Report Complete';
   if (/submitted to tanner/i.test(raw)) return 'Submitted to Tanner';
-  if (/needs review|completed|complete/i.test(raw)) return 'Needs Review';
+  if (/in review/i.test(raw)) return 'In Review';
+  if (/synced|needs review|completed|complete/i.test(raw)) return 'Synced';
   return raw || 'In Progress';
 }
 
@@ -1446,6 +1450,7 @@ async function handleSaveReview(request, env) {
   const fieldData = isPlainObject(current && current.field_data)
     ? structuredClone(current.field_data)
     : {};
+  const markInReview = body.markInReview === true && !isTerminalReviewStatus(fieldData);
 
   if (stepId === 'summary' || stepId === 'post') {
     fieldData[fieldKey] = field.value;
@@ -1457,6 +1462,7 @@ async function handleSaveReview(request, env) {
     if (!isPlainObject(fieldData[stepId])) fieldData[stepId] = {};
     fieldData[stepId][fieldKey] = field.value;
   }
+  if (markInReview) fieldData.status = 'In Review';
 
   const updatedAt = new Date().toISOString();
   const params = new URLSearchParams();
@@ -1477,12 +1483,44 @@ async function handleSaveReview(request, env) {
   if (!response.ok) throw new Error(`review_save_failed:${response.status}:${text.slice(0, 200)}`);
   const rows = text ? JSON.parse(text) : [];
   const saved = Array.isArray(rows) && rows.length ? rows[0] : null;
+  const reviewStatus = markInReview
+    ? await setAssessmentReviewStatus(env, inspectionId, 'In Review')
+    : '';
   return json({
     saved: true,
     inspectionId,
     fieldData: saved && isPlainObject(saved.field_data) ? saved.field_data : fieldData,
-    updatedAt: saved && saved.updated_at ? saved.updated_at : updatedAt
+    updatedAt: saved && saved.updated_at ? saved.updated_at : updatedAt,
+    reviewStatus
   });
+}
+
+function isTerminalReviewStatus(fieldData) {
+  const submission = isPlainObject(fieldData && fieldData.submission) ? fieldData.submission : {};
+  const raw = firstNonEmpty(submission.status, fieldData && fieldData.status);
+  return /submitted to tanner|report complete/i.test(String(raw || ''));
+}
+
+async function setAssessmentReviewStatus(env, inspectionId, status) {
+  const current = await getAssessmentRow(env, inspectionId);
+  if (!current) throw new Error('assessment_not_found_for_review_status');
+  if (/submitted to tanner|report complete/i.test(String(current.status || ''))) {
+    return current.status;
+  }
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/ihl_assessments?${params}`), {
+    method: 'PATCH',
+    headers: serviceHeaders(env, {
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }),
+    body: JSON.stringify({ status })
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`assessment_review_status_failed:${response.status}:${text.slice(0, 200)}`);
+  const rows = text ? JSON.parse(text) : [];
+  return Array.isArray(rows) && rows.length ? rows[0].status : status;
 }
 
 async function handleReviewUnlock(request, env) {
@@ -1501,10 +1539,10 @@ async function handleReviewUnlock(request, env) {
   const unlockedAt = new Date().toISOString();
   fieldData.submission = {
     ...(isPlainObject(fieldData.submission) ? fieldData.submission : {}),
-    status: 'Needs Review',
+    status: 'In Review',
     unlockedAt
   };
-  fieldData.status = 'Needs Review';
+  fieldData.status = 'In Review';
 
   const reviewParams = new URLSearchParams();
   reviewParams.set('on_conflict', 'inspection_id');
@@ -1531,7 +1569,7 @@ async function handleReviewUnlock(request, env) {
       'Content-Type': 'application/json',
       'Prefer': 'return=minimal'
     }),
-    body: JSON.stringify({ status: 'Needs Review' })
+    body: JSON.stringify({ status: 'In Review' })
   });
   const assessmentText = await assessmentResponse.text();
   if (!assessmentResponse.ok) {
@@ -1542,7 +1580,7 @@ async function handleReviewUnlock(request, env) {
     status: 'ok',
     unlocked: true,
     inspectionId,
-    reviewStatus: 'Needs Review',
+    reviewStatus: 'In Review',
     unlockedAt
   });
 }

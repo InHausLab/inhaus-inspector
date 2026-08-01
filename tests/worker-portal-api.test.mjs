@@ -121,10 +121,51 @@ test('admin unlock updates review storage and assessment status', async () => {
     assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.unlocked, true);
-    assert.equal(result.reviewStatus, 'Needs Review');
+    assert.equal(result.reviewStatus, 'In Review');
     assert.deepEqual(requests.map(item => item.method), ['GET', 'POST', 'PATCH']);
-    assert.match(requests[1].body, /Needs Review/);
-    assert.match(requests[2].body, /Needs Review/);
+    assert.match(requests[1].body, /In Review/);
+    assert.match(requests[2].body, /In Review/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('review field save moves a synced assessment to In Review', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = String(url);
+    const method = options.method || 'GET';
+    requests.push({ requestUrl, method, body: options.body || '' });
+    if (method === 'GET' && requestUrl.includes('/rest/v1/review_data?')) {
+      return Response.json([{ inspection_id: 'INH-TEST-123', field_data: {}, updated_at: null }]);
+    }
+    if (method === 'POST' && requestUrl.includes('/rest/v1/review_data?')) {
+      const payload = JSON.parse(options.body);
+      return Response.json([{ ...payload, updated_at: '2026-08-01T19:00:00.000Z' }]);
+    }
+    if (method === 'GET' && requestUrl.includes('/rest/v1/ihl_assessments?')) {
+      return Response.json([{ inspection_id: 'INH-TEST-123', status: 'Synced', raw_jsonb: {} }]);
+    }
+    if (method === 'PATCH' && requestUrl.includes('/rest/v1/ihl_assessments?')) {
+      return Response.json([{ inspection_id: 'INH-TEST-123', status: 'In Review' }]);
+    }
+    throw new Error(`unexpected request: ${requestUrl}`);
+  };
+  try {
+    const response = await worker.fetch(reviewRequest('/save-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        inspectionId: 'INH-TEST-123',
+        markInReview: true,
+        field: { stepId: 'bedroom-1', key: 'notes', value: 'Reviewed note' }
+      })
+    }), ENV);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.reviewStatus, 'In Review');
+    assert.equal(result.fieldData.status, 'In Review');
+    assert.deepEqual(requests.map(item => item.method), ['GET', 'POST', 'GET', 'PATCH']);
   } finally {
     globalThis.fetch = originalFetch;
   }

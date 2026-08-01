@@ -31,4 +31,7 @@ test('all deployed app tools use the Worker and contain no Apps Script endpoint'
   assert.match(activeSource, /\/get-review/);
   assert.doesNotMatch(activeSource, /workerUrl\('\/mirror'\)|mirrorSupabasePhotosToDrive|mirrorPhotosToDrive/);
   assert.doesNotMatch(activeSource, /Sync to Drive|Not synced to Drive|uploaded to Google Drive/);
+  assert.doesNotMatch(activeSource, /Synced to Drive|Syncing to Drive/);
+  assert.match(activeSource, /Backed up to cloud/);
+  assert.match(activeSource, /Backing up to cloud/);
 });

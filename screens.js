@@ -4078,7 +4078,7 @@ export function renderReview() {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting... \u23f3';
       ctx.inspection.status = 'completed';
-      ctx.inspection.reviewStatus = 'Needs Review';
+      ctx.inspection.reviewStatus = 'Synced';
       ctx.inspection.endedAt = new Date().toISOString();
       ctx.inspection.completedAt = ctx.inspection.endedAt;
       const completeData = buildExportJSON(ctx.stepList);

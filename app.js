@@ -601,7 +601,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=220';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v220',
+      appVersion: 'v221',
       success: success
     };
   }
