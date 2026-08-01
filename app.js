@@ -1,18 +1,16 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=219';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=219';
-import { initStorage, saveNow, scheduleSave } from './storage.js?v=219';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=219';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=219';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=219';
-import { initScreens, render } from './screens.js?v=219';
-import { initAppFeedback } from './feedback.js?v=219';
-import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
+import { PHOTO_WORKER_URL } from './config.js?v=220';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=220';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=220';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=220';
+import { cloudFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendInspectionToCloud, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=220';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=220';
+import { initScreens, render } from './screens.js?v=220';
+import { initAppFeedback } from './feedback.js?v=220';
+import { deletePhotoFromSupabase } from './supabase-photos.js?v=220';
 
 (function () {
   'use strict';
-
-  // scriptFetch → moved to sync.js
 
   const { el, renderField, renderProgressBar, renderStatusBar, renderTimersBar, renderCheck, fmtDate, showToast, flashUncheckedItems, updateShowIf } = UI;
 
@@ -43,7 +41,6 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
   let _inspectionDirty = false;
   let _autoCheckpointInterval = null;
   const AUTO_CHECKPOINT_INTERVAL_MS = 3 * 60 * 1000;
-  const EXPECTED_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec';
   // screen moved to state.js
   // Load truck check from localStorage (persists across interruptions, expires at midnight)
   const _truckCheckKey = 'inhausTruckCheck_' + new Date().toISOString().slice(0, 10);
@@ -143,30 +140,6 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
     return !!ok;
   }
 
-  function forceConfigRefreshIfStale() {
-    if (GOOGLE_SCRIPT_URL === EXPECTED_GOOGLE_SCRIPT_URL || !('serviceWorker' in navigator)) return;
-    const retryKey = 'inhausConfigRefreshAttemptAt';
-    const lastAttempt = Number(localStorage.getItem(retryKey) || 0);
-    if (Date.now() - lastAttempt < 5 * 60 * 1000) return;
-    localStorage.setItem(retryKey, String(Date.now()));
-    navigator.serviceWorker.getRegistration().then(async reg => {
-      if (!reg) return;
-      const activate = worker => {
-        if (!worker) return;
-        if (worker.state === 'installed') {
-          worker.postMessage({ type: 'SKIP_WAITING' });
-          navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
-          return;
-        }
-        worker.addEventListener('statechange', () => {
-          if (worker.state === 'installed') activate(worker);
-        });
-      };
-      await reg.update();
-      activate(reg.waiting || reg.installing);
-    }).catch(err => console.warn('Could not refresh stale app configuration:', err));
-  }
-
   // ── ID Generator ───────────────────────────────────────────
   function genId() {
     const d = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -221,7 +194,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
   }
 
   // showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, retryFailedPhotos,
-  // sendToGoogleScript, checkpointToCloud, submitInspection → moved to sync.js
+  // Cloud save, checkpoint, and submit functions live in sync.js.
   window.uploadPhotoImmediate = uploadPhotoImmediate;
   window.retryFailedPhotos = retryFailedPhotos;
   window.queuePhotoForBackgroundUpload = queuePhotoForBackgroundUpload;
@@ -294,9 +267,8 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
     return { recovered, vaulted };
   }
 
-  // A photo is "safely uploaded" if it's confirmed in Supabase (storagePath /
-  // _driveConfirmed / vault uploadState) OR in Google Drive (driveUrl/driveId).
-  function photoIsUploaded(p, vaulted) {
+  // A photo is safely uploaded when cloud storage or a prior Drive artifact confirms it.
+  function photoIsCloudConfirmed(p, vaulted) {
     return !!(p && (p._driveConfirmed === true || p._uploaded === true || p.driveUrl || p.driveId || p.storagePath)) ||
            !!(vaulted && (vaulted.driveUrl || vaulted.driveId || vaulted.storagePath ||
               vaulted.uploadState === 'stored' || vaulted.uploadState === 'uploaded'));
@@ -304,25 +276,25 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
 
   async function getPhotoHealth() {
     const insp = inspection || getInspection();
-    if (!insp) return { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
+    if (!insp) return { total: 0, local: 0, cloud: 0, pending: 0, missing: 0, vaultOnly: 0 };
     await hydrateInspectionPhotosFromVault(insp);
     const vaultPhotos = window.DB && window.DB.getPhotosForInspection
       ? await window.DB.getPhotosForInspection(insp.inspectionId)
       : [];
     const vaultMap = new Map(vaultPhotos.map(function(p) { return [p.photoId, p]; }));
     const seen = new Set();
-    const result = { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
+    const result = { total: 0, local: 0, cloud: 0, pending: 0, missing: 0, vaultOnly: 0 };
     visitInspectionPhotos(insp, function(photo) {
       if (!photo || !photo.photoId) return;
       seen.add(photo.photoId);
       result.total++;
       const vaultedPhoto = vaultMap.get(photo.photoId);
       const hasLocal = !!((photo.dataUrl && photo.dataUrl !== '__uploaded__') || (vaultedPhoto && vaultedPhoto.dataUrl));
-      const hasDrive = photoIsUploaded(photo, vaultedPhoto);
+      const hasCloud = photoIsCloudConfirmed(photo, vaultedPhoto);
       if (hasLocal) result.local++;
-      if (hasDrive) result.drive++;
-      if (!hasDrive && hasLocal) result.pending++;
-      if (!hasDrive && !hasLocal) result.missing++;
+      if (hasCloud) result.cloud++;
+      if (!hasCloud && hasLocal) result.pending++;
+      if (!hasCloud && !hasLocal) result.missing++;
     });
     vaultPhotos.forEach(function(p) {
       if (p && p.photoId && !seen.has(p.photoId) && p.dataUrl) result.vaultOnly++;
@@ -380,14 +352,14 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
 
   async function runCloudPreflight() {
     const insp = inspection || getInspection();
-    if (!insp || !GOOGLE_SCRIPT_URL) return { ok: false, message: 'No active inspection' };
+    if (!insp || !PHOTO_WORKER_URL) return { ok: false, message: 'No active inspection' };
     try {
       updateSyncStatus('syncing', 'cloud check');
       const exportData = buildExportJSON(stepList);
       const payload = stripPhotosFromExport(exportData);
       payload._checkpoint = true;
       payload._preflight = true;
-      await scriptFetch(payload);
+      await cloudFetch(payload);
       setLastCheckpointSucceededAt(Date.now());
       scheduleSave();
       updateSyncStatus('checkpoint', 'cloud ready');
@@ -425,7 +397,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
       // Final sync owns photo upload so it can avoid overlapping retry jobs.
 
       // ── PHOTO INTEGRITY GATE ──────────────────────────────────────
-      // Any photo with neither a driveUrl nor a local dataUrl is LOST.
+      // Any photo with neither cloud confirmation nor local pixels is lost.
       // Block the sync and show a hard error so the inspector knows.
       const audit = auditPhotos(inspection);
       if (audit.lost.length > 0) {
@@ -543,14 +515,14 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
       overlay.appendChild(dismissBtn);
 
     } else if (state === 'photo-error') {
-      // Hard block — photos are lost (no local data, no Drive URL)
+      // Hard block - photos are lost (no local data or cloud confirmation).
       overlay.style.background = '#7f1d1d';
       overlay.style.color = '#fff';
       var lostCount = receipt && receipt.lostPhotos ? receipt.lostPhotos.length : 0;
       overlay.innerHTML = '📸' +
         '<div style="font-size:1.4rem;font-weight:800;text-align:center;margin-bottom:8px;">PHOTO ERROR — DO NOT CLOSE APP</div>' +
         '<div style="color:#fca5a5;font-size:0.95rem;margin-bottom:16px;text-align:center;">' +
-          lostCount + ' photo' + (lostCount === 1 ? '' : 's') + ' cannot be found on device or in Drive.<br>' +
+          lostCount + ' photo' + (lostCount === 1 ? '' : 's') + ' cannot be found on the device or in cloud storage.<br>' +
           'Do NOT close this app. Call support now: <a href="tel:+19706183064" style="color:#fff;font-weight:800;">970-618-3064</a>' +
         '</div>' +
         '<div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;width:100%;max-width:420px;font-size:0.82rem;color:#fca5a5;white-space:pre-wrap;">' +
@@ -578,19 +550,19 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
   }
 
   // ── Photo integrity audit — runs before any final sync —————————————————
-  // Rule: every photo must have EITHER a driveUrl (safe in Drive)
-  //       OR a non-empty dataUrl (safe on device).
+  // Rule: every photo must be confirmed in cloud storage or remain recoverable
+  // from a non-empty dataUrl on this device.
   // Any photo with neither is LOST and must block the sync with a hard error.
   function auditPhotos(insp) {
     const lost = [];
     const pending = []; // have dataUrl but not yet uploaded
     visitInspectionPhotos(insp, function(p, context) {
       if (!p || !p.photoId) return;
-      const hasDrive = photoIsUploaded(p);
+      const hasCloud = photoIsCloudConfirmed(p);
       const hasLocal = p.dataUrl && p.dataUrl !== '__uploaded__';
-      if (!hasDrive && !hasLocal) {
+      if (!hasCloud && !hasLocal) {
         lost.push({ photoId: p.photoId, context, caption: p.caption || '', roomName: p.roomName || '' });
-      } else if (!hasDrive && hasLocal) {
+      } else if (!hasCloud && hasLocal) {
         pending.push({ photoId: p.photoId, context });
       }
     });
@@ -605,14 +577,14 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
     if (inspection) visitInspectionPhotos(inspection, function(p) {
       if (!p || !p.photoId) return;
       photosExpected++;
-      var hasDrive = photoIsUploaded(p);
+      var hasCloud = photoIsCloudConfirmed(p);
       var hasLocal = !!((p.dataUrl && p.dataUrl !== '__uploaded__') || p._vaultSaved);
-      if (hasDrive) photosUploaded++;
+      if (hasCloud) photosUploaded++;
       else if (hasLocal) pendingPhotoIds.add(p.photoId);
     });
     if (inspection) {
       (inspection._photoRetryQueue || []).forEach(function(p) {
-        if (p && p.photoId && !photoIsUploaded(p) && p.dataUrl && p.dataUrl !== '__uploaded__') {
+        if (p && p.photoId && !photoIsCloudConfirmed(p) && p.dataUrl && p.dataUrl !== '__uploaded__') {
           pendingPhotoIds.add(p.photoId);
         }
       });
@@ -629,7 +601,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v219',
+      appVersion: 'v220',
       success: success
     };
   }
@@ -637,11 +609,11 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
 
 
   async function retryQueuedUploads() {
-    if (!GOOGLE_SCRIPT_URL || !navigator.onLine) return;
+    if (!PHOTO_WORKER_URL || !navigator.onLine) return;
     const queue = await window.DB.getQueue();
     for (const item of queue) {
       try {
-        await sendToGoogleScript(item);
+        await sendInspectionToCloud(item);
         await window.DB.removeFromQueue(item.inspectionId);
       } catch (e) { break; }
     }
@@ -714,7 +686,6 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
 
   // Service worker intentionally disabled — was causing Safari freeze on cache update
 
-  forceConfigRefreshIfStale();
   restoreActivePosition().finally(() => {
     retryQueuedUploads();
     render();
@@ -736,9 +707,9 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
           banner.addEventListener('click', () => banner.remove());
           document.body.appendChild(banner);
         }
-        banner.textContent = '\u26a0\ufe0f Storage ' + Math.round(pct) + '% full \u2014 go to Review and tap Sync to Drive now';
+        banner.textContent = '\u26a0\ufe0f Storage ' + Math.round(pct) + '% full \u2014 go to Review and back up to cloud now';
       }
-      // Change 5: time-based warning - not synced to Drive in 30+ min
+      // Time-based warning when the inspection has not reached cloud storage recently.
       const THIRTY_MIN = 30 * 60 * 1000;
       const lastSync = getBestCloudSyncAt();
       const notSynced = lastSync === null || (Date.now() - lastSync) > THIRTY_MIN;
@@ -763,7 +734,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
           });
           document.body.appendChild(syncWarn);
         }
-        syncWarn.textContent = '\u26a0\ufe0f Not synced to Drive in 30+ min \u2014 tap to sync now';
+        syncWarn.textContent = '\u26a0\ufe0f No cloud backup in 30+ min \u2014 tap to sync now';
       } else if (!notSynced || sessionStorage.getItem('syncWarnDismissed')) {
         const existing = document.getElementById('sync-age-warning');
         if (existing) existing.remove();

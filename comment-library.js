@@ -1,6 +1,6 @@
 // InHaus Inspector - company-wide approved comment library bridge
-import { GOOGLE_SCRIPT_URL, FIELD_RESUME_TOKEN } from './config.js?v=219';
-import { scriptFetch } from './sync.js?v=219';
+import { PHOTO_WORKER_URL, FIELD_RESUME_TOKEN } from './config.js?v=220';
+import { cloudFetch } from './sync.js?v=220';
 
 const CACHE_KEY = 'inhaus_company_comment_library_v1';
 let memoryCache = null;
@@ -60,10 +60,9 @@ async function fetchJson(url, context) {
 export async function loadCompanyCommentLibrary(force) {
   const cached = readCache();
   if (!force && cached.loadedAt && Date.now() - Date.parse(cached.loadedAt) < 5 * 60 * 1000) return cached.comments;
-  if (!GOOGLE_SCRIPT_URL) return cached.comments;
+  if (!PHOTO_WORKER_URL) return cached.comments;
   try {
-    const url = new URL(GOOGLE_SCRIPT_URL);
-    url.searchParams.set('action', 'commentLibrary');
+    const url = new URL(PHOTO_WORKER_URL + '/comment-library');
     url.searchParams.set('token', FIELD_RESUME_TOKEN);
     const data = await fetchJson(url.toString(), 'Company comment library');
     serverReady = data.libraryVersion === 1 && Array.isArray(data.comments);
@@ -111,7 +110,7 @@ export async function submitCompanyCommentCandidate(inspection, finding, entry) 
     await loadCompanyCommentLibrary(true);
     if (!serverReady) throw new Error('Company library backend is not deployed yet');
   }
-  const result = await scriptFetch({
+  const result = await cloudFetch({
     action: 'commentLibraryCandidate',
     token: FIELD_RESUME_TOKEN,
     inspectionId: inspection?.inspectionId || '',

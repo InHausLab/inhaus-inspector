@@ -3,10 +3,10 @@
 // Photos still upload as already-compressed JPEG blobs, but the browser no
 // longer writes to Supabase with the publishable key. It asks the InHaus
 // Cloudflare Worker for a short-lived signed upload URL, then PUTs the binary
-// bytes to that URL. The Worker owns service-role Supabase writes and Drive
-// mirroring.
+// bytes to that URL. The Worker owns service-role Supabase writes. Drive photo
+// packaging is generated later by the retryable Tanner handoff job.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=219';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=220';
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
   const controller = new AbortController();
@@ -136,57 +136,6 @@ export async function deletePhotoFromSupabase(inspectionId, photoId) {
     body: JSON.stringify({ inspectionId, photoId, sharedSecret: PHOTO_UPLOAD_SECRET })
   }, 30000, 'Photo delete');
   return parseJsonResponse(resp, 'Photo delete failed');
-}
-
-export async function mirrorPhotosToDrive(payload) {
-  if (!payload || !payload.inspectionId) throw new Error('Missing inspectionId for Drive mirror');
-  if (!payload.driveFolderId) throw new Error('Missing assessment Drive folder for photo mirror');
-
-  // The Worker batches 3 photos per invocation to stay under CF's subrequest limit.
-  // Loop until hasMore is false (all photos mirrored).
-  let totalMirrored = 0;
-  let driveFolderId = payload.driveFolderId;
-  let photoFolderId = payload.photoFolderId || '';
-  let photoFolderName = '';
-  const MAX_BATCHES = 50; // safety cap (50 × 3 = 150 photos max)
-  let batch = 0;
-  let hasMore = false;
-
-  while (batch < MAX_BATCHES) {
-    batch++;
-    const resp = await fetchWithTimeout(workerUrl('/mirror'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        inspectionId: payload.inspectionId,
-        inspectionName: payload.inspectionName || '',
-        driveFolderId,
-        photoFolderId,
-        sharedSecret: PHOTO_UPLOAD_SECRET
-      })
-    }, 90000, 'Drive photo mirror');
-    const result = await parseJsonResponse(resp, 'Drive mirror failed');
-    totalMirrored += (result.mirrored || 0);
-    if (result.driveFolderId || result.folderId) driveFolderId = result.driveFolderId || result.folderId;
-    if (result.photoFolderId) photoFolderId = result.photoFolderId;
-    if (result.photoFolderName) photoFolderName = result.photoFolderName;
-    hasMore = result.hasMore === true;
-    if (!hasMore) break;
-  }
-
-  if (hasMore) {
-    throw new Error('Drive mirror still has photos pending after ' + (MAX_BATCHES * 3) + ' photos. Retry submit to continue the Drive package.');
-  }
-
-  return {
-    mirrored: totalMirrored,
-    skipped: 0,
-    hasMore: false,
-    folderId: driveFolderId,
-    driveFolderId,
-    photoFolderId,
-    photoFolderName
-  };
 }
 
 // Check which photos for an inspection are already confirmed in Supabase.

@@ -1,4 +1,4 @@
-import { scriptFetch } from './sync.js?v=219';
+import { cloudFetch } from './sync.js?v=220';
 
 const tokenInput = document.getElementById('admin-token');
 const loadButton = document.getElementById('load-library');
@@ -33,7 +33,7 @@ async function loadLibrary() {
   loadButton.disabled = true;
   setStatus('Loading…');
   try {
-    const data = await scriptFetch({ action: 'commentLibraryAdmin', command: 'list', adminToken: token });
+    const data = await cloudFetch({ action: 'commentLibraryAdmin', command: 'list', adminToken: token });
     if (data.libraryVersion !== 1 || !data.library) throw new Error(data.message || 'Company library backend is not deployed yet');
     library = data.library || { comments: [], candidates: [] };
     sessionStorage.setItem('inhaus_comment_admin_token', token);
@@ -88,7 +88,7 @@ function editor(item, pending) {
 }
 
 async function updateLibrary(command, commentId, cleanedText, severity, reportSection) {
-  const result = await scriptFetch({
+  const result = await cloudFetch({
     action: 'commentLibraryAdmin',
     adminToken: tokenInput.value.trim(),
     command,

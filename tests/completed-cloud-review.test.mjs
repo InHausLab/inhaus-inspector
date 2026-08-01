@@ -52,7 +52,8 @@ test('phone cloud continue can open a prepared inspection directly by ID', () =>
 
 test('phone cloud list uses the fast active-only endpoint', () => {
   assert.match(syncSource, /CLOUD_LIST_TIMEOUT_MS = 15000/);
-  assert.match(syncSource, /url\.searchParams\.set\('action', 'listActive'\)/);
+  assert.match(syncSource, /PHOTO_WORKER_URL \+ '\/inspections\/active'/);
+  assert.doesNotMatch(syncSource, /url\.searchParams\.set\('action', 'listActive'\)/);
   assert.match(syncSource, /listCloudInspections[\s\S]*CLOUD_LIST_TIMEOUT_MS/);
   assert.doesNotMatch(screensSource, /Show Completed Review History/);
 });

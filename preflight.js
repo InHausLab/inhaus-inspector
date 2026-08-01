@@ -10,14 +10,15 @@ const fs = require('fs');
 const configRaw = fs.readFileSync('./config.js', 'utf8');
 const get = (key) => { const m = configRaw.match(new RegExp(`export const ${key} = '([^']+)'`)); return m ? m[1] : null; };
 
-const SCRIPT_URL = get('GOOGLE_SCRIPT_URL');
 const WORKER_URL = get('PHOTO_WORKER_URL');
 const UPLOAD_SECRET = get('PHOTO_UPLOAD_SECRET');
+const FIELD_TOKEN = get('FIELD_RESUME_TOKEN');
 
 // Load Supabase creds
-const supaCreds = JSON.parse(fs.readFileSync(process.env.HOME + '/.openclaw/credentials/supabase_inhaus.json', 'utf8'));
+const supaPath = process.env.HOME + '/.openclaw/credentials/supabase_inhaus.json';
+const supaCreds = fs.existsSync(supaPath) ? JSON.parse(fs.readFileSync(supaPath, 'utf8')) : {};
 const SUPA_URL = supaCreds.url || 'https://kvpaqvieacccojkkxqul.supabase.co';
-const SUPA_KEY = supaCreds.service_role_key;
+const SUPA_KEY = process.env.SUPABASE_SERVICE_KEY || supaCreds.service_role_key || '';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -69,29 +70,28 @@ async function run() {
     else fail('Netlify', 'status ' + r.status + ', version: ' + version);
   } catch(e) { fail('Netlify', e.message); }
 
-  // ── 2. Apps Script ping ──────────────────────────────────
-  console.log('\n[2] Apps Script...');
-  if (!SCRIPT_URL) { fail('Apps Script URL', 'not set in config.js'); }
+  // ── 2. Worker health and required cloud routes ───────────
+  console.log('\n[2] Cloud Worker health...');
+  if (!WORKER_URL) { fail('Cloud Worker URL', 'not set in config.js'); }
   else {
     try {
-      const r = await fetch(SCRIPT_URL + '?action=ping');
-      // Follow redirect
-      if (r.status === 302 || r.status === 301) {
-        const loc = r.headers.location;
-        const r2 = await fetch(loc);
-        try {
-          const d = JSON.parse(r2.body);
-          if (d.status === 'ok') pass('Apps Script ping', d.message || 'ok');
-          else fail('Apps Script ping', JSON.stringify(d));
-        } catch(e) { fail('Apps Script ping', 'HTML response — deployment dead'); }
+      const r = await fetch(WORKER_URL + '/health');
+      const d = JSON.parse(r.body);
+      const requiredRoutes = [
+        'POST /start-inspection-shell',
+        'POST /inspections/save',
+        'POST /inspections/team-merge',
+        'GET /inspections/active',
+        'GET /inspections/:inspectionId',
+        'POST /handoff-jobs'
+      ];
+      const missing = requiredRoutes.filter(route => !Array.isArray(d.routes) || !d.routes.includes(route));
+      if (r.status === 200 && d.status === 'ok' && missing.length === 0 && d.capabilities?.inspectionCloudApi === true) {
+        pass('Cloud Worker health', d.version || 'ok');
       } else {
-        try {
-          const d = JSON.parse(r.body);
-          if (d.status === 'ok') pass('Apps Script ping', d.message || 'ok');
-          else fail('Apps Script ping', JSON.stringify(d));
-        } catch(e) { fail('Apps Script ping', 'Non-JSON response — deployment dead. Body: ' + r.body.slice(0,100)); }
+        fail('Cloud Worker health', missing.length ? 'missing routes: ' + missing.join(', ') : JSON.stringify(d).slice(0, 160));
       }
-    } catch(e) { fail('Apps Script', e.message); }
+    } catch(e) { fail('Cloud Worker health', e.message); }
   }
 
   // ── 3. CF Worker /sign ───────────────────────────────────
@@ -122,9 +122,11 @@ async function run() {
 
   // ── 4. Supabase ──────────────────────────────────────────
   console.log('\n[4] Supabase...');
-  try {
+  if (!SUPA_KEY) {
+    fail('Supabase credentials', 'set SUPABASE_SERVICE_KEY or install the local credentials file');
+  } else try {
     const r = await fetch(SUPA_URL + '/rest/v1/inspector_photo_uploads?limit=1&select=photo_id', {
-      headers: { 'apikey': SUPA_KEY, 'Authorization': '***' + SUPA_KEY }
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
     });
     if (r.status === 200) {
       const d = JSON.parse(r.body);
@@ -132,27 +134,17 @@ async function run() {
     } else fail('Supabase API', 'status ' + r.status + ': ' + r.body.slice(0, 100));
   } catch(e) { fail('Supabase', e.message); }
 
-  // ── 5. Apps Script list (data endpoint) ─────────────────
-  console.log('\n[5] Apps Script list endpoint...');
-  if (SCRIPT_URL) {
+  // ── 5. Worker active inspection list ────────────────────
+  console.log('\n[5] Cloud active inspection list...');
+  if (WORKER_URL && FIELD_TOKEN) {
     try {
-      // Try common tokens
-      const tokens = ['***', '***', '***'];
-      let found = false;
-      for (const token of tokens) {
-        const r = await fetch(SCRIPT_URL + '?action=list&token=' + token);
-        try {
-          const d = JSON.parse(r.body);
-          if (d.status === 'ok') {
-            pass('Apps Script list', token + ' — ' + (d.count || 0) + ' inspections');
-            found = true;
-            break;
-          }
-        } catch(e) {}
-      }
-      if (!found) fail('Apps Script list', 'all tokens rejected — check REVIEW_ACCESS_TOKEN in Script Properties');
-    } catch(e) { fail('Apps Script list', e.message); }
-  }
+      const r = await fetch(WORKER_URL + '/inspections/active?token=' + encodeURIComponent(FIELD_TOKEN));
+      const d = JSON.parse(r.body);
+      if (r.status === 200 && d.status === 'ok' && Array.isArray(d.inspections)) {
+        pass('Cloud active inspection list', d.count + ' active inspection(s)');
+      } else fail('Cloud active inspection list', JSON.stringify(d).slice(0, 160));
+    } catch(e) { fail('Cloud active inspection list', e.message); }
+  } else fail('Cloud active inspection list', 'Worker URL or field token missing');
 
   // ── 6. Version consistency ───────────────────────────────
   console.log('\n[6] Version consistency...');

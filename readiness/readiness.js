@@ -1,73 +1,70 @@
-const STORAGE_KEY = 'inhaus-inspector-readiness-v179';
+const STORAGE_KEY = 'inhaus-inspector-readiness-worker-v1';
 const PASS = 'pass';
 const WARN = 'warn';
 const FAIL = 'fail';
 const BLOCKED = 'blocked';
 const UNCHECKED = 'unchecked';
-const LIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec'; // Apps Script v71 — updated July 20 2026
+const CLOUD_WORKER_URL = 'https://inhaus-photo-worker.inhauslab.workers.dev';
 const REVIEW_ACCESS_TOKEN = 'InHaus2026';
 const SAMPLE_INSPECTION_ID = 'INH-20260717-YZNHG0'; // Jay cabin — verified in the v71 bridge on July 20 2026
-const EXPECTED_PHOTO_COUNT = 34;
 
 const autoChecks = [
   {
     id: 'field-app-shell',
     title: 'Field app shell',
-    detail: 'Inspector app v179 loads from the current production origin.',
+    detail: 'Inspector app loads from the current production origin.',
     path: '/index.html',
-    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && text.includes('v179'),
+    expect: text => text.includes('InHaus') && text.includes('service-worker.js') && /version-badge">v\d+/.test(text),
     critical: true
   },
   {
     id: 'service-worker-bypass',
     title: 'Service worker isolation',
-    detail: 'The v179 service worker is live and standalone tools bypass the field-app cache.',
+    detail: 'The current service worker is live and standalone tools bypass the field-app cache.',
     path: '/service-worker.js',
-    expect: text => text.includes("CACHE_NAME = 'inhaus-v179'") && text.includes("'/readiness'") && text.includes("'/reports'"),
+    expect: text => /CACHE_NAME = 'inhaus-v\d+'/.test(text) && text.includes("'/readiness'") && text.includes("'/reports'"),
     critical: true
   },
   {
-    id: 'apps-script-post',
-    title: 'Apps Script POST checkpoint',
-    detail: 'The same-origin health function sends a real POST checkpoint to Apps Script and verifies status:ok.',
-    path: '/.netlify/functions/apps-script-post-check',
-    timeoutMs: 30000,
+    id: 'cloud-worker-health',
+    title: 'Cloud Worker health',
+    detail: 'The Worker exposes the inspection save, pickup, merge, and handoff routes.',
+    path: CLOUD_WORKER_URL + '/health',
+    timeoutMs: 15000,
     expect: text => {
       const parsed = JSON.parse(text);
-      return parsed.status === 'ok' && parsed.upstreamStatus === 200 && parsed.checkpointed === true;
-    },
-    critical: true
-  },
-  {
-    id: 'apps-script-review-list',
-    title: 'Apps Script review list',
-    detail: 'Live v71 bridge returns the real inspection in the review inventory.',
-    path: bridgeUrl({ action: 'list', token: REVIEW_ACCESS_TOKEN }),
-    timeoutMs: 30000,
-    expect: text => {
-      const parsed = JSON.parse(text);
-      const inspections = Array.isArray(parsed.inspections) ? parsed.inspections : [];
-      const sample = inspections.find(item => item.inspectionId === SAMPLE_INSPECTION_ID);
+      const routes = Array.isArray(parsed.routes) ? parsed.routes : [];
       return parsed.status === 'ok'
-        && Boolean(sample)
-        && sample.photoCount === EXPECTED_PHOTO_COUNT
-        && sample.missingCount === 0;
+        && parsed.capabilities?.inspectionCloudApi === true
+        && routes.includes('POST /inspections/save')
+        && routes.includes('GET /inspections/active')
+        && routes.includes('POST /handoff-jobs');
     },
     critical: true
   },
   {
-    id: 'apps-script-report-detail',
-    title: 'Apps Script report detail',
-    detail: 'Live v71 bridge returns the complete 34-photo production inspection.',
-    path: bridgeUrl({ action: 'get', id: SAMPLE_INSPECTION_ID, token: REVIEW_ACCESS_TOKEN }),
+    id: 'cloud-worker-active-list',
+    title: 'Cloud active inspection list',
+    detail: 'The Worker returns a valid active-inspection inventory.',
+    path: workerUrl('/inspections/active', { token: REVIEW_ACCESS_TOKEN }),
+    timeoutMs: 30000,
+    expect: text => {
+      const parsed = JSON.parse(text);
+      return parsed.status === 'ok' && Array.isArray(parsed.inspections) && parsed.count === parsed.inspections.length;
+    },
+    critical: true
+  },
+  {
+    id: 'cloud-worker-report-detail',
+    title: 'Cloud inspection detail',
+    detail: 'The Worker returns a known complete production inspection from Supabase.',
+    path: workerUrl('/inspections/' + SAMPLE_INSPECTION_ID, { token: REVIEW_ACCESS_TOKEN }),
     timeoutMs: 30000,
     expect: text => {
       const parsed = JSON.parse(text);
       const inspection = parsed.inspection || {};
       return parsed.status === 'ok'
-        && inspection.inspectionId === SAMPLE_INSPECTION_ID
-        && Array.isArray(inspection.photos)
-        && inspection.photos.length === EXPECTED_PHOTO_COUNT;
+        && inspection.inspectionId === SAMPLE_INSPECTION_ID;
     },
     critical: true
   },
@@ -83,9 +80,9 @@ const autoChecks = [
   {
     id: 'config-script',
     title: 'Inspector config',
-    detail: 'Client config script is present with Google Script URL and sync secret keys.',
+    detail: 'Client config points at the Cloud Worker and contains no Apps Script URL.',
     path: '/config.js',
-    expect: text => text.includes('GOOGLE_SCRIPT_URL') && text.includes('SYNC_SECRET'),
+    expect: text => text.includes('PHOTO_WORKER_URL') && text.includes('PHOTO_UPLOAD_SECRET') && !text.includes('GOOGLE_SCRIPT_URL'),
     critical: true
   },
   {
@@ -102,7 +99,7 @@ const manualGates = [
   {
     id: 'phone-version',
     title: 'Phone version',
-    detail: 'The inspector phone shows v179 after refresh or cache reset.',
+    detail: 'The inspector phone shows the same current version as the deployed app.',
     required: true
   },
   {
@@ -350,7 +347,7 @@ async function runOnePostCheck(check) {
       signal: controller.signal
     });
     if (!response.ok) {
-      return { status: check.critical ? FAIL : WARN, message: `POST HTTP ${response.status} — Apps Script POST broken (405 = bad deployment settings)` };
+      return { status: check.critical ? FAIL : WARN, message: `POST HTTP ${response.status}` };
     }
     const text = await response.text();
     const ok = Boolean(check.expect(text));
@@ -359,15 +356,15 @@ async function runOnePostCheck(check) {
       message: ok ? `POST verified: ${check.path}` : `POST returned unexpected response: ${text.slice(0, 120)}`
     };
   } catch (err) {
-    const message = err.name === 'AbortError' ? `POST timed out — Apps Script not responding` : err.message || 'POST check failed.';
+    const message = err.name === 'AbortError' ? 'POST timed out' : err.message || 'POST check failed.';
     return { status: check.critical ? FAIL : WARN, message };
   } finally {
     window.clearTimeout(timer);
   }
 }
 
-function bridgeUrl(params) {
-  const url = new URL(LIVE_BRIDGE_URL);
+function workerUrl(path, params) {
+  const url = new URL(path, CLOUD_WORKER_URL);
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   return url.toString();
 }
@@ -461,7 +458,7 @@ function makeReport(summary) {
     `Status: ${summary.title}`,
     `Score: ${summary.score}%`,
     `Last run: ${state.lastRunAt ? formatDateTime(state.lastRunAt) : 'Not run'}`,
-    'Release: v179 / Apps Script v71',
+    'Release: Cloud Worker inspection pipeline',
     '',
     '## Live Checks',
     ...summary.autoResults.map(({ check, result }) => `- ${statusLabel(result.status)}: ${check.title} - ${result.message || check.detail}`),

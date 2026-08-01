@@ -4,6 +4,12 @@ compatibility_date = "2026-07-14"
 account_id = "bbf861ec06c3d708b464c5c40e2d4833"
 workers_dev = true
 
+[triggers]
+crons = ["*/10 * * * *"]
+
 [vars]
 SUPABASE_URL = "https://kvpaqvieacccojkkxqul.supabase.co"
 SUPABASE_BUCKET = "inspection-photos"
+ASSESSMENTS_FOLDER_ID = "11A2EXgQSFo4BAh3aYlJpHxqZKsfwe06l"
+REPORT_TRACKER_SHEET_ID = "1aqIKWTn-UoDt9gH5pwo7XoDUzVV4FgYUCb-KyPZvZUA"
+ASSESSMENT_NUMBER_SOURCE = "supabase_sequence"

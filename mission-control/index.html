@@ -236,8 +236,10 @@
     (() => {
       'use strict';
 
-      const LIST_URL = 'https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec?action=list&token=InHaus2026';
-      const PHOTO_URL = 'https://inhaus-photo-worker.inhauslab.workers.dev/inspection-photos';
+      const WORKER_URL = 'https://inhaus-photo-worker.inhauslab.workers.dev';
+      const REVIEW_TOKEN = 'InHaus2026';
+      const LIST_URL = `${WORKER_URL}/inspections/active`;
+      const PHOTO_URL = `${WORKER_URL}/inspection-photos`;
       const REFRESH_SECONDS = 30;
 
       const dashboard = document.getElementById('dashboard');
@@ -393,8 +395,11 @@
         return card;
       }
 
-      async function fetchJson(url) {
-        const response = await fetch(url, { cache: 'no-store' });
+      async function fetchJson(url, authorized = false) {
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: authorized ? { Authorization: `Bearer ${REVIEW_TOKEN}` } : {}
+        });
         if (!response.ok) throw new Error(`Request failed (${response.status})`);
         const data = await response.json();
         if (data.status && data.status !== 'ok') throw new Error(data.message || `Service returned ${data.status}`);
@@ -421,7 +426,7 @@
         dashboard.setAttribute('aria-busy', 'true');
 
         try {
-          const listData = await fetchJson(LIST_URL);
+          const listData = await fetchJson(LIST_URL, true);
           const inspections = Array.isArray(listData) ? listData : (Array.isArray(listData.inspections) ? listData.inspections : []);
           const hydrated = await Promise.all(inspections.map(fetchPhotos));
           dashboard.replaceChildren();

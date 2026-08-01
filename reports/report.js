@@ -1,5 +1,4 @@
-const REPORT_REVIEW_API_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec';
-const REPORT_BRIDGE_API_URL = 'https://script.google.com/macros/s/AKfycbzwyXsEmFCBkkRYIA0VXBCd89WWt4n2YqSAlJXRU477g7ws7_JitbZpvr4GopEQ2UqlXQ/exec';
+const REPORT_WORKER_URL = 'https://inhaus-photo-worker.inhauslab.workers.dev';
 const ACCESS_TOKEN_STORAGE_KEY = 'inhaus-report-access-token';
 const DEFAULT_REPORT_ID = 'INH-20260428-DKNSOB';
 const REPORT_CREDIT = 'Credit: Prepared by InHaus Lab from inspector-submitted field data and review notes.';
@@ -112,13 +111,18 @@ function pickDefaultInspectionId(inspections) {
   return normalizeId(selected && (selected.id || selected.inspectionId));
 }
 
-async function apiFetch(endpoint, params) {
-  const url = new URL(endpoint);
-  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-  const response = await fetch(url.toString(), { method: 'GET', mode: 'cors' });
+async function workerGet(path, params, token, requireAuth = true) {
+  const url = new URL(REPORT_WORKER_URL + path);
+  Object.entries(params || {}).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+    headers: requireAuth && token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!response.ok) throw new Error(`API ${response.status}`);
   const data = await response.json();
-  if (data.status === 'error') throw new Error(data.message || 'API error');
+  if (data.status === 'error' || data.error) throw new Error(data.message || data.error || 'API error');
   return data;
 }
 
@@ -128,7 +132,7 @@ async function loadInspectionList() {
   let liveError = null;
   if (token) {
     try {
-      const live = await apiFetch(REPORT_REVIEW_API_URL, { action: 'list', token });
+      const live = await workerGet('/inspections', {}, token);
       if (live && Array.isArray(live.inspections)) return live.inspections;
     } catch (err) {
       liveError = err;
@@ -148,33 +152,28 @@ async function loadInspectionList() {
 }
 
 async function loadInspectionById(id) {
-  const list = knownInspections.length ? knownInspections : await loadInspectionList();
-  const summary = list.find(item => normalizeId(item.id || item.inspectionId) === id);
-  const token = (summary && summary.reviewToken) || getAccessToken();
+  const token = getAccessToken();
 
   if (token) {
     try {
-      const live = await apiFetch(REPORT_REVIEW_API_URL, { action: 'get', id, token });
+      const [live, review, photoData] = await Promise.all([
+        workerGet(`/inspections/${encodeURIComponent(id)}`, {}, token),
+        workerGet('/get-review', { inspectionId: id }, token).catch(() => ({ fieldData: {} })),
+        workerGet('/inspection-photos', { inspectionId: id, token: id.toLowerCase() }, token, false).catch(() => ({ photos: [] }))
+      ]);
       const liveInspection = live.inspection || live;
-      if (liveInspection && liveInspection.inspectionId) return liveInspection;
-    } catch (err) {
-      // Try the current bridge review-overlay endpoint, then static fallback below.
-    }
-
-    try {
-      const review = await apiFetch(REPORT_BRIDGE_API_URL, {
-        action: 'getReview',
-        id,
-        'x-sync-secret': token
-      });
-      const staticInspection = await loadStaticInspectionById(id);
-      return {
-        ...staticInspection,
-        reviewedData: {
-          ...(staticInspection.reviewedData || {}),
-          ...(review.reviewedData || {})
-        }
-      };
+      if (liveInspection && liveInspection.inspectionId) {
+        return {
+          ...liveInspection,
+          reviewedData: {
+            ...(liveInspection.reviewedData || {}),
+            ...((review && review.fieldData) || {})
+          },
+          photos: Array.isArray(photoData.photos) && photoData.photos.length
+            ? photoData.photos
+            : (Array.isArray(liveInspection.photos) ? liveInspection.photos : [])
+        };
+      }
     } catch (err) {
       // Static fallback below.
     }

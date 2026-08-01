@@ -1,5 +1,5 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=219';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=220';
 
 let _onSyncStatusChange = null;
 let _onInspectionDirty = null;
@@ -62,9 +62,9 @@ export async function saveNow(options) {
     if (e && e.name === 'DatabaseUpgradeBlockedError') {
       showSaveError('\u26a0\ufe0f Close other InHaus Inspector tabs, then try again');
     } else if (e && (e.name === 'QuotaExceededError' || (e.message && e.message.includes('quota')))) {
-      showSaveError('\u26a0\ufe0f Storage full \u2014 SCREENSHOT THIS SCREEN NOW then tap Sync to Drive');
+      showSaveError('\u26a0\ufe0f Storage full \u2014 SCREENSHOT THIS SCREEN NOW then back up to cloud');
     } else {
-      showSaveError('\u26a0\ufe0f Save failed \u2014 data may be lost on reload. Tap Sync to Drive now.');
+      showSaveError('\u26a0\ufe0f Save failed \u2014 data may be lost on reload. Back up to cloud now.');
     }
     return false;
   }

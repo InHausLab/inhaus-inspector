@@ -30,12 +30,20 @@ Use this before sending a report-viewer link to Hans, Tanner, or an inspector.
 
 ## Endpoint Map
 
-- `REPORT_REVIEW_API_URL` points to the v37 bridge endpoint and supports `action=list` and `action=get` with the portal access token.
-- `REPORT_BRIDGE_API_URL` points to the same authoritative bridge and remains the fallback for `action=getReview`.
-- The v37 bridge returned `status: ok`, `count: 4` for `action=list`, and returned the full `INH-20260428-DKNSOB` inspection for `action=get`.
+- `REPORT_WORKER_URL` points to the InHaus Cloudflare Worker.
+- `GET /inspections` returns the live inspection list.
+- `GET /inspections/:inspectionId` returns the canonical inspection and recovered team checkpoints.
+- `GET /get-review` returns reviewer edits and confirmed submission receipts.
+- `GET /inspection-photos` returns the Supabase photo manifest and full-resolution Worker photo URLs.
 - The viewer falls back to static JSON under `/reports/api/` so the public sample can render without entering a portal code.
 - Live tokens should stay out of links. Use session storage through the access-code field for any live review access.
-- The authoritative Apps Script deployment is `AKfycbxmOMfSGaz9sDHxAKBjNXtJ44MLdusXRe-GOrV6nGH0Iw0tciFg1Wkw-02hB-dQglAbgQ` unless a newer verified handoff says otherwise.
+- The report viewer has no Apps Script production dependency.
+
+## Release Gate
+
+- Do not approve a release from contract tests alone.
+- Run E2E-1 against the deployed Worker, app, and review portal in a real browser.
+- Capture screenshots and verify Supabase agrees with every visible status transition.
 
 ## Current Safe Behavior
 

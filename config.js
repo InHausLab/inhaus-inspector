@@ -1,18 +1,7 @@
 // InHaus Inspector - Configuration Constants
 
-// ── Google Drive Export Config ─────────────────────────────
-// Google Apps Script web app URL
-export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWzLVAIbUMDR11ryZiHft3ZTrzT9zrCQl5Gw4Tq6nIoNYhCepQYEC0dYz3r8b51LEXqQ/exec'; // Apps Script v65 restored — July 20 2026
-
-// ── Sync secret ────────────────────────────────────────────
-// Frontend token only - not a true secret. Must match SYNC_SECRET in Apps Script Properties.
-// The deployed Apps Script currently accepts this value.
-export const SYNC_SECRET = 'ihl-sync-2026';
-// Keep as a same-value fallback for cached clients and duplicate-secret de-duping.
-export const LEGACY_SYNC_SECRET = 'ihl-sync-2026';
-
 // Shared read token for the internal cloud inspection list. This is a frontend
-// access token (not a secret) and matches the existing review/list endpoint.
+// access token (not a secret) and matches the Worker review/list endpoint.
 export const FIELD_RESUME_TOKEN = 'InHaus2026';
 
 // ── Google Shared Drive Config ──────────────────────────────
@@ -32,6 +21,5 @@ export const SUPABASE_BUCKET = 'inspection-photos';
 export const PHOTO_WORKER_URL = 'https://inhaus-photo-worker.inhauslab.workers.dev';
 export const PHOTO_UPLOAD_SECRET = '42be53ef7bf9c07b52bb56c30ebd457a5ed227343a6d5313df98cbd525006b7c';
 
-// Feature flag. Keep false until Supabase is configured and tested, then flip
-// to true to route photos through Supabase instead of Apps Script/Drive.
+// Photo storage is Supabase-first; Drive is a generated handoff artifact.
 export const USE_SUPABASE_PHOTOS = true;

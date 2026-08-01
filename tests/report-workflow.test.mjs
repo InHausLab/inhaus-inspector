@@ -10,22 +10,26 @@ test('photo metadata survives the stripped binary payload', () => {
   assert.match(sync, /mainPayload\.photoManifest = allPhotos\.map/);
 });
 
-test('Drive mirror requires the assessment folder and targets Technician Photos', () => {
-  assert.match(worker, /if \(!driveFolderId\) throw new Error\('missing_drive_folder_id'\)/);
-  assert.match(worker, /getOrCreateDriveFolder\(accessToken, driveFolderId, 'Technician Photos'\)/);
-  assert.match(photoClient, /if \(!payload\.driveFolderId\) throw new Error\('Missing assessment Drive folder/);
-  assert.match(photoClient, /photoFolderId/);
+test('Drive photo packaging belongs to the retryable Worker handoff', () => {
+  assert.match(worker, /async function createOrRepairPhotoPackage/);
+  assert.match(worker, /photoFolderPendingCount/);
+  assert.match(worker, /nextRunAt/);
+  assert.doesNotMatch(sync, /mirrorSupabasePhotosToDrive|mirrorPhotosToDrive/);
+  assert.doesNotMatch(photoClient, /workerUrl\('\/mirror'\)/);
 });
 
-test('final verification requires the real assessment row and Drive mirror readiness', () => {
+test('final app verification requires the real assessment row and Supabase originals', () => {
   assert.match(worker, /const assessmentExists = await assessmentExistsForInspection\(env, inspectionId\)/);
-  assert.match(sync, /status\.reviewPortalReady !== true/);
-  assert.match(sync, /Drive photo package is not ready/);
+  assert.match(sync, /status\.complete !== true \|\| status\.assessmentExists !== true/);
+  assert.match(sync, /Cloud verification failed:/);
+  assert.doesNotMatch(sync, /status\.reviewPortalReady !== true/);
+  assert.doesNotMatch(sync, /Drive photo package is not ready/);
 });
 
-test('Drive mirror supports hundred-photo homes without a false complete receipt', () => {
-  assert.match(photoClient, /const MAX_BATCHES = 50/);
-  assert.match(photoClient, /Drive mirror still has photos pending/);
+test('hundred-photo homes are packaged in resumable Worker batches', () => {
+  assert.match(worker, /HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 10/);
+  assert.match(worker, /pendingCount \+= 1/);
+  assert.match(worker, /receipt\.status = 'running'/);
 });
 
 test('Drive filenames use inspection context instead of slot identifiers', () => {

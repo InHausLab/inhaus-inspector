@@ -1,19 +1,15 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=219';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=219';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=220';
+import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=220';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=219';
-import { scheduleSave } from './storage.js?v=219';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=219';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=219';
+         getBestCloudSyncAt } from './state.js?v=220';
+import { scheduleSave } from './storage.js?v=220';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=220';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=220';
 
-// Wrapper: always injects the sync secret into the JSON body so Apps Script
-// can authenticate the request without CORS-breaking custom headers.
-let _workingSyncSecret = null;
-const PHOTO_UPLOAD_BATCH_SIZE = 3;
 const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
 const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
 const CLOUD_POST_TIMEOUT_MS = 45000;
@@ -22,7 +18,6 @@ const CLOUD_LIST_TIMEOUT_MS = 15000;
 let _photoRetryTimer = null;
 let _photoRetryDueAt = 0;
 let _photoRetryInProgress = false;
-let _bulkPhotoUploadInProgress = false;
 let _lastAutomaticPhotoRetryAt = 0;
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
@@ -40,61 +35,36 @@ async function fetchWithTimeout(url, options, timeoutMs, label) {
   }
 }
 
-function getSyncSecretsToTry() {
-  const secrets = [];
-  [_workingSyncSecret, SYNC_SECRET, LEGACY_SYNC_SECRET].forEach(function(secret) {
-    if (secret && !secrets.includes(secret)) secrets.push(secret);
-  });
-  return secrets;
+function cloudRouteForPayload(payload) {
+  if (payload?.photoUploadOnly) throw new Error('The retired Apps Script photo path is disabled.');
+  if (payload?.action === 'startInspectionShell') return '/start-inspection-shell';
+  if (payload?.action === 'teamMerge') return '/inspections/team-merge';
+  if (payload?.action === 'appFeedback') return '/app-feedback';
+  if (payload?.action === 'commentLibraryCandidate') return '/comment-library/candidates';
+  if (payload?.action === 'commentLibraryAdmin') return '/comment-library/admin';
+  return '/inspections/save';
 }
 
-async function postWithSyncSecret(payload, secret) {
-  const body = Object.assign({}, payload, { 'x-sync-secret': secret });
-  const resp = await fetchWithTimeout(GOOGLE_SCRIPT_URL, {
+export async function cloudFetch(payload) {
+  if (!PHOTO_WORKER_URL || !PHOTO_UPLOAD_SECRET) throw new Error('Cloud inspection service is not configured.');
+  const route = cloudRouteForPayload(payload);
+  const body = Object.assign({}, payload, { sharedSecret: PHOTO_UPLOAD_SECRET });
+  const resp = await fetchWithTimeout(PHOTO_WORKER_URL + route, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   }, CLOUD_POST_TIMEOUT_MS, 'Cloud save');
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const responseText = await resp.text();
   let data;
   try {
     data = JSON.parse(responseText);
   } catch (err) {
-    const looksLikeHtml = /^\s*</.test(responseText);
-    throw new Error(
-      looksLikeHtml
-        ? 'Apps Script returned an HTML page instead of JSON. The deployment URL may be expired or inaccessible.'
-        : 'Apps Script returned invalid JSON.'
-    );
+    throw new Error('Cloud service returned invalid JSON.');
   }
-  if (!data || typeof data !== 'object') {
-    throw new Error('Apps Script returned an invalid response.');
+  if (!resp.ok || !data || data.status === 'error' || data.error) {
+    throw new Error((data && (data.message || data.error)) || 'Cloud save failed with HTTP ' + resp.status + '.');
   }
   return data;
-}
-
-export async function scriptFetch(payload) {
-  let lastUnauthorized = 'Unauthorized';
-  for (const secret of getSyncSecretsToTry()) {
-    const data = await postWithSyncSecret(payload, secret);
-    if (data.status === 'error') {
-      const message = data.message || 'Apps Script error';
-      if (message.toLowerCase().includes('unauthorized')) {
-        lastUnauthorized = message;
-        continue;
-      }
-      _workingSyncSecret = secret;
-      throw new Error(message);
-    }
-    if (data.status !== 'ok') {
-      _workingSyncSecret = secret;
-      throw new Error(data.message || 'Apps Script did not confirm the save.');
-    }
-    _workingSyncSecret = secret;
-    return data;
-  }
-  throw new Error(lastUnauthorized);
 }
 
 function photoNeedsUpload(photo) {
@@ -111,17 +81,6 @@ function driveUrlFromId(driveId) {
 function getPhotoDriveLink(photo) {
   if (!photo) return '';
   return photo.driveUrl || driveUrlFromId(photo.driveId);
-}
-
-function getUploadedCount(uploadResult) {
-  const raw = uploadResult && (
-    uploadResult.photosUploaded ||
-    uploadResult.uploaded ||
-    uploadResult.uploadedCount ||
-    uploadResult.count
-  );
-  const count = Number(raw);
-  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 }
 
 function driveFolderUrlFromId(folderId) {
@@ -146,77 +105,6 @@ function getKnownDriveFolderId(inspection, exportData) {
   return (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
     (exportData && (exportData.driveFolderId || exportData.folderId)) ||
     '';
-}
-
-function addUniqueLookupKey(keys, value) {
-  const key = String(value || '').trim();
-  if (key && !keys.includes(key)) keys.push(key);
-}
-
-function getClientLastName(fullName) {
-  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : '';
-}
-
-function getPhotoFolderLookupKeys(inspection, exportData) {
-  const keys = [];
-  addUniqueLookupKey(keys, inspection && inspection._photoFolderLookupId);
-  addUniqueLookupKey(keys, exportData && exportData.inspectionId);
-  addUniqueLookupKey(keys, exportData && exportData.propertyAddress);
-  addUniqueLookupKey(keys, getClientLastName(exportData && exportData.clientName));
-  addUniqueLookupKey(keys, exportData && exportData.clientName);
-  return keys;
-}
-
-function isInspectionFolderNotFoundError(err) {
-  const message = err && err.message ? err.message : String(err || '');
-  return /Inspection folder not found/i.test(message);
-}
-
-function isPhotoLogAlreadyExistsError(err) {
-  const message = err && err.message ? err.message : String(err || '');
-  return /sheet with the name\s+"?Photo Log"?\s+already exists/i.test(message);
-}
-
-function syntheticConfirmedPhotoResult(photos, inspectionId, warning) {
-  const requestedPhotos = Array.isArray(photos) ? photos : [];
-  return {
-    photosUploaded: requestedPhotos.length,
-    inspectionId: inspectionId || '',
-    warning: warning || '',
-    photos: requestedPhotos.map(function(photo) {
-      return {
-        photoId: photo && photo.photoId ? photo.photoId : '',
-        room: photo && photo.roomName ? photo.roomName : '',
-        step: photo && photo.stepName ? photo.stepName : '',
-        caption: photo && photo.caption ? photo.caption : '',
-        driveUrl: '',
-        driveId: ''
-      };
-    })
-  };
-}
-
-async function uploadPhotoBatchWithFolderFallback(basePayload, lookupKeys) {
-  let lastFolderError = null;
-  const keys = lookupKeys.length ? lookupKeys : [basePayload.inspectionId];
-  for (const lookupKey of keys) {
-    try {
-      const payload = Object.assign({}, basePayload, { inspectionId: lookupKey });
-      const result = await scriptFetch(payload);
-      return { result: result, lookupKey: lookupKey };
-    } catch (err) {
-      if (!isInspectionFolderNotFoundError(err)) throw err;
-      lastFolderError = err;
-    }
-  }
-  throw lastFolderError || new Error('Inspection folder not found');
-}
-
-function getKnownDriveFolderUrl(inspection, exportData) {
-  return (inspection && (inspection._driveFolderUrl || inspection.driveFolderUrl || inspection.folderUrl)) ||
-    (exportData && (exportData.driveFolderUrl || exportData.folderUrl)) ||
-    driveFolderUrlFromId(getKnownDriveFolderId(inspection, exportData));
 }
 
 function rememberDriveResult(result, fingerprint, source) {
@@ -356,7 +244,7 @@ export async function ensureStartInspectionShell(stepList, options = {}) {
   payload.startedAt = payload.startedAt || inspection.startedAt || new Date().toISOString();
   updateSyncStatus('syncing', 'creating assessment shell');
   try {
-    const result = await scriptFetch(payload);
+    const result = await cloudFetch(payload);
     rememberStartInspectionShellResult(result);
     setLastCheckpointSucceededAt(Date.now());
     updateSyncStatus('checkpoint', 'assessment shell ready');
@@ -371,75 +259,6 @@ export async function ensureStartInspectionShell(stepList, options = {}) {
     updateSyncStatus('failed', message);
     return { ok: false, message };
   }
-}
-
-async function recoverDriveMetadataFromReviewApi(inspectionId, fingerprint) {
-  if (!GOOGLE_SCRIPT_URL || !inspectionId) return false;
-  const inspection = getInspection();
-  if (getKnownDriveFolderId(inspection)) return true;
-
-  try {
-    const url = new URL(GOOGLE_SCRIPT_URL);
-    url.searchParams.set('action', 'get');
-    url.searchParams.set('id', inspectionId);
-    url.searchParams.set('token', String(inspectionId).toLowerCase());
-    const resp = await fetchWithTimeout(
-      url.toString(),
-      { method: 'GET', cache: 'no-store' },
-      CLOUD_GET_TIMEOUT_MS,
-      'Drive folder lookup'
-    );
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    if (!data || data.status === 'error') throw new Error((data && data.message) || 'review lookup failed');
-    const remote = data.inspection || {};
-    const folderId = remote.folderId || remote.driveFolderId || remote.drive_folder_id || '';
-    if (!folderId) return false;
-    rememberDriveResult({
-      folderId: folderId,
-      folderUrl: remote.folderUrl || remote.assessmentFolderUrl || driveFolderUrlFromId(folderId),
-      spreadsheetId: remote.spreadsheetId || '',
-      spreadsheetUrl: remote.spreadsheetUrl || ''
-    }, fingerprint, 'review-api');
-    return true;
-  } catch (err) {
-    console.warn('Existing Drive folder lookup failed:', err);
-    return false;
-  }
-}
-
-function getConfirmedPhotoMap(uploadResult, requestedPhotos) {
-  const confirmed = new Map();
-  const returnedPhotos = Array.isArray(uploadResult && uploadResult.photos) ? uploadResult.photos : [];
-  returnedPhotos.forEach(function(p, idx) {
-    const driveUrl = getPhotoDriveLink(p);
-    const photoId = (p && p.photoId) || (requestedPhotos && requestedPhotos[idx] && requestedPhotos[idx].photoId);
-    if (photoId && driveUrl) {
-      confirmed.set(photoId, {
-        driveUrl: driveUrl,
-        driveId: p.driveId || ''
-      });
-    }
-  });
-  const uploadedCount = Math.min(getUploadedCount(uploadResult), (requestedPhotos || []).length);
-  for (let idx = 0; idx < uploadedCount; idx++) {
-    const returnedPhoto = returnedPhotos[idx] || {};
-    const requestedPhoto = requestedPhotos && requestedPhotos[idx];
-    const photoId = (returnedPhoto && returnedPhoto.photoId) || (requestedPhoto && requestedPhoto.photoId);
-    if (photoId && !confirmed.has(photoId)) {
-      confirmed.set(photoId, {
-        driveUrl: getPhotoDriveLink(returnedPhoto) || '',
-        driveId: (returnedPhoto && returnedPhoto.driveId) || ''
-      });
-    }
-  }
-  return confirmed;
-}
-
-function normalizePhotoForUpload(photo) {
-  if (!photo) return photo;
-  const imageData = photo.imageData || photo.dataUrl || '';
-  return Object.assign({}, photo, { imageData: imageData });
 }
 
 function getLocalPhotoMap(inspection) {
@@ -595,13 +414,9 @@ export function showUploadBanner(type, msg) {
 }
 
 // ── Real-time single-photo upload ─────────────────────────
-// NOTE: Photos are uploaded to Drive as private files.
-// The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
-// for the review portal to display them. This is a known workaround - see issue tracker.
 export async function uploadPhotoImmediate(photo, inspectionId, clientName, propertyAddress) {
-  if (!GOOGLE_SCRIPT_URL || !inspectionId) return false;
+  if (!PHOTO_WORKER_URL || !inspectionId) return false;
   const inspection = getInspection();
-  const knownFolderId = getKnownDriveFolderId(inspection);
   let originalDataUrl = photo.dataUrl;
   if (!originalDataUrl || originalDataUrl === '__uploaded__') {
     if (photo.photoId && window.DB && window.DB.getPhoto) {
@@ -620,104 +435,7 @@ export async function uploadPhotoImmediate(photo, inspectionId, clientName, prop
     if (!originalDataUrl || originalDataUrl === '__uploaded__') return !!(photo.driveUrl || photo.driveId);
   }
 
-  // Phase 2: route photos straight to Supabase Storage as binary, bypassing the
-  // base64 → Apps Script → Drive path entirely. Flag-gated; off by default.
-  if (USE_SUPABASE_PHOTOS) {
-    return await storePhotoInSupabase(photo, inspectionId, originalDataUrl);
-  }
-
-  // [RETIRED] If we reach here, USE_SUPABASE_PHOTOS is false — should not happen in production.
-  console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
-
-  const payload = {
-    photoUploadOnly: true,
-    inspectionId: inspectionId,
-    sourceInspectionId: inspectionId,
-    clientName: clientName || '',
-    propertyAddress: propertyAddress || '',
-    folderId: knownFolderId,
-    driveFolderId: knownFolderId,
-    folderUrl: getKnownDriveFolderUrl(inspection),
-    photos: [{
-      photoId: photo.photoId || '',
-      roomName: photo.roomName || '',
-      stepName: photo.stepName || '',
-      imageData: originalDataUrl || '',
-      caption: photo.caption || '',
-      assignedSlot: photo.assignedSlot || ''
-    }]
-  };
-
-  async function doUpload() {
-    const uploadResult = await uploadPhotoBatchWithFolderFallback(
-      payload,
-      getPhotoFolderLookupKeys(inspection, {
-        inspectionId: inspectionId,
-        clientName: clientName || '',
-        propertyAddress: propertyAddress || ''
-      })
-    );
-    if (inspection && uploadResult.lookupKey && uploadResult.lookupKey !== inspectionId) {
-      inspection._photoFolderLookupId = uploadResult.lookupKey;
-    }
-    return uploadResult.result;
-  }
-
-  try {
-    const result = await doUpload();
-    rememberDriveResult(result, inspection && inspection._lastMainPayloadFingerprint, 'photo-upload');
-    const returnedPhoto = result && result.photos && result.photos[0];
-    const confirmedDriveUrl = getPhotoDriveLink(returnedPhoto);
-    const uploadedCount = getUploadedCount(result);
-
-    if (uploadedCount > 0) {
-      // Drive confirmed receipt. Keep the local copy in case Drive sharing is restricted.
-      if (confirmedDriveUrl) photo.driveUrl = confirmedDriveUrl;
-      if (returnedPhoto && returnedPhoto.driveId) photo.driveId = returnedPhoto.driveId;
-      photo._driveConfirmed = true;
-      photo._uploaded = true;
-      if (window.DB && window.DB.updatePhoto) {
-        window.DB.updatePhoto(photo.photoId, {
-          driveUrl: photo.driveUrl || '',
-          driveId: photo.driveId || '',
-          uploadState: 'uploaded'
-        });
-      }
-      scheduleSave();
-      updateSyncStatus('checkpoint');
-      return true;
-    } else {
-      // Drive returned OK but 0 photos — keep for retry
-      console.warn('Photo upload returned 0 — keeping in IndexedDB for retry', photo.photoId);
-      photo._uploadFailed = true;
-      addToPhotoRetryQueue(photo);
-      return false;
-    }
-  } catch(e) {
-    if (isPhotoLogAlreadyExistsError(e)) {
-      console.warn('Photo uploaded but Photo Log append collided; marking confirmed:', photo.photoId);
-      photo._driveConfirmed = true;
-      photo._uploaded = true;
-      photo._uploadFailed = false;
-      photo._uploadWarning = 'photo_log_already_exists';
-      if (window.DB && window.DB.updatePhoto) {
-        window.DB.updatePhoto(photo.photoId, {
-          driveUrl: photo.driveUrl || '',
-          driveId: photo.driveId || '',
-          uploadState: 'uploaded'
-        });
-      }
-      scheduleSave();
-      updateSyncStatus('checkpoint');
-      return true;
-    }
-    // Network failure or any error — restore dataUrl and keep for retry
-    console.warn('Photo upload failed, keeping in IndexedDB:', e.message, photo.photoId);
-    photo.dataUrl = originalDataUrl;
-    photo._uploadFailed = true;
-    addToPhotoRetryQueue(photo);
-    return false;
-  }
+  return await storePhotoInSupabase(photo, inspectionId, originalDataUrl);
 }
 
 // Phase 2 photo path: upload one photo to Supabase and update local state to
@@ -786,8 +504,8 @@ export function schedulePhotoRetry(delayMs) {
 export async function retryFailedPhotos(options) {
   const opts = options || {};
   const inspection = getInspection();
-  if (!inspection || !GOOGLE_SCRIPT_URL || !navigator.onLine) return;
-  if (_photoRetryInProgress || _bulkPhotoUploadInProgress) return;
+  if (!inspection || !PHOTO_WORKER_URL || !navigator.onLine) return;
+  if (_photoRetryInProgress) return;
   const queue = (inspection._photoRetryQueue || []).filter(photoNeedsUpload);
   if (!queue.length) return;
   if (opts.automatic) {
@@ -836,7 +554,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=219');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=220');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -909,34 +627,6 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   if (all.length > 0) showUploadBanner('success', 'All ' + all.length + ' photo' + (all.length === 1 ? '' : 's') + ' saved');
 }
 
-function getMirrorInspectionName(exportData, inspection) {
-  return (inspection && (inspection.inspectionName || inspection.folderName || inspection.assessmentName)) ||
-    exportData.inspectionName ||
-    exportData.folderName ||
-    exportData.assessmentName ||
-    [exportData.clientName, exportData.propertyAddress].filter(Boolean).join(' - ') ||
-    exportData.inspectionId ||
-    '';
-}
-
-async function mirrorSupabasePhotosToDrive(exportData, inspection) {
-  showUploadBanner('pending', 'Mirroring photos to Drive…');
-  const result = await mirrorPhotosToDrive({
-    inspectionId: exportData.inspectionId,
-    inspectionName: getMirrorInspectionName(exportData, inspection),
-    driveFolderId: getKnownDriveFolderId(inspection, exportData),
-    photoFolderId: inspection && inspection._technicianPhotoFolderId || ''
-  });
-  if (inspection && result && result.photoFolderId) {
-    inspection._technicianPhotoFolderId = result.photoFolderId;
-    scheduleSave({ markDirty: false });
-  }
-  if (result && result.mirrored > 0) {
-    showUploadBanner('success', 'Mirrored ' + result.mirrored + ' photo' + (result.mirrored === 1 ? '' : 's') + ' to Drive');
-  }
-  return result;
-}
-
 function getExpectedPhotoIds(photos, inspection) {
   const ids = [];
   function addPhoto(photo) {
@@ -961,23 +651,15 @@ async function verifyFinalSync(exportData, allPhotos, inspection) {
     }
     throw new Error('Cloud verification failed: ' + missingCount + ' photo' + (missingCount === 1 ? '' : 's') + ' missing from storage.');
   }
-  if (status.reviewPortalReady !== true) {
-    const missingMirrorCount = Array.isArray(status.missingMirrorPhotoIds) ? status.missingMirrorPhotoIds.length : expectedPhotoIds.length;
-    throw new Error('Drive photo package is not ready: ' + missingMirrorCount + ' photo' + (missingMirrorCount === 1 ? '' : 's') + ' still need Drive mirroring.');
-  }
   return status;
 }
-
-// NOTE: Photos are uploaded to Drive as private files.
-// The Apps Script must call setSharing(ANYONE_WITH_LINK, VIEW) on each file
-// for the review portal to display them. This is a known workaround - see issue tracker.
-export async function sendToGoogleScript(exportData) {
+export async function sendInspectionToCloud(exportData) {
   attachKnownShellMetadata(exportData);
   const inspection = getInspection();
   // Always strip photos from main payload - send data first, then photos separately
   const allPhotos = extractAllPhotosFromExport(exportData);
   const mainPayload = stripPhotosFromExport(exportData);
-  // Keep lightweight photo metadata in the main save so Apps Script can build a
+  // Keep lightweight photo metadata in the main save so the handoff can build a
   // complete Photo Log even though binary photo data now travels through Supabase.
   mainPayload.photoManifest = allPhotos.map(function(photo) {
     return {
@@ -991,129 +673,18 @@ export async function sendToGoogleScript(exportData) {
   const mainPayloadFingerprint = payloadFingerprint(mainPayload);
   const photosToUpload = allPhotos.filter(photoNeedsUpload);
 
-  if (photosToUpload.length > 0 && !USE_SUPABASE_PHOTOS) {
-    // [RETIRED] Guard: this block should never run when USE_SUPABASE_PHOTOS=true.
-    console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
-    await recoverDriveMetadataFromReviewApi(exportData.inspectionId, mainPayloadFingerprint);
-  }
-
-  // Always resend inspection JSON during final submit/retry. Local sync flags can
-  // survive a stale or retired deployment and falsely claim the server has the
-  // assessment. The Apps Script folder/sheet path and Supabase write are
-  // idempotent, so a confirmed server round-trip is safer than trusting local state.
-  const mainResult = await scriptFetch(mainPayload);
+  // Always resend inspection JSON during final submit/retry. The Worker/Supabase
+  // write is idempotent, so a confirmed server round-trip is safer than local flags.
+  const mainResult = await cloudFetch(mainPayload);
   rememberDriveResult(mainResult, mainPayloadFingerprint, 'main-sync');
 
-  if (USE_SUPABASE_PHOTOS) {
-    // Always run — the flush pulls from the vault too, so it catches photos whose
-    // pixels never made it into the export.
-    await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
-    await mirrorSupabasePhotosToDrive(exportData, inspection);
-    const verified = await verifyFinalSync(exportData, allPhotos, inspection);
-    if (inspection) {
-      inspection._lastServerVerification = verified;
-      inspection._lastServerVerifiedAt = new Date().toISOString();
-      scheduleSave({ markDirty: false });
-    }
-  } else if (photosToUpload.length > 0) {
-    // [RETIRED] Guard: this block should never run when USE_SUPABASE_PHOTOS=true.
-    console.warn('[RETIRED] Apps Script photo path triggered — should not happen with USE_SUPABASE_PHOTOS=true');
-    showUploadBanner('pending', 'Uploading ' + photosToUpload.length + ' photo' + (photosToUpload.length === 1 ? '' : 's') + '\u2026');
-    let confirmedCount = 0;
-    const missingPhotos = [];
-    let workingPhotoFolderLookupId = inspection && inspection._photoFolderLookupId;
-    _bulkPhotoUploadInProgress = true;
-    try {
-      for (let start = 0; start < photosToUpload.length; start += PHOTO_UPLOAD_BATCH_SIZE) {
-        const batch = photosToUpload
-          .slice(start, start + PHOTO_UPLOAD_BATCH_SIZE)
-          .map(normalizePhotoForUpload);
-        const end = start + batch.length;
-        updateSyncStatus('syncing', 'photos ' + end + '/' + photosToUpload.length);
-        showUploadBanner(
-          'pending',
-          'Uploading photos ' + (start + 1) + '-' + end + ' of ' + photosToUpload.length + '\u2026'
-        );
-
-        const batchFolderId = getKnownDriveFolderId(inspection, exportData);
-        const photoPayload = {
-          photoUploadOnly: true,
-          inspectionId: exportData.inspectionId,
-          sourceInspectionId: exportData.inspectionId,
-          clientName: exportData.clientName,
-          propertyAddress: exportData.propertyAddress,
-          folderId: batchFolderId,
-          driveFolderId: batchFolderId,
-          folderUrl: getKnownDriveFolderUrl(inspection, exportData),
-          photos: batch
-        };
-        const folderLookupKeys = getPhotoFolderLookupKeys(inspection, exportData);
-        if (workingPhotoFolderLookupId) {
-          folderLookupKeys.sort(function(a, b) {
-            if (a === workingPhotoFolderLookupId) return -1;
-            if (b === workingPhotoFolderLookupId) return 1;
-            return 0;
-          });
-        }
-
-        let photoResult;
-        try {
-          const uploadResult = await uploadPhotoBatchWithFolderFallback(photoPayload, folderLookupKeys);
-          photoResult = uploadResult.result;
-          workingPhotoFolderLookupId = uploadResult.lookupKey;
-          if (inspection && workingPhotoFolderLookupId && workingPhotoFolderLookupId !== exportData.inspectionId) {
-            inspection._photoFolderLookupId = workingPhotoFolderLookupId;
-          }
-        } catch (err) {
-          if (isPhotoLogAlreadyExistsError(err)) {
-            console.warn('Photo batch uploaded but Photo Log append collided; marking batch confirmed:', err.message);
-            photoResult = syntheticConfirmedPhotoResult(
-              batch,
-              exportData.inspectionId,
-              'photo_log_already_exists'
-            );
-          } else {
-            const remaining = photosToUpload.slice(start);
-            queueUnconfirmedLocalPhotos(inspection, remaining, err && err.message ? err.message : 'upload_failed');
-            throw new Error(
-              'Photo upload failed after confirming ' +
-              confirmedCount +
-              ' of ' + photosToUpload.length + ' photos: ' +
-              (err && err.message ? err.message : String(err))
-            );
-          }
-        }
-
-        rememberDriveResult(photoResult, mainPayloadFingerprint, 'photo-upload');
-        const confirmedPhotos = getConfirmedPhotoMap(photoResult, batch);
-        if (confirmedPhotos.size > 0 && inspection) {
-          markConfirmedLocalPhotos(inspection, confirmedPhotos);
-          confirmedCount += confirmedPhotos.size;
-          scheduleSave();
-        }
-
-        const batchMissing = batch.filter(function(photo) {
-          return !photo.photoId || !confirmedPhotos.has(photo.photoId);
-        });
-        if (batchMissing.length > 0) {
-          queueUnconfirmedLocalPhotos(inspection, batchMissing, 'not_confirmed_in_drive');
-          missingPhotos.push.apply(missingPhotos, batchMissing);
-        }
-
-        await new Promise(function(resolve) { setTimeout(resolve, 150); });
-      }
-    } finally {
-      _bulkPhotoUploadInProgress = false;
-    }
-
-    if (missingPhotos.length > 0) {
-      throw new Error(
-        'Photo upload incomplete: confirmed ' +
-        (photosToUpload.length - missingPhotos.length) +
-        ' of ' + photosToUpload.length + ' photos in Drive'
-      );
-    }
-    if (inspection) scheduleSave();
+  // The vault flush catches photos whose pixels did not make it into the export.
+  await uploadPhotosViaSupabase(photosToUpload, exportData, inspection);
+  const verified = await verifyFinalSync(exportData, allPhotos, inspection);
+  if (inspection) {
+    inspection._lastServerVerification = verified;
+    inspection._lastServerVerifiedAt = new Date().toISOString();
+    scheduleSave({ markDirty: false });
   }
 }
 
@@ -1148,8 +719,7 @@ export function normalizeBridgeCapabilities(data) {
 async function loadBridgeCapabilities() {
   if (_bridgeCapabilities) return _bridgeCapabilities;
   try {
-    const url = new URL(GOOGLE_SCRIPT_URL);
-    url.searchParams.set('action', 'capabilities');
+    const url = new URL(PHOTO_WORKER_URL + '/health');
     url.searchParams.set('token', FIELD_RESUME_TOKEN);
     const data = await fetchCloudInspectionJson(url, 'Cloud capabilities');
     // Production currently returns teamFieldMerge at the top level while older
@@ -1163,20 +733,17 @@ async function loadBridgeCapabilities() {
 }
 
 export async function listCloudInspections() {
-  if (!GOOGLE_SCRIPT_URL) throw new Error('Cloud inspection service is not configured.');
-  const url = new URL(GOOGLE_SCRIPT_URL);
-  url.searchParams.set('action', 'listActive');
+  if (!PHOTO_WORKER_URL) throw new Error('Cloud inspection service is not configured.');
+  const url = new URL(PHOTO_WORKER_URL + '/inspections/active');
   url.searchParams.set('token', FIELD_RESUME_TOKEN);
   const data = await fetchCloudInspectionJson(url, 'Active cloud inspection list', CLOUD_LIST_TIMEOUT_MS);
   return Array.isArray(data.inspections) ? data.inspections : [];
 }
 
 export async function loadCloudInspection(inspectionId) {
-  if (!GOOGLE_SCRIPT_URL) throw new Error('Cloud inspection service is not configured.');
+  if (!PHOTO_WORKER_URL) throw new Error('Cloud inspection service is not configured.');
   if (!inspectionId) throw new Error('Missing inspection ID.');
-  const url = new URL(GOOGLE_SCRIPT_URL);
-  url.searchParams.set('action', 'get');
-  url.searchParams.set('id', inspectionId);
+  const url = new URL(PHOTO_WORKER_URL + '/inspections/' + encodeURIComponent(inspectionId));
   url.searchParams.set('token', FIELD_RESUME_TOKEN);
   const data = await fetchCloudInspectionJson(url, 'Cloud inspection');
   if (!data.inspection) throw new Error('Cloud inspection data is missing.');
@@ -1197,7 +764,7 @@ export function getCheckpointBackoffMs() {
 
 export async function checkpointToCloud(stepList) {
   const inspection = getInspection();
-  if (!inspection || !GOOGLE_SCRIPT_URL) return;
+  if (!inspection || !PHOTO_WORKER_URL) return;
   if (!navigator.onLine) {
     updateSyncStatus('offline');
     return;
@@ -1219,7 +786,7 @@ export async function checkpointToCloud(stepList) {
         const teamPayload = stripPhotosFromExport(teamExport);
         teamPayload._checkpoint = true;
         updateSyncStatus('syncing');
-        const teamResult = await scriptFetch({
+        const teamResult = await cloudFetch({
           action: 'teamMerge',
           token: FIELD_RESUME_TOKEN,
           inspection: teamPayload
@@ -1256,7 +823,7 @@ export async function checkpointToCloud(stepList) {
     const payload = stripPhotosFromExport(exportData);
     payload._checkpoint = true;
     updateSyncStatus('syncing'); // Change 2
-    const result = await scriptFetch(payload);
+    const result = await cloudFetch(payload);
     rememberDriveResult(result, payloadFingerprint(payload), 'checkpoint');
     setLastCheckpointSucceededAt(Date.now()); // Change 1
     scheduleSave({ markDirty: false });
@@ -1303,7 +870,7 @@ export async function checkpointToCloud(stepList) {
 }
 
 export async function submitInspection(exportData) {
-  if (!GOOGLE_SCRIPT_URL) return true;
+  if (!PHOTO_WORKER_URL) return true;
   updateSyncStatus('syncing'); // Change 2
   showUploadBanner('pending', 'Saving assessment to cloud\u2026');
   try {
@@ -1325,7 +892,7 @@ export async function submitInspection(exportData) {
         console.warn('Final team merge pull skipped:', mergeErr);
       }
     }
-    await sendToGoogleScript(exportData);
+    await sendInspectionToCloud(exportData);
     await window.DB.removeFromQueue(exportData.inspectionId);
     setLastSuccessfulCloudSyncAt(Date.now()); // Change 1
     const inspection = getInspection();

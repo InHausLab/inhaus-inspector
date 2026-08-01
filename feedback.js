@@ -1,7 +1,7 @@
 // InHaus Inspector - App improvement feedback capture and durable retry queue
-import { getInspection, getScreen } from './state.js?v=219';
-import { scriptFetch } from './sync.js?v=219';
-import { GOOGLE_SCRIPT_URL } from './config.js?v=219';
+import { getInspection, getScreen } from './state.js?v=220';
+import { cloudFetch } from './sync.js?v=220';
+import { PHOTO_WORKER_URL } from './config.js?v=220';
 
 let initialized = false;
 let retryInProgress = false;
@@ -47,17 +47,16 @@ function currentContext() {
 
 async function sendFeedback(feedback) {
   if (!feedbackCapabilityConfirmed) {
-    const url = new URL(GOOGLE_SCRIPT_URL);
-    url.searchParams.set('action', 'capabilities');
+    const url = new URL(PHOTO_WORKER_URL + '/health');
     const response = await fetch(url.toString(), { cache: 'no-store' });
     if (!response.ok) throw new Error('Feedback cloud check failed.');
     const capabilities = await response.json();
-    if (!capabilities || capabilities.status !== 'ok' || capabilities.appFeedback !== true) {
+    if (!capabilities || capabilities.capabilities?.appFeedback !== true) {
       throw new Error('App feedback cloud storage is not deployed yet.');
     }
     feedbackCapabilityConfirmed = true;
   }
-  const result = await scriptFetch({ action: 'appFeedback', feedback });
+  const result = await cloudFetch({ action: 'appFeedback', feedback });
   if (!result || result.saved !== true) throw new Error('Cloud did not confirm the feedback save.');
   if (window.DB?.removeAppFeedback) await window.DB.removeAppFeedback(feedback.feedbackId);
   return result;

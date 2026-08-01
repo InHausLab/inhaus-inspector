@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=219';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=219';
-import { ensureInspectionWorkspace } from './findings.js?v=219';
+import { getInspection } from './state.js?v=220';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=220';
+import { ensureInspectionWorkspace } from './findings.js?v=220';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -206,7 +206,7 @@ export function buildExportJSON(stepList) {
     carpetedRooms: (inspection.stepData?.['property-details']?.carpetedRooms) || '',
     fireplace: (inspection.stepData?.['property-details']?.fireplace) || '',
     // NOTE: pets + stoveType are now chips (arrays) — normalize to string immediately so
-    // Apps Script receives a plain string regardless of old vs new format.
+    // Keep the stored timestamp compatible with older inspection records.
     pets: (() => { const v = (inspection.stepData?.['property-details']?.pets) || ''; return Array.isArray(v) ? v.join(', ') : v; })(),
     petsOther: (inspection.stepData?.['property-details']?.petsOther) || '',
     smokingVaping: (inspection.stepData?.['property-details']?.smokingVaping) || '',

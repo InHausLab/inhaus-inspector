@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=219';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=219';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=219';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=219';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=219';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=219';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=220';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=220';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=220';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=220';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=220';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=220';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=219';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=219';
-import { updatePhotoMetadata } from './supabase-photos.js?v=219';
-import { FIELD_RESUME_TOKEN } from './config.js?v=219';
+} from './findings.js?v=220';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=220';
+import { updatePhotoMetadata } from './supabase-photos.js?v=220';
+import { FIELD_RESUME_TOKEN } from './config.js?v=220';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=219';
+} from './comment-library.js?v=220';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -258,10 +258,10 @@ function getPhotoPreviewSrc(photo) {
 
 function getPhotoStatus(photo) {
   const hasLocal = !!(photo && photo.dataUrl && photo.dataUrl !== '__uploaded__');
-  const hasDrive = !!(photo && (photo._driveConfirmed === true || photo._uploaded === true || photo.driveUrl || photo.driveId || photo.storagePath));
+  const hasCloud = !!(photo && (photo._driveConfirmed === true || photo._uploaded === true || photo.driveUrl || photo.driveId || photo.storagePath));
   const hasVault = !!(photo && photo._vaultSaved);
-  if (hasDrive && hasLocal) return { label: 'Cloud + phone', tone: 'good' };
-  if (hasDrive) return { label: 'Cloud', tone: 'good' };
+  if (hasCloud && hasLocal) return { label: 'Cloud + phone', tone: 'good' };
+  if (hasCloud) return { label: 'Cloud', tone: 'good' };
   if (hasLocal || hasVault) return { label: 'Waiting', tone: 'wait' };
   return { label: 'Missing', tone: 'bad' };
 }
@@ -800,7 +800,7 @@ export function renderInspCard(insp, canResume) {
       canResume ? ui().el('button', { className: 'btn btn-primary', onClick: () => resumeInsp(insp.inspectionId) }, 'Resume') : null,
       ui().el('button', { className: 'btn btn-outline', onClick: () => viewInsp(insp.inspectionId) }, 'View'),
       ui().el('button', { className: 'btn btn-danger-outline btn-small', onClick: () => {
-        if (confirm('⚠️ Delete this inspection permanently?\n\nAll photos and data will be removed from this device.\n\nOnly delete after confirming your photos have been uploaded to Google Drive.\n\nThis cannot be undone.')) {
+        if (confirm('⚠️ Delete this inspection permanently?\n\nAll photos and data will be removed from this device.\n\nOnly delete after confirming the cloud backup is complete.\n\nThis cannot be undone.')) {
           clearActivePosition(insp.inspectionId);
           window.DB.remove(insp.inspectionId).then(() => ctx.render());
         }
@@ -3749,7 +3749,7 @@ export function renderReview() {
     const departureDone = depItems.every(i => !!depData[i.key]);
     const lastCloud = getBestCloudSyncAt();
     const syncStatus = getSyncStatus();
-    let health = { total: 0, local: 0, drive: 0, pending: 0, missing: 0, vaultOnly: 0 };
+    let health = { total: 0, local: 0, cloud: 0, pending: 0, missing: 0, vaultOnly: 0 };
     let healthError = '';
     if (window.getPhotoHealth) {
       try {
@@ -3839,7 +3839,7 @@ export function renderReview() {
   refreshLeaveStatus();
 
   const legendBar = ui().el('div', { className: 'review-guide' });
-  legendBar.innerHTML = '<strong>Status guide:</strong> Visited = opened. Not visited = skipped. Drive photos are already backed up.';
+  legendBar.innerHTML = '<strong>Status guide:</strong> Visited = opened. Not visited = skipped. Cloud-confirmed photos are backed up.';
   c.appendChild(legendBar);
 
   // ── 6a: Departure Checklist ──
@@ -4105,7 +4105,7 @@ export function renderReview() {
         if (!ok) {
           throw new Error(
             (ctx.inspection && ctx.inspection._lastFinalSyncError) ||
-            'Drive did not confirm every photo upload.'
+            'Cloud storage did not confirm every photo upload.'
           );
         }
         reuploadBtn.textContent = '\u2713 Sync Complete (' + allPhotos.length + ' photos safe)';
@@ -4114,7 +4114,7 @@ export function renderReview() {
         reuploadBtn.textContent = '\u21ba Retry cloud sync';
         alert('Upload failed: ' + e.message);
       }
-    }}, '\u21ba Re-upload photos');
+    }}, '\u21ba Retry cloud sync');
     actCard.appendChild(ui().el('div', { className: 'completed-banner' }, [
       ui().el('strong', null, '\u2713 Inspection Complete'),
       ui().el('p', null, 'Completed: ' + ui().fmtDate(ctx.inspection.endedAt)),
@@ -4123,7 +4123,7 @@ export function renderReview() {
     if (window.getPhotoHealth) {
       window.getPhotoHealth().then(function(health) {
         const allConfirmed = health.total === 0 || (
-          health.drive >= health.total && health.pending === 0 && health.missing === 0
+          health.cloud >= health.total && health.pending === 0 && health.missing === 0
         );
         if (allConfirmed) reuploadBtn.textContent = '\u21ba Retry inspection data sync';
       }).catch(function(err) {
