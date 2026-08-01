@@ -86,3 +86,12 @@ test('test training preparation still creates a cloud pickup shell', () => {
   assert.doesNotMatch(ensureShell, /return \{ ok: true, skipped: true/);
   assert.match(syncSource, /inspection\._startInspectionShellStatus === 'ready'[\s\S]*inspection\.driveFolderId/);
 });
+
+test('advanced smoke shortcut creates a test pickup without walking every intake field', () => {
+  assert.match(screensSource, /Create Test Pickup Inspection/);
+  assert.match(screensSource, /function quickTestPickupData\(\)/);
+  assert.match(screensSource, /assessmentType: 'Test \/ Training'/);
+  assert.match(screensSource, /Create a TEST \/ TRAINING pickup inspection now/);
+  assert.match(screensSource, /ensureStartInspectionShell\(ctx\.stepList, \{ force: true \}\)/);
+  assert.match(screensSource, /checkpointToCloud\(ctx\.stepList\)/);
+});

@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=217';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=217';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=217';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=217';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=217';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=217';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=218';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=218';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=218';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=218';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=218';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=218';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=217';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=217';
-import { updatePhotoMetadata } from './supabase-photos.js?v=217';
-import { FIELD_RESUME_TOKEN } from './config.js?v=217';
+} from './findings.js?v=218';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=218';
+import { updatePhotoMetadata } from './supabase-photos.js?v=218';
+import { FIELD_RESUME_TOKEN } from './config.js?v=218';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=217';
+} from './comment-library.js?v=218';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -543,6 +543,92 @@ function toggleDevMode() {
   ctx.render();
 }
 
+function quickTestPickupData() {
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 12);
+  return {
+    inspectionId: ctx.genId(),
+    inspectorName: 'Codex QA',
+    inspectorEmail: '',
+    inspectionDate: now.toISOString().slice(0, 10),
+    clientName: 'TEST Pickup ' + stamp.slice(4),
+    propertyAddress: '123 Test Pickup Rd, Basalt CO',
+    numberOfLevels: '2',
+    numberOfBedrooms: '3',
+    numberOfBathrooms: '2',
+    waterSource: ['Municipal'],
+    waterSourceDescription: '',
+    wifiNetwork: '',
+    wifiPassword: '',
+    clientConcerns: 'Pipeline smoke test only. Do not report.',
+    blueprintNotes: '',
+    assessmentType: 'Test / Training',
+    pfasSetup: 'No',
+    pfasKitNum: '',
+    waterPanelPlanned: 'Not requested',
+    waterSampleId: '',
+    waterSampleType: 'Not determined',
+    requiredTests: [],
+    microplasticsStatus: 'Not requested',
+    microplasticsSampleId: '',
+    pfasStatus: 'Not requested',
+    pfasSampleId: '',
+    officePrepNotes: 'Automated test pickup created from Advanced.',
+    teamInspectorNames: ''
+  };
+}
+
+async function createQuickTestPickup(button) {
+  if (!confirm('Create a TEST / TRAINING pickup inspection now?\n\nThis creates a cloud pickup record and _Test Assessments folder, but no real tracker row.')) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Creating test pickup...';
+  try {
+    const now = new Date().toISOString();
+    const data = quickTestPickupData();
+    ctx.inspection = {
+      ...intakeValuesOnly(data),
+      inspectionId: data.inspectionId,
+      startedAt: now,
+      preparedAt: now,
+      updatedAt: now,
+      endedAt: null,
+      status: 'prepared',
+      reviewStatus: 'Prepared',
+      stepData: {},
+      timers: {},
+      dynamicRooms: { lowest: [{ name: 'Radon - Room 1' }], additional: [{ name: 'Living Room' }, { name: 'Laundry Room' }] },
+      _lastStepIdx: 0,
+      truckCheck: {}
+    };
+    ensureInspectionWorkspace(ctx.inspection);
+    setInspection(ctx.inspection);
+    applyOfficePreparation(ctx.inspection, data);
+    setInspection(ctx.inspection);
+    ctx.stepList = buildStepList(ctx.inspection);
+    const localSaved = await saveNow();
+    if (!localSaved) throw new Error('Local save failed');
+    const shellReady = await ensureStartInspectionShell(ctx.stepList, { force: true });
+    if (!shellReady || shellReady.ok !== true) {
+      throw new Error(shellReady?.message || 'folder/tracker receipt missing');
+    }
+    const cloudSaved = await checkpointToCloud(ctx.stepList);
+    if (!cloudSaved) throw new Error('Cloud pickup save failed');
+    await saveNow();
+    const id = ctx.inspection.inspectionId;
+    ui().showToast('Test pickup ready: ' + id);
+    alert('Test pickup created.\n\nInspection ID:\n' + id + '\n\nNow open Continue Active Inspection on the phone.');
+    ctx.inspection = null;
+    setInspection(null);
+    setScreen('home');
+    ctx.render();
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = originalText;
+    alert('Could not create test pickup: ' + (err?.message || String(err)));
+  }
+}
+
 export function buildAppHeader(subtitle) {
   const header = ui().el('div', { className: 'app-header' });
   const logo = ui().el('div', { className: 'app-logo', style: 'cursor:pointer;', onClick: () => {
@@ -635,6 +721,12 @@ export function renderHome() {
     }
   }, isDevMode() ? '\u26a0\ufe0f Dev Mode ON \u2014 tap to disable' : 'Enable Dev Mode');
   advancedSection.appendChild(devToggle);
+  const quickPickupBtn = ui().el('button', {
+    className: 'btn btn-outline btn-full',
+    style: 'margin-top:8px;font-size:0.8rem;color:#2563eb;border-color:#93c5fd;',
+    onClick: () => createQuickTestPickup(quickPickupBtn)
+  }, 'Create Test Pickup Inspection');
+  advancedSection.appendChild(quickPickupBtn);
   c.appendChild(advancedSection);
 
   // ── Jump to Step (dev only) ─────────────────────────────
