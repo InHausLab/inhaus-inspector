@@ -87,6 +87,16 @@ test('test training preparation still creates a cloud pickup shell', () => {
   assert.match(syncSource, /inspection\._startInspectionShellStatus === 'ready'[\s\S]*inspection\.driveFolderId/);
 });
 
+test('start shell receipt uses shell/action status instead of transport ok', () => {
+  const start = syncSource.indexOf('function rememberStartInspectionShellResult(result)');
+  const end = syncSource.indexOf('function attachKnownShellMetadata', start);
+  const rememberShell = syncSource.slice(start, end);
+  assert.match(rememberShell, /result\.shellStatus/);
+  assert.match(rememberShell, /result\.actionStatus/);
+  assert.match(rememberShell, /result\.status && result\.status !== 'ok'/);
+  assert.match(rememberShell, /inspection\._startInspectionShellStatus = receiptStatus/);
+});
+
 test('advanced smoke shortcut creates a test pickup without walking every intake field', () => {
   assert.match(screensSource, /Create Test Pickup Inspection/);
   assert.match(screensSource, /function quickTestPickupData\(\)/);

@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=218';
-import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=218';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, LEGACY_SYNC_SECRET, FIELD_RESUME_TOKEN, USE_SUPABASE_PHOTOS } from './config.js?v=219';
+import { uploadPhotoToSupabase, mirrorPhotosToDrive, verifyInspectionStatus } from './supabase-photos.js?v=219';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=218';
-import { scheduleSave } from './storage.js?v=218';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=218';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=218';
+         getBestCloudSyncAt } from './state.js?v=219';
+import { scheduleSave } from './storage.js?v=219';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=219';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=219';
 
 // Wrapper: always injects the sync secret into the JSON body so Apps Script
 // can authenticate the request without CORS-breaking custom headers.
@@ -300,8 +300,14 @@ function shellReceiptIsReady(inspection) {
 function rememberStartInspectionShellResult(result) {
   const inspection = getInspection();
   if (!inspection || !result) return;
+  const receiptStatus = (
+    result.shellStatus ||
+    result.actionStatus ||
+    (result.status && result.status !== 'ok' ? result.status : '') ||
+    (result.isTestTraining ? 'skipped_test_training' : 'ready')
+  );
   inspection._startInspectionShellReceipt = result;
-  inspection._startInspectionShellStatus = result.status || (result.isTestTraining ? 'skipped_test_training' : 'ready');
+  inspection._startInspectionShellStatus = receiptStatus;
   inspection._startInspectionShellUpdatedAt = result.updatedAt || new Date().toISOString();
   inspection._startInspectionShellError = result.error || '';
   if (result.isTestTraining === true) {
@@ -830,7 +836,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=218');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=219');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {

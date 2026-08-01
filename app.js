@@ -1,13 +1,13 @@
 // InHaus Inspector - Main Application
-import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=218';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=218';
-import { initStorage, saveNow, scheduleSave } from './storage.js?v=218';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=218';
-import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=218';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=218';
-import { initScreens, render } from './screens.js?v=218';
-import { initAppFeedback } from './feedback.js?v=218';
-import { deletePhotoFromSupabase } from './supabase-photos.js?v=218';
+import { GOOGLE_SCRIPT_URL, SYNC_SECRET, SHARED_DRIVE_FOLDER_ID, VISION_PROXY_URL } from './config.js?v=219';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=219';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=219';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=219';
+import { scriptFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendToGoogleScript, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=219';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=219';
+import { initScreens, render } from './screens.js?v=219';
+import { initAppFeedback } from './feedback.js?v=219';
+import { deletePhotoFromSupabase } from './supabase-photos.js?v=219';
 
 (function () {
   'use strict';
@@ -629,7 +629,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=218';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v218',
+      appVersion: 'v219',
       success: success
     };
   }
