@@ -106,3 +106,11 @@ test('advanced smoke shortcut creates a test pickup without walking every intake
   assert.match(screensSource, /ensureStartInspectionShell\(ctx\.stepList, \{ force: true \}\)/);
   assert.match(screensSource, /checkpointToCloud\(ctx\.stepList\)/);
 });
+
+test('Dev Mode bypasses completion requirements only for test training inspections', () => {
+  const start = screensSource.indexOf('function collectInspectionIssues()');
+  const end = screensSource.indexOf('function formatIssueList', start);
+  const gate = screensSource.slice(start, end);
+  assert.match(gate, /isDevMode\(\) && \/test\|training\/i\.test/);
+  assert.match(gate, /if \(isDevTraining\) return issues/);
+});

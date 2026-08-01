@@ -144,6 +144,8 @@ function getStepReviewIssues(step) {
 function collectInspectionIssues() {
   const issues = [];
   if (!ctx || !ctx.stepList) return issues;
+  const isDevTraining = isDevMode() && /test|training/i.test(String(ctx.inspection?.assessmentType || ''));
+  if (isDevTraining) return issues;
 
   ctx.stepList.forEach((step, idx) => {
     if (step.type === 'review') return;
