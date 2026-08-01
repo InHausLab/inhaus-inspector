@@ -26,7 +26,7 @@ const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w9';
+const WORKER_VERSION = 'handoff-w10';
 
 export default {
   async fetch(request, env, ctx) {
@@ -1909,7 +1909,8 @@ function getHandoffReceiptFromFieldData(fieldData = {}) {
 
 function getReadyHandoffReceipt(fieldData = {}) {
   const receipt = getHandoffReceiptFromFieldData(fieldData);
-  return receipt && isReadyHandoffReceipt(receipt) ? receipt : null;
+  const expectedRoomCount = getHandoffRoomRecords(fieldData).length;
+  return receipt && isReadyHandoffReceipt(receipt, { expectedRoomCount }) ? receipt : null;
 }
 
 function buildPartialFailedHandoffReceipt(fieldData = {}) {
@@ -1947,7 +1948,7 @@ function buildPartialFailedHandoffReceipt(fieldData = {}) {
   return partial;
 }
 
-function isReadyHandoffReceipt(receipt = {}) {
+function isReadyHandoffReceipt(receipt = {}, expectations = {}) {
   if (!receipt || !isPlainObject(receipt)) return false;
   const status = String(receipt.status || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
   const trackerStatus = String(receipt.trackerStatus || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
@@ -1960,6 +1961,13 @@ function isReadyHandoffReceipt(receipt = {}) {
   if (!isTestTraining && !(receipt.trackerUrl || receipt.trackerRow || receipt.trackerRowUrl)) return false;
   if (Number(receipt.photoFolderFailedCount || receipt.technicianPhotoFailedCount || 0) > 0) return false;
   if (Number(receipt.photoFolderPendingCount || 0) > 0) return false;
+  const counts = isPlainObject(receipt.counts) ? receipt.counts : {};
+  const expectedRoomCount = Number(expectations.expectedRoomCount || receipt.sourceRoomCount || counts.sourceRoomCount || 0);
+  const expectedPhotoCount = Number(expectations.expectedPhotoCount || receipt.sourcePhotoCount || counts.sourcePhotoCount || 0);
+  const roomDetailCount = Number(receipt.roomDetailCount || counts.roomDetailCount || 0);
+  const photoLogCount = Number(receipt.photoLogCount || counts.photoLogCount || 0);
+  if (expectedRoomCount > 0 && roomDetailCount < expectedRoomCount) return false;
+  if (expectedPhotoCount > 0 && photoLogCount < expectedPhotoCount) return false;
   return true;
 }
 
@@ -1967,15 +1975,18 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const source = buildHandoffSource(inspectionId, fieldData, body);
   const isTestTraining = isTestTrainingInspection(source);
   const previousReceipt = getHandoffReceiptFromFieldData(fieldData) || {};
+  const sourceRoomCount = getHandoffRoomRecords(fieldData).length;
+  const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
+  const previousRoomDetailCount = Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0);
   const canReuseStaticArtifacts = !!(body.forceFullRepair !== true &&
     previousReceipt.spreadsheetId &&
     previousReceipt.spreadsheetUrl &&
-    (previousReceipt.rawJsonUrl || previousReceipt.rawReviewDataUrl));
+    (previousReceipt.rawJsonUrl || previousReceipt.rawReviewDataUrl) &&
+    (sourceRoomCount === 0 || previousRoomDetailCount >= sourceRoomCount));
   const shell = isTestTraining
     ? await ensureTestHandoffShell(env, accessToken, source)
     : await ensureRealHandoffShell(env, accessToken, source, fieldData);
   const photoRows = await getPhotoManifestRows(env, inspectionId);
-  const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
   const spreadsheet = canReuseStaticArtifacts
     ? {
         spreadsheetId: previousReceipt.spreadsheetId,
@@ -2044,7 +2055,8 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       photoFolderOperationCount: photoPackage.operationCount,
       rawReviewKeyCount: spreadsheet.rawReviewKeyCount,
       formattedReviewRowCount: spreadsheet.formattedReviewRowCount,
-      roomDetailCount: spreadsheet.roomDetailCount
+      roomDetailCount: spreadsheet.roomDetailCount,
+      sourceRoomCount
     },
     sourcePhotoCount: photoRows.length,
     photoManifestCount: photoRows.length,
@@ -2061,6 +2073,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     rawReviewKeyCount: spreadsheet.rawReviewKeyCount,
     formattedReviewRowCount: spreadsheet.formattedReviewRowCount,
     roomDetailCount: spreadsheet.roomDetailCount,
+    sourceRoomCount,
     checksums: {
       sourceSnapshotHash: stableHash(fieldData.system && fieldData.system.inspectionRecovery),
       reviewDataHash: stableHash(fieldData),
@@ -2074,12 +2087,17 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     schemaVersion: HANDOFF_RECEIPT_SCHEMA_VERSION,
     error: photoPackage.error || ''
   };
-  if (!isReadyHandoffReceipt(receipt) && photoPackage.pendingCount > 0 && photoPackage.failedCount === 0) {
+  const receiptExpectations = { expectedRoomCount: sourceRoomCount, expectedPhotoCount: photoRows.length };
+  if (!isReadyHandoffReceipt(receipt, receiptExpectations) && photoPackage.pendingCount > 0 && photoPackage.failedCount === 0) {
     receipt.status = 'running';
     receipt.error = `photo copy pending:${photoPackage.pendingCount}`;
-  } else if (!isReadyHandoffReceipt(receipt)) {
+  } else if (!isReadyHandoffReceipt(receipt, receiptExpectations)) {
     receipt.status = 'failed';
-    if (!receipt.error) receipt.error = getHandoffReceiptMissingReason(receipt);
+    if (!receipt.error) {
+      receipt.error = sourceRoomCount > spreadsheet.roomDetailCount
+        ? `room_detail_rows_incomplete:${spreadsheet.roomDetailCount}/${sourceRoomCount}`
+        : getHandoffReceiptMissingReason(receipt);
+    }
   }
   return receipt;
 }
@@ -2164,6 +2182,45 @@ async function ensureRealHandoffShell(env, accessToken, source, fieldData) {
 }
 
 async function ensureTestHandoffShell(env, accessToken, source) {
+  const existing = isPlainObject(source.system?.startInspectionShell)
+    ? source.system.startInspectionShell
+    : (isPlainObject(source.startInspectionShell) ? source.startInspectionShell : null);
+  if (existing && existing.status === 'ready' && existing.folderId) {
+    const folder = driveFileFromReceipt(existing.folderId, existing.folderUrl, existing.folderName);
+    const photosFolder = existing.photosFolderId || existing.technicianPhotosFolderId
+      ? driveFileFromReceipt(existing.photosFolderId || existing.technicianPhotosFolderId, existing.photosFolderUrl || existing.technicianPhotosFolderUrl)
+      : await getOrCreateDriveFolder(accessToken, folder.id, assessmentSubfolderName('Photos', source));
+    const cocsFolder = existing.cocsFolderId
+      ? driveFileFromReceipt(existing.cocsFolderId, existing.cocsFolderUrl)
+      : await getOrCreateDriveFolder(accessToken, folder.id, assessmentSubfolderName('COCs', source));
+    const backupFolder = existing.backupFolderId
+      ? driveFileFromReceipt(existing.backupFolderId, existing.backupFolderUrl)
+      : await getOrCreateDriveFolder(accessToken, folder.id, assessmentSubfolderName('Backup', source));
+    return {
+      ...existing,
+      status: 'ready',
+      shellStatus: 'ready',
+      isTestTraining: true,
+      assessmentNumber: '',
+      assessmentNumberSource: 'skipped_test_training',
+      folderId: folder.id,
+      folderUrl: driveFolderUrl(folder),
+      photosFolderId: photosFolder.id,
+      photosFolderUrl: driveFolderUrl(photosFolder),
+      technicianPhotosFolderId: photosFolder.id,
+      technicianPhotosFolderUrl: driveFolderUrl(photosFolder),
+      cocsFolderId: cocsFolder.id,
+      cocsFolderUrl: driveFolderUrl(cocsFolder),
+      backupFolderId: backupFolder.id,
+      backupFolderUrl: driveFolderUrl(backupFolder),
+      trackerRow: '',
+      trackerUrl: '',
+      trackerStatus: 'skipped_test_training',
+      updatedAt: new Date().toISOString(),
+      workerVersion: WORKER_VERSION,
+      error: ''
+    };
+  }
   const assessmentsFolderId = String(env.ASSESSMENTS_FOLDER_ID || source.sharedDriveFolderId || source.driveFolderId || '').trim();
   if (!assessmentsFolderId) throw new Error('missing_assessments_folder_id');
   const testRoot = await getOrCreateDriveFolder(accessToken, assessmentsFolderId, TEST_ASSESSMENTS_FOLDER_NAME);
@@ -2212,6 +2269,11 @@ function buildHandoffSource(inspectionId, fieldData, body) {
     ...reviewedData,
     ...body,
     inspectionId
+  };
+  source.system = {
+    ...(isPlainObject(fieldData.system) ? fieldData.system : {}),
+    ...(isPlainObject(reviewedData.system) ? reviewedData.system : {}),
+    ...(isPlainObject(body.system) ? body.system : {})
   };
   source.clientName = firstNonEmpty(body.clientName, reviewedData.clientName, fieldData.clientName, recovery.clientName, fieldData.client);
   source.propertyAddress = firstNonEmpty(body.propertyAddress, reviewedData.propertyAddress, fieldData.propertyAddress, recovery.propertyAddress, fieldData.address);
@@ -3212,7 +3274,7 @@ async function createOrUpdateReviewDataSpreadsheet(accessToken, folderId, source
   const formattedRows = buildFormattedReviewRows(fieldData);
   const rawRows = buildRawReviewRows(fieldData);
   const photoLogRows = buildPhotoLogRows(photoRows);
-  const roomRows = buildRoomDetailRows(fieldData);
+  const roomRows = buildRoomDetailRows(fieldData, photoRows);
   await clearSheetTabs(accessToken, spreadsheet.id, ['Review Portal Data', 'Raw Review Data', 'Photo Log', 'Room Details']);
   await writeSheetValueSets(accessToken, spreadsheet.id, [
     { tab: 'Review Portal Data', rows: formattedRows },
@@ -3401,21 +3463,47 @@ function buildPhotoLogRows(photoRows) {
   return rows;
 }
 
-function buildRoomDetailRows(fieldData) {
+function getHandoffInspectionRecovery(fieldData = {}) {
+  const system = isPlainObject(fieldData.system) ? fieldData.system : {};
+  return isPlainObject(system.inspectionRecovery)
+    ? system.inspectionRecovery
+    : (isPlainObject(fieldData.inspectionRecovery) ? fieldData.inspectionRecovery : {});
+}
+
+function getHandoffRoomRecords(fieldData = {}) {
+  if (Array.isArray(fieldData.rooms)) return fieldData.rooms;
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  return Array.isArray(recovery.rooms) ? recovery.rooms : [];
+}
+
+function buildRoomDetailRows(fieldData, photoRows = []) {
   const rows = [['Room', 'Notes', 'No Issues', 'Follow Up', 'Photos']];
-  const rooms = Array.isArray(fieldData.rooms) ? fieldData.rooms : [];
+  const rooms = getHandoffRoomRecords(fieldData);
   rooms.forEach(function(room) {
     if (!isPlainObject(room)) return;
+    const stepId = firstNonEmpty(room.stepId, room.id);
+    const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const roomName = firstNonEmpty(room.name, room.roomName, room.label, stepId);
     const photoIds = []
       .concat(Array.isArray(room.photoIds) ? room.photoIds : [])
       .concat(Array.isArray(room.photos) ? room.photos.map(photo => isPlainObject(photo) ? (photo.id || photo.photoId || photo.photo_id || '') : photo) : [])
+      .concat((photoRows || [])
+        .filter(photo => String(photo.room_name || '').trim().toLowerCase() === String(roomName || '').trim().toLowerCase())
+        .map(photo => photo.photo_id || ''))
       .filter(Boolean);
+    const followUp = firstNonEmpty(
+      reviewedRoom.followUp,
+      reviewedRoom.followUpPlan,
+      room.followUp,
+      room.followUpPlan,
+      [reviewedRoom.recheckIn ? `Recheck in: ${reviewedRoom.recheckIn}` : '', reviewedRoom.watchFor ? `Watch for: ${reviewedRoom.watchFor}` : ''].filter(Boolean).join(' · ')
+    );
     rows.push([
-      room.name || room.roomName || room.label || '',
-      room.inspectorNotes || room.notes || room.polishedInspectorNotes || '',
-      room.noIssuesFound || room.noIssues ? 'TRUE' : '',
-      room.followUp || room.followUpPlan || '',
-      photoIds.join(', ')
+      roomName,
+      firstNonEmpty(reviewedRoom.polishedInspectorNotes, reviewedRoom.inspectorNotes, room.inspectorNotes, room.notes, room.polishedInspectorNotes),
+      reviewedRoom.noIssuesFound === true || reviewedRoom.noIssues === true || room.noIssuesFound === true || room.noIssues === true ? 'TRUE' : '',
+      followUp,
+      Array.from(new Set(photoIds)).join(', ')
     ]);
   });
   return rows;

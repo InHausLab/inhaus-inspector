@@ -534,7 +534,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w9', 'health exposes Worker version');
+  assert(data.version === 'handoff-w10', 'health exposes Worker version');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
   assert(data.dependencies.supabaseBucket === true, 'health checks Supabase bucket config');
@@ -1291,7 +1291,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(sheetDataRowsForTab(state, 'Photo Log').length === 2, 'photo log has one row per photo');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-1', 'Kitchen', 'ATP Before', 'Before photo', 'https://drive.google.com/file/d/drive-photo-1/view']), 'photo log includes first photo details');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-2', 'Kitchen', 'ATP After', 'After photo', 'https://drive.google.com/file/d/drive-photo-2/view']), 'photo log includes second photo details');
-  assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Observed staining.', 'photo-1']), 'room details include inspector notes and room photo IDs');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Observed staining.', 'photo-1, photo-2']), 'room details include inspector notes and every assigned room photo ID');
   assert(state.rawUploads.length === 1, 'writes raw JSON backup file');
   assert(state.rawUploads[0].bodyText.includes('"obs_6_note": "Sixth observation"'), 'raw JSON backup includes late observation key');
   assert(state.rawUploads[0].bodyText.includes('"actionTaken_1_desc": "Cleaned test surface"'), 'raw JSON backup includes action-taken key');
@@ -1495,6 +1495,89 @@ async function testTrainingHandoffCreatesTestPackageOnly() {
   assert(state.assessmentWrites.length === 0, 'training handoff does not write ihl_assessments');
   assert(state.handoffJobWrites[0].is_test === true, 'training handoff initial durable job is marked test/training');
   assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-HAND01').is_test === true, 'training handoff durable job is marked test/training');
+}
+
+async function testTrainingHandoffRepairsMissingRecoveryRoomsInOriginalShell() {
+  const shellReceipt = {
+    status: 'ready',
+    shellStatus: 'ready',
+    isTestTraining: true,
+    inspectionId: 'INH-TRAINING-HAND02',
+    folderId: 'drive-test-shell',
+    folderUrl: 'https://drive.google.com/drive/folders/drive-test-shell',
+    folderName: 'TEST - Original Client',
+    photosFolderId: 'drive-test-photos',
+    photosFolderUrl: 'https://drive.google.com/drive/folders/drive-test-photos',
+    cocsFolderId: 'drive-test-cocs',
+    cocsFolderUrl: 'https://drive.google.com/drive/folders/drive-test-cocs',
+    backupFolderId: 'drive-test-backup',
+    backupFolderUrl: 'https://drive.google.com/drive/folders/drive-test-backup',
+    trackerStatus: 'skipped_test_training'
+  };
+  const incompleteReceipt = {
+    status: 'ready',
+    isTestTraining: true,
+    folderId: 'drive-duplicate-shell',
+    folderUrl: 'https://drive.google.com/drive/folders/drive-duplicate-shell',
+    photosFolderId: 'drive-duplicate-photos',
+    photosFolderUrl: 'https://drive.google.com/drive/folders/drive-duplicate-photos',
+    cocsFolderId: 'drive-duplicate-cocs',
+    cocsFolderUrl: 'https://drive.google.com/drive/folders/drive-duplicate-cocs',
+    backupFolderId: 'drive-duplicate-backup',
+    backupFolderUrl: 'https://drive.google.com/drive/folders/drive-duplicate-backup',
+    spreadsheetId: 'drive-incomplete-sheet',
+    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-incomplete-sheet/edit',
+    rawJsonUrl: 'https://drive.google.com/file/d/drive-incomplete-raw/view',
+    trackerStatus: 'skipped_test_training',
+    rawReviewKeyCount: 10,
+    formattedReviewRowCount: 4,
+    photoLogCount: 0,
+    roomDetailCount: 0
+  };
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-TRAINING-HAND02',
+      field_data: {
+        clientName: 'Original Client Reviewed',
+        propertyAddress: '2 Practice Way, Basalt CO',
+        inspectionDate: '2026-08-01',
+        inspectionType: 'Test / Training',
+        isTestTraining: true,
+        'bedroom-0': { inspectorNotes: 'Reviewed bedroom note.' },
+        'bathroom-0': { noIssuesFound: true },
+        system: {
+          startInspectionShell: shellReceipt,
+          tannerHandoff: incompleteReceipt,
+          inspectionRecovery: {
+            inspectionId: 'INH-TRAINING-HAND02',
+            rooms: [
+              { stepId: 'bedroom-0', roomName: 'Bedroom', notes: 'Source bedroom note.' },
+              { stepId: 'bathroom-0', roomName: 'Bathroom' }
+            ]
+          }
+        },
+        reviewPortalData: incompleteReceipt
+      },
+      updated_at: '2026-08-01T15:00:00.000Z'
+    },
+    photoRows: []
+  });
+  const { response, data } = await callWorker('/handoff-jobs', {
+    inspectionId: 'INH-TRAINING-HAND02',
+    requestedBy: 'review-portal',
+    reviewedData: { system: { reviewOnlyFlag: true } }
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  assert(response.status === 200, 'training recovery-room repair returns 200');
+  assert(data.artifactReceipt.status === 'ready', 'repaired receipt is ready');
+  assert(data.artifactReceipt.folderId === 'drive-test-shell', 'training handoff reuses the original start-shell folder');
+  assert(data.artifactReceipt.sourceRoomCount === 2, 'receipt records two preserved source rooms');
+  assert(data.artifactReceipt.roomDetailCount === 2, 'receipt records two Room Details rows');
+  assert(data.artifactReceipt.staticArtifactsReused === false, 'incomplete static artifacts are rebuilt');
+  assert(!state.driveCreates.some(file => file.name === '_Test Assessments'), 'repair does not create a second test root');
+  assert(!state.driveCreates.some(file => String(file.name).startsWith('TEST – 2026-08-01')), 'repair does not create a second assessment folder');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Bedroom', 'Reviewed bedroom note.']), 'Room Details uses the reviewed bedroom note');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Bathroom', 'TRUE']), 'Room Details includes the no-issues review outcome');
 }
 
 async function testHandoffDoesNotDuplicateAlreadyCopiedPhoto() {
@@ -2305,6 +2388,7 @@ const tests = [
   testHandoffJobSheetFailureSavesFailedReceipt,
   testHandoffJobStatusReadsDurableJob,
   testTrainingHandoffCreatesTestPackageOnly,
+  testTrainingHandoffRepairsMissingRecoveryRoomsInOriginalShell,
   testHandoffDoesNotDuplicateAlreadyCopiedPhoto,
   testHandoffWithRemainingPhotosStaysRunning,
   testHandoffHandlesLargePhotoBatchWithoutFalseCompletion,
