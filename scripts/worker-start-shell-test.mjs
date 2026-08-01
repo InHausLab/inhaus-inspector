@@ -144,6 +144,7 @@ function makeMockFetch(options = {}) {
     driveCreates: [],
     driveSearches: [],
     driveFolderLists: [],
+    driveTrashes: [],
     rawUploads: [],
     photoMetadataWrites: [],
     photoUpdates: [],
@@ -236,6 +237,13 @@ function makeMockFetch(options = {}) {
         webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`
       }));
       return jsonResponse({ files: existingFiles });
+    }
+
+    if (url.includes('www.googleapis.com/drive/v3/files/') && method === 'PATCH') {
+      const fileId = decodeURIComponent(url.split('/files/')[1].split('?')[0]);
+      const body = JSON.parse(String(init.body || '{}'));
+      state.driveTrashes.push({ fileId, ...body });
+      return jsonResponse({ id: fileId, trashed: body.trashed === true });
     }
 
     if (url.includes('www.googleapis.com/upload/drive/v3/files') && (method === 'POST' || method === 'PATCH')) {
@@ -374,6 +382,11 @@ function makeMockFetch(options = {}) {
       return jsonResponse(options.photoRows || []);
     }
 
+    if (url.includes('/rest/v1/inspector_photo_uploads') && method === 'DELETE') {
+      if (options.failPhotoMetadataDelete) return jsonResponse({ error: 'forced_delete_failure' }, 403);
+      return new Response(null, { status: 204 });
+    }
+
     if (url.endsWith('/rest/v1/inspector_photo_uploads') && method === 'POST') {
       const body = JSON.parse(String(init.body || '{}'));
       state.photoMetadataWrites.push(body);
@@ -402,6 +415,10 @@ function makeMockFetch(options = {}) {
         status: 200,
         headers: { 'Content-Type': 'image/jpeg' }
       });
+    }
+
+    if (url.includes('/storage/v1/object/inspection-photos') && method === 'DELETE') {
+      return new Response(null, { status: 200 });
     }
 
     if (url.includes('/storage/v1/object/list/inspection-photos') && method === 'POST') {
@@ -517,7 +534,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w8', 'health exposes Worker version');
+  assert(data.version === 'handoff-w9', 'health exposes Worker version');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
   assert(data.dependencies.supabaseBucket === true, 'health checks Supabase bucket config');
@@ -819,6 +836,125 @@ async function testInspectionOpenRecoversConcurrentTeamEvents() {
   assert(response.status === 200, 'inspection open returns 200');
   assert(data.inspection.resumeData.stepData.kitchen.notes === 'Device A kitchen note', 'inspection open recovers device A update');
   assert(data.inspection.resumeData.stepData.bedroom.notes === 'Device B bedroom note', 'inspection open recovers device B update');
+}
+
+async function testInspectionOpenAppliesPhotoTombstones() {
+  const stalePhoto = {
+    photoId: 'p-deleted01',
+    roomName: 'Bedroom 1',
+    stepName: 'Photos',
+    timestamp: '2026-08-01T15:00:00.000Z'
+  };
+  const base = {
+    inspectionId: 'INH-20260801-TOMB01',
+    status: 'completed',
+    resumeData: {
+      inspectionId: 'INH-20260801-TOMB01',
+      status: 'completed',
+      stepData: { bedroom1: { _photos: [stalePhoto] } },
+      photoTombstones: {}
+    }
+  };
+  const deletionEvent = {
+    inspectionId: 'INH-20260801-TOMB01',
+    resumeData: {
+      inspectionId: 'INH-20260801-TOMB01',
+      status: 'completed',
+      stepData: { bedroom1: { _photos: [] } },
+      photoTombstones: {
+        'p-deleted01': { status: 'deleted', updatedAt: '2026-08-01T15:05:00.000Z' }
+      }
+    }
+  };
+  const { mockFetch } = makeMockFetch({
+    assessmentRows: [{ inspection_id: 'INH-20260801-TOMB01', assessment_num: '021', status: 'Synced', raw_jsonb: base }],
+    inspectionEvents: [
+      { event_key: 'delete-photo', inspection_id: 'INH-20260801-TOMB01', payload: deletionEvent, created_at: '2026-08-01T15:05:00.000Z' }
+    ]
+  });
+  const { response, data } = await callWorkerGet('/inspections/INH-20260801-TOMB01?token=review-token', baseEnv(), mockFetch);
+
+  assert(response.status === 200, 'inspection tombstone open returns 200');
+  assert(data.inspection.resumeData.stepData.bedroom1._photos.length === 0, 'deleted photo is removed while replaying inspection events');
+  assert(data.inspection.resumeData.photoTombstones['p-deleted01'].status === 'deleted', 'photo tombstone remains in the canonical source record');
+}
+
+async function testPhotoDeleteRemovesManagedDriveCopy() {
+  const photoId = 'p-delete-drive01';
+  const driveFileId = 'drive-photo-delete01';
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-20260801-DEL01',
+      field_data: {
+        system: {
+          startInspectionShell: {
+            photosFolderId: 'drive-photos'
+          }
+        }
+      },
+      updated_at: '2026-08-01T15:00:00.000Z'
+    },
+    photoRows: [{
+      inspection_id: 'INH-20260801-DEL01',
+      photo_id: photoId,
+      drive_url: `https://drive.google.com/file/d/${driveFileId}/view`
+    }],
+    existingDriveFiles: [{
+      id: driveFileId,
+      parentId: 'drive-photos',
+      name: `Bedroom 1 - Overview - ${photoId}.jpg`,
+      mimeType: 'image/jpeg'
+    }]
+  });
+  const { response, data } = await callWorker('/delete', {
+    sharedSecret: 'upload-secret',
+    inspectionId: 'INH-20260801-DEL01',
+    photoId
+  }, baseEnv(), mockFetch);
+
+  assert(response.status === 200, 'photo delete returns 200');
+  assert(data.deleted === true, 'photo delete confirms deletion');
+  assert(data.driveDeletedCount === 1, 'photo delete confirms one managed Drive copy removed');
+  assert(state.driveTrashes.length === 1, 'photo delete trashes the Drive file');
+  assert(state.driveTrashes[0].fileId === driveFileId, 'photo delete targets the matching Drive file');
+}
+
+async function testPhotoDeleteDoesNotRemoveDriveFileOutsideManagedFolder() {
+  const photoId = 'p-delete-outside01';
+  const driveFileId = 'drive-photo-outside01';
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-20260801-DEL02',
+      field_data: {
+        system: {
+          startInspectionShell: {
+            photosFolderId: 'drive-photos'
+          }
+        }
+      },
+      updated_at: '2026-08-01T15:00:00.000Z'
+    },
+    photoRows: [{
+      inspection_id: 'INH-20260801-DEL02',
+      photo_id: photoId,
+      drive_url: `https://drive.google.com/file/d/${driveFileId}/view`
+    }],
+    existingDriveFiles: [{
+      id: driveFileId,
+      parentId: 'unrelated-folder',
+      name: `Bedroom 1 - Overview - ${photoId}.jpg`,
+      mimeType: 'image/jpeg'
+    }]
+  });
+  const { response, data } = await callWorker('/delete', {
+    sharedSecret: 'upload-secret',
+    inspectionId: 'INH-20260801-DEL02',
+    photoId
+  }, baseEnv(), mockFetch);
+
+  assert(response.status === 200, 'photo delete outside managed folder returns 200');
+  assert(data.driveDeletedCount === 0, 'photo outside managed folder is not counted as deleted');
+  assert(state.driveTrashes.length === 0, 'photo outside managed folder is not trashed');
 }
 
 async function testTeamMergePersistsEventBeforeCanonicalUpdate() {
@@ -2153,6 +2289,9 @@ const tests = [
   testInspectionSaveCreatesDurableCheckpoint,
   testActiveInspectionListUsesCanonicalSupabaseRows,
   testInspectionOpenRecoversConcurrentTeamEvents,
+  testInspectionOpenAppliesPhotoTombstones,
+  testPhotoDeleteRemovesManagedDriveCopy,
+  testPhotoDeleteDoesNotRemoveDriveFileOutsideManagedFolder,
   testTeamMergePersistsEventBeforeCanonicalUpdate,
   testRealInspectionWithTrainingAddressDoesNotSkipShell,
   testRealStartShellCreatesReceipt,

@@ -26,7 +26,7 @@ const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w8';
+const WORKER_VERSION = 'handoff-w9';
 
 export default {
   async fetch(request, env, ctx) {
@@ -458,6 +458,7 @@ async function handleInspectionGet(request, url, env) {
   for (const event of events) {
     if (isPlainObject(event.payload)) inspection = mergeInspectionExports(inspection, event.payload);
   }
+  inspection = applyInspectionPhotoTombstones(inspection, inspection.photoTombstones);
   inspection.inspectionId = inspection.inspectionId || inspectionId;
   inspection.id = inspection.id || inspectionId;
   inspection.status = row.status || inspection.status || '';
@@ -592,7 +593,7 @@ async function saveInspectionAssessment(env, source, knownRow = null) {
     completed_at: firstNonEmpty(source.completedAt, resume.completedAt) || null,
     app_version: firstNonEmpty(source.appVersion, resume.appVersion) || null,
     payload_version: firstNonEmpty(source.payloadVersion, resume.payloadVersion) || null,
-    raw_jsonb: source,
+    raw_jsonb: applyInspectionPhotoTombstones(source, source.photoTombstones || resume.photoTombstones),
     source_system: isTestTraining ? 'worker_test_training' : 'worker_inspection_api',
     source_id: inspectionId
   };
@@ -716,7 +717,7 @@ function mergeInspectionExports(remoteExport, incomingExport) {
   merged.collaboration = structuredClone(mergedResume.collaboration || {});
   merged.auditTrail = structuredClone(mergedResume.auditTrail || []);
   merged.photoTombstones = structuredClone(mergedResume.photoTombstones || {});
-  return merged;
+  return applyInspectionPhotoTombstones(merged, merged.photoTombstones);
 }
 
 function mergeInspectionRecords(remote, incoming) {
@@ -747,7 +748,33 @@ function mergeInspectionRecords(remote, incoming) {
   collaboration.serverMergedAt = new Date().toISOString();
   merged.collaboration = collaboration;
   merged._serverMergedAt = collaboration.serverMergedAt;
-  return merged;
+  return applyInspectionPhotoTombstones(merged, merged.photoTombstones);
+}
+
+function applyInspectionPhotoTombstones(value, tombstones) {
+  const source = isPlainObject(tombstones) ? tombstones : {};
+  const deletedPhotoIds = new Set(
+    Object.entries(source)
+      .filter(([, item]) => String(item && item.status || '').toLowerCase() === 'deleted')
+      .map(([photoId]) => photoId)
+  );
+  if (!deletedPhotoIds.size || !value || typeof value !== 'object') return value;
+
+  const visit = candidate => {
+    if (Array.isArray(candidate)) {
+      return candidate
+        .filter(item => !(item && item.photoId && deletedPhotoIds.has(item.photoId)))
+        .map(visit);
+    }
+    if (!isPlainObject(candidate)) return candidate;
+    for (const [key, child] of Object.entries(candidate)) {
+      if (key === 'photoTombstones') continue;
+      candidate[key] = visit(child);
+    }
+    return candidate;
+  };
+
+  return visit(structuredClone(value));
 }
 
 function mergeInspectionStep(remoteStep, incomingStep) {
@@ -1272,6 +1299,8 @@ async function handleReviewPhotoDelete(request, env) {
 
 async function deletePhotoRecord(env, inspectionId, photoId) {
   const storagePath = storagePathFor(inspectionId, photoId);
+  const photoRows = await getPhotoRowsForDelete(env, inspectionId, photoId);
+  const existingDriveUrl = String(photoRows[0] && photoRows[0].drive_url || '');
 
   const objectResponse = await fetch(normalizeSupabaseUrl(env, `/storage/v1/object/${encodeURIComponent(env.SUPABASE_BUCKET)}`), {
     method: 'DELETE',
@@ -1288,6 +1317,7 @@ async function deletePhotoRecord(env, inspectionId, photoId) {
   const metadataResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
     method: 'DELETE', headers: serviceHeaders(env)
   });
+  let metadata = 'deleted';
   if (!metadataResponse.ok) {
     // Production intentionally grants UPDATE but not DELETE on this table.
     // Tombstone the existing row without a schema change, then exclude it from
@@ -1300,9 +1330,81 @@ async function deletePhotoRecord(env, inspectionId, photoId) {
     if (!tombstoneResponse.ok) {
       throw new Error(`photo_metadata_tombstone_failed:${tombstoneResponse.status}:${(await tombstoneResponse.text()).slice(0, 120)}`);
     }
-    return json({ deleted: true, metadata: 'tombstoned', inspectionId, photoId });
+    metadata = 'tombstoned';
   }
-  return json({ deleted: true, metadata: 'deleted', inspectionId, photoId });
+
+  let driveCleanup = { deletedCount: 0, matchedFileIds: [] };
+  let driveDeleteWarning = '';
+  try {
+    driveCleanup = await deleteManagedDrivePhotoCopies(env, inspectionId, photoId, existingDriveUrl);
+  } catch (err) {
+    driveDeleteWarning = err && err.message ? err.message : String(err);
+  }
+
+  return json({
+    deleted: true,
+    metadata,
+    inspectionId,
+    photoId,
+    driveDeletedCount: driveCleanup.deletedCount,
+    driveDeleteWarning
+  });
+}
+
+async function getPhotoRowsForDelete(env, inspectionId, photoId) {
+  const params = new URLSearchParams();
+  params.set('inspection_id', `eq.${inspectionId}`);
+  params.set('photo_id', `eq.${photoId}`);
+  params.set('select', 'photo_id,drive_url');
+  params.set('limit', '10');
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/inspector_photo_uploads?${params}`), {
+    headers: serviceHeaders(env)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`photo_delete_lookup_failed:${response.status}:${text.slice(0, 120)}`);
+  const rows = text ? JSON.parse(text) : [];
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function deleteManagedDrivePhotoCopies(env, inspectionId, photoId, driveUrl) {
+  if (!env.GOOGLE_SERVICE_ACCOUNT) return { deletedCount: 0, matchedFileIds: [] };
+  const shell = await getStartInspectionShellState(env, inspectionId);
+  const photosFolderId = firstNonEmpty(
+    shell && shell.photosFolderId,
+    shell && shell.technicianPhotosFolderId
+  );
+  const accessToken = await getGoogleAccessToken(env);
+  const matchedFileIds = new Set();
+  const directDriveId = extractDriveFileId(driveUrl);
+
+  if (photosFolderId) {
+    const filesByName = await listDriveFolderFilesByName(accessToken, photosFolderId);
+    const expectedSuffix = ` - ${photoId}.jpg`;
+    for (const file of filesByName.values()) {
+      const name = String(file && file.name || '');
+      if (
+        file.id === directDriveId ||
+        name === `${photoId}.jpg` ||
+        name.endsWith(expectedSuffix)
+      ) matchedFileIds.add(file.id);
+    }
+  }
+
+  for (const fileId of matchedFileIds) await trashDriveFile(accessToken, fileId);
+  return { deletedCount: matchedFileIds.size, matchedFileIds: Array.from(matchedFileIds) };
+}
+
+async function trashDriveFile(accessToken, fileId) {
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true&fields=id,trashed`,
+    {
+      method: 'PATCH',
+      headers: driveHeaders(accessToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ trashed: true })
+    }
+  );
+  const text = await response.text();
+  if (!response.ok) throw new Error(`drive_photo_delete_failed:${response.status}:${text.slice(0, 120)}`);
 }
 
 async function handleInspectionPhotos(url, env) {

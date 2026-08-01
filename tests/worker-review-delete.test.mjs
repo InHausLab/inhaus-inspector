@@ -41,11 +41,14 @@ test('review photo delete route removes storage and metadata when authorized', a
       deleted: true,
       metadata: 'deleted',
       inspectionId: 'INH-TEST',
-      photoId: 'photo-1'
+      photoId: 'photo-1',
+      driveDeletedCount: 0,
+      driveDeleteWarning: ''
     });
-    assert.deepEqual(requests.map(request => request.method), ['DELETE', 'DELETE']);
-    assert.match(requests[0].url, /\/storage\/v1\/object\/inspection-photos$/);
-    assert.match(requests[1].url, /\/rest\/v1\/inspector_photo_uploads\?/);
+    assert.deepEqual(requests.map(request => request.method), ['GET', 'DELETE', 'DELETE']);
+    assert.match(requests[0].url, /\/rest\/v1\/inspector_photo_uploads\?/);
+    assert.match(requests[1].url, /\/storage\/v1\/object\/inspection-photos$/);
+    assert.match(requests[2].url, /\/rest\/v1\/inspector_photo_uploads\?/);
   } finally {
     globalThis.fetch = originalFetch;
   }
