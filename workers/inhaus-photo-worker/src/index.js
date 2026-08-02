@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w17';
+const WORKER_VERSION = 'handoff-w18';
 
 export default {
   async fetch(request, env, ctx) {
@@ -3801,7 +3801,7 @@ function buildPhotoLogRows(photoRows) {
       row.slot === undefined || row.slot === null ? '' : String(row.slot),
       row.storage_path || '',
       row.drive_url || '',
-      row.photo_id && row.inspection_id ? `https://inhaus-photo-worker.inhauslab.workers.dev/photo?inspectionId=${encodeURIComponent(row.inspection_id)}&photoId=${encodeURIComponent(row.photo_id)}` : '',
+      row.photo_id && row.inspection_id ? `https://inhaus-photo-worker.inhauslab.workers.dev/photo?inspectionId=${encodeURIComponent(row.inspection_id)}&photoId=${encodeURIComponent(row.photo_id)}&token=${encodeURIComponent(String(row.inspection_id).toLowerCase())}` : '',
       row.created_at || ''
     ]);
   });

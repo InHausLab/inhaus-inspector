@@ -577,7 +577,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w17', 'health exposes Worker version');
+  assert(data.version === 'handoff-w18', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -2664,6 +2664,7 @@ async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
   assert(data.artifactReceipt.photoDriveUrlCount === 1, 'ready receipt counts every photo Drive URL');
   assert(photoLogWrites.length >= 2, 'final photo batch refreshes the Photo Log after copying');
   assert(String(finalPhotoLog[1]?.[6] || '').includes('drive.google.com/file/d/'), 'final Photo Log contains the copied photo Drive URL');
+  assert(String(finalPhotoLog[1]?.[7] || '').includes('token=inh-training-photolog01'), 'final Photo Log review URL includes its inspection token');
 }
 
 const tests = [
