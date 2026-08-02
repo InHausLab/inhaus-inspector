@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w21';
+const WORKER_VERSION = 'handoff-w22';
 
 export default {
   async fetch(request, env, ctx) {
@@ -3854,18 +3854,17 @@ async function batchUpdateSpreadsheet(accessToken, spreadsheetId, requests) {
 }
 
 async function clearSheetTabs(accessToken, spreadsheetId, tabs) {
-  await Promise.all(tabs.map(async function(tab) {
-    const range = encodeURIComponent(`${tab}!A:Z`);
-    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${range}:clear`, {
-      method: 'POST',
-      headers: driveHeaders(accessToken, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({})
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(`sheet_clear_failed:${res.status}:${JSON.stringify(data).slice(0, 200)}`);
-    }
-  }));
+  const ranges = (tabs || []).map(tab => `'${String(tab).replace(/'/g, "''")}'!A:Z`);
+  if (!ranges.length) return;
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchClear`, {
+    method: 'POST',
+    headers: driveHeaders(accessToken, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ ranges })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(`sheet_clear_failed:${res.status}:${JSON.stringify(data).slice(0, 200)}`);
+  }
 }
 
 async function writeSheetValueSets(accessToken, spreadsheetId, sets) {

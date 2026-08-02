@@ -195,8 +195,9 @@ function makeMockFetch(options = {}) {
       return jsonResponse({ replies: [] });
     }
 
-    if (url.includes('sheets.googleapis.com') && url.includes(':clear')) {
-      state.sheetClears.push(url);
+    if (url.includes('sheets.googleapis.com') && url.includes('/values:batchClear')) {
+      const body = JSON.parse(String(init.body || '{}'));
+      state.sheetClears.push(...(body.ranges || []));
       return jsonResponse({});
     }
 
@@ -577,7 +578,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w21', 'health exposes Worker version');
+  assert(data.version === 'handoff-w22', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1335,6 +1336,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   );
   assert(data.artifactReceipt.photoFolderLinkedCount === 2, 'receipt links existing Drive photos');
   assert(data.artifactReceipt.photoFolderOperationLimit === 5, 'receipt records conservative default photo operation batch limit');
+  assert(state.calls.length < 50, `handoff stays below Cloudflare's 50-subrequest limit: ${state.calls.length}`);
   assert(state.driveFolderLists.some(list => list.parentId === 'drive-photos'), 'lists Photos folder once for package repair');
   assert(state.trackerUpdates.length === 0, 'handoff reuses existing start-shell tracker row');
   assert(state.assessmentWrites.length === 0, 'handoff does not rewrite assessment row when shell exists');
@@ -2678,7 +2680,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w21', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w22', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
