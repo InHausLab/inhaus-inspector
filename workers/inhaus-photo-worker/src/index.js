@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w23';
+const WORKER_VERSION = 'handoff-w24';
 
 export default {
   async fetch(request, env, ctx) {
@@ -984,7 +984,7 @@ async function handleHandoffJob(request, env, ctx) {
     expectedRoomCount: Array.isArray(canonicalSource.rooms) ? canonicalSource.rooms.length : 0
   };
   const existingReceipt = getReadyHandoffReceipt(fieldData, receiptExpectations);
-  if (existingReceipt) {
+  if (body.forceFullRepair !== true && existingReceipt) {
     const cachedJob = {
       jobId: handoffJobId(inspectionId),
       inspectionId,
@@ -1003,7 +1003,7 @@ async function handleHandoffJob(request, env, ctx) {
 
   const durableJob = await getDurableHandoffJob(env, inspectionId);
   const durableReceipt = durableJob && isPlainObject(durableJob.receipt) ? durableJob.receipt : null;
-  if (durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
+  if (body.forceFullRepair !== true && durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
     const cachedJob = durableJobToPublicJob(durableJob);
     return json({
       ...cachedJob,
@@ -1078,7 +1078,7 @@ async function handleHandoffJob(request, env, ctx) {
       queued: true
     }, 202);
   }
-  const claim = await claimDirectHandoffJob(env, inspectionId, runningJob);
+  const claim = await claimDirectHandoffJob(env, inspectionId, runningJob, body.forceFullRepair === true);
   if (!claim.acquired) {
     const existingJob = durableJobToPublicJob(claim.row) || runningJob;
     const activeReceipt = isPlainObject(claim.row && claim.row.receipt) ? claim.row.receipt : null;
@@ -1140,7 +1140,7 @@ async function handleHandoffJobRunner(request, env, ctx) {
     const durableReceipt = durableJob && isPlainObject(durableJob.receipt)
       ? durableJob.receipt
       : (isPlainObject(reviewSystem.tannerHandoff) ? reviewSystem.tannerHandoff : null);
-    if (durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
+    if (body.forceFullRepair !== true && durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
       return json({
         processed: 1,
         results: [{
@@ -1171,7 +1171,7 @@ async function handleHandoffJobRunner(request, env, ctx) {
       attemptCount: (Number(previousJob.attemptCount) || 0) + 1,
       artifactReceipt: durableReceipt
     };
-    const claim = await claimDirectHandoffJob(env, inspectionId, runnerJob);
+    const claim = await claimDirectHandoffJob(env, inspectionId, runnerJob, body.forceFullRepair === true);
     if (!claim.acquired) {
       return json({
         processed: 0,
@@ -2730,7 +2730,7 @@ function buildDurableHandoffJobPayload(inspectionId, job, receipt) {
   };
 }
 
-async function claimDirectHandoffJob(env, inspectionId, job) {
+async function claimDirectHandoffJob(env, inspectionId, job, allowReadyRepair = false) {
   const now = new Date().toISOString();
   const lockId = `${WORKER_VERSION}:${crypto.randomUUID()}`;
   const claimedJob = {
@@ -2760,7 +2760,9 @@ async function claimDirectHandoffJob(env, inspectionId, job) {
   const staleBefore = new Date(Date.now() - DIRECT_HANDOFF_LOCK_STALE_MS).toISOString();
   const patchParams = new URLSearchParams();
   patchParams.set('job_key', `eq.${handoffJobId(inspectionId)}`);
-  patchParams.set('status', 'in.(queued,running,waiting_on_export_adapter,repairing,failed)');
+  patchParams.set('status', allowReadyRepair
+    ? 'in.(queued,running,waiting_on_export_adapter,repairing,ready,failed)'
+    : 'in.(queued,running,waiting_on_export_adapter,repairing,failed)');
   patchParams.set('or', `(locked_at.is.null,locked_at.lt.${staleBefore})`);
   const patchResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/handoff_jobs?${patchParams}`), {
     method: 'PATCH',
