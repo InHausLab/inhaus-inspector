@@ -111,6 +111,14 @@ test('admin unlock updates review storage and assessment status', async () => {
         updated_at: '2026-08-01T18:00:00.000Z'
       }]);
     }
+    if (method === 'PATCH' && requestUrl.includes('/rest/v1/review_data?')) {
+      const payload = JSON.parse(options.body);
+      return Response.json([{
+        inspection_id: 'INH-TEST-123',
+        field_data: payload.field_data,
+        updated_at: payload.updated_at
+      }]);
+    }
     return new Response(null, { status: 204 });
   };
   try {
@@ -122,7 +130,7 @@ test('admin unlock updates review storage and assessment status', async () => {
     const result = await response.json();
     assert.equal(result.unlocked, true);
     assert.equal(result.reviewStatus, 'In Review');
-    assert.deepEqual(requests.map(item => item.method), ['GET', 'POST', 'PATCH']);
+    assert.deepEqual(requests.map(item => item.method), ['GET', 'PATCH', 'PATCH']);
     assert.match(requests[1].body, /In Review/);
     assert.match(requests[2].body, /In Review/);
   } finally {
@@ -140,9 +148,13 @@ test('review field save moves a synced assessment to In Review', async () => {
     if (method === 'GET' && requestUrl.includes('/rest/v1/review_data?')) {
       return Response.json([{ inspection_id: 'INH-TEST-123', field_data: {}, updated_at: null }]);
     }
-    if (method === 'POST' && requestUrl.includes('/rest/v1/review_data?')) {
+    if (method === 'PATCH' && requestUrl.includes('/rest/v1/review_data?')) {
       const payload = JSON.parse(options.body);
-      return Response.json([{ ...payload, updated_at: '2026-08-01T19:00:00.000Z' }]);
+      return Response.json([{
+        inspection_id: 'INH-TEST-123',
+        field_data: payload.field_data,
+        updated_at: payload.updated_at
+      }]);
     }
     if (method === 'GET' && requestUrl.includes('/rest/v1/ihl_assessments?')) {
       return Response.json([{ inspection_id: 'INH-TEST-123', status: 'Synced', raw_jsonb: {} }]);
@@ -165,7 +177,7 @@ test('review field save moves a synced assessment to In Review', async () => {
     const result = await response.json();
     assert.equal(result.reviewStatus, 'In Review');
     assert.equal(result.fieldData.status, 'In Review');
-    assert.deepEqual(requests.map(item => item.method), ['GET', 'POST', 'GET', 'PATCH']);
+    assert.deepEqual(requests.map(item => item.method), ['GET', 'PATCH', 'GET', 'PATCH']);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -181,9 +193,13 @@ test('submitted review status updates the assessment inventory status', async ()
     if (method === 'GET' && requestUrl.includes('/rest/v1/review_data?')) {
       return Response.json([{ inspection_id: 'INH-TEST-123', field_data: { status: 'In Review' }, updated_at: null }]);
     }
-    if (method === 'POST' && requestUrl.includes('/rest/v1/review_data?')) {
+    if (method === 'PATCH' && requestUrl.includes('/rest/v1/review_data?')) {
       const payload = JSON.parse(options.body);
-      return Response.json([{ ...payload, updated_at: '2026-08-01T20:00:00.000Z' }]);
+      return Response.json([{
+        inspection_id: 'INH-TEST-123',
+        field_data: payload.field_data,
+        updated_at: payload.updated_at
+      }]);
     }
     if (method === 'GET' && requestUrl.includes('/rest/v1/ihl_assessments?')) {
       return Response.json([{ inspection_id: 'INH-TEST-123', status: 'In Review', raw_jsonb: {} }]);
@@ -206,7 +222,127 @@ test('submitted review status updates the assessment inventory status', async ()
     const result = await response.json();
     assert.equal(result.reviewStatus, 'Submitted to Tanner');
     assert.equal(result.fieldData.status, 'Submitted to Tanner');
-    assert.deepEqual(requests.map(item => item.method), ['GET', 'POST', 'GET', 'PATCH']);
+    assert.deepEqual(requests.map(item => item.method), ['GET', 'PATCH', 'GET', 'PATCH']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('parallel review field saves survive optimistic conflict retries', async () => {
+  const originalFetch = globalThis.fetch;
+  let reviewRow = {
+    inspection_id: 'INH-RACE-TEST',
+    field_data: {},
+    updated_at: '2026-08-01T20:00:00.000Z'
+  };
+  let initialReadCount = 0;
+  let releaseInitialReads;
+  const initialReadBarrier = new Promise(resolve => { releaseInitialReads = resolve; });
+  let conflictCount = 0;
+
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = String(url);
+    const method = options.method || 'GET';
+    if (!requestUrl.includes('/rest/v1/review_data?')) {
+      throw new Error(`unexpected request: ${requestUrl}`);
+    }
+    if (method === 'GET') {
+      const snapshot = structuredClone(reviewRow);
+      initialReadCount += 1;
+      if (initialReadCount === 8) releaseInitialReads();
+      await initialReadBarrier;
+      return Response.json([snapshot]);
+    }
+    if (method === 'PATCH') {
+      const requestParams = new URL(requestUrl).searchParams;
+      const expectedUpdatedAt = String(requestParams.get('updated_at') || '').replace(/^eq\./, '');
+      if (expectedUpdatedAt !== reviewRow.updated_at) {
+        conflictCount += 1;
+        return Response.json([]);
+      }
+      const payload = JSON.parse(options.body);
+      reviewRow = {
+        inspection_id: reviewRow.inspection_id,
+        field_data: payload.field_data,
+        updated_at: payload.updated_at
+      };
+      return Response.json([structuredClone(reviewRow)]);
+    }
+    throw new Error(`unexpected method: ${method}`);
+  };
+
+  try {
+    const responses = await Promise.all(Array.from({ length: 8 }, (_, index) => worker.fetch(reviewRequest('/save-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        inspectionId: 'INH-RACE-TEST',
+        field: { stepId: 'race-check', key: `field${index + 1}`, value: `value${index + 1}` }
+      })
+    }), ENV)));
+    assert.deepEqual(responses.map(response => response.status), Array(8).fill(200));
+    assert.equal(Object.keys(reviewRow.field_data['race-check']).length, 8);
+    assert.ok(conflictCount > 0, 'the test must force at least one write conflict');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('parallel first review saves survive a concurrent row insert', async () => {
+  const originalFetch = globalThis.fetch;
+  let reviewRow = null;
+  let initialReadCount = 0;
+  let releaseInitialReads;
+  const initialReadBarrier = new Promise(resolve => { releaseInitialReads = resolve; });
+  let insertConflictCount = 0;
+
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = String(url);
+    const method = options.method || 'GET';
+    if (!requestUrl.includes('/rest/v1/review_data?')) {
+      throw new Error(`unexpected request: ${requestUrl}`);
+    }
+    if (method === 'GET') {
+      const snapshot = reviewRow ? structuredClone(reviewRow) : null;
+      initialReadCount += 1;
+      if (initialReadCount === 4) releaseInitialReads();
+      await initialReadBarrier;
+      return Response.json(snapshot ? [snapshot] : []);
+    }
+    if (method === 'POST') {
+      if (reviewRow) {
+        insertConflictCount += 1;
+        return Response.json({ code: '23505', message: 'duplicate key' }, { status: 409 });
+      }
+      const payload = JSON.parse(options.body);
+      reviewRow = structuredClone(payload);
+      return Response.json([structuredClone(reviewRow)]);
+    }
+    if (method === 'PATCH') {
+      const requestParams = new URL(requestUrl).searchParams;
+      const expectedUpdatedAt = String(requestParams.get('updated_at') || '').replace(/^eq\./, '');
+      if (!reviewRow || expectedUpdatedAt !== reviewRow.updated_at) return Response.json([]);
+      const payload = JSON.parse(options.body);
+      reviewRow = {
+        inspection_id: reviewRow.inspection_id,
+        field_data: payload.field_data,
+        updated_at: payload.updated_at
+      };
+      return Response.json([structuredClone(reviewRow)]);
+    }
+    throw new Error(`unexpected method: ${method}`);
+  };
+
+  try {
+    const responses = await Promise.all(Array.from({ length: 4 }, (_, index) => worker.fetch(reviewRequest('/save-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        inspectionId: 'INH-FIRST-RACE',
+        field: { stepId: 'first-save', key: `field${index + 1}`, value: `value${index + 1}` }
+      })
+    }), ENV)));
+    assert.deepEqual(responses.map(response => response.status), Array(4).fill(200));
+    assert.equal(Object.keys(reviewRow.field_data['first-save']).length, 4);
+    assert.ok(insertConflictCount > 0, 'the test must force a concurrent insert conflict');
   } finally {
     globalThis.fetch = originalFetch;
   }

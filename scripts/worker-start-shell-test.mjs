@@ -136,6 +136,7 @@ function makeMockFetch(options = {}) {
     reviewRow: options.reviewRow || null,
     trackerValues: cloneSheetValues(options.trackerValues || trackerValues()),
     reviewWrites: [],
+    reviewWriteConflicts: 0,
     assessmentWrites: [],
     trackerUpdates: [],
     spreadsheetUpdates: [],
@@ -275,6 +276,27 @@ function makeMockFetch(options = {}) {
       return jsonResponse(state.reviewRow ? [state.reviewRow] : []);
     }
 
+    if (url.includes('/rest/v1/review_data') && method === 'PATCH') {
+      const body = JSON.parse(String(init.body || '{}'));
+      const params = new URL(url).searchParams;
+      const expectedUpdatedAt = String(params.get('updated_at') || '');
+      const currentUpdatedAt = state.reviewRow && state.reviewRow.updated_at;
+      const matches = expectedUpdatedAt === 'is.null'
+        ? !currentUpdatedAt
+        : expectedUpdatedAt.replace(/^eq\./, '') === String(currentUpdatedAt || '');
+      if (!state.reviewRow || !matches) {
+        state.reviewWriteConflicts += 1;
+        return jsonResponse([]);
+      }
+      state.reviewWrites.push(body);
+      state.reviewRow = {
+        inspection_id: state.reviewRow.inspection_id,
+        field_data: body.field_data,
+        updated_at: body.updated_at
+      };
+      return jsonResponse([state.reviewRow]);
+    }
+
     if (url.includes('/rest/v1/review_data') && method === 'POST') {
       const body = JSON.parse(String(init.body || '{}'));
       state.reviewWrites.push(body);
@@ -283,7 +305,7 @@ function makeMockFetch(options = {}) {
         field_data: body.field_data,
         updated_at: body.updated_at
       };
-      return jsonResponse([]);
+      return jsonResponse([state.reviewRow]);
     }
 
     if (url.includes('/rest/v1/assessment_number_reservations') && method === 'POST') {
@@ -578,7 +600,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w26', 'health exposes Worker version');
+  assert(data.version === 'handoff-w27', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -2749,7 +2771,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w26', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w27', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {

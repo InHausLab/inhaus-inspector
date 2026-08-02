@@ -29,7 +29,8 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w26';
+const WORKER_VERSION = 'handoff-w27';
+const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 
 export default {
   async fetch(request, env, ctx) {
@@ -1726,56 +1727,36 @@ async function handleSaveReview(request, env) {
 
   const stepId = cleanReviewKey(field.stepId, 'stepId');
   const fieldKey = cleanReviewKey(field.key, 'fieldKey');
-  const current = await getReviewRow(env, inspectionId);
-  const fieldData = isPlainObject(current && current.field_data)
-    ? structuredClone(current.field_data)
-    : {};
-  const markInReview = body.markInReview === true && !isTerminalReviewStatus(fieldData);
-
-  if (stepId === 'summary' || stepId === 'post') {
-    fieldData[fieldKey] = field.value;
-    if (isPlainObject(fieldData[stepId])) {
-      delete fieldData[stepId][fieldKey];
-      if (!Object.keys(fieldData[stepId]).length) delete fieldData[stepId];
+  const savedReview = await mutateReviewDataWithRetry(env, inspectionId, fieldData => {
+    const markInReview = body.markInReview === true && !isTerminalReviewStatus(fieldData);
+    if (stepId === 'summary' || stepId === 'post') {
+      fieldData[fieldKey] = field.value;
+      if (isPlainObject(fieldData[stepId])) {
+        delete fieldData[stepId][fieldKey];
+        if (!Object.keys(fieldData[stepId]).length) delete fieldData[stepId];
+      }
+    } else {
+      if (!isPlainObject(fieldData[stepId])) fieldData[stepId] = {};
+      fieldData[stepId][fieldKey] = field.value;
     }
-  } else {
-    if (!isPlainObject(fieldData[stepId])) fieldData[stepId] = {};
-    fieldData[stepId][fieldKey] = field.value;
-  }
-  if (markInReview) fieldData.status = 'In Review';
-
-  const updatedAt = new Date().toISOString();
-  const params = new URLSearchParams();
-  params.set('on_conflict', 'inspection_id');
-  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
-    method: 'POST',
-    headers: serviceHeaders(env, {
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=representation'
-    }),
-    body: JSON.stringify({
-      inspection_id: inspectionId,
-      field_data: fieldData,
-      updated_at: updatedAt
-    })
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`review_save_failed:${response.status}:${text.slice(0, 200)}`);
-  const rows = text ? JSON.parse(text) : [];
-  const saved = Array.isArray(rows) && rows.length ? rows[0] : null;
+    if (markInReview) fieldData.status = 'In Review';
+    return fieldData;
+  }, 'review_save_failed');
+  const fieldData = savedReview.fieldData;
   const explicitReviewStatus = stepId === 'summary' && fieldKey === 'status' &&
     /^(in review|submitted to tanner|report complete)$/i.test(String(field.value || '').trim())
     ? String(field.value).trim()
     : '';
-  const requestedReviewStatus = explicitReviewStatus || (markInReview ? 'In Review' : '');
+  const shouldMarkInReview = body.markInReview === true && !isTerminalReviewStatus(fieldData);
+  const requestedReviewStatus = explicitReviewStatus || (shouldMarkInReview ? 'In Review' : '');
   const reviewStatus = requestedReviewStatus
     ? await setAssessmentReviewStatus(env, inspectionId, requestedReviewStatus)
     : '';
   return json({
     saved: true,
     inspectionId,
-    fieldData: saved && isPlainObject(saved.field_data) ? saved.field_data : fieldData,
-    updatedAt: saved && saved.updated_at ? saved.updated_at : updatedAt,
+    fieldData,
+    updatedAt: savedReview.updatedAt,
     reviewStatus
   });
 }
@@ -1817,34 +1798,16 @@ async function handleReviewUnlock(request, env) {
   }
 
   const inspectionId = cleanId(body.inspectionId || body.id, 'inspectionId');
-  const current = await getReviewRow(env, inspectionId);
-  const fieldData = isPlainObject(current && current.field_data)
-    ? structuredClone(current.field_data)
-    : {};
   const unlockedAt = new Date().toISOString();
-  fieldData.submission = {
-    ...(isPlainObject(fieldData.submission) ? fieldData.submission : {}),
-    status: 'In Review',
-    unlockedAt
-  };
-  fieldData.status = 'In Review';
-
-  const reviewParams = new URLSearchParams();
-  reviewParams.set('on_conflict', 'inspection_id');
-  const reviewResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${reviewParams}`), {
-    method: 'POST',
-    headers: serviceHeaders(env, {
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
-    }),
-    body: JSON.stringify({
-      inspection_id: inspectionId,
-      field_data: fieldData,
-      updated_at: unlockedAt
-    })
-  });
-  const reviewText = await reviewResponse.text();
-  if (!reviewResponse.ok) throw new Error(`review_unlock_save_failed:${reviewResponse.status}:${reviewText.slice(0, 200)}`);
+  await mutateReviewDataWithRetry(env, inspectionId, fieldData => {
+    fieldData.submission = {
+      ...(isPlainObject(fieldData.submission) ? fieldData.submission : {}),
+      status: 'In Review',
+      unlockedAt
+    };
+    fieldData.status = 'In Review';
+    return fieldData;
+  }, 'review_unlock_save_failed');
 
   const assessmentParams = new URLSearchParams();
   assessmentParams.set('inspection_id', `eq.${inspectionId}`);
@@ -1953,6 +1916,72 @@ async function getReviewRow(env, inspectionId) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
+function nextReviewMutationTimestamp(currentUpdatedAt) {
+  const currentMs = Date.parse(String(currentUpdatedAt || ''));
+  const nextMs = Number.isFinite(currentMs)
+    ? Math.max(Date.now(), currentMs + 1)
+    : Date.now();
+  return new Date(nextMs).toISOString();
+}
+
+async function mutateReviewDataWithRetry(env, inspectionId, mutator, errorPrefix) {
+  for (let attempt = 1; attempt <= REVIEW_MUTATION_MAX_ATTEMPTS; attempt += 1) {
+    const current = await getReviewRow(env, inspectionId);
+    const fieldData = current && isPlainObject(current.field_data)
+      ? structuredClone(current.field_data)
+      : {};
+    const mutated = await mutator(fieldData, { attempt, current });
+    const nextFieldData = isPlainObject(mutated) ? mutated : fieldData;
+    const updatedAt = nextReviewMutationTimestamp(current && current.updated_at);
+    const params = new URLSearchParams();
+    params.set('select', 'inspection_id,field_data,updated_at');
+
+    let response;
+    if (current) {
+      params.set('inspection_id', `eq.${inspectionId}`);
+      params.set('updated_at', current.updated_at ? `eq.${current.updated_at}` : 'is.null');
+      response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
+        method: 'PATCH',
+        headers: serviceHeaders(env, {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        }),
+        body: JSON.stringify({ field_data: nextFieldData, updated_at: updatedAt })
+      });
+    } else {
+      response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
+        method: 'POST',
+        headers: serviceHeaders(env, {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        }),
+        body: JSON.stringify({
+          inspection_id: inspectionId,
+          field_data: nextFieldData,
+          updated_at: updatedAt
+        })
+      });
+    }
+
+    const text = await response.text();
+    if (!response.ok) {
+      const insertConflict = !current && (response.status === 409 || /23505|duplicate key/i.test(text));
+      if (insertConflict) continue;
+      throw new Error(`${errorPrefix}:${response.status}:${text.slice(0, 200)}`);
+    }
+    const rows = text ? JSON.parse(text) : [];
+    if (Array.isArray(rows) && rows.length) {
+      const saved = rows[0];
+      return {
+        fieldData: isPlainObject(saved.field_data) ? saved.field_data : nextFieldData,
+        updatedAt: saved.updated_at || updatedAt,
+        attempt
+      };
+    }
+  }
+  throw new Error(`${errorPrefix}:conflict_after_${REVIEW_MUTATION_MAX_ATTEMPTS}_attempts`);
+}
+
 async function getReviewRows(env) {
   const rows = [];
   const pageSize = 1000;
@@ -1981,51 +2010,32 @@ async function getStartInspectionShellState(env, inspectionId) {
 }
 
 async function saveStartInspectionShellState(env, inspectionId, receipt) {
-  const current = await getReviewRow(env, inspectionId);
-  const fieldData = current && isPlainObject(current.field_data)
-    ? structuredClone(current.field_data)
-    : {};
-  const system = isPlainObject(fieldData.system) ? structuredClone(fieldData.system) : {};
   const cleanReceipt = {
     ...(isPlainObject(receipt) ? receipt : {}),
     updatedAt: (receipt && receipt.updatedAt) || new Date().toISOString(),
     error: (receipt && receipt.error) || ''
   };
-  system.startInspectionShell = cleanReceipt;
-  fieldData.system = system;
-  fieldData.assessmentNumber = cleanReceipt.assessmentNumber || fieldData.assessmentNumber || '';
-  fieldData.assessmentNumberSource = cleanReceipt.assessmentNumberSource || fieldData.assessmentNumberSource || '';
-  fieldData.assessmentReservationId = cleanReceipt.assessmentReservationId || fieldData.assessmentReservationId || '';
-  fieldData.folderId = cleanReceipt.folderId || fieldData.folderId || '';
-  fieldData.folderUrl = cleanReceipt.folderUrl || fieldData.folderUrl || '';
-  fieldData.driveFolderId = cleanReceipt.folderId || fieldData.driveFolderId || '';
-  fieldData.driveFolderUrl = cleanReceipt.folderUrl || fieldData.driveFolderUrl || '';
-  fieldData.trackerRow = cleanReceipt.trackerRow || fieldData.trackerRow || '';
-  fieldData.trackerUrl = cleanReceipt.trackerUrl || fieldData.trackerUrl || '';
-  fieldData.trackerRowUrl = cleanReceipt.trackerUrl || fieldData.trackerRowUrl || '';
-  fieldData.trackerStatus = cleanReceipt.trackerStatus || fieldData.trackerStatus || '';
-  fieldData.startInspectionShellStatus = cleanReceipt.status || fieldData.startInspectionShellStatus || '';
-  fieldData.startInspectionShellUpdatedAt = cleanReceipt.updatedAt;
-  fieldData.lastStartInspectionShellError = cleanReceipt.error || '';
-  fieldData.isTestTraining = cleanReceipt.isTestTraining === true;
-
-  const updatedAt = new Date().toISOString();
-  const params = new URLSearchParams();
-  params.set('on_conflict', 'inspection_id');
-  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
-    method: 'POST',
-    headers: serviceHeaders(env, {
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
-    }),
-    body: JSON.stringify({
-      inspection_id: inspectionId,
-      field_data: fieldData,
-      updated_at: updatedAt
-    })
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`start_shell_save_failed:${response.status}:${text.slice(0, 200)}`);
+  await mutateReviewDataWithRetry(env, inspectionId, fieldData => {
+    const system = isPlainObject(fieldData.system) ? structuredClone(fieldData.system) : {};
+    system.startInspectionShell = cleanReceipt;
+    fieldData.system = system;
+    fieldData.assessmentNumber = cleanReceipt.assessmentNumber || fieldData.assessmentNumber || '';
+    fieldData.assessmentNumberSource = cleanReceipt.assessmentNumberSource || fieldData.assessmentNumberSource || '';
+    fieldData.assessmentReservationId = cleanReceipt.assessmentReservationId || fieldData.assessmentReservationId || '';
+    fieldData.folderId = cleanReceipt.folderId || fieldData.folderId || '';
+    fieldData.folderUrl = cleanReceipt.folderUrl || fieldData.folderUrl || '';
+    fieldData.driveFolderId = cleanReceipt.folderId || fieldData.driveFolderId || '';
+    fieldData.driveFolderUrl = cleanReceipt.folderUrl || fieldData.driveFolderUrl || '';
+    fieldData.trackerRow = cleanReceipt.trackerRow || fieldData.trackerRow || '';
+    fieldData.trackerUrl = cleanReceipt.trackerUrl || fieldData.trackerUrl || '';
+    fieldData.trackerRowUrl = cleanReceipt.trackerUrl || fieldData.trackerRowUrl || '';
+    fieldData.trackerStatus = cleanReceipt.trackerStatus || fieldData.trackerStatus || '';
+    fieldData.startInspectionShellStatus = cleanReceipt.status || fieldData.startInspectionShellStatus || '';
+    fieldData.startInspectionShellUpdatedAt = cleanReceipt.updatedAt;
+    fieldData.lastStartInspectionShellError = cleanReceipt.error || '';
+    fieldData.isTestTraining = cleanReceipt.isTestTraining === true;
+    return fieldData;
+  }, 'start_shell_save_failed');
 }
 
 async function upsertAssessmentShellRecord(env, source, receipt) {
@@ -2941,116 +2951,72 @@ async function upsertHandoffArtifacts(env, inspectionId, jobRow, receipt) {
 }
 
 async function saveHandoffJobState(env, inspectionId, fieldData, job, receipt, options = {}) {
-  let currentFieldData = {};
-  try {
-    const current = await getReviewRow(env, inspectionId);
-    currentFieldData = current && isPlainObject(current.field_data) ? current.field_data : {};
-  } catch {
-    currentFieldData = {};
-  }
   const provided = isPlainObject(fieldData) ? structuredClone(fieldData) : {};
-  const current = isPlainObject(currentFieldData) ? structuredClone(currentFieldData) : {};
   const preferProvided = options.preferProvidedFieldData === true;
-  const nextFieldData = preferProvided
-    ? { ...current, ...provided }
-    : { ...provided, ...current };
-  const providedSystem = isPlainObject(provided.system) ? provided.system : {};
-  const currentSystem = isPlainObject(current.system) ? current.system : {};
-  const system = preferProvided
-    ? { ...currentSystem, ...providedSystem }
-    : { ...providedSystem, ...currentSystem };
-  system.handoffJob = {
-    ...(isPlainObject(job) ? job : {}),
-    artifactReceipt: receipt || (job && job.artifactReceipt) || null
-  };
-  if (receipt) system.tannerHandoff = receipt;
-  nextFieldData.system = system;
-  if (receipt) {
-    nextFieldData.reviewPortalData = receipt;
-    nextFieldData.folderId = receipt.folderId || nextFieldData.folderId || '';
-    nextFieldData.folderUrl = receipt.folderUrl || nextFieldData.folderUrl || '';
-    nextFieldData.assessmentFolderId = receipt.folderId || nextFieldData.assessmentFolderId || '';
-    nextFieldData.assessmentFolderUrl = receipt.folderUrl || nextFieldData.assessmentFolderUrl || '';
-    nextFieldData.reviewPortalDataSpreadsheetId = receipt.spreadsheetId || nextFieldData.reviewPortalDataSpreadsheetId || '';
-    nextFieldData.reviewPortalDataSpreadsheetUrl = receipt.spreadsheetUrl || nextFieldData.reviewPortalDataSpreadsheetUrl || '';
-    nextFieldData.reviewPortalDataUrl = receipt.spreadsheetUrl || nextFieldData.reviewPortalDataUrl || '';
-    nextFieldData.rawReviewDataUrl = receipt.rawJsonUrl || receipt.rawReviewDataUrl || nextFieldData.rawReviewDataUrl || '';
-    nextFieldData.rawReviewDataJsonUrl = receipt.rawJsonUrl || receipt.rawReviewDataUrl || nextFieldData.rawReviewDataJsonUrl || '';
-    nextFieldData.technicianPhotosFolderId = receipt.technicianPhotosFolderId || receipt.photosFolderId || nextFieldData.technicianPhotosFolderId || '';
-    nextFieldData.technicianPhotosFolderUrl = receipt.technicianPhotosFolderUrl || receipt.photosFolderUrl || nextFieldData.technicianPhotosFolderUrl || '';
-    nextFieldData.photosFolderId = receipt.photosFolderId || receipt.technicianPhotosFolderId || nextFieldData.photosFolderId || '';
-    nextFieldData.photosFolderUrl = receipt.photosFolderUrl || receipt.technicianPhotosFolderUrl || nextFieldData.photosFolderUrl || '';
-    nextFieldData.cocsFolderId = receipt.cocsFolderId || nextFieldData.cocsFolderId || '';
-    nextFieldData.cocsFolderUrl = receipt.cocsFolderUrl || nextFieldData.cocsFolderUrl || '';
-    nextFieldData.backupFolderId = receipt.backupFolderId || nextFieldData.backupFolderId || '';
-    nextFieldData.backupFolderUrl = receipt.backupFolderUrl || nextFieldData.backupFolderUrl || '';
-    nextFieldData.trackerRow = receipt.trackerRow || nextFieldData.trackerRow || '';
-    nextFieldData.trackerUrl = receipt.trackerUrl || nextFieldData.trackerUrl || '';
-    nextFieldData.trackerRowUrl = receipt.trackerUrl || nextFieldData.trackerRowUrl || '';
-    nextFieldData.trackerStatus = receipt.trackerStatus || nextFieldData.trackerStatus || '';
-    nextFieldData.handoffStatus = receipt.status || nextFieldData.handoffStatus || '';
-    nextFieldData.handoffUpdatedAt = receipt.updatedAt || new Date().toISOString();
-    nextFieldData.lastHandoffError = receipt.error || '';
-    nextFieldData.handoffAttemptCount = receipt.attemptCount || nextFieldData.handoffAttemptCount || '';
-    nextFieldData.handoffLastRunAt = receipt.lastRunAt || nextFieldData.handoffLastRunAt || '';
-    nextFieldData.handoffNextRunAt = receipt.nextRunAt || '';
-    nextFieldData.isTestTraining = receipt.isTestTraining === true;
-  }
-
   await upsertDurableHandoffJob(env, inspectionId, job, receipt);
 
-  const updatedAt = new Date().toISOString();
-  const params = new URLSearchParams();
-  params.set('on_conflict', 'inspection_id');
-  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
-    method: 'POST',
-    headers: serviceHeaders(env, {
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
-    }),
-    body: JSON.stringify({
-      inspection_id: inspectionId,
-      field_data: nextFieldData,
-      updated_at: updatedAt
-    })
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`handoff_state_save_failed:${response.status}:${text.slice(0, 200)}`);
+  await mutateReviewDataWithRetry(env, inspectionId, currentFieldData => {
+    const current = isPlainObject(currentFieldData) ? structuredClone(currentFieldData) : {};
+    const nextFieldData = preferProvided
+      ? { ...current, ...provided }
+      : { ...provided, ...current };
+    const providedSystem = isPlainObject(provided.system) ? provided.system : {};
+    const currentSystem = isPlainObject(current.system) ? current.system : {};
+    const system = preferProvided
+      ? { ...currentSystem, ...providedSystem }
+      : { ...providedSystem, ...currentSystem };
+    system.handoffJob = {
+      ...(isPlainObject(job) ? job : {}),
+      artifactReceipt: receipt || (job && job.artifactReceipt) || null
+    };
+    if (receipt) system.tannerHandoff = receipt;
+    nextFieldData.system = system;
+    if (receipt) {
+      nextFieldData.reviewPortalData = receipt;
+      nextFieldData.folderId = receipt.folderId || nextFieldData.folderId || '';
+      nextFieldData.folderUrl = receipt.folderUrl || nextFieldData.folderUrl || '';
+      nextFieldData.assessmentFolderId = receipt.folderId || nextFieldData.assessmentFolderId || '';
+      nextFieldData.assessmentFolderUrl = receipt.folderUrl || nextFieldData.assessmentFolderUrl || '';
+      nextFieldData.reviewPortalDataSpreadsheetId = receipt.spreadsheetId || nextFieldData.reviewPortalDataSpreadsheetId || '';
+      nextFieldData.reviewPortalDataSpreadsheetUrl = receipt.spreadsheetUrl || nextFieldData.reviewPortalDataSpreadsheetUrl || '';
+      nextFieldData.reviewPortalDataUrl = receipt.spreadsheetUrl || nextFieldData.reviewPortalDataUrl || '';
+      nextFieldData.rawReviewDataUrl = receipt.rawJsonUrl || receipt.rawReviewDataUrl || nextFieldData.rawReviewDataUrl || '';
+      nextFieldData.rawReviewDataJsonUrl = receipt.rawJsonUrl || receipt.rawReviewDataUrl || nextFieldData.rawReviewDataJsonUrl || '';
+      nextFieldData.technicianPhotosFolderId = receipt.technicianPhotosFolderId || receipt.photosFolderId || nextFieldData.technicianPhotosFolderId || '';
+      nextFieldData.technicianPhotosFolderUrl = receipt.technicianPhotosFolderUrl || receipt.photosFolderUrl || nextFieldData.technicianPhotosFolderUrl || '';
+      nextFieldData.photosFolderId = receipt.photosFolderId || receipt.technicianPhotosFolderId || nextFieldData.photosFolderId || '';
+      nextFieldData.photosFolderUrl = receipt.photosFolderUrl || receipt.technicianPhotosFolderUrl || nextFieldData.photosFolderUrl || '';
+      nextFieldData.cocsFolderId = receipt.cocsFolderId || nextFieldData.cocsFolderId || '';
+      nextFieldData.cocsFolderUrl = receipt.cocsFolderUrl || nextFieldData.cocsFolderUrl || '';
+      nextFieldData.backupFolderId = receipt.backupFolderId || nextFieldData.backupFolderId || '';
+      nextFieldData.backupFolderUrl = receipt.backupFolderUrl || nextFieldData.backupFolderUrl || '';
+      nextFieldData.trackerRow = receipt.trackerRow || nextFieldData.trackerRow || '';
+      nextFieldData.trackerUrl = receipt.trackerUrl || nextFieldData.trackerUrl || '';
+      nextFieldData.trackerRowUrl = receipt.trackerUrl || nextFieldData.trackerRowUrl || '';
+      nextFieldData.trackerStatus = receipt.trackerStatus || nextFieldData.trackerStatus || '';
+      nextFieldData.handoffStatus = receipt.status || nextFieldData.handoffStatus || '';
+      nextFieldData.handoffUpdatedAt = receipt.updatedAt || new Date().toISOString();
+      nextFieldData.lastHandoffError = receipt.error || '';
+      nextFieldData.handoffAttemptCount = receipt.attemptCount || nextFieldData.handoffAttemptCount || '';
+      nextFieldData.handoffLastRunAt = receipt.lastRunAt || nextFieldData.handoffLastRunAt || '';
+      nextFieldData.handoffNextRunAt = receipt.nextRunAt || '';
+      nextFieldData.isTestTraining = receipt.isTestTraining === true;
+    }
+    return nextFieldData;
+  }, 'handoff_state_save_failed');
 }
 
 async function saveHandoffRequestFieldData(env, inspectionId, fieldData) {
-  let currentFieldData = {};
-  try {
-    const current = await getReviewRow(env, inspectionId);
-    currentFieldData = current && isPlainObject(current.field_data) ? current.field_data : {};
-  } catch {
-    currentFieldData = {};
-  }
   const provided = isPlainObject(fieldData) ? structuredClone(fieldData) : {};
-  const current = isPlainObject(currentFieldData) ? structuredClone(currentFieldData) : {};
-  const providedSystem = isPlainObject(provided.system) ? provided.system : {};
-  const currentSystem = isPlainObject(current.system) ? current.system : {};
-  const system = { ...currentSystem, ...providedSystem };
-  if (currentSystem.handoffJob) system.handoffJob = currentSystem.handoffJob;
-  if (currentSystem.tannerHandoff) system.tannerHandoff = currentSystem.tannerHandoff;
-  const nextFieldData = { ...current, ...provided, system };
-  const updatedAt = new Date().toISOString();
-  const params = new URLSearchParams();
-  params.set('on_conflict', 'inspection_id');
-  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/review_data?${params}`), {
-    method: 'POST',
-    headers: serviceHeaders(env, {
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
-    }),
-    body: JSON.stringify({
-      inspection_id: inspectionId,
-      field_data: nextFieldData,
-      updated_at: updatedAt
-    })
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`handoff_request_save_failed:${response.status}:${text.slice(0, 200)}`);
+  await mutateReviewDataWithRetry(env, inspectionId, currentFieldData => {
+    const current = isPlainObject(currentFieldData) ? structuredClone(currentFieldData) : {};
+    const providedSystem = isPlainObject(provided.system) ? provided.system : {};
+    const currentSystem = isPlainObject(current.system) ? current.system : {};
+    const system = { ...currentSystem, ...providedSystem };
+    if (currentSystem.handoffJob) system.handoffJob = currentSystem.handoffJob;
+    if (currentSystem.tannerHandoff) system.tannerHandoff = currentSystem.tannerHandoff;
+    return { ...current, ...provided, system };
+  }, 'handoff_request_save_failed');
 }
 
 async function getTrackerContext(accessToken, spreadsheetId) {
