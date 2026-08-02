@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=226';
-import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=226';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=227';
+import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=227';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=226';
-import { scheduleSave } from './storage.js?v=226';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=226';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=226';
+         getBestCloudSyncAt } from './state.js?v=227';
+import { scheduleSave } from './storage.js?v=227';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=227';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=227';
 
 const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
 const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
@@ -554,7 +554,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=226');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=227');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -869,7 +869,7 @@ export async function checkpointToCloud(stepList) {
   }
 }
 
-export async function submitInspection(exportData) {
+export async function submitInspection(exportData, stepList) {
   if (!PHOTO_WORKER_URL) return true;
   updateSyncStatus('syncing'); // Change 2
   showUploadBanner('pending', 'Saving assessment to cloud\u2026');
@@ -886,7 +886,10 @@ export async function submitInspection(exportData) {
         if (cloudRecord?.resumeData) {
           mergeRemoteInspection(activeInspection, cloudRecord.resumeData);
           scheduleSave();
-          exportData = buildExportJSON(_lastCheckpointStepList);
+          const currentStepList = Array.isArray(stepList) && stepList.length
+            ? stepList
+            : _lastCheckpointStepList;
+          if (currentStepList.length) exportData = buildExportJSON(currentStepList);
         }
       } catch (mergeErr) {
         console.warn('Final team merge pull skipped:', mergeErr);

@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=226';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=226';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=226';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=226';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=226';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=226';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=227';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=227';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=227';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=227';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=227';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=227';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=226';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=226';
-import { updatePhotoMetadata } from './supabase-photos.js?v=226';
-import { FIELD_RESUME_TOKEN } from './config.js?v=226';
+} from './findings.js?v=227';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=227';
+import { updatePhotoMetadata } from './supabase-photos.js?v=227';
+import { FIELD_RESUME_TOKEN } from './config.js?v=227';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=226';
+} from './comment-library.js?v=227';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -4085,7 +4085,7 @@ export function renderReview() {
       ctx.inspection.completedAt = ctx.inspection.endedAt;
       const completeData = buildExportJSON(ctx.stepList);
       saveNow().then(async () => {
-        const ok = await submitInspection(completeData);
+        const ok = await submitInspection(completeData, ctx.stepList);
         if (!ok) {
           submitBtn.disabled = false;
           submitBtn.textContent = '\u2713 Submit Inspection';
@@ -4103,7 +4103,7 @@ export function renderReview() {
       try {
         const reuploadData = buildExportJSON(ctx.stepList);
         const allPhotos = extractAllPhotosFromExport(reuploadData);
-        const ok = await submitInspection(reuploadData);
+        const ok = await submitInspection(reuploadData, ctx.stepList);
         if (!ok) {
           throw new Error(
             (ctx.inspection && ctx.inspection._lastFinalSyncError) ||

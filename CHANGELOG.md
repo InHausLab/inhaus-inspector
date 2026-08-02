@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v227 — Final Team Submission Uses Current Step List
+**Date:** August 1, 2026
+
+- Removed the final team submission dependency on a private step-list cache that resets
+  when the browser closes or reloads.
+- Final submission now receives the current UI step list explicitly, preserving room
+  and photo metadata after a recovery/reopen workflow.
+- Added regression coverage for every final submission caller.
+
 ## v226 — Preserve Supabase Photo Manifest Metadata
 **Date:** August 1, 2026
 

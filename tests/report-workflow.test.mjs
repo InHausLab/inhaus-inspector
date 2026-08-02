@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 const worker = readFileSync(new URL('../workers/inhaus-photo-worker/src/index.js', import.meta.url), 'utf8');
 const sync = readFileSync(new URL('../sync.js', import.meta.url), 'utf8');
 const photoClient = readFileSync(new URL('../supabase-photos.js', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+const screens = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 globalThis.localStorage = {
   getItem: () => null,
   setItem: () => {},
@@ -33,6 +35,14 @@ test('Supabase-stored photos remain in the final photo manifest after pixels are
   assert.equal(photos.length, 1);
   assert.equal(photos[0].photoId, 'photo-stored-1');
   assert.equal(photos[0].storagePath, 'INH-TEST/photo-stored-1.jpg');
+});
+
+test('final team merge rebuilds from the caller step list after browser reopen', () => {
+  assert.match(sync, /submitInspection\(exportData, stepList\)/);
+  assert.match(sync, /Array\.isArray\(stepList\) && stepList\.length/);
+  assert.match(app, /submitInspection\(exportData, stepList\)/);
+  assert.match(screens, /submitInspection\(completeData, ctx\.stepList\)/);
+  assert.match(screens, /submitInspection\(reuploadData, ctx\.stepList\)/);
 });
 
 test('Drive photo packaging belongs to the retryable Worker handoff', () => {
