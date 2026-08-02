@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w15';
+const WORKER_VERSION = 'handoff-w16';
 
 export default {
   async fetch(request, env, ctx) {
@@ -2113,8 +2113,10 @@ function isReadyHandoffReceipt(receipt = {}, expectations = {}) {
   const expectedPhotoCount = Number(expectations.expectedPhotoCount || receipt.sourcePhotoCount || counts.sourcePhotoCount || 0);
   const roomDetailCount = Number(receipt.roomDetailCount || counts.roomDetailCount || 0);
   const photoLogCount = Number(receipt.photoLogCount || counts.photoLogCount || 0);
+  const photoDriveUrlCount = Number(receipt.photoDriveUrlCount || counts.photoDriveUrlCount || 0);
   if (expectedRoomCount > 0 && roomDetailCount < expectedRoomCount) return false;
   if (expectedPhotoCount > 0 && photoLogCount < expectedPhotoCount) return false;
+  if (expectedPhotoCount > 0 && photoDriveUrlCount < expectedPhotoCount) return false;
   return true;
 }
 
@@ -2125,6 +2127,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const sourceRoomCount = getHandoffRoomRecords(fieldData).length;
   const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
   const previousRoomDetailCount = Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0);
+  const previousPhotoDriveUrlCount = Number(previousReceipt.photoDriveUrlCount || previousCounts.photoDriveUrlCount || 0);
   const canReuseStaticArtifacts = !!(body.forceFullRepair !== true &&
     previousReceipt.spreadsheetId &&
     previousReceipt.spreadsheetUrl &&
@@ -2134,7 +2137,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     ? await ensureTestHandoffShell(env, accessToken, source)
     : await ensureRealHandoffShell(env, accessToken, source, fieldData);
   const photoRows = await getPhotoManifestRows(env, inspectionId);
-  const spreadsheet = canReuseStaticArtifacts
+  let spreadsheet = canReuseStaticArtifacts
     ? {
         spreadsheetId: previousReceipt.spreadsheetId,
         spreadsheetUrl: previousReceipt.spreadsheetUrl,
@@ -2153,6 +2156,21 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const photoPackage = await createOrRepairPhotoPackage(env, accessToken, shell.photosFolderId, photoRows, {
     copyLimit: Number(body.photoCopyLimit || env.HANDOFF_PHOTO_COPY_LIMIT || HANDOFF_PHOTO_COPY_LIMIT_DEFAULT)
   });
+  const finalizedPhotoRows = await getPhotoManifestRows(env, inspectionId);
+  const photoDriveUrlCount = finalizedPhotoRows.filter(row => !!row.drive_url).length;
+  if (
+    photoPackage.pendingCount === 0 &&
+    photoPackage.failedCount === 0 &&
+    (photoRows.some(row => !row.drive_url) || previousPhotoDriveUrlCount < photoDriveUrlCount)
+  ) {
+    spreadsheet = await createOrUpdateReviewDataSpreadsheet(
+      accessToken,
+      shell.folderId,
+      source,
+      fieldData,
+      finalizedPhotoRows
+    );
+  }
   const now = new Date().toISOString();
   const receipt = {
     status: 'ready',
@@ -2190,6 +2208,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     },
     counts: {
       sourcePhotoCount: photoRows.length,
+      photoDriveUrlCount,
       photoManifestCount: photoRows.length,
       photoLogCount: spreadsheet.photoLogCount,
       photoFolderAlreadyPackagedCount: photoPackage.alreadyPackagedCount,
@@ -2206,6 +2225,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       sourceRoomCount
     },
     sourcePhotoCount: photoRows.length,
+    photoDriveUrlCount,
     photoManifestCount: photoRows.length,
     photoLogCount: spreadsheet.photoLogCount,
     photoFolderAlreadyPackagedCount: photoPackage.alreadyPackagedCount,

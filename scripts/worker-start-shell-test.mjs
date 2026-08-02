@@ -146,6 +146,7 @@ function makeMockFetch(options = {}) {
     driveFolderLists: [],
     driveTrashes: [],
     rawUploads: [],
+    photoRows: (options.photoRows || []).map(row => ({ ...row })),
     photoMetadataWrites: [],
     photoUpdates: [],
     activityEventWrites: [],
@@ -400,7 +401,7 @@ function makeMockFetch(options = {}) {
     }
 
     if (url.includes('/rest/v1/inspector_photo_uploads') && method === 'GET') {
-      return jsonResponse(options.photoRows || []);
+      return jsonResponse(state.photoRows);
     }
 
     if (url.includes('/rest/v1/inspector_photo_uploads') && method === 'DELETE') {
@@ -416,6 +417,14 @@ function makeMockFetch(options = {}) {
 
     if (url.includes('/rest/v1/inspector_photo_uploads') && method === 'PATCH') {
       const body = JSON.parse(String(init.body || '{}'));
+      const requestUrl = new URL(url);
+      const photoIdMatch = String(requestUrl.searchParams.get('photo_id') || '').match(/^eq\.(.+)$/);
+      const inspectionIdMatch = String(requestUrl.searchParams.get('inspection_id') || '').match(/^eq\.(.+)$/);
+      state.photoRows.forEach(row => {
+        if (photoIdMatch && row.photo_id !== photoIdMatch[1]) return;
+        if (inspectionIdMatch && row.inspection_id !== inspectionIdMatch[1]) return;
+        Object.assign(row, body);
+      });
       state.photoUpdates.push(body);
       return jsonResponse([]);
     }
@@ -558,7 +567,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w15', 'health exposes Worker version');
+  assert(data.version === 'handoff-w16', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1948,6 +1957,8 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
     trackerStatus: 'In Progress',
     photoFolderPendingCount: 1,
     photoFolderFailedCount: 0,
+    sourcePhotoCount: 1,
+    photoDriveUrlCount: 1,
     photoLogCount: 1,
     rawReviewKeyCount: 6,
     formattedReviewRowCount: 4
@@ -2510,6 +2521,59 @@ async function testProductionHandoffQueuesBeforeRunnerBuildsPackage() {
   assert(!state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-QUEUE01').locked_at, 'runner releases the direct lock');
 }
 
+async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
+  const shellReceipt = {
+    status: 'ready',
+    shellStatus: 'ready',
+    isTestTraining: true,
+    inspectionId: 'INH-TRAINING-PHOTOLOG01',
+    folderId: 'drive-photolog-shell',
+    folderUrl: 'https://drive.google.com/drive/folders/drive-photolog-shell',
+    photosFolderId: 'drive-photolog-photos',
+    photosFolderUrl: 'https://drive.google.com/drive/folders/drive-photolog-photos',
+    cocsFolderId: 'drive-photolog-cocs',
+    cocsFolderUrl: 'https://drive.google.com/drive/folders/drive-photolog-cocs',
+    backupFolderId: 'drive-photolog-backup',
+    backupFolderUrl: 'https://drive.google.com/drive/folders/drive-photolog-backup',
+    trackerStatus: 'skipped_test_training'
+  };
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-TRAINING-PHOTOLOG01',
+      field_data: {
+        clientName: 'Photo Log Refresh Test',
+        inspectionType: 'Test / Training',
+        isTestTraining: true,
+        rooms: [{ stepId: 'kitchen-0', roomName: 'Kitchen', notes: 'Photo log test.' }],
+        system: { startInspectionShell: shellReceipt }
+      },
+      updated_at: '2026-08-01T15:00:00.000Z'
+    },
+    photoRows: [{
+      photo_id: 'photo-refresh-1',
+      inspection_id: 'INH-TRAINING-PHOTOLOG01',
+      room_name: 'Kitchen',
+      step_name: 'Photos',
+      caption: 'Refresh this URL',
+      slot: 1,
+      storage_path: 'INH-TRAINING-PHOTOLOG01/photo-refresh-1.jpg',
+      drive_url: '',
+      created_at: '2026-08-01T15:00:00.000Z'
+    }]
+  });
+  const { response, data } = await callWorker('/handoff-jobs', {
+    inspectionId: 'INH-TRAINING-PHOTOLOG01',
+    requestedBy: 'review-portal'
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  const photoLogWrites = state.sheetValueWrites.filter(update => String(update.range || '').startsWith("'Photo Log'!"));
+  const finalPhotoLog = photoLogWrites[photoLogWrites.length - 1]?.values || [];
+  assert(response.status === 200, 'final photo batch returns ready');
+  assert(data.artifactReceipt.photoDriveUrlCount === 1, 'ready receipt counts every photo Drive URL');
+  assert(photoLogWrites.length >= 2, 'final photo batch refreshes the Photo Log after copying');
+  assert(String(finalPhotoLog[1]?.[6] || '').includes('drive.google.com/file/d/'), 'final Photo Log contains the copied photo Drive URL');
+}
+
 const tests = [
   testHealthRoute,
   testCorsAllowsWorkerTokenHeader,
@@ -2551,7 +2615,8 @@ const tests = [
   testDueRunnerSkipsActivelyLockedJob,
   testDueRunnerRetriesFailedAfterBackoff,
   testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork,
-  testProductionHandoffQueuesBeforeRunnerBuildsPackage
+  testProductionHandoffQueuesBeforeRunnerBuildsPackage,
+  testFinalPhotoBatchRefreshesPhotoLogDriveUrls
 ];
 
 for (const test of tests) {
