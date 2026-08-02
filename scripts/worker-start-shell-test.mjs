@@ -159,6 +159,7 @@ function makeMockFetch(options = {}) {
     commentWrites: [],
     handoffJobs: (options.handoffJobs || []).map(row => ({ ...row })),
     handoffJobWrites: [],
+    handoffJobQueueTransitions: [],
     handoffJobClaims: [],
     handoffArtifacts: (options.handoffArtifacts || []).map(row => ({ ...row })),
     handoffArtifactWrites: [],
@@ -346,15 +347,24 @@ function makeMockFetch(options = {}) {
       const requestUrl = new URL(url);
       const jobKeyFilter = requestUrl.searchParams.get('job_key') || '';
       const jobKeyMatch = jobKeyFilter.match(/^eq\.(.+)$/);
+      const updatedAtFilter = requestUrl.searchParams.get('updated_at') || '';
+      const updatedAtMatch = updatedAtFilter.match(/^eq\.(.+)$/);
+      const statusFilter = requestUrl.searchParams.get('status') || '';
+      const statusMatch = statusFilter.match(/^eq\.(.+)$/);
       const lockFilter = requestUrl.searchParams.get('or') || '';
       const staleMatch = lockFilter.match(/locked_at\.lt\.([^,)]+)/);
       const staleBefore = staleMatch ? Date.parse(staleMatch[1]) : 0;
       const rows = state.handoffJobs.filter(row => {
         if (jobKeyMatch && row.job_key !== jobKeyMatch[1]) return false;
+        if (updatedAtMatch && row.updated_at !== updatedAtMatch[1]) return false;
+        if (statusMatch && row.status !== statusMatch[1]) return false;
         if (!lockFilter) return true;
         return !row.locked_at || (staleBefore && Date.parse(row.locked_at) < staleBefore);
       });
       rows.forEach(row => Object.assign(row, body));
+      if (updatedAtFilter || (statusFilter && !lockFilter)) {
+        state.handoffJobQueueTransitions.push({ jobKeyFilter, updatedAtFilter, statusFilter, matched: rows.length });
+      }
       return jsonResponse(rows);
     }
 
@@ -567,7 +577,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w16', 'health exposes Worker version');
+  assert(data.version === 'handoff-w17', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -2521,6 +2531,88 @@ async function testProductionHandoffQueuesBeforeRunnerBuildsPackage() {
   assert(!state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-QUEUE01').locked_at, 'runner releases the direct lock');
 }
 
+async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
+  const updatedAt = '2026-08-01T15:00:00.000Z';
+  const legacyReceipt = {
+    status: 'ready',
+    inspectionId: 'INH-TRAINING-LEGACY01',
+    isTestTraining: true,
+    folderId: 'drive-legacy-shell',
+    folderUrl: 'https://drive.google.com/drive/folders/drive-legacy-shell',
+    photosFolderId: 'drive-legacy-photos',
+    photosFolderUrl: 'https://drive.google.com/drive/folders/drive-legacy-photos',
+    backupFolderId: 'drive-legacy-backup',
+    backupFolderUrl: 'https://drive.google.com/drive/folders/drive-legacy-backup',
+    spreadsheetId: 'sheet-legacy',
+    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-legacy/edit',
+    rawJsonUrl: 'https://drive.google.com/file/d/raw-legacy/view',
+    trackerStatus: 'skipped_test_training',
+    sourcePhotoCount: 1,
+    photoLogCount: 1,
+    sourceRoomCount: 1,
+    roomDetailCount: 1,
+    photoFolderPendingCount: 0,
+    photoFolderFailedCount: 0,
+    workerVersion: 'handoff-w15'
+  };
+  const shellReceipt = {
+    status: 'ready',
+    shellStatus: 'ready',
+    inspectionId: 'INH-TRAINING-LEGACY01',
+    isTestTraining: true,
+    folderId: legacyReceipt.folderId,
+    folderUrl: legacyReceipt.folderUrl,
+    photosFolderId: legacyReceipt.photosFolderId,
+    photosFolderUrl: legacyReceipt.photosFolderUrl,
+    backupFolderId: legacyReceipt.backupFolderId,
+    backupFolderUrl: legacyReceipt.backupFolderUrl,
+    trackerStatus: 'skipped_test_training'
+  };
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-TRAINING-LEGACY01',
+      field_data: {
+        clientName: 'Legacy Receipt Repair',
+        inspectionType: 'Test / Training',
+        isTestTraining: true,
+        rooms: [{ stepId: 'bedroom-0', roomName: 'Bedroom', notes: 'Legacy receipt repair.' }],
+        system: {
+          startInspectionShell: shellReceipt,
+          tannerHandoff: legacyReceipt
+        },
+        reviewPortalData: legacyReceipt
+      },
+      updated_at: updatedAt
+    },
+    handoffJobs: [{
+      id: 'job-legacy01',
+      job_key: 'handoff_INH-TRAINING-LEGACY01',
+      inspection_id: 'INH-TRAINING-LEGACY01',
+      is_test: true,
+      status: 'ready',
+      requested_by: 'review-portal',
+      requested_at: updatedAt,
+      attempt_count: 1,
+      receipt: legacyReceipt,
+      updated_at: updatedAt
+    }]
+  });
+
+  const queued = await callWorker('/handoff-jobs', {
+    inspectionId: 'INH-TRAINING-LEGACY01',
+    requestedBy: 'review-portal',
+    runInline: false
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  assert(queued.response.status === 202, 'legacy receipt repair is queued');
+  assert(queued.data.queued === true, 'legacy receipt repair response is marked queued');
+  assert(state.handoffJobQueueTransitions.length === 1, 'legacy receipt repair uses one conditional queue transition');
+  assert(state.handoffJobQueueTransitions[0].updatedAtFilter === `eq.${updatedAt}`, 'queue transition compares the durable updated timestamp');
+  assert(state.handoffJobQueueTransitions[0].matched === 1, 'queue transition acquires the observed durable row');
+  assert(state.handoffJobs[0].status === 'queued', 'legacy durable job becomes queued');
+  assert(state.handoffJobs[0].receipt.workerVersion === 'handoff-w15', 'queue keeps the prior receipt until the runner replaces it');
+}
+
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
   const shellReceipt = {
     status: 'ready',
@@ -2616,6 +2708,7 @@ const tests = [
   testDueRunnerRetriesFailedAfterBackoff,
   testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork,
   testProductionHandoffQueuesBeforeRunnerBuildsPackage,
+  testLegacyReadyReceiptQueuesWithCompareAndSet,
   testFinalPhotoBatchRefreshesPhotoLogDriveUrls
 ];
 
