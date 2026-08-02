@@ -286,10 +286,10 @@ function makeMockFetch(options = {}) {
       return jsonResponse([]);
     }
 
-    if (url.includes('/rest/v1/rpc/reserve_assessment_shell') && method === 'POST') {
+    if (url.includes('/rest/v1/assessment_number_reservations') && method === 'POST') {
       if (options.failAssessmentReservation) return jsonResponse({ error: 'forced_reservation_failure' }, 500);
       const body = JSON.parse(String(init.body || '{}'));
-      const inspectionId = String(body.p_inspection_id || '');
+      const inspectionId = String(body.inspection_id || '');
       const existing = state.assessmentReservations.find(row => row.inspection_id === inspectionId);
       if (existing) return jsonResponse([existing]);
       const assessmentNumber = Number(options.assessmentReservationNumber || (18 + state.assessmentReservations.length));
@@ -578,7 +578,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w25', 'health exposes Worker version');
+  assert(data.version === 'handoff-w26', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -2749,7 +2749,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w25', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w26', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {

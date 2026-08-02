@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w25';
+const WORKER_VERSION = 'handoff-w26';
 
 export default {
   async fetch(request, env, ctx) {
@@ -3203,22 +3203,27 @@ async function resolveAssessmentNumberReservation(env, source, trackerContext, e
 async function reserveAssessmentNumberFromSupabase(env, source) {
   const inspectionId = cleanId(source.inspectionId || source.id, 'inspectionId');
   const inspectionDate = String(source.inspectionDate || source.startedAt || '').slice(0, 10) || null;
-  const response = await fetch(normalizeSupabaseUrl(env, '/rest/v1/rpc/reserve_assessment_shell'), {
+  const params = new URLSearchParams();
+  params.set('on_conflict', 'inspection_id');
+  params.set('select', 'id,inspection_id,assessment_number,assessment_number_display,reservation_status,created_at,updated_at');
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/assessment_number_reservations?${params}`), {
     method: 'POST',
     headers: serviceHeaders(env, {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=representation'
     }),
     body: JSON.stringify({
-      p_inspection_id: inspectionId,
-      p_client_name: source.clientName || source.ownerName || '',
-      p_property_address: source.propertyAddress || source.address || '',
-      p_inspector_name: source.inspectorName || source.inspector || '',
-      p_inspection_date: inspectionDate,
-      p_requested_by: 'cloudflare_worker_start_shell',
-      p_metadata: {
+      inspection_id: inspectionId,
+      client_name: source.clientName || source.ownerName || null,
+      property_address: source.propertyAddress || source.address || null,
+      inspector_name: source.inspectorName || source.inspector || null,
+      inspection_date: inspectionDate,
+      requested_by: 'cloudflare_worker_start_shell',
+      metadata: {
         workerVersion: WORKER_VERSION,
         source: 'start-inspection-shell'
-      }
+      },
+      updated_at: new Date().toISOString()
     })
   });
   const text = await response.text();
@@ -3242,7 +3247,7 @@ async function reserveAssessmentNumberFromSupabase(env, source) {
   return {
     assessmentNumber,
     source: ASSESSMENT_NUMBER_SOURCE_SUPABASE,
-    reservationId: row.reservation_id || row.id || '',
+    reservationId: row.id || row.reservation_id || '',
     reservationStatus: row.reservation_status || ''
   };
 }

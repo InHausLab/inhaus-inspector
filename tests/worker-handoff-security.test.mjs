@@ -48,6 +48,16 @@ test('assessment reservation upsert names its conflict constraint explicitly', (
   assert.doesNotMatch(reservationFix, /^\s*on conflict\s*\(inspection_id\)/im);
 });
 
+test('Worker reserves assessment numbers through the protected table, not the ambiguous RPC', () => {
+  const workerSource = readFileSync(
+    new URL('../workers/inhaus-photo-worker/src/index.js', import.meta.url),
+    'utf8'
+  );
+  assert.match(workerSource, /\/rest\/v1\/assessment_number_reservations\?/);
+  assert.match(workerSource, /resolution=merge-duplicates,return=representation/);
+  assert.doesNotMatch(workerSource, /\/rest\/v1\/rpc\/reserve_assessment_shell/);
+});
+
 test('live schema verification checks RLS and RPC permissions', () => {
   assert.match(verification, /handoff_tables_rls/);
   assert.match(verification, /handoff_rpc_permissions/);
