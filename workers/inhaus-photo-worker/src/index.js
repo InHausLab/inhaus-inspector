@@ -28,7 +28,7 @@ const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w12';
+const WORKER_VERSION = 'handoff-w13';
 
 export default {
   async fetch(request, env, ctx) {
@@ -1004,14 +1004,42 @@ async function handleHandoffJob(request, env, ctx) {
     submitAttempt: isPlainObject(body.submitAttempt) ? body.submitAttempt : null,
     artifactReceipt: null
   };
-  await saveHandoffJobState(env, inspectionId, fieldData, runningJob, null);
-
-  if (body.background === true && ctx && typeof ctx.waitUntil === 'function') {
-    ctx.waitUntil(processHandoffJobBatch(env, inspectionId, body, runningJob));
-    return json({ ...runningJob, status: 'queued', background: true }, 202);
+  const claim = await claimDirectHandoffJob(env, inspectionId, runningJob);
+  if (!claim.acquired) {
+    const existingJob = durableJobToPublicJob(claim.row) || runningJob;
+    const activeReceipt = isPlainObject(claim.row && claim.row.receipt) ? claim.row.receipt : null;
+    if (activeReceipt && isReadyHandoffReceipt(activeReceipt)) {
+      return json({
+        ...existingJob,
+        status: 'ready',
+        artifactReceipt: activeReceipt,
+        reviewPortalData: activeReceipt,
+        cached: true
+      });
+    }
+    return json({
+      ...existingJob,
+      artifactReceipt: activeReceipt,
+      reviewPortalData: activeReceipt,
+      cached: false,
+      inFlight: true
+    }, 202);
   }
 
-  const result = await processHandoffJobBatch(env, inspectionId, body, runningJob);
+  const claimedJob = {
+    ...runningJob,
+    durableJobId: claim.row.id || '',
+    lockedAt: claim.row.locked_at || '',
+    lockedBy: claim.row.locked_by || ''
+  };
+  await saveHandoffJobState(env, inspectionId, fieldData, claimedJob, null);
+
+  if (body.background === true && ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(processHandoffJobBatch(env, inspectionId, body, claimedJob));
+    return json({ ...claimedJob, status: 'queued', background: true }, 202);
+  }
+
+  const result = await processHandoffJobBatch(env, inspectionId, body, claimedJob);
   return json(
     { ...result.job, reviewPortalData: result.receipt, error: result.error || '' },
     result.ready ? 200 : (result.pending ? 202 : 500)
@@ -1123,6 +1151,8 @@ async function processHandoffJobBatch(env, inspectionId, body = {}, seedJob = nu
       lastError: ready || pending ? '' : (receipt.error || 'handoff_receipt_incomplete'),
       finishedAt: pending ? '' : finishedAt,
       nextRunAt,
+      lockedAt: '',
+      lockedBy: '',
       artifactReceipt: receipt
     };
     await saveHandoffJobState(env, inspectionId, fieldData, finishedJob, receipt);
@@ -1161,6 +1191,8 @@ async function processHandoffJobBatch(env, inspectionId, body = {}, seedJob = nu
       lastRunAt: failedAt,
       nextRunAt: failedReceipt.nextRunAt,
       finishedAt: failedAt,
+      lockedAt: '',
+      lockedBy: '',
       artifactReceipt: failedReceipt
     };
     await saveHandoffJobState(env, inspectionId, fieldData, failedJob, failedReceipt);
@@ -2388,11 +2420,11 @@ async function getDurableHandoffJob(env, inspectionId) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
-async function upsertDurableHandoffJob(env, inspectionId, job, receipt) {
+function buildDurableHandoffJobPayload(inspectionId, job, receipt) {
   const cleanJob = isPlainObject(job) ? job : {};
   const cleanReceipt = isPlainObject(receipt) ? receipt : (isPlainObject(cleanJob.artifactReceipt) ? cleanJob.artifactReceipt : null);
   const now = new Date().toISOString();
-  const payload = {
+  return {
     job_key: cleanJob.jobId || handoffJobId(inspectionId),
     inspection_id: inspectionId,
     is_test: cleanJob.isTestTraining === true || (cleanReceipt ? cleanReceipt.isTestTraining === true : false),
@@ -2417,6 +2449,72 @@ async function upsertDurableHandoffJob(env, inspectionId, job, receipt) {
     worker_version: WORKER_VERSION,
     updated_at: now
   };
+}
+
+async function claimDirectHandoffJob(env, inspectionId, job) {
+  const now = new Date().toISOString();
+  const lockId = `${WORKER_VERSION}:${crypto.randomUUID()}`;
+  const claimedJob = {
+    ...(isPlainObject(job) ? job : {}),
+    status: 'running',
+    lockedAt: now,
+    lockedBy: lockId
+  };
+  const payload = buildDurableHandoffJobPayload(inspectionId, claimedJob, null);
+  const insertParams = new URLSearchParams();
+  insertParams.set('on_conflict', 'job_key');
+  const insertResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/handoff_jobs?${insertParams}`), {
+    method: 'POST',
+    headers: serviceHeaders(env, {
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=ignore-duplicates,return=representation'
+    }),
+    body: JSON.stringify(payload)
+  });
+  const insertText = await insertResponse.text();
+  if (!insertResponse.ok) throw new Error(`handoff_job_claim_insert_failed:${insertResponse.status}:${insertText.slice(0, 200)}`);
+  const insertedRows = insertText ? JSON.parse(insertText) : [];
+  if (Array.isArray(insertedRows) && insertedRows.length) {
+    return { acquired: true, row: insertedRows[0] };
+  }
+
+  const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const patchParams = new URLSearchParams();
+  patchParams.set('job_key', `eq.${handoffJobId(inspectionId)}`);
+  patchParams.set('status', 'in.(queued,running,waiting_on_export_adapter,repairing,failed)');
+  patchParams.set('or', `(locked_at.is.null,locked_at.lt.${staleBefore})`);
+  const patchResponse = await fetch(normalizeSupabaseUrl(env, `/rest/v1/handoff_jobs?${patchParams}`), {
+    method: 'PATCH',
+    headers: serviceHeaders(env, {
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }),
+    body: JSON.stringify({
+      status: 'running',
+      requested_by: claimedJob.requestedBy || 'worker',
+      requested_at: claimedJob.requestedAt || now,
+      locked_at: now,
+      locked_by: lockId,
+      started_at: now,
+      finished_at: null,
+      last_error: null,
+      updated_at: now,
+      worker_version: WORKER_VERSION
+    })
+  });
+  const patchText = await patchResponse.text();
+  if (!patchResponse.ok) throw new Error(`handoff_job_claim_patch_failed:${patchResponse.status}:${patchText.slice(0, 200)}`);
+  const patchedRows = patchText ? JSON.parse(patchText) : [];
+  if (Array.isArray(patchedRows) && patchedRows.length) {
+    return { acquired: true, row: patchedRows[0] };
+  }
+
+  return { acquired: false, row: await getDurableHandoffJob(env, inspectionId) };
+}
+
+async function upsertDurableHandoffJob(env, inspectionId, job, receipt) {
+  const cleanReceipt = isPlainObject(receipt) ? receipt : (isPlainObject(job && job.artifactReceipt) ? job.artifactReceipt : null);
+  const payload = buildDurableHandoffJobPayload(inspectionId, job, receipt);
   const params = new URLSearchParams();
   params.set('on_conflict', 'job_key');
   const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/handoff_jobs?${params}`), {

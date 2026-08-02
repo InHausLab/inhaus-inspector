@@ -340,6 +340,23 @@ function makeMockFetch(options = {}) {
       return jsonResponse(rows);
     }
 
+    if (url.includes('/rest/v1/handoff_jobs') && method === 'PATCH') {
+      const body = JSON.parse(String(init.body || '{}'));
+      const requestUrl = new URL(url);
+      const jobKeyFilter = requestUrl.searchParams.get('job_key') || '';
+      const jobKeyMatch = jobKeyFilter.match(/^eq\.(.+)$/);
+      const lockFilter = requestUrl.searchParams.get('or') || '';
+      const staleMatch = lockFilter.match(/locked_at\.lt\.([^,)]+)/);
+      const staleBefore = staleMatch ? Date.parse(staleMatch[1]) : 0;
+      const rows = state.handoffJobs.filter(row => {
+        if (jobKeyMatch && row.job_key !== jobKeyMatch[1]) return false;
+        if (!lockFilter) return true;
+        return !row.locked_at || (staleBefore && Date.parse(row.locked_at) < staleBefore);
+      });
+      rows.forEach(row => Object.assign(row, body));
+      return jsonResponse(rows);
+    }
+
     if (url.includes('/rest/v1/handoff_jobs') && method === 'POST') {
       const body = JSON.parse(String(init.body || '{}'));
       const row = {
@@ -348,6 +365,10 @@ function makeMockFetch(options = {}) {
         ...body
       };
       const index = state.handoffJobs.findIndex(existing => existing.job_key === row.job_key);
+      const prefer = new Headers(init.headers || {}).get('Prefer') || '';
+      if (index >= 0 && prefer.includes('resolution=ignore-duplicates')) {
+        return jsonResponse([]);
+      }
       if (index >= 0) {
         state.handoffJobs[index] = { ...state.handoffJobs[index], ...row };
       } else {
@@ -534,7 +555,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w12', 'health exposes Worker version');
+  assert(data.version === 'handoff-w13', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -2362,6 +2383,64 @@ async function testDueRunnerRetriesFailedAfterBackoff() {
   assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-RETRY01').status === 'ready', 'due runner retry updates durable job');
 }
 
+async function testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork() {
+  const lockedAt = new Date().toISOString();
+  const runningReceipt = {
+    status: 'running',
+    inspectionId: 'INH-TRAINING-DUPLICATE01',
+    isTestTraining: true,
+    trackerStatus: 'skipped_test_training',
+    photoFolderPendingCount: 80
+  };
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-TRAINING-DUPLICATE01',
+      field_data: {
+        clientName: 'Duplicate Submit Test',
+        inspectionType: 'Test / Training',
+        isTestTraining: true,
+        system: {
+          handoffJob: {
+            jobId: 'handoff_INH-TRAINING-DUPLICATE01',
+            status: 'running',
+            attemptCount: 1,
+            lockedAt,
+            lockedBy: 'handoff-w13:first-request'
+          }
+        }
+      },
+      updated_at: lockedAt
+    },
+    handoffJobs: [{
+      id: 'job-duplicate01',
+      job_key: 'handoff_INH-TRAINING-DUPLICATE01',
+      inspection_id: 'INH-TRAINING-DUPLICATE01',
+      is_test: true,
+      status: 'running',
+      attempt_count: 1,
+      locked_at: lockedAt,
+      locked_by: 'handoff-w13:first-request',
+      requested_by: 'review-portal',
+      requested_at: lockedAt,
+      payload: {},
+      receipt: runningReceipt,
+      updated_at: lockedAt
+    }],
+    photoRows: []
+  });
+  const { response, data } = await callWorker('/handoff-jobs', {
+    inspectionId: 'INH-TRAINING-DUPLICATE01',
+    requestedBy: 'second-device'
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  assert(response.status === 202, 'duplicate direct handoff returns accepted while first request runs');
+  assert(data.inFlight === true, 'duplicate direct handoff is marked in flight');
+  assert(data.artifactReceipt.photoFolderPendingCount === 80, 'duplicate response returns current receipt');
+  assert(state.driveCreates.length === 0, 'duplicate direct handoff does not create Drive artifacts');
+  assert(state.sheetValueWrites.length === 0, 'duplicate direct handoff does not write spreadsheets');
+  assert(state.reviewWrites.length === 0, 'duplicate direct handoff does not overwrite review state');
+}
+
 const tests = [
   testHealthRoute,
   testCorsAllowsWorkerTokenHeader,
@@ -2401,7 +2480,8 @@ const tests = [
   testRunnerFailureSchedulesBackoff,
   testDueRunnerSkipsFutureBackoff,
   testDueRunnerSkipsActivelyLockedJob,
-  testDueRunnerRetriesFailedAfterBackoff
+  testDueRunnerRetriesFailedAfterBackoff,
+  testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork
 ];
 
 for (const test of tests) {
