@@ -5,9 +5,34 @@ import { readFileSync } from 'node:fs';
 const worker = readFileSync(new URL('../workers/inhaus-photo-worker/src/index.js', import.meta.url), 'utf8');
 const sync = readFileSync(new URL('../sync.js', import.meta.url), 'utf8');
 const photoClient = readFileSync(new URL('../supabase-photos.js', import.meta.url), 'utf8');
+globalThis.localStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {}
+};
+globalThis.sessionStorage = globalThis.localStorage;
 
 test('photo metadata survives the stripped binary payload', () => {
   assert.match(sync, /mainPayload\.photoManifest = allPhotos\.map/);
+});
+
+test('Supabase-stored photos remain in the final photo manifest after pixels are cleared', async () => {
+  const { extractAllPhotosFromExport } = await import('../inspection.js');
+  const photos = extractAllPhotosFromExport({
+    rooms: [{
+      roomName: 'Bedroom 1',
+      photos: [{
+        photoId: 'photo-stored-1',
+        dataUrl: '__uploaded__',
+        storagePath: 'INH-TEST/photo-stored-1.jpg',
+        roomName: 'Bedroom 1',
+        stepName: 'Photos'
+      }]
+    }]
+  });
+  assert.equal(photos.length, 1);
+  assert.equal(photos[0].photoId, 'photo-stored-1');
+  assert.equal(photos[0].storagePath, 'INH-TEST/photo-stored-1.jpg');
 });
 
 test('Drive photo packaging belongs to the retryable Worker handoff', () => {

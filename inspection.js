@@ -1,16 +1,17 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=225';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=225';
-import { ensureInspectionWorkspace } from './findings.js?v=225';
+import { getInspection } from './state.js?v=226';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=226';
+import { ensureInspectionWorkspace } from './findings.js?v=226';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
   function pickPhoto(p, fallbackRoomName) {
-    // Include already-uploaded photos (they have driveUrl but dataUrl cleared)
+    // Include already-uploaded photos after their local pixels are cleared.
     const imageData = p.imageData || p.dataUrl || '';
     const hasData = imageData && imageData !== '__uploaded__';
     const hasDrive = p.driveUrl || p.driveId;
-    if (!hasData && !hasDrive) return null;
+    const hasStoredOriginal = Boolean(p.storagePath);
+    if (!hasData && !hasDrive && !hasStoredOriginal) return null;
     return {
       photoId: p.photoId || '',
       imageData: hasData ? imageData : '',
@@ -21,7 +22,8 @@ export function extractAllPhotosFromExport(exportData) {
       placementSource: p.placementSource || '',
       routingStatus: p.routingStatus || '',
       driveUrl: p.driveUrl || null,
-      driveId: p.driveId || null
+      driveId: p.driveId || null,
+      storagePath: p.storagePath || ''
     };
   }
   function extractFromSection(s, fallbackRoomName) {
@@ -101,7 +103,8 @@ function exportPhotoArray(arr) {
     assignedSlot: p.assignedSlot || null,
     imageData: p.dataUrl,
     driveUrl: p.driveUrl || null,
-    driveId: p.driveId || null
+    driveId: p.driveId || null,
+    storagePath: p.storagePath || ''
   }));
 }
 

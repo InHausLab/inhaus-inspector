@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v226 — Preserve Supabase Photo Manifest Metadata
+**Date:** August 1, 2026
+
+- Kept photos with confirmed Supabase `storagePath` values in the final lightweight
+  photo manifest after local image pixels are cleared.
+- Fixed the portal inventory disagreement where the authoritative photo service showed
+  four photos but the app list reported zero.
+- Added a regression test for stored-photo manifest extraction.
+
 ## v225 — Multi-Photo Rendering Release Correction
 **Date:** August 1, 2026
 
