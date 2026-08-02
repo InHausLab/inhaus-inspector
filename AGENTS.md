@@ -11,6 +11,11 @@
 A task is **done** when and only when:
 
 - **E2E-1 passes** against the deployed artifact.
+- The real deployed product is used through the normal browser/human workflow with
+  realistic data. Automated, unit, integration, contract, build, and smoke tests are
+  prerequisites; they are not acceptance proof by themselves.
+- Browser screenshots and direct checks of the affected systems of record or generated
+  artifacts prove the result. State every affected path that remains unverified.
 - The passing run is recorded in the completion report (run ID or timestamp, not just "it passed").
 - CHANGELOG.md is updated with the change, version bump, and commit SHA.
 - This file is updated if any process described here changed.
@@ -41,6 +46,13 @@ If proof requires a phone, mobile browser, or user-authenticated session you can
 access directly: **stop and write a handoff brief**. Do not attempt verification you
 cannot perform. Do not say it is fixed.
 
+**The agent owns the retry loop.** Deploy, verify, diagnose, and retry independently
+whenever tooling and access permit. Never use Matt, Tanner, Hans, or an inspector as a
+retry button. Ask a person only for a blocker requiring their identity, authorization,
+physical device, or business decision. Do not ask them to perform a check the agent can
+perform through the browser, API, database, repository, deployment system, or generated
+artifacts.
+
 **Three-failure hard stop.** After two failed attempts: record what was tried, state
 the remaining hypothesis, one more attempt only if materially different. After three
 failures: stop completely. Write a handoff brief with problem, files, symptoms, changes
@@ -53,9 +65,8 @@ tried, log evidence, remaining hypotheses, and requested next action. No fourth 
 1. **Inspector app (Netlify):** deploy via `git push` to `main`. Never deploy by dragging
    files or using the Netlify UI directly — it bypasses version tracking.
 
-2. **Apps Script:** deploy by pasting source into the Google Apps Script editor UI and
-   deploying a new version manually. **Never use `clasp deploy`** — it breaks the live
-   web app. Record the Google Version number in CHANGELOG.md.
+2. **Apps Script:** it is not part of the inspector app, review portal, or handoff
+   production path. Do not restore an Apps Script fallback or second writer.
 
 3. **Cloudflare Worker:** deploy via `wrangler deploy` from a machine with a valid
    Cloudflare API token scoped to the InHaus account (`bbf861ec`). The deploying
@@ -72,7 +83,6 @@ tried, log evidence, remaining hypotheses, and requested next action. No fourth 
 | Component       | Deploy method         | Required credential          | Authorized machines         |
 |-----------------|----------------------|------------------------------|-----------------------------|
 | Inspector app   | `git push` → Netlify  | GitHub (InHausLab org)       | Any machine with git access |
-| Apps Script     | Editor UI → Deploy    | Google account (matt@)       | Any browser, Matt only      |
 | CF Worker       | `wrangler deploy`     | CF API token, account bbf861ec | Hans's Mac Mini (as of Aug 2026) |
 | Supabase schema | Supabase dashboard    | Supabase project credentials | Any browser                 |
 
@@ -131,12 +141,12 @@ or E2E infrastructure is down (state this and file a follow-up).
 
 Before any field inspection with real client data:
 
-- Every endpoint serving inspection data (Worker routes, Apps Script GETs, any portal API)
+- Every endpoint serving inspection data (Worker routes and portal APIs)
   must require authentication.
 - Run the audit: attempt unauthenticated GETs against every known endpoint. Record results.
 - Report findings before fixing anything. The report is the deliverable, not the fix.
-- Apps Script GET endpoints were flagged in a prior review as potentially unauthenticated.
-  Verify current state. Do not assume the Worker bearer token covers all surfaces.
+- Verify current deployed state. Do not assume one endpoint's bearer token covers all
+  surfaces.
 
 ---
 
@@ -146,5 +156,4 @@ Before any field inspection with real client data:
 - Read it before starting any task.
 - When a process described here changes, update this file in the same commit.
 - If this file and actual practice diverge, the file is wrong — fix the file.
-- A matching copy lives in the Apps Script repo (`inhaus-apps-script/AGENTS.md`).
-  Keep them in sync on process changes that affect both repos.
+- The global Codex rules at `~/.codex/AGENTS.md` apply in addition to this file.
