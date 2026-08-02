@@ -21,7 +21,7 @@ const DRIVE_SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
 const TRACKER_TAB_REPORT = 'Report Tracker';
 const TRACKER_DATA_START = 8;
 const TEST_ASSESSMENTS_FOLDER_NAME = '_Test Assessments';
-const HANDOFF_RECEIPT_SCHEMA_VERSION = 'handoff-receipt-v1';
+const HANDOFF_RECEIPT_SCHEMA_VERSION = 'handoff-receipt-v2';
 const HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 5;
 const HANDOFF_RUNNER_LIMIT_DEFAULT = 5;
 const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w20';
+const WORKER_VERSION = 'handoff-w21';
 
 export default {
   async fetch(request, env, ctx) {
@@ -2117,6 +2117,12 @@ function buildPartialFailedHandoffReceipt(fieldData = {}) {
   set('spreadsheetUrl', receipt.spreadsheetUrl, receipt.reviewPortalDataSpreadsheetUrl, receipt.reviewPortalDataUrl);
   set('reviewPortalDataSpreadsheetId', receipt.reviewPortalDataSpreadsheetId, receipt.spreadsheetId);
   set('reviewPortalDataSpreadsheetUrl', receipt.reviewPortalDataSpreadsheetUrl, receipt.spreadsheetUrl, receipt.reviewPortalDataUrl);
+  set('inspectionSpreadsheetId', receipt.inspectionSpreadsheetId, receipt.appInspectionSpreadsheetId);
+  set('inspectionSpreadsheetUrl', receipt.inspectionSpreadsheetUrl, receipt.appInspectionSpreadsheetUrl);
+  set('appInspectionSpreadsheetId', receipt.appInspectionSpreadsheetId, receipt.inspectionSpreadsheetId);
+  set('appInspectionSpreadsheetUrl', receipt.appInspectionSpreadsheetUrl, receipt.inspectionSpreadsheetUrl);
+  set('contextFileId', receipt.contextFileId);
+  set('contextFileUrl', receipt.contextFileUrl);
   set('rawReviewDataUrl', receipt.rawReviewDataUrl, receipt.rawJsonUrl);
   set('rawJsonUrl', receipt.rawJsonUrl, receipt.rawReviewDataUrl);
   set('rawJsonId', receipt.rawJsonId);
@@ -2136,6 +2142,8 @@ function isReadyHandoffReceipt(receipt = {}, expectations = {}) {
   if (!(receipt.folderUrl || receipt.folderId)) return false;
   if (!(receipt.photosFolderUrl || receipt.photosFolderId || receipt.technicianPhotosFolderUrl || receipt.technicianPhotosFolderId)) return false;
   if (!(receipt.spreadsheetUrl || receipt.spreadsheetId)) return false;
+  if (!(receipt.inspectionSpreadsheetUrl || receipt.inspectionSpreadsheetId || receipt.appInspectionSpreadsheetUrl || receipt.appInspectionSpreadsheetId)) return false;
+  if (!(receipt.contextFileUrl || receipt.contextFileId)) return false;
   if (!(receipt.rawJsonUrl || receipt.rawReviewDataUrl)) return false;
   if (!isTestTraining && !(receipt.trackerUrl || receipt.trackerRow || receipt.trackerRowUrl)) return false;
   if (Number(receipt.photoFolderFailedCount || receipt.technicianPhotoFailedCount || 0) > 0) return false;
@@ -2144,9 +2152,13 @@ function isReadyHandoffReceipt(receipt = {}, expectations = {}) {
   const expectedRoomCount = Number(expectations.expectedRoomCount || receipt.sourceRoomCount || counts.sourceRoomCount || 0);
   const expectedPhotoCount = Number(expectations.expectedPhotoCount || receipt.sourcePhotoCount || counts.sourcePhotoCount || 0);
   const roomDetailCount = Number(receipt.roomDetailCount || counts.roomDetailCount || 0);
+  const appRoomDetailCount = Number(receipt.appRoomDetailCount || counts.appRoomDetailCount || 0);
+  const rawAppKeyCount = Number(receipt.rawAppKeyCount || counts.rawAppKeyCount || 0);
   const photoLogCount = Number(receipt.photoLogCount || counts.photoLogCount || 0);
   const photoDriveUrlCount = Number(receipt.photoDriveUrlCount || counts.photoDriveUrlCount || 0);
   if (expectedRoomCount > 0 && roomDetailCount < expectedRoomCount) return false;
+  if (expectedRoomCount > 0 && appRoomDetailCount < expectedRoomCount) return false;
+  if (rawAppKeyCount <= 0) return false;
   if (expectedPhotoCount > 0 && photoLogCount < expectedPhotoCount) return false;
   if (expectedPhotoCount > 0 && photoDriveUrlCount < expectedPhotoCount) return false;
   return true;
@@ -2164,12 +2176,19 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const sourceRoomCount = getHandoffRoomRecords(handoffFieldData).length;
   const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
   const previousRoomDetailCount = Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0);
+  const previousAppRoomDetailCount = Number(previousReceipt.appRoomDetailCount || previousCounts.appRoomDetailCount || 0);
   const previousPhotoDriveUrlCount = Number(previousReceipt.photoDriveUrlCount || previousCounts.photoDriveUrlCount || 0);
   const canReuseStaticArtifacts = !!(body.forceFullRepair !== true &&
     previousReceipt.spreadsheetId &&
     previousReceipt.spreadsheetUrl &&
     (previousReceipt.rawJsonUrl || previousReceipt.rawReviewDataUrl) &&
     (sourceRoomCount === 0 || previousRoomDetailCount >= sourceRoomCount));
+  const canReuseRootArtifacts = !!(canReuseStaticArtifacts &&
+    (previousReceipt.inspectionSpreadsheetId || previousReceipt.appInspectionSpreadsheetId) &&
+    (previousReceipt.inspectionSpreadsheetUrl || previousReceipt.appInspectionSpreadsheetUrl) &&
+    previousReceipt.contextFileId &&
+    previousReceipt.contextFileUrl &&
+    (sourceRoomCount === 0 || previousAppRoomDetailCount >= sourceRoomCount));
   const shell = isTestTraining
     ? await ensureTestHandoffShell(env, accessToken, source)
     : await ensureRealHandoffShell(env, accessToken, source, fieldData);
@@ -2208,6 +2227,35 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       finalizedPhotoRows
     );
   }
+  const inspectionSpreadsheet = canReuseRootArtifacts
+    ? {
+        spreadsheetId: previousReceipt.inspectionSpreadsheetId || previousReceipt.appInspectionSpreadsheetId,
+        spreadsheetUrl: previousReceipt.inspectionSpreadsheetUrl || previousReceipt.appInspectionSpreadsheetUrl,
+        roomDetailCount: previousAppRoomDetailCount,
+        rawAppKeyCount: Number(previousReceipt.rawAppKeyCount || previousCounts.rawAppKeyCount || 0)
+      }
+    : await createOrUpdateInspectionSpreadsheet(
+        accessToken,
+        shell.folderId,
+        source,
+        handoffFieldData,
+        finalizedPhotoRows
+      );
+  const contextFile = canReuseRootArtifacts
+    ? {
+        contextFileId: previousReceipt.contextFileId,
+        contextFileUrl: previousReceipt.contextFileUrl
+      }
+    : await createOrUpdateAssessmentContext(
+        accessToken,
+        shell,
+        source,
+        handoffFieldData,
+        finalizedPhotoRows,
+        inspectionSpreadsheet,
+        spreadsheet,
+        rawBackup
+      );
   const now = new Date().toISOString();
   const receipt = {
     status: 'ready',
@@ -2229,6 +2277,12 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     spreadsheetUrl: spreadsheet.spreadsheetUrl,
     reviewPortalDataSpreadsheetId: spreadsheet.spreadsheetId,
     reviewPortalDataSpreadsheetUrl: spreadsheet.spreadsheetUrl,
+    inspectionSpreadsheetId: inspectionSpreadsheet.spreadsheetId,
+    inspectionSpreadsheetUrl: inspectionSpreadsheet.spreadsheetUrl,
+    appInspectionSpreadsheetId: inspectionSpreadsheet.spreadsheetId,
+    appInspectionSpreadsheetUrl: inspectionSpreadsheet.spreadsheetUrl,
+    contextFileId: contextFile.contextFileId,
+    contextFileUrl: contextFile.contextFileUrl,
     rawReviewDataUrl: rawBackup.rawJsonUrl,
     rawJsonUrl: rawBackup.rawJsonUrl,
     rawJsonId: rawBackup.rawJsonId,
@@ -2259,6 +2313,8 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       rawReviewKeyCount: spreadsheet.rawReviewKeyCount,
       formattedReviewRowCount: spreadsheet.formattedReviewRowCount,
       roomDetailCount: spreadsheet.roomDetailCount,
+      appRoomDetailCount: inspectionSpreadsheet.roomDetailCount,
+      rawAppKeyCount: inspectionSpreadsheet.rawAppKeyCount,
       sourceRoomCount
     },
     sourcePhotoCount: photoRows.length,
@@ -2277,6 +2333,8 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     rawReviewKeyCount: spreadsheet.rawReviewKeyCount,
     formattedReviewRowCount: spreadsheet.formattedReviewRowCount,
     roomDetailCount: spreadsheet.roomDetailCount,
+    appRoomDetailCount: inspectionSpreadsheet.roomDetailCount,
+    rawAppKeyCount: inspectionSpreadsheet.rawAppKeyCount,
     sourceRoomCount,
     checksums: {
       sourceSnapshotHash: stableHash(handoffFieldData.system && handoffFieldData.system.inspectionRecovery),
@@ -2285,6 +2343,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     },
     createdAt: now,
     staticArtifactsReused: canReuseStaticArtifacts,
+    rootArtifactsReused: canReuseRootArtifacts,
     updatedAt: now,
     workerVersion: WORKER_VERSION,
     appsScriptVersion: '',
@@ -2577,6 +2636,9 @@ function getHandoffReceiptMissingReason(receipt = {}) {
   if (!(receipt.folderUrl || receipt.folderId)) missing.push('assessment folder');
   if (!(receipt.photosFolderUrl || receipt.photosFolderId || receipt.technicianPhotosFolderUrl || receipt.technicianPhotosFolderId)) missing.push('photos folder');
   if (!(receipt.spreadsheetUrl || receipt.spreadsheetId)) missing.push('review data spreadsheet');
+  if (!(receipt.inspectionSpreadsheetUrl || receipt.inspectionSpreadsheetId || receipt.appInspectionSpreadsheetUrl || receipt.appInspectionSpreadsheetId)) missing.push('InHaus inspection spreadsheet');
+  if (!(receipt.contextFileUrl || receipt.contextFileId)) missing.push('assessment context');
+  if (Number(receipt.rawAppKeyCount || receipt.counts?.rawAppKeyCount || 0) <= 0) missing.push('raw app data rows');
   if (!(receipt.rawJsonUrl || receipt.rawReviewDataUrl)) missing.push('raw backup');
   if (!receipt.isTestTraining && !(receipt.trackerUrl || receipt.trackerRow || receipt.trackerRowUrl)) missing.push('tracker row');
   if (Number(receipt.photoFolderFailedCount || receipt.technicianPhotoFailedCount || 0) > 0) missing.push('photo copy failures');
@@ -2831,6 +2893,18 @@ function handoffArtifactRows(inspectionId, jobRow, receipt) {
     photoLogCount: Number(receipt.photoLogCount || 0),
     roomDetailCount: Number(receipt.roomDetailCount || 0)
   });
+  add(
+    'inhaus_inspection_spreadsheet',
+    'google_sheet',
+    receipt.inspectionSpreadsheetId || receipt.appInspectionSpreadsheetId,
+    receipt.inspectionSpreadsheetUrl || receipt.appInspectionSpreadsheetUrl,
+    'ready',
+    {
+      roomDetailCount: Number(receipt.appRoomDetailCount || receipt.counts?.appRoomDetailCount || 0),
+      rawAppKeyCount: Number(receipt.rawAppKeyCount || receipt.counts?.rawAppKeyCount || 0)
+    }
+  );
+  add('assessment_context', 'markdown', receipt.contextFileId, receipt.contextFileUrl, 'ready');
   add('raw_review_data', 'raw_json_backup', receipt.rawJsonId || '', receipt.rawJsonUrl || receipt.rawReviewDataUrl, 'ready', {
     rawKeyCount: Number(receipt.rawKeyCount || receipt.rawReviewKeyCount || 0)
   });
@@ -3913,6 +3987,349 @@ function buildRoomDetailRows(fieldData, photoRows = []) {
     ]);
   });
   return rows;
+}
+
+async function createOrUpdateInspectionSpreadsheet(accessToken, folderId, source, fieldData, photoRows) {
+  const title = inspectionSpreadsheetTitle(source);
+  const spreadsheet = await getOrCreateDriveFile(accessToken, folderId, title, DRIVE_SPREADSHEET_MIME);
+  const tabs = ['Summary', 'Air Data', 'Room Details', 'CSV Output', 'Follow-Up Items', 'Raw App Data'];
+  await ensureSpreadsheetTabs(accessToken, spreadsheet.id, tabs);
+
+  const summaryRows = buildInspectionSummaryRows(source, fieldData);
+  const airRows = buildInspectionAirDataRows(fieldData);
+  const roomRows = buildInspectionRoomDetailRows(fieldData, photoRows);
+  const csvRows = buildInspectionCsvRows(source, fieldData, photoRows);
+  const followUpRows = buildInspectionFollowUpRows(fieldData);
+  const rawRows = buildRawAppRows(fieldData);
+  await clearSheetTabs(accessToken, spreadsheet.id, tabs);
+  await writeSheetValueSets(accessToken, spreadsheet.id, [
+    { tab: 'Summary', rows: summaryRows },
+    { tab: 'Air Data', rows: airRows },
+    { tab: 'Room Details', rows: roomRows },
+    { tab: 'CSV Output', rows: csvRows },
+    { tab: 'Follow-Up Items', rows: followUpRows },
+    { tab: 'Raw App Data', rows: rawRows }
+  ]);
+
+  return {
+    spreadsheetId: spreadsheet.id,
+    spreadsheetUrl: spreadsheet.webViewLink || `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheet.id)}/edit`,
+    roomDetailCount: Math.max(0, roomRows.length - 1),
+    airDataCount: Math.max(0, airRows.length - 1),
+    followUpCount: Math.max(0, followUpRows.length - 1),
+    rawAppKeyCount: Math.max(0, rawRows.length - 1)
+  };
+}
+
+function inspectionSpreadsheetTitle(source) {
+  const lastName = getClientLastName(source.clientName);
+  return `InHaus Inspection — ${source.inspectionId || source.id || 'inspection'}_${lastName}`;
+}
+
+function buildInspectionSummaryRows(source, fieldData) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const record = { ...recovery, ...source };
+  const rows = [
+    ['INHAUS LAB — INSPECTION DATA', ''],
+    ['', ''],
+    ['BASIC INFORMATION', ''],
+    ['Inspection ID', firstNonEmpty(record.inspectionId, record.id)],
+    ['Inspector', firstNonEmpty(record.inspectorName, record.inspector)],
+    ['Inspection Date', firstNonEmpty(record.inspectionDate, record.date)],
+    ['Client', firstNonEmpty(record.clientName, record.client)],
+    ['Property Address', firstNonEmpty(record.propertyAddress, record.address)],
+    ['Inspection Type', firstNonEmpty(record.inspectionType, record.assessmentType)],
+    ['', ''],
+    ['PROPERTY DETAILS', ''],
+    ['Residence Type', exportValue(record, ['residenceType', 'propertyType', 'homeType'])],
+    ['Year Built', exportValue(record, ['yearBuilt', 'propertyYearBuilt'])],
+    ['Square Feet', exportValue(record, ['squareFeet', 'sqFt', 'propertySquareFeet'])],
+    ['Bedrooms', exportValue(record, ['numberOfBedrooms', 'bedrooms'])],
+    ['Bathrooms', exportValue(record, ['numberOfBathrooms', 'bathrooms'])],
+    ['Levels', exportValue(record, ['numberOfLevels', 'levels'])],
+    ['Basement', exportValue(record, ['basement', 'hasBasement'])],
+    ['Carpeted Rooms', exportValue(record, ['carpetedRooms', 'carpet'])],
+    ['Water Source', exportValue(record, ['waterSource'])],
+    ['', ''],
+    ['SYSTEMS / SITE CONDITIONS', ''],
+    ['Water Filtration', exportValue(record, ['waterFiltration', 'filtration'])],
+    ['Water Softener', exportValue(record, ['waterSoftener', 'softener'])],
+    ['Heating', exportValue(record, ['heating', 'heatingSystem'])],
+    ['Air Conditioning', exportValue(record, ['ac', 'airConditioning'])],
+    ['Ventilation', exportValue(record, ['ventilation'])],
+    ['Weather', exportValue(record, ['weather', 'weatherConditions'])],
+    ['Occupancy', exportValue(record, ['occupancy', 'occupied'])],
+    ['Client Concerns', firstNonEmpty(fieldData.clientConcerns, exportValue(record, ['clientConcerns']))],
+    ['Known Problem Areas', firstNonEmpty(fieldData.knownProblemAreas, exportValue(record, ['knownProblemAreas']))]
+  ];
+  return rows.map(row => row.map(spreadsheetCellValue));
+}
+
+function buildInspectionAirDataRows(fieldData) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const rows = [['Room', 'PM2.5', 'PM10', 'TVOCs', 'Formaldehyde', 'CO', 'CO2', 'Ozone']];
+  getHandoffRoomRecords(fieldData).forEach(function(room) {
+    if (!isPlainObject(room)) return;
+    const data = roomExportData(room, recovery);
+    rows.push([
+      roomDisplayName(room),
+      exportValue(data, ['pm25', 'pm2_5', 'pm2.5', 'qtrakPm25']),
+      exportValue(data, ['pm10', 'qtrakPm10']),
+      exportValue(data, ['tvoc', 'tvocs', 'qtrakTvoc']),
+      exportValue(data, ['formaldehyde', 'hcho', 'qtrakFormaldehyde']),
+      exportValue(data, ['co', 'carbonMonoxide', 'qtrakCo']),
+      exportValue(data, ['co2', 'carbonDioxide', 'qtrakCo2']),
+      exportValue(data, ['ozone', 'o3'])
+    ].map(spreadsheetCellValue));
+  });
+  return rows;
+}
+
+function buildInspectionRoomDetailRows(fieldData, photoRows = []) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const rows = [['Room', 'Type', 'Level', 'Observations', 'Notes', 'Breeze Done', 'Spore Trap ID', 'FLIR Done', 'FLIR Concerns', 'Q-Trak Captured', 'Q-Trak Location', 'Follow-Up', 'Photo IDs']];
+  getHandoffRoomRecords(fieldData).forEach(function(room) {
+    if (!isPlainObject(room)) return;
+    const data = roomExportData(room, recovery);
+    const stepId = firstNonEmpty(room.stepId, room.id);
+    const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const photoIds = roomPhotoIds(room, photoRows);
+    rows.push([
+      roomDisplayName(room),
+      firstNonEmpty(room.type, room.roomType, room.roomCategory, exportValue(data, ['roomType', 'type'])),
+      firstNonEmpty(room.level, room.floor, exportValue(data, ['level', 'floor'])),
+      firstNonEmpty(exportValue(data, ['observations', 'observation', 'finding', 'findings']), reviewedRoom.observations),
+      firstNonEmpty(reviewedRoom.polishedInspectorNotes, reviewedRoom.inspectorNotes, exportValue(data, ['inspectorNotes', 'notes', 'roomNotes'])),
+      exportValue(data, ['breezeDone']),
+      exportValue(data, ['sporeTrapId', 'sporeTrapID', 'breezeSampleId', 'breezeSampleID']),
+      exportValue(data, ['flirDone']),
+      exportValue(data, ['flirConcerns']),
+      exportValue(data, ['qtrakCaptured']),
+      exportValue(data, ['qtrakLocation']),
+      firstNonEmpty(reviewedRoom.followUpPlan, reviewedRoom.followUp, exportValue(data, ['followUpNote', 'followUpPlan', 'watchFor'])),
+      photoIds.join(', ')
+    ].map(spreadsheetCellValue));
+  });
+  return rows;
+}
+
+function buildInspectionCsvRows(source, fieldData, photoRows = []) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const record = { ...recovery, ...source };
+  const rooms = getHandoffRoomRecords(fieldData);
+  const headers = [
+    'Inspection ID', 'Inspector', 'Inspection Date', 'Client', 'Property Address', 'Inspection Type',
+    'Residence Type', 'Year Built', 'Square Feet', 'Bedrooms', 'Bathrooms', 'Levels', 'Basement',
+    'Water Source', 'Water Filtration', 'Heating', 'Air Conditioning', 'Ventilation', 'Weather',
+    'Client Concerns', 'Known Problem Areas', 'Room Count', 'Photo Count'
+  ];
+  const values = [
+    firstNonEmpty(record.inspectionId, record.id),
+    firstNonEmpty(record.inspectorName, record.inspector),
+    firstNonEmpty(record.inspectionDate, record.date),
+    firstNonEmpty(record.clientName, record.client),
+    firstNonEmpty(record.propertyAddress, record.address),
+    firstNonEmpty(record.inspectionType, record.assessmentType),
+    exportValue(record, ['residenceType', 'propertyType', 'homeType']),
+    exportValue(record, ['yearBuilt', 'propertyYearBuilt']),
+    exportValue(record, ['squareFeet', 'sqFt', 'propertySquareFeet']),
+    exportValue(record, ['numberOfBedrooms', 'bedrooms']),
+    exportValue(record, ['numberOfBathrooms', 'bathrooms']),
+    exportValue(record, ['numberOfLevels', 'levels']),
+    exportValue(record, ['basement', 'hasBasement']),
+    exportValue(record, ['waterSource']),
+    exportValue(record, ['waterFiltration', 'filtration']),
+    exportValue(record, ['heating', 'heatingSystem']),
+    exportValue(record, ['ac', 'airConditioning']),
+    exportValue(record, ['ventilation']),
+    exportValue(record, ['weather', 'weatherConditions']),
+    firstNonEmpty(fieldData.clientConcerns, exportValue(record, ['clientConcerns'])),
+    firstNonEmpty(fieldData.knownProblemAreas, exportValue(record, ['knownProblemAreas'])),
+    rooms.length,
+    (photoRows || []).length
+  ];
+  return [headers, values.map(spreadsheetCellValue)];
+}
+
+function buildInspectionFollowUpRows(fieldData) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const rows = [['Room', 'Re-check In', 'What to Watch For', 'Photo IDs']];
+  getHandoffRoomRecords(fieldData).forEach(function(room) {
+    if (!isPlainObject(room)) return;
+    const data = roomExportData(room, recovery);
+    const stepId = firstNonEmpty(room.stepId, room.id);
+    const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const needed = firstNonEmpty(reviewedRoom.followUpNeeded, exportValue(data, ['followUpNeeded']));
+    const timeframe = firstNonEmpty(reviewedRoom.followUpTimeframe, reviewedRoom.recheckIn, exportValue(data, ['followUpTimeframe', 'recheckIn']));
+    const note = firstNonEmpty(reviewedRoom.followUpNote, reviewedRoom.watchFor, reviewedRoom.followUpPlan, exportValue(data, ['followUpNote', 'watchFor', 'followUpPlan']));
+    const photoIds = [].concat(
+      Array.isArray(reviewedRoom.followUpPhotoIds) ? reviewedRoom.followUpPhotoIds : [],
+      Array.isArray(data._followUpPhotos) ? data._followUpPhotos : []
+    ).map(item => isPlainObject(item) ? firstNonEmpty(item.id, item.photoId, item.photo_id) : item).filter(Boolean);
+    if (!isAffirmativeValue(needed) && !timeframe && !note && !photoIds.length) return;
+    rows.push([roomDisplayName(room), timeframe, note, Array.from(new Set(photoIds)).join(', ')].map(spreadsheetCellValue));
+  });
+  return rows;
+}
+
+function buildRawAppRows(fieldData) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const rows = [['Key', 'Value', 'Type']];
+  Object.keys(recovery || {}).sort().forEach(function(key) {
+    const serialized = serializeReviewValue(recovery[key]);
+    rows.push([key, serialized.value, serialized.type]);
+  });
+  return rows;
+}
+
+function roomExportData(room, recovery) {
+  const stepId = firstNonEmpty(room.stepId, room.id);
+  const stepData = isPlainObject(recovery.stepData) && stepId && isPlainObject(recovery.stepData[stepId])
+    ? recovery.stepData[stepId]
+    : {};
+  return { ...room, ...stepData };
+}
+
+function roomDisplayName(room) {
+  return firstNonEmpty(room.roomName, room.name, room.label, room.stepId, room.id, 'Room');
+}
+
+function roomPhotoIds(room, photoRows) {
+  const roomName = String(roomDisplayName(room)).trim().toLowerCase();
+  return Array.from(new Set([].concat(
+    Array.isArray(room.photoIds) ? room.photoIds : [],
+    Array.isArray(room.photos) ? room.photos.map(photo => isPlainObject(photo) ? firstNonEmpty(photo.id, photo.photoId, photo.photo_id) : photo) : [],
+    (photoRows || []).filter(photo => String(photo.room_name || '').trim().toLowerCase() === roomName).map(photo => photo.photo_id || '')
+  ).filter(Boolean)));
+}
+
+function exportValue(record, keys) {
+  const wanted = new Set((keys || []).map(normalizeExportKey));
+  const found = findExportValue(record, wanted);
+  return found === undefined ? '' : spreadsheetCellValue(found);
+}
+
+function findExportValue(value, wanted, depth = 0, seen = new Set()) {
+  if (!value || typeof value !== 'object' || depth > 3 || seen.has(value)) return undefined;
+  seen.add(value);
+  for (const [key, child] of Object.entries(value)) {
+    if (wanted.has(normalizeExportKey(key)) && child !== undefined && child !== null && String(child).trim() !== '') return child;
+  }
+  for (const child of Object.values(value)) {
+    if (!child || typeof child !== 'object') continue;
+    const found = findExportValue(child, wanted, depth + 1, seen);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+function normalizeExportKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function spreadsheetCellValue(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  if (Array.isArray(value)) return value.map(item => spreadsheetCellValue(item)).join(', ');
+  if (isPlainObject(value)) return JSON.stringify(value);
+  return value;
+}
+
+function isAffirmativeValue(value) {
+  return value === true || /^(yes|true|recommended|required)$/i.test(String(value || '').trim());
+}
+
+async function createOrUpdateAssessmentContext(accessToken, shell, source, fieldData, photoRows, inspectionSpreadsheet, reviewSpreadsheet, rawBackup) {
+  const content = buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, inspectionSpreadsheet, reviewSpreadsheet, rawBackup);
+  const file = await createOrUpdateDriveTextFile(accessToken, shell.folderId, '_context.md', content, 'text/markdown');
+  return {
+    contextFileId: file.id,
+    contextFileUrl: file.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`
+  };
+}
+
+function buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, inspectionSpreadsheet, reviewSpreadsheet, rawBackup) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const rooms = getHandoffRoomRecords(fieldData);
+  const assessmentLabel = shell.assessmentNumber ? `Assessment ${shell.assessmentNumber}` : 'Test / Training Assessment';
+  const clientName = firstNonEmpty(source.clientName, recovery.clientName, 'Unknown client');
+  const propertyAddress = firstNonEmpty(source.propertyAddress, recovery.propertyAddress, 'Unknown address');
+  const status = firstNonEmpty(fieldData.status, source.status, source.reviewStatus, 'In Progress');
+  const sampleLines = collectAssessmentContextValues({ ...recovery, ...fieldData }, function(path) {
+    return /(sample|specimen|radon|pfas|microplastic|breeze|qtrak|omni).*(id|number|result|status)|^(radon|pfas|microplastics|breeze)$/i.test(path);
+  });
+  const roomLines = rooms.map(function(room) {
+    const data = roomExportData(room, recovery);
+    const note = exportValue(data, ['inspectorNotes', 'notes', 'roomNotes', 'observations', 'observation']);
+    const noIssues = isAffirmativeValue(exportValue(data, ['noIssuesFound', 'noIssues']));
+    const detail = note || (noIssues ? 'No issues found; intentionally left blank.' : 'No room note recorded.');
+    return `- **${markdownText(roomDisplayName(room))}:** ${markdownText(detail)}`;
+  });
+  const lines = [
+    `# _context.md — ${markdownText(assessmentLabel)} — ${markdownText(clientName)} — ${markdownText(propertyAddress)}`,
+    '',
+    `Last updated: ${new Date().toISOString()}`,
+    `Source: InHaus Inspector and Review Portal (${markdownText(source.inspectionId || source.id || '')})`,
+    '',
+    '---',
+    '',
+    '## Status',
+    '',
+    `- **Handoff status:** ${markdownText(status)}`,
+    `- **Inspection date:** ${markdownText(firstNonEmpty(source.inspectionDate, recovery.inspectionDate, 'Not recorded'))}`,
+    `- **Inspector:** ${markdownText(firstNonEmpty(source.inspectorName, recovery.inspectorName, 'Not recorded'))}`,
+    `- **Package type:** ${source.isTestTraining === true || source.isTest === true || source.is_test === true ? 'Test / Training' : 'Real assessment'}`,
+    '',
+    '## Background',
+    '',
+    `- **Client:** ${markdownText(clientName)}`,
+    `- **Property:** ${markdownText(propertyAddress)}`,
+    `- **Client concerns:** ${markdownText(firstNonEmpty(fieldData.clientConcerns, recovery.clientConcerns, 'Not recorded'))}`,
+    `- **Known problem areas:** ${markdownText(firstNonEmpty(fieldData.knownProblemAreas, recovery.knownProblemAreas, 'Not recorded'))}`,
+    '',
+    '## Test Results and Sample IDs',
+    '',
+    ...(sampleLines.length ? sampleLines.map(item => `- **${markdownText(item.path)}:** ${markdownText(item.value)}`) : ['- No test result or sample ID recorded.']),
+    '',
+    '## Rooms',
+    '',
+    ...(roomLines.length ? roomLines : ['- No rooms recorded.']),
+    '',
+    '## Review Notes',
+    '',
+    `- **Report builder notes:** ${markdownText(firstNonEmpty(fieldData.reportBuilderNotes, 'Not recorded'))}`,
+    `- **Client follow-up plan:** ${markdownText(firstNonEmpty(fieldData.followUpPlan, 'Not recorded'))}`,
+    '',
+    '## Files',
+    '',
+    `- [InHaus Inspection spreadsheet](${inspectionSpreadsheet.spreadsheetUrl})`,
+    `- [Review Portal Data spreadsheet](${reviewSpreadsheet.spreadsheetUrl})`,
+    `- [Photos folder](${shell.photosFolderUrl}) — ${(photoRows || []).length} photo${(photoRows || []).length === 1 ? '' : 's'}`,
+    `- [COCs folder](${shell.cocsFolderUrl})`,
+    `- [Backup folder](${shell.backupFolderUrl})`,
+    `- [Raw review JSON backup](${rawBackup.rawJsonUrl})`,
+    ''
+  ];
+  return lines.join('\n');
+}
+
+function collectAssessmentContextValues(value, matcher, path = '', depth = 0, rows = [], seen = new Set()) {
+  if (!value || typeof value !== 'object' || depth > 4 || seen.has(value)) return rows;
+  seen.add(value);
+  Object.entries(value).forEach(function([key, child]) {
+    const nextPath = path ? `${path}.${key}` : key;
+    if (child === undefined || child === null || child === '') return;
+    if ((typeof child !== 'object' || child instanceof Date) && matcher(nextPath)) {
+      rows.push({ path: nextPath, value: spreadsheetCellValue(child) });
+      return;
+    }
+    if (typeof child === 'object') collectAssessmentContextValues(child, matcher, nextPath, depth + 1, rows, seen);
+  });
+  return rows.slice(0, 100);
+}
+
+function markdownText(value) {
+  return String(spreadsheetCellValue(value) || '').replace(/\r?\n/g, ' ').replace(/([\\`*_{}\[\]()#+.!|>-])/g, '\\$1');
 }
 
 async function createRawReviewDataBackup(accessToken, backupFolderId, source, fieldData) {

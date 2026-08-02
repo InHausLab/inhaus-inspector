@@ -577,7 +577,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w20', 'health exposes Worker version');
+  assert(data.version === 'handoff-w21', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1324,6 +1324,8 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(data.status === 'ready', 'handoff job is ready');
   assert(data.artifactReceipt.status === 'ready', 'artifact receipt is ready');
   assert(data.artifactReceipt.spreadsheetId, 'receipt has Review Portal Data spreadsheet');
+  assert(data.artifactReceipt.inspectionSpreadsheetId, 'receipt has InHaus Inspection spreadsheet');
+  assert(data.artifactReceipt.contextFileId, 'receipt has assessment context file');
   assert(data.artifactReceipt.rawJsonUrl, 'receipt has raw JSON backup');
   assert(data.artifactReceipt.photoLogCount === 2, 'receipt counts photo log rows');
   assert(data.artifactReceipt.roomDetailCount === 1, 'receipt counts room detail rows');
@@ -1338,6 +1340,9 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(state.assessmentWrites.length === 0, 'handoff does not rewrite assessment row when shell exists');
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Raw Review Data')), 'writes Raw Review Data tab');
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Photo Log')), 'writes Photo Log tab');
+  assert(state.sheetValueWrites.some(update => String(update.range).includes('Raw App Data')), 'writes Raw App Data tab');
+  assert(state.sheetValueWrites.some(update => String(update.range).includes('Air Data')), 'writes Air Data tab');
+  assert(hasSheetCellValue(state, 'Summary', 'INHAUS LAB — INSPECTION DATA'), 'writes InHaus Inspection summary');
   assert(sheetDataRowsForTab(state, 'Raw Review Data').length === Object.keys(fieldData).length, 'raw tab has one row for every field_data key');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_2_note', 'Second observation', 'string']), 'raw tab includes obs_2_note');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_6_note', 'Sixth observation', 'string']), 'raw tab includes obs_6_note');
@@ -1351,15 +1356,21 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-1', 'Kitchen', 'ATP Before', 'Before photo', 'https://drive.google.com/file/d/drive-photo-1/view']), 'photo log includes first photo details');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-2', 'Kitchen', 'ATP After', 'After photo', 'https://drive.google.com/file/d/drive-photo-2/view']), 'photo log includes second photo details');
   assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Canonical assessment note.', 'photo-1, photo-2']), 'room details include canonical inspector notes and every assigned room photo ID');
-  assert(state.rawUploads.length === 1, 'writes raw JSON backup file');
-  assert(state.rawUploads[0].bodyText.includes('"obs_6_note": "Sixth observation"'), 'raw JSON backup includes late observation key');
-  assert(state.rawUploads[0].bodyText.includes('"actionTaken_1_desc": "Cleaned test surface"'), 'raw JSON backup includes action-taken key');
-  assert(state.rawUploads[0].bodyText.includes('"followUp_3_photoIds"'), 'raw JSON backup includes follow-up photo IDs');
+  assert(state.rawUploads.length === 2, 'writes raw JSON backup and assessment context files');
+  const rawJsonUpload = state.rawUploads.find(upload => upload.bodyText.includes('"obs_6_note": "Sixth observation"'));
+  const contextUpload = state.rawUploads.find(upload => upload.bodyText.includes('# _context.md'));
+  assert(rawJsonUpload, 'raw JSON backup includes late observation key');
+  assert(rawJsonUpload.bodyText.includes('"actionTaken_1_desc": "Cleaned test surface"'), 'raw JSON backup includes action-taken key');
+  assert(rawJsonUpload.bodyText.includes('"followUp_3_photoIds"'), 'raw JSON backup includes follow-up photo IDs');
+  assert(contextUpload, 'assessment context file has the expected heading');
+  assert(contextUpload.bodyText.includes('## Files'), 'assessment context links Tanner package files');
   assert(state.reviewWrites.length >= 2, 'saves running and final handoff states');
   assert(state.handoffJobWrites.length >= 2, 'writes running and final durable handoff job states');
   assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-20260801-HAND01').status === 'ready', 'durable handoff job is ready');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'assessment_folder'), 'durable artifacts include assessment folder');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'review_portal_data_spreadsheet'), 'durable artifacts include review data spreadsheet');
+  assert(state.handoffArtifacts.some(row => row.artifact_key === 'inhaus_inspection_spreadsheet'), 'durable artifacts include InHaus Inspection spreadsheet');
+  assert(state.handoffArtifacts.some(row => row.artifact_key === 'assessment_context'), 'durable artifacts include assessment context');
   assert(state.handoffArtifacts.find(row => row.artifact_key === 'review_portal_data_spreadsheet').metadata.roomDetailCount === 1, 'durable spreadsheet artifact records room detail count');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'raw_review_data'), 'durable artifacts include raw review data backup');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'photos_folder'), 'durable artifacts include photos folder');
@@ -1380,6 +1391,11 @@ async function testHandoffJobCachedReceiptDoesNotDuplicateWork() {
     photosFolderUrl: 'https://drive.google.com/drive/folders/drive-photos',
     spreadsheetId: 'drive-sheet',
     spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-sheet/edit',
+    inspectionSpreadsheetId: 'drive-inspection-sheet',
+    inspectionSpreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-inspection-sheet/edit',
+    contextFileId: 'drive-context',
+    contextFileUrl: 'https://drive.google.com/file/d/drive-context/view',
+    rawAppKeyCount: 10,
     rawJsonUrl: 'https://drive.google.com/file/d/raw/view',
     trackerRow: 10,
     trackerUrl: 'https://docs.google.com/spreadsheets/d/tracker-sheet/edit#range=A10',
@@ -1976,6 +1992,11 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
     photosFolderUrl: 'https://drive.google.com/drive/folders/drive-photos',
     spreadsheetId: 'drive-sheet',
     spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-sheet/edit',
+    inspectionSpreadsheetId: 'drive-inspection-sheet',
+    inspectionSpreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-inspection-sheet/edit',
+    contextFileId: 'drive-context',
+    contextFileUrl: 'https://drive.google.com/file/d/drive-context/view',
+    rawAppKeyCount: 10,
     rawJsonUrl: 'https://drive.google.com/file/d/raw/view',
     trackerRow: 9,
     trackerUrl: 'https://docs.google.com/spreadsheets/d/tracker-sheet/edit#range=A9',
@@ -1986,7 +2007,8 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
     photoDriveUrlCount: 1,
     photoLogCount: 1,
     rawReviewKeyCount: 6,
-    formattedReviewRowCount: 4
+    formattedReviewRowCount: 4,
+    appRoomDetailCount: 0
   };
   const { mockFetch, state } = makeMockFetch({
     reviewRow: {
@@ -2140,6 +2162,11 @@ async function testInspectionStatusIncludesHandoffReceipt() {
     photosFolderUrl: 'https://drive.google.com/drive/folders/drive-photos',
     spreadsheetId: 'drive-sheet',
     spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-sheet/edit',
+    inspectionSpreadsheetId: 'drive-inspection-sheet',
+    inspectionSpreadsheetUrl: 'https://docs.google.com/spreadsheets/d/drive-inspection-sheet/edit',
+    contextFileId: 'drive-context',
+    contextFileUrl: 'https://drive.google.com/file/d/drive-context/view',
+    rawAppKeyCount: 10,
     rawJsonUrl: 'https://drive.google.com/file/d/raw/view',
     trackerRow: 9,
     trackerUrl: 'https://docs.google.com/spreadsheets/d/tracker-sheet/edit#range=A9',
@@ -2651,7 +2678,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w20', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w21', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
