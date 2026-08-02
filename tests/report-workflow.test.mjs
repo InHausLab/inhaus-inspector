@@ -27,7 +27,7 @@ test('final app verification requires the real assessment row and Supabase origi
 });
 
 test('hundred-photo homes are packaged in resumable Worker batches', () => {
-  assert.match(worker, /HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 10/);
+  assert.match(worker, /HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 5/);
   assert.match(worker, /pendingCount \+= 1/);
   assert.match(worker, /receipt\.status = 'running'/);
 });

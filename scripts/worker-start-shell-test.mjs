@@ -558,7 +558,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w14', 'health exposes Worker version');
+  assert(data.version === 'handoff-w15', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1298,7 +1298,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(data.artifactReceipt.photoLogCount === 2, 'receipt counts photo log rows');
   assert(data.artifactReceipt.roomDetailCount === 1, 'receipt counts room detail rows');
   assert(data.artifactReceipt.photoFolderLinkedCount === 2, 'receipt links existing Drive photos');
-  assert(data.artifactReceipt.photoFolderOperationLimit === 10, 'receipt records default photo operation batch limit');
+  assert(data.artifactReceipt.photoFolderOperationLimit === 5, 'receipt records conservative default photo operation batch limit');
   assert(state.driveFolderLists.some(list => list.parentId === 'drive-photos'), 'lists Photos folder once for package repair');
   assert(state.trackerUpdates.length === 0, 'handoff reuses existing start-shell tracker row');
   assert(state.assessmentWrites.length === 0, 'handoff does not rewrite assessment row when shell exists');
@@ -2483,7 +2483,13 @@ async function testProductionHandoffQueuesBeforeRunnerBuildsPackage() {
   const queued = await callWorker('/handoff-jobs', {
     inspectionId: 'INH-TRAINING-QUEUE01',
     requestedBy: 'review-portal',
-    runInline: false
+    runInline: false,
+    reviewedData: {
+      rooms: [
+        { stepId: 'bedroom-0', roomName: 'Bedroom', notes: 'Current portal bedroom note.' },
+        { stepId: 'office-0', roomName: 'Office', notes: 'Current portal office note.' }
+      ]
+    }
   }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
 
   assert(queued.response.status === 202, 'production handoff submit returns queued');
@@ -2499,6 +2505,7 @@ async function testProductionHandoffQueuesBeforeRunnerBuildsPackage() {
 
   assert(run.response.status === 200, 'claimed runner completes the queued package');
   assert(run.data.results[0].ready === true, 'claimed runner returns a ready package');
+  assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner packages the current reviewed rooms supplied at queue time');
   assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-QUEUE01').status === 'ready', 'runner saves ready durable state');
   assert(!state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-QUEUE01').locked_at, 'runner releases the direct lock');
 }

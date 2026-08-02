@@ -5,7 +5,7 @@ const runStartShell = process.argv.includes('--start-shell-test');
 const runHandoff = process.argv.includes('--handoff-test');
 const runRunner = process.argv.includes('--runner-test');
 const runActivity = process.argv.includes('--activity-test');
-const expectedWorkerVersion = process.env.EXPECTED_WORKER_VERSION || 'handoff-w14';
+const expectedWorkerVersion = process.env.EXPECTED_WORKER_VERSION || 'handoff-w15';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

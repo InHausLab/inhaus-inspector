@@ -22,14 +22,14 @@ const TRACKER_TAB_REPORT = 'Report Tracker';
 const TRACKER_DATA_START = 8;
 const TEST_ASSESSMENTS_FOLDER_NAME = '_Test Assessments';
 const HANDOFF_RECEIPT_SCHEMA_VERSION = 'handoff-receipt-v1';
-const HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 10;
+const HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 5;
 const HANDOFF_RUNNER_LIMIT_DEFAULT = 5;
 const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w14';
+const WORKER_VERSION = 'handoff-w15';
 
 export default {
   async fetch(request, env, ctx) {
@@ -967,9 +967,16 @@ async function handleHandoffJob(request, env, ctx) {
 
   const inspectionId = cleanId(body.inspectionId || body.id, 'inspectionId');
   const row = await getReviewRow(env, inspectionId);
-  const fieldData = row && isPlainObject(row.field_data)
-    ? structuredClone(row.field_data)
-    : (isPlainObject(body.reviewedData) ? structuredClone(body.reviewedData) : {});
+  const storedFieldData = row && isPlainObject(row.field_data) ? structuredClone(row.field_data) : {};
+  const suppliedFieldData = isPlainObject(body.reviewedData) ? structuredClone(body.reviewedData) : {};
+  const fieldData = {
+    ...storedFieldData,
+    ...suppliedFieldData,
+    system: {
+      ...(isPlainObject(storedFieldData.system) ? storedFieldData.system : {}),
+      ...(isPlainObject(suppliedFieldData.system) ? suppliedFieldData.system : {})
+    }
+  };
   const system = isPlainObject(fieldData.system) ? fieldData.system : {};
   const existingReceipt = getReadyHandoffReceipt(fieldData);
   if (existingReceipt) {
@@ -1035,7 +1042,7 @@ async function handleHandoffJob(request, env, ctx) {
       lockedAt: '',
       lockedBy: ''
     };
-    await saveHandoffJobState(env, inspectionId, fieldData, queuedJob, durableReceipt);
+    await saveHandoffJobState(env, inspectionId, fieldData, queuedJob, durableReceipt, { preferProvidedFieldData: true });
     return json({
       ...queuedJob,
       status: 'queued',
@@ -1072,7 +1079,7 @@ async function handleHandoffJob(request, env, ctx) {
     lockedAt: claim.row.locked_at || '',
     lockedBy: claim.row.locked_by || ''
   };
-  await saveHandoffJobState(env, inspectionId, fieldData, claimedJob, null);
+  await saveHandoffJobState(env, inspectionId, fieldData, claimedJob, null, { preferProvidedFieldData: true });
 
   if (body.background === true && ctx && typeof ctx.waitUntil === 'function') {
     ctx.waitUntil(processHandoffJobBatch(env, inspectionId, body, claimedJob));
@@ -2704,7 +2711,7 @@ async function upsertHandoffArtifacts(env, inspectionId, jobRow, receipt) {
   return text ? JSON.parse(text) : [];
 }
 
-async function saveHandoffJobState(env, inspectionId, fieldData, job, receipt) {
+async function saveHandoffJobState(env, inspectionId, fieldData, job, receipt, options = {}) {
   let currentFieldData = {};
   try {
     const current = await getReviewRow(env, inspectionId);
@@ -2712,14 +2719,17 @@ async function saveHandoffJobState(env, inspectionId, fieldData, job, receipt) {
   } catch {
     currentFieldData = {};
   }
-  const nextFieldData = {
-    ...(isPlainObject(fieldData) ? structuredClone(fieldData) : {}),
-    ...(isPlainObject(currentFieldData) ? structuredClone(currentFieldData) : {})
-  };
-  const system = {
-    ...(isPlainObject(fieldData && fieldData.system) ? structuredClone(fieldData.system) : {}),
-    ...(isPlainObject(currentFieldData && currentFieldData.system) ? structuredClone(currentFieldData.system) : {})
-  };
+  const provided = isPlainObject(fieldData) ? structuredClone(fieldData) : {};
+  const current = isPlainObject(currentFieldData) ? structuredClone(currentFieldData) : {};
+  const preferProvided = options.preferProvidedFieldData === true;
+  const nextFieldData = preferProvided
+    ? { ...current, ...provided }
+    : { ...provided, ...current };
+  const providedSystem = isPlainObject(provided.system) ? provided.system : {};
+  const currentSystem = isPlainObject(current.system) ? current.system : {};
+  const system = preferProvided
+    ? { ...currentSystem, ...providedSystem }
+    : { ...providedSystem, ...currentSystem };
   system.handoffJob = {
     ...(isPlainObject(job) ? job : {}),
     artifactReceipt: receipt || (job && job.artifactReceipt) || null
