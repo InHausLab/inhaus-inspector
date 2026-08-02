@@ -23,6 +23,7 @@ const activeSource = activeFiles
   .join('\n');
 const releaseGraphFiles = [
   '../index.html',
+  '../cache-reset.html',
   '../service-worker.js',
   '../app.js',
   '../screens.js',
@@ -64,4 +65,5 @@ test('deployed module graph uses one release cache version', () => {
   assert.doesNotMatch(releaseGraphSource, /\?v=(?!229\b)\d+/);
   assert.match(releaseGraphSource, /\?v=229/);
   assert.match(releaseGraphSource, /inhaus-v229/);
+  assert.match(releaseGraphSource, /LATEST_VERSION = '229'/);
 });

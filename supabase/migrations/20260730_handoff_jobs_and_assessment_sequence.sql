@@ -193,7 +193,7 @@ begin
     nullif(trim(coalesce(p_requested_by, '')), ''),
     coalesce(p_metadata, '{}'::jsonb)
   )
-  on conflict (inspection_id) do update set
+  on conflict on constraint assessment_number_reservations_inspection_id_key do update set
     client_name = coalesce(excluded.client_name, assessment_number_reservations.client_name),
     property_address = coalesce(excluded.property_address, assessment_number_reservations.property_address),
     inspector_name = coalesce(excluded.inspector_name, assessment_number_reservations.inspector_name),

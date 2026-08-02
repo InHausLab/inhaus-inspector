@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL('../supabase/migrations/20260730_handoff_jobs_and_assessment_sequence.sql', import.meta.url),
   'utf8'
 );
+const reservationFix = readFileSync(
+  new URL('../supabase/migrations/20260802_fix_assessment_reservation_conflict.sql', import.meta.url),
+  'utf8'
+);
 const verification = readFileSync(
   new URL('../supabase/verification/20260730_verify_handoff_schema.sql', import.meta.url),
   'utf8'
@@ -36,6 +40,12 @@ test('handoff tables and RPCs are restricted to service role', () => {
   assert.match(migration, /grant execute on function public\.reserve_assessment_shell[\s\S]*to service_role/);
   assert.match(migration, /revoke all on function public\.claim_due_handoff_jobs[\s\S]*from public, anon, authenticated/);
   assert.match(migration, /grant execute on function public\.claim_due_handoff_jobs[\s\S]*to service_role/);
+});
+
+test('assessment reservation upsert names its conflict constraint explicitly', () => {
+  assert.match(migration, /on conflict on constraint assessment_number_reservations_inspection_id_key/i);
+  assert.match(reservationFix, /on conflict on constraint assessment_number_reservations_inspection_id_key/i);
+  assert.doesNotMatch(reservationFix, /^\s*on conflict\s*\(inspection_id\)/im);
 });
 
 test('live schema verification checks RLS and RPC permissions', () => {
