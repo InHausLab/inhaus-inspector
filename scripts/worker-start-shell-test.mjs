@@ -522,10 +522,13 @@ async function callWorker(path, body, env, mockFetch, options = {}) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mockFetch;
   try {
+    const requestBody = path === '/handoff-jobs' && !Object.prototype.hasOwnProperty.call(body || {}, 'runInline')
+      ? { ...(body || {}), runInline: true }
+      : body;
     const request = new Request(`https://worker.test${path}`, {
       method: options.method || 'POST',
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      body: JSON.stringify(body)
+      body: JSON.stringify(requestBody)
     });
     const response = await worker.fetch(request, env, options.ctx);
     const data = await response.json();
@@ -555,7 +558,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w13', 'health exposes Worker version');
+  assert(data.version === 'handoff-w14', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1900,14 +1903,18 @@ async function testBackgroundHandoffQueuesWaitUntil() {
     data = await response.json();
     assert(response.status === 202, 'background handoff returns 202');
     assert(data.status === 'queued', 'background handoff is queued');
-    assert(waitUntilPromises.length === 1, 'background handoff schedules waitUntil work');
-    await Promise.all(waitUntilPromises);
+    assert(waitUntilPromises.length === 0, 'queued handoff does not risk long work in waitUntil');
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  assert(state.reviewRow.field_data.system.tannerHandoff.status === 'ready', 'waitUntil writes ready handoff receipt');
-  assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-20260801-BG01').status === 'ready', 'waitUntil writes ready durable job');
+  const run = await callWorker('/handoff-jobs/run', {
+    inspectionId: 'INH-20260801-BG01',
+    token: 'review-token'
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+  assert(run.response.status === 200, 'runner completes a queued background handoff');
+  assert(state.reviewRow.field_data.system.tannerHandoff.status === 'ready', 'runner writes ready handoff receipt');
+  assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-20260801-BG01').status === 'ready', 'runner writes ready durable job');
 }
 
 async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
@@ -2441,6 +2448,61 @@ async function testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork() {
   assert(state.reviewWrites.length === 0, 'duplicate direct handoff does not overwrite review state');
 }
 
+async function testProductionHandoffQueuesBeforeRunnerBuildsPackage() {
+  const shellReceipt = {
+    status: 'ready',
+    shellStatus: 'ready',
+    isTestTraining: true,
+    inspectionId: 'INH-TRAINING-QUEUE01',
+    folderId: 'drive-queue-shell',
+    folderUrl: 'https://drive.google.com/drive/folders/drive-queue-shell',
+    photosFolderId: 'drive-queue-photos',
+    photosFolderUrl: 'https://drive.google.com/drive/folders/drive-queue-photos',
+    cocsFolderId: 'drive-queue-cocs',
+    cocsFolderUrl: 'https://drive.google.com/drive/folders/drive-queue-cocs',
+    backupFolderId: 'drive-queue-backup',
+    backupFolderUrl: 'https://drive.google.com/drive/folders/drive-queue-backup',
+    trackerStatus: 'skipped_test_training'
+  };
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: 'INH-TRAINING-QUEUE01',
+      field_data: {
+        clientName: 'Queued Package Test',
+        propertyAddress: '14 Queue Way, Basalt CO',
+        inspectionDate: '2026-08-01',
+        inspectionType: 'Test / Training',
+        isTestTraining: true,
+        rooms: [{ stepId: 'bedroom-0', roomName: 'Bedroom', notes: 'Queued runner note.' }],
+        system: { startInspectionShell: shellReceipt }
+      },
+      updated_at: '2026-08-01T15:00:00.000Z'
+    },
+    photoRows: []
+  });
+  const queued = await callWorker('/handoff-jobs', {
+    inspectionId: 'INH-TRAINING-QUEUE01',
+    requestedBy: 'review-portal',
+    runInline: false
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  assert(queued.response.status === 202, 'production handoff submit returns queued');
+  assert(queued.data.queued === true, 'production handoff response is marked queued');
+  assert(state.driveCreates.length === 0, 'queue request does not build Drive artifacts inline');
+  assert(!state.handoffJobs[0].locked_at, 'queued job is left unlocked for the runner');
+
+  const run = await callWorker('/handoff-jobs/run', {
+    inspectionId: 'INH-TRAINING-QUEUE01',
+    token: 'review-token',
+    requestedBy: 'portal-runner'
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  assert(run.response.status === 200, 'claimed runner completes the queued package');
+  assert(run.data.results[0].ready === true, 'claimed runner returns a ready package');
+  assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-QUEUE01').status === 'ready', 'runner saves ready durable state');
+  assert(!state.handoffJobs.find(row => row.job_key === 'handoff_INH-TRAINING-QUEUE01').locked_at, 'runner releases the direct lock');
+}
+
 const tests = [
   testHealthRoute,
   testCorsAllowsWorkerTokenHeader,
@@ -2481,7 +2543,8 @@ const tests = [
   testDueRunnerSkipsFutureBackoff,
   testDueRunnerSkipsActivelyLockedJob,
   testDueRunnerRetriesFailedAfterBackoff,
-  testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork
+  testDirectDuplicateHandoffReturnsInFlightWithoutDuplicateWork,
+  testProductionHandoffQueuesBeforeRunnerBuildsPackage
 ];
 
 for (const test of tests) {

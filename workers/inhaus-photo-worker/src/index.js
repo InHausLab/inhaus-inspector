@@ -26,9 +26,10 @@ const HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 10;
 const HANDOFF_RUNNER_LIMIT_DEFAULT = 5;
 const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
 const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
+const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w13';
+const WORKER_VERSION = 'handoff-w14';
 
 export default {
   async fetch(request, env, ctx) {
@@ -988,6 +989,29 @@ async function handleHandoffJob(request, env, ctx) {
     return json({ ...cachedJob, reviewPortalData: existingReceipt, cached: true });
   }
 
+  const durableJob = await getDurableHandoffJob(env, inspectionId);
+  const durableReceipt = durableJob && isPlainObject(durableJob.receipt) ? durableJob.receipt : null;
+  if (durableReceipt && isReadyHandoffReceipt(durableReceipt)) {
+    const cachedJob = durableJobToPublicJob(durableJob);
+    return json({
+      ...cachedJob,
+      status: 'ready',
+      artifactReceipt: durableReceipt,
+      reviewPortalData: durableReceipt,
+      cached: true
+    });
+  }
+  if (isFreshDirectHandoffLock(durableJob)) {
+    const activeJob = durableJobToPublicJob(durableJob);
+    return json({
+      ...activeJob,
+      artifactReceipt: durableReceipt,
+      reviewPortalData: durableReceipt,
+      cached: false,
+      inFlight: true
+    }, 202);
+  }
+
   const now = new Date().toISOString();
   const previousJob = isPlainObject(system.handoffJob) ? system.handoffJob : {};
   const runningJob = {
@@ -1004,6 +1028,22 @@ async function handleHandoffJob(request, env, ctx) {
     submitAttempt: isPlainObject(body.submitAttempt) ? body.submitAttempt : null,
     artifactReceipt: null
   };
+  if (body.runInline !== true) {
+    const queuedJob = {
+      ...runningJob,
+      status: 'queued',
+      lockedAt: '',
+      lockedBy: ''
+    };
+    await saveHandoffJobState(env, inspectionId, fieldData, queuedJob, durableReceipt);
+    return json({
+      ...queuedJob,
+      status: 'queued',
+      artifactReceipt: durableReceipt,
+      reviewPortalData: durableReceipt,
+      queued: true
+    }, 202);
+  }
   const claim = await claimDirectHandoffJob(env, inspectionId, runningJob);
   if (!claim.acquired) {
     const existingJob = durableJobToPublicJob(claim.row) || runningJob;
@@ -1053,10 +1093,71 @@ async function handleHandoffJobRunner(request, env, ctx) {
 
   const inspectionId = body.inspectionId || body.id ? cleanId(body.inspectionId || body.id, 'inspectionId') : '';
   if (inspectionId) {
+    const durableJob = await getDurableHandoffJob(env, inspectionId);
+    const reviewRow = await getReviewRow(env, inspectionId);
+    const reviewFieldData = reviewRow && isPlainObject(reviewRow.field_data) ? reviewRow.field_data : {};
+    const reviewSystem = isPlainObject(reviewFieldData.system) ? reviewFieldData.system : {};
+    const reviewJob = isPlainObject(reviewSystem.handoffJob) ? reviewSystem.handoffJob : {};
+    const durableReceipt = durableJob && isPlainObject(durableJob.receipt)
+      ? durableJob.receipt
+      : (isPlainObject(reviewSystem.tannerHandoff) ? reviewSystem.tannerHandoff : null);
+    if (durableReceipt && isReadyHandoffReceipt(durableReceipt)) {
+      return json({
+        processed: 1,
+        results: [{
+          ...publicHandoffRunResult({
+            job: durableJobToPublicJob(durableJob),
+            receipt: durableReceipt,
+            ready: true,
+            pending: false,
+            failed: false
+          }),
+          cached: true
+        }]
+      });
+    }
+    const durablePublicJob = durableJobToPublicJob(durableJob) || {};
+    const previousJob = {
+      ...reviewJob,
+      ...durablePublicJob,
+      attemptCount: Math.max(Number(reviewJob.attemptCount) || 0, Number(durablePublicJob.attemptCount) || 0)
+    };
+    const runnerJob = {
+      ...previousJob,
+      jobId: previousJob.jobId || handoffJobId(inspectionId),
+      inspectionId,
+      requestedBy: body.requestedBy || 'handoff-runner',
+      requestedAt: previousJob.requestedAt || new Date().toISOString(),
+      status: previousJob.status === 'failed' ? 'repairing' : 'running',
+      attemptCount: (Number(previousJob.attemptCount) || 0) + 1,
+      artifactReceipt: durableReceipt
+    };
+    const claim = await claimDirectHandoffJob(env, inspectionId, runnerJob);
+    if (!claim.acquired) {
+      return json({
+        processed: 0,
+        inFlight: true,
+        results: [{
+          inspectionId,
+          status: 'running',
+          ready: false,
+          pending: true,
+          failed: false,
+          attemptCount: Number(previousJob.attemptCount || 0),
+          error: ''
+        }]
+      }, 202);
+    }
+    const claimedJob = {
+      ...runnerJob,
+      durableJobId: claim.row.id || '',
+      lockedAt: claim.row.locked_at || '',
+      lockedBy: claim.row.locked_by || ''
+    };
     const result = await processHandoffJobBatch(env, inspectionId, {
       ...body,
       requestedBy: body.requestedBy || 'handoff-runner'
-    }, null);
+    }, claimedJob);
     return json(
       { processed: 1, results: [publicHandoffRunResult(result)] },
       result.ready ? 200 : (result.pending ? 202 : 500)
@@ -2384,6 +2485,12 @@ function emptyToNull(value) {
   return value === undefined || value === null || value === '' ? null : value;
 }
 
+function isFreshDirectHandoffLock(row) {
+  if (!row || !row.locked_at) return false;
+  const lockedAt = Date.parse(row.locked_at);
+  return Number.isFinite(lockedAt) && lockedAt > Date.now() - DIRECT_HANDOFF_LOCK_STALE_MS;
+}
+
 function durableJobToPublicJob(row) {
   if (!row || !isPlainObject(row)) return null;
   return {
@@ -2478,7 +2585,7 @@ async function claimDirectHandoffJob(env, inspectionId, job) {
     return { acquired: true, row: insertedRows[0] };
   }
 
-  const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const staleBefore = new Date(Date.now() - DIRECT_HANDOFF_LOCK_STALE_MS).toISOString();
   const patchParams = new URLSearchParams();
   patchParams.set('job_key', `eq.${handoffJobId(inspectionId)}`);
   patchParams.set('status', 'in.(queued,running,waiting_on_export_adapter,repairing,failed)');
