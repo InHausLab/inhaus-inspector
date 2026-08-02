@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w22';
+const WORKER_VERSION = 'handoff-w23';
 
 export default {
   async fetch(request, env, ctx) {
@@ -4255,7 +4255,12 @@ function buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, ins
   const propertyAddress = firstNonEmpty(source.propertyAddress, recovery.propertyAddress, 'Unknown address');
   const status = firstNonEmpty(fieldData.status, source.status, source.reviewStatus, 'In Progress');
   const sampleLines = collectAssessmentContextValues({ ...recovery, ...fieldData }, function(path) {
-    return /(sample|specimen|radon|pfas|microplastic|breeze|qtrak|omni).*(id|number|result|status)|^(radon|pfas|microplastics|breeze)$/i.test(path);
+    if (/(_fieldUpdates|auditTrail|collaboration|findings|photoManifest|photoTombstones)/i.test(path)) return false;
+    const leaf = path.split('.').pop() || '';
+    if (/^(deviceId|updatedById|memberId|stepId|findingId|photoId|checkpointId|reservationId)$/i.test(leaf)) return false;
+    return /^testsConfirmed\./i.test(path) ||
+      /(?:sample|specimen|kit|monitor).*(?:id|number|num)$/i.test(leaf) ||
+      (/(?:result|status)$/i.test(leaf) && /(radon|pfas|microplastic|breeze|boulder|qtrak|omni|water)/i.test(path));
   });
   const roomLines = rooms.map(function(room) {
     const data = roomExportData(room, recovery);
@@ -4274,7 +4279,8 @@ function buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, ins
     '',
     '## Status',
     '',
-    `- **Handoff status:** ${markdownText(status)}`,
+    '- **Handoff package:** Ready',
+    `- **Review status at export:** ${markdownText(status)}`,
     `- **Inspection date:** ${markdownText(firstNonEmpty(source.inspectionDate, recovery.inspectionDate, 'Not recorded'))}`,
     `- **Inspector:** ${markdownText(firstNonEmpty(source.inspectorName, recovery.inspectorName, 'Not recorded'))}`,
     `- **Package type:** ${source.isTestTraining === true || source.isTest === true || source.is_test === true ? 'Test / Training' : 'Real assessment'}`,

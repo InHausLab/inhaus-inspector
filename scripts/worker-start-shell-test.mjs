@@ -578,7 +578,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w22', 'health exposes Worker version');
+  assert(data.version === 'handoff-w23', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1283,7 +1283,14 @@ async function testHandoffJobCreatesPackageReceipt() {
       assessment_folder_url: 'https://drive.google.com/drive/folders/drive-assessment',
       raw_jsonb: {
         inspectionId: 'INH-20260801-HAND01',
-        rooms: [{ name: 'Kitchen', inspectorNotes: 'Canonical assessment note.', photoIds: ['photo-1'] }]
+        boulderBlueSampleId: 'BB-TEST-123',
+        rooms: [{ name: 'Kitchen', inspectorNotes: 'Canonical assessment note.', photoIds: ['photo-1'] }],
+        stepData: {
+          kitchen: {
+            qtrakLocation: 'Kitchen',
+            _fieldUpdates: { qtrakLocation: { deviceId: 'internal-device-id' } }
+          }
+        }
       }
     }],
     reviewRow: {
@@ -1366,6 +1373,8 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(rawJsonUpload.bodyText.includes('"followUp_3_photoIds"'), 'raw JSON backup includes follow-up photo IDs');
   assert(contextUpload, 'assessment context file has the expected heading');
   assert(contextUpload.bodyText.includes('## Files'), 'assessment context links Tanner package files');
+  assert(contextUpload.bodyText.includes('BB\\-TEST\\-123'), 'assessment context includes the actual sample ID');
+  assert(!contextUpload.bodyText.includes('internal\\-device\\-id'), 'assessment context excludes internal device metadata');
   assert(state.reviewWrites.length >= 2, 'saves running and final handoff states');
   assert(state.handoffJobWrites.length >= 2, 'writes running and final durable handoff job states');
   assert(state.handoffJobs.find(row => row.job_key === 'handoff_INH-20260801-HAND01').status === 'ready', 'durable handoff job is ready');
@@ -2680,7 +2689,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w22', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w23', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
