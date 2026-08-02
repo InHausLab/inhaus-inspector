@@ -6,6 +6,9 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v228 — Current Room Name Applied at Photo Selection
+- Standard room photo controls now resolve the live room-name field when files are selected, preventing photos from retaining a default room name after the inspector renames the room.
+
 ## v227 — Final Team Submission Uses Current Step List
 **Date:** August 1, 2026
 

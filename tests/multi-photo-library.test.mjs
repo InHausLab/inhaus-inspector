@@ -10,3 +10,9 @@ test('multi-photo library import renders once after every selected file is saved
   assert.match(ui, /section\.replaceWith\(renderPhoto[\s\S]*if \(window\.showToast\)/);
   assert.doesNotMatch(ui, /photos\.push\(newPhoto\);\s*onUpdate\(\);\s*section\.replaceWith/);
 });
+
+test('photo capture resolves the current room name when files are selected', () => {
+  assert.match(ui, /getRoomName: \(\) => data\.roomName \|\| data\._roomName \|\| ''/);
+  assert.match(ui, /typeof photoOptions\.getRoomName === 'function' \? photoOptions\.getRoomName\(\) : roomName \|\| ''/);
+  assert.match(ui, /roomName: resolvedRoomName, stepName: stepName \|\| ''/);
+});

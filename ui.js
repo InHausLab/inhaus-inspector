@@ -2675,7 +2675,11 @@
           data.roomName || data._roomName || '',
           f.stepName || '',
           data.inspectionId || (window.inspection && window.inspection.inspectionId) || '',
-          { label: f.label || f.photoLabel || 'Photos', hideLabel: !!f.hideLabel }
+          {
+            label: f.label || f.photoLabel || 'Photos',
+            hideLabel: !!f.hideLabel,
+            getRoomName: () => data.roomName || data._roomName || ''
+          }
         );
       }
       case 'timer':
