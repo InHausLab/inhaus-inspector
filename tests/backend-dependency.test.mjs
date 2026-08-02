@@ -61,7 +61,7 @@ test('all deployed app tools use the Worker and contain no Apps Script endpoint'
 });
 
 test('deployed module graph uses one release cache version', () => {
-  assert.doesNotMatch(releaseGraphSource, /\?v=(?!223\b)\d+/);
-  assert.match(releaseGraphSource, /\?v=223/);
-  assert.match(releaseGraphSource, /inhaus-v223/);
+  assert.doesNotMatch(releaseGraphSource, /\?v=(?!224\b)\d+/);
+  assert.match(releaseGraphSource, /\?v=224/);
+  assert.match(releaseGraphSource, /inhaus-v224/);
 });

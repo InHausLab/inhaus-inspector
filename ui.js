@@ -1527,7 +1527,6 @@
           await savePhotoRecordToVault(newPhoto, inspectionId);
           photos.push(newPhoto);
           onUpdate();
-          section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions));
           if (window.queuePhotoForBackgroundUpload) {
             window.queuePhotoForBackgroundUpload(newPhoto);
           }
@@ -1535,6 +1534,7 @@
         } catch (err) { console.error('Photo error:', err); }
       }
       if (savedCount > 0 && window.showToast) {
+        section.replaceWith(renderPhoto(photos, onUpdate, roomName, stepName, inspectionId, photoOptions));
         const countLabel = savedCount === 1 ? 'Photo' : savedCount + ' photos';
         const resolvedDestination = resolvedRoomName && stepLabel && resolvedRoomName.toLowerCase() !== stepLabel.toLowerCase()
           ? resolvedRoomName + ' → ' + stepLabel

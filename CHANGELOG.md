@@ -6,6 +6,17 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v224 — Multi-Photo Library Rendering Fix
+**Date:** August 1, 2026
+
+- Fixed the deployed library-photo path so selecting multiple images renders every
+  saved image immediately instead of only rendering the first image until a later
+  screen refresh.
+- Kept the existing per-photo vault save, background upload, metadata, and full-quality
+  image handling unchanged.
+- Release proof requires two images selected in one browser action, both visible
+  immediately, both restored after reload/reopen, and the complete deployed E2E-1 path.
+
 ## v211 / Review Portal V29 — July 24 Feedback Completion
 **Date:** July 24, 2026
 
