@@ -12,10 +12,18 @@ test('precheck lets the inspector add or remove tests on site', () => {
   assert.match(screens, /ctx\.inspection\.requiredTests/);
 });
 
-test('Boulder Blue location uses the inspection room selector', () => {
-  assert.match(steps, /type: 'inspection-room-select', label: 'Boulder Blue Test Location'/);
-  assert.match(ui, /case 'inspection-room-select'/);
-  assert.match(ui, /\['Kitchen', 'Utility Room', 'Attic', 'Crawl Space'\]/);
+test('Boulder Blue location uses the inspection floor selector', () => {
+  assert.match(steps, /type: 'inspection-level-select', label: 'Boulder Blue Test Location'/);
+  assert.match(ui, /case 'inspection-level-select'/);
+  assert.match(ui, /\['Basement'\]/);
+  assert.match(ui, /\['First Floor', 'Second Floor', 'Third Floor', 'Fourth Floor', 'Fifth Floor'\]/);
+});
+
+test('Radon setup does not create an artificial room inspection', () => {
+  assert.doesNotMatch(steps, /\|\| \[\{ name: 'Radon - Room 1' \}\]/);
+  assert.doesNotMatch(screens, /Radon - Room 1/);
+  assert.doesNotMatch(screens, /Add Another Radon Area/);
+  assert.match(steps, /phase: 'supplementary'.*legacyLowest: true/);
 });
 
 test('Q-Trak room defaults to the current room without overwriting saved data', () => {

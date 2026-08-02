@@ -1,7 +1,7 @@
 // InHaus Inspector - App improvement feedback capture and durable retry queue
-import { getInspection, getScreen } from './state.js?v=229';
-import { cloudFetch } from './sync.js?v=229';
-import { PHOTO_WORKER_URL } from './config.js?v=229';
+import { getInspection, getScreen } from './state.js?v=230';
+import { cloudFetch } from './sync.js?v=230';
+import { PHOTO_WORKER_URL } from './config.js?v=230';
 
 let initialized = false;
 let retryInProgress = false;
@@ -58,6 +58,7 @@ async function sendFeedback(feedback) {
   }
   const result = await cloudFetch({ action: 'appFeedback', feedback });
   if (!result || result.saved !== true) throw new Error('Cloud did not confirm the feedback save.');
+  if (result.trackerMirrored !== true) throw new Error('Cloud saved the suggestion but Tanner\'s tracker is not updated yet.');
   if (window.DB?.removeAppFeedback) await window.DB.removeAppFeedback(feedback.feedbackId);
   return result;
 }

@@ -1,6 +1,6 @@
 // InHaus Inspector - company-wide approved comment library bridge
-import { PHOTO_WORKER_URL, FIELD_RESUME_TOKEN } from './config.js?v=229';
-import { cloudFetch } from './sync.js?v=229';
+import { PHOTO_WORKER_URL, FIELD_RESUME_TOKEN } from './config.js?v=230';
+import { cloudFetch } from './sync.js?v=230';
 
 const CACHE_KEY = 'inhaus_company_comment_library_v1';
 let memoryCache = null;

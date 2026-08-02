@@ -19,6 +19,7 @@ const DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
 const DRIVE_SPREADSHEET_MIME = 'application/vnd.google-apps.spreadsheet';
 const DRIVE_SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
 const TRACKER_TAB_REPORT = 'Report Tracker';
+const FEEDBACK_TRACKER_TAB = 'Things to Fix';
 const TRACKER_DATA_START = 8;
 const TEST_ASSESSMENTS_FOLDER_NAME = '_Test Assessments';
 const HANDOFF_RECEIPT_SCHEMA_VERSION = 'handoff-receipt-v2';
@@ -29,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w27';
+const WORKER_VERSION = 'handoff-w28';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 
 export default {
@@ -148,6 +149,8 @@ async function handleHealth(env) {
       googleServiceAccount: !!env.GOOGLE_SERVICE_ACCOUNT,
       assessmentsFolderId: !!env.ASSESSMENTS_FOLDER_ID,
       reportTrackerSheetId: !!env.REPORT_TRACKER_SHEET_ID,
+      feedbackTrackerSheetId: !!env.FEEDBACK_TRACKER_SHEET_ID,
+      feedbackFolderId: !!env.FEEDBACK_FOLDER_ID,
       handoffJobStore: 'supabase_handoff_jobs',
       handoffArtifactStore: 'supabase_handoff_artifacts',
       handoffJobClaim: 'rpc_claim_due_handoff_jobs',
@@ -159,26 +162,35 @@ async function handleHealth(env) {
       inspectionCloudApi: true,
       teamFieldMerge: true,
       companyCommentLibrary: true,
-      appFeedback: true,
+      appFeedback: !!env.FEEDBACK_TRACKER_SHEET_ID && !!env.FEEDBACK_FOLDER_ID && !!env.GOOGLE_SERVICE_ACCOUNT,
       recoveryAudit: true
     }
   });
 }
 
 async function handleAppFeedback(request, env) {
-  requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
+  requireEnv(env, [
+    'SUPABASE_URL',
+    'SUPABASE_SERVICE_KEY',
+    'UPLOAD_SECRET',
+    'GOOGLE_SERVICE_ACCOUNT',
+    'FEEDBACK_TRACKER_SHEET_ID',
+    'FEEDBACK_FOLDER_ID'
+  ]);
   const body = await readJson(request);
   validateSharedSecret(body, env);
   const feedback = isPlainObject(body.feedback) ? cleanInspectionPayload(body.feedback) : {};
   const feedbackId = cleanReviewKey(feedback.feedbackId || `APP-FEEDBACK-${crypto.randomUUID()}`, 'feedbackId');
-  const inspectionId = String(feedback.inspectionId || '').trim() || null;
+  const context = isPlainObject(feedback.context) ? feedback.context : {};
+  const inspectionId = String(feedback.inspectionId || context.inspectionId || '').trim() || null;
+  feedback.feedbackId = feedbackId;
   const params = new URLSearchParams();
   params.set('on_conflict', 'feedback_id');
   const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/app_feedback?${params}`), {
     method: 'POST',
     headers: serviceHeaders(env, {
       'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
+      'Prefer': 'resolution=ignore-duplicates,return=minimal'
     }),
     body: JSON.stringify({
       feedback_id: feedbackId,
@@ -190,7 +202,178 @@ async function handleAppFeedback(request, env) {
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`app_feedback_save_failed:${response.status}:${text.slice(0, 200)}`);
-  return json({ status: 'ok', saved: true, feedbackId });
+
+  let trackerMirror = null;
+  try {
+    trackerMirror = await mirrorAppFeedbackToTracker(env, feedback);
+  } catch (err) {
+    trackerMirror = {
+      mirrored: false,
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+  await updateAppFeedbackMirrorState(env, feedbackId, feedback, trackerMirror);
+  return json({
+    status: 'ok',
+    saved: true,
+    feedbackId,
+    trackerMirrored: trackerMirror.mirrored === true,
+    trackerRow: trackerMirror.row || 0,
+    trackerUrl: trackerMirror.trackerUrl || '',
+    trackerError: trackerMirror.error || ''
+  });
+}
+
+async function mirrorAppFeedbackToTracker(env, feedback) {
+  const accessToken = await getGoogleAccessToken(env);
+  const spreadsheetId = String(env.FEEDBACK_TRACKER_SHEET_ID || '').trim();
+  const values = await getSheetValues(accessToken, spreadsheetId, feedbackSheetRange('A:P'));
+  const feedbackId = String(feedback.feedbackId || '').trim();
+  let row = findFeedbackTrackerRow(values, feedbackId);
+  const existing = row ? (values[row - 1] || []) : [];
+  const filesByName = await listDriveFolderFilesByName(accessToken, env.FEEDBACK_FOLDER_ID);
+  const screenshotUrl = existing[10] || await ensureFeedbackAttachment(
+    accessToken,
+    env.FEEDBACK_FOLDER_ID,
+    filesByName,
+    feedbackId,
+    'screenshot',
+    feedback.screenshotName,
+    feedback.screenshotDataUrl
+  );
+  const voiceUrl = existing[11] || await ensureFeedbackAttachment(
+    accessToken,
+    env.FEEDBACK_FOLDER_ID,
+    filesByName,
+    feedbackId,
+    'voice',
+    '',
+    feedback.voiceDataUrl,
+    feedback.voiceMimeType
+  );
+  if (!row) row = findNextFeedbackTrackerRow(values);
+
+  const context = isPlainObject(feedback.context) ? feedback.context : {};
+  const trackerValues = [[
+    feedback.submittedAt || new Date().toISOString(),
+    feedbackId,
+    existing[2] || 'New',
+    context.inspectorName || feedback.inspectorName || '',
+    context.inspectionId || feedback.inspectionId || '',
+    context.propertyAddress || feedback.propertyAddress || '',
+    context.appVersion || '',
+    context.screen || '',
+    context.stepIndex === undefined || context.stepIndex === null ? '' : context.stepIndex,
+    feedback.note || '',
+    screenshotUrl,
+    voiceUrl,
+    context.pageUrl || '',
+    context.userAgent || '',
+    context.online === true ? 'Yes' : (context.online === false ? 'No' : ''),
+    existing[15] || ''
+  ]];
+  await batchUpdateSheetValues(accessToken, spreadsheetId, [{
+    range: feedbackSheetRange(`A${row}:P${row}`),
+    values: trackerValues
+  }]);
+  return {
+    mirrored: true,
+    row,
+    screenshotUrl,
+    voiceUrl,
+    trackerUrl: `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/edit#range=A${row}`,
+    mirroredAt: new Date().toISOString(),
+    error: ''
+  };
+}
+
+async function updateAppFeedbackMirrorState(env, feedbackId, feedback, mirror) {
+  const context = isPlainObject(feedback.context) ? feedback.context : {};
+  const payload = structuredClone(feedback);
+  payload.system = {
+    ...(isPlainObject(payload.system) ? payload.system : {}),
+    trackerMirror: {
+      mirrored: mirror.mirrored === true,
+      row: mirror.row || 0,
+      trackerUrl: mirror.trackerUrl || '',
+      screenshotUrl: mirror.screenshotUrl || '',
+      voiceUrl: mirror.voiceUrl || '',
+      mirroredAt: mirror.mirroredAt || '',
+      error: mirror.error || ''
+    }
+  };
+  const params = new URLSearchParams();
+  params.set('feedback_id', `eq.${feedbackId}`);
+  const response = await fetch(normalizeSupabaseUrl(env, `/rest/v1/app_feedback?${params}`), {
+    method: 'PATCH',
+    headers: serviceHeaders(env, {
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    }),
+    body: JSON.stringify({
+      inspection_id: String(feedback.inspectionId || context.inspectionId || '').trim() || null,
+      payload,
+      updated_at: new Date().toISOString()
+    })
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`app_feedback_mirror_state_failed:${response.status}:${text.slice(0, 200)}`);
+}
+
+function findFeedbackTrackerRow(values, feedbackId) {
+  if (!feedbackId) return 0;
+  for (let index = 1; index < values.length; index += 1) {
+    if (String((values[index] || [])[1] || '').trim() === feedbackId) return index + 1;
+  }
+  return 0;
+}
+
+function findNextFeedbackTrackerRow(values) {
+  for (let index = 1; index < values.length; index += 1) {
+    if (!String((values[index] || [])[1] || '').trim()) return index + 1;
+  }
+  return Math.max(2, values.length + 1);
+}
+
+function feedbackSheetRange(a1Range) {
+  return `'${String(FEEDBACK_TRACKER_TAB).replace(/'/g, "''")}'!${a1Range}`;
+}
+
+async function ensureFeedbackAttachment(accessToken, folderId, filesByName, feedbackId, kind, originalName, dataUrl, mimeHint) {
+  if (!dataUrl) return '';
+  const attachment = dataUrlToBlob(dataUrl, mimeHint);
+  const fileName = feedbackAttachmentName(feedbackId, kind, originalName, attachment.type);
+  const existing = filesByName.get(fileName);
+  if (existing) return existing.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(existing.id)}/view`;
+  const uploaded = await uploadDriveBlob(accessToken, folderId, fileName, attachment, attachment.type);
+  filesByName.set(fileName, uploaded);
+  return uploaded.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(uploaded.id)}/view`;
+}
+
+function feedbackAttachmentName(feedbackId, kind, _originalName, mimeType) {
+  const extension = feedbackMimeExtension(mimeType);
+  return `${feedbackId} - ${kind}${extension}`;
+}
+
+function feedbackMimeExtension(mimeType) {
+  const normalized = String(mimeType || '').toLowerCase();
+  if (normalized.includes('png')) return '.png';
+  if (normalized.includes('jpeg') || normalized.includes('jpg')) return '.jpg';
+  if (normalized.includes('webm')) return '.webm';
+  if (normalized.includes('mpeg')) return '.mp3';
+  if (normalized.includes('mp4') || normalized.includes('m4a')) return '.m4a';
+  if (normalized.includes('wav')) return '.wav';
+  return '.bin';
+}
+
+function dataUrlToBlob(dataUrl, mimeHint) {
+  const match = String(dataUrl || '').match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+  if (!match) throw new Error('invalid_feedback_attachment');
+  const mimeType = match[1] || mimeHint || 'application/octet-stream';
+  const binary = match[2] ? atob(match[3]) : decodeURIComponent(match[3]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: mimeType });
 }
 
 async function handleCommentLibraryGet(request, url, env) {
@@ -4371,16 +4554,21 @@ async function findDriveFolder(accessToken, parentId, folderName) {
 }
 
 async function uploadDriveFile(accessToken, folderId, fileName, fileBlob) {
+  return await uploadDriveBlob(accessToken, folderId, fileName, fileBlob, 'image/jpeg');
+}
+
+async function uploadDriveBlob(accessToken, folderId, fileName, fileBlob, mimeType) {
   const boundary = `inhaus_${crypto.randomUUID().replace(/-/g, '')}`;
+  const contentType = String(mimeType || fileBlob.type || 'application/octet-stream');
   const metadata = {
     name: fileName,
     parents: [folderId],
-    mimeType: 'image/jpeg'
+    mimeType: contentType
   };
   const body = new Blob([
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
     JSON.stringify(metadata),
-    `\r\n--${boundary}\r\nContent-Type: image/jpeg\r\n\r\n`,
+    `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
     fileBlob,
     `\r\n--${boundary}--`
   ]);

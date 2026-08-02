@@ -5,8 +5,7 @@ import {
   buildStepList,
   deriveRequiredTests,
   getStepFields,
-  getWaterSampleFields,
-  validateStep
+  getWaterSampleFields
 } from '../steps.js';
 import { observationFields } from '../fields.js';
 
@@ -16,7 +15,7 @@ function inspection(overrides = {}) {
     numberOfBedrooms: '3',
     numberOfBathrooms: '3',
     stepData: {},
-    dynamicRooms: { lowest: [{ name: 'Lowest Level — Room 1' }], additional: [] },
+    dynamicRooms: { lowest: [], additional: [] },
     ...overrides
   };
 }
@@ -30,19 +29,24 @@ test('new step lists omit Main Living Area and retain Primary Bathroom naming', 
   assert.equal(insp.stepData['living-area'].notes, 'legacy data remains preserved');
 });
 
-test('first Lowest Level room has no room-name field anywhere in the workflow', () => {
-  const firstLowest = {
-    id: 'lowest-room-0',
-    type: 'room-test',
-    dynamic: 'lowest',
-    index: 0,
-    name: 'Lowest Level — Room 1'
-  };
-  const secondLowest = { ...firstLowest, id: 'lowest-room-1', index: 1, name: 'Lowest Level — Room 2' };
+test('Radon setup is not a room and meaningful legacy room data remains editable', () => {
+  const newSteps = buildStepList(inspection());
+  assert.equal(newSteps.some(step => step.id.startsWith('lowest-room-')), false);
 
-  assert.equal(getStepFields(firstLowest).some(field => field?.key === 'roomName'), false);
-  assert.equal(getStepFields(secondLowest).some(field => field?.key === 'roomName'), true);
-  assert.equal(validateStep(firstLowest, {}).some(issue => /Room Name/.test(issue)), false);
+  const emptyLegacySteps = buildStepList(inspection({
+    dynamicRooms: { lowest: [{ name: 'Radon - Room 1' }], additional: [] },
+    stepData: { 'lowest-room-0': { _photos: [], qtrakReading: { value: null, status: '' } } }
+  }));
+  assert.equal(emptyLegacySteps.some(step => step.id === 'lowest-room-0'), false);
+
+  const legacySteps = buildStepList(inspection({
+    dynamicRooms: { lowest: [{ name: 'Radon - Room 1' }], additional: [] },
+    stepData: { 'lowest-room-0': { notes: 'Legacy lower-level observation' } }
+  }));
+  const legacyRoom = legacySteps.find(step => step.id === 'lowest-room-0');
+  assert.equal(legacyRoom?.phase, 'supplementary');
+  assert.equal(legacyRoom?.name, 'Lower Level Room');
+  assert.equal(getStepFields(legacyRoom).some(field => field?.key === 'roomName'), true);
 });
 
 test('Utility Room appears after the room walkthrough and before wrap-up', () => {

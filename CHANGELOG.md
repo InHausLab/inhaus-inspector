@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v230 — Feedback Workflow Corrections
+**Date:** August 2, 2026
+
+- Removed the artificial `Radon - Room 1` inspection from new inspections. Radon remains a setup step; meaningful legacy lower-level room records remain editable under Additional Rooms.
+- Changed Boulder Blue placement from a room-name selector to a floor selector containing Basement and the inspection's available numbered floors.
+- Restored the light-bulb feedback handoff without restoring Apps Script: Supabase remains the durable record and the Worker mirrors each item and attachment into Tanner's shared Things to Fix tracker idempotently.
+- The app keeps a feedback item in its retry queue until both Supabase and Tanner's tracker confirm it, and the Supabase record stores the tracker receipt.
+
 ## v229 — Preserve Test / Training Classification During Phone Backup
 **Date:** August 2, 2026
 

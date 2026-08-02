@@ -38,5 +38,6 @@ test('photo capture keeps high-resolution source images for review', () => {
 test('app feedback points Tanner to the shared tracker', () => {
   assert.match(feedback, /shared Things to Fix tracker that Tanner monitors/);
   assert.match(feedback, /Saved in the shared Things to Fix tracker for Tanner/);
+  assert.match(feedback, /result\.trackerMirrored !== true/);
   assert.doesNotMatch(feedback, /Send to Matt/);
 });

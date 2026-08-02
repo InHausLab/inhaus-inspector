@@ -5,7 +5,7 @@ const runStartShell = process.argv.includes('--start-shell-test');
 const runHandoff = process.argv.includes('--handoff-test');
 const runRunner = process.argv.includes('--runner-test');
 const runActivity = process.argv.includes('--activity-test');
-const expectedWorkerVersion = process.env.EXPECTED_WORKER_VERSION || 'handoff-w18';
+const expectedWorkerVersion = process.env.EXPECTED_WORKER_VERSION || 'handoff-w28';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -36,6 +36,9 @@ async function smokeHealth() {
   assert(data.dependencies && data.dependencies.reviewAccessToken === true, 'health missing review access token dependency');
   assert(data.dependencies && data.dependencies.assessmentsFolderId === true, 'health missing assessments folder config');
   assert(data.dependencies && data.dependencies.reportTrackerSheetId === true, 'health missing tracker sheet config');
+  assert(data.dependencies && data.dependencies.feedbackTrackerSheetId === true, 'health missing feedback tracker config');
+  assert(data.dependencies && data.dependencies.feedbackFolderId === true, 'health missing feedback attachment folder config');
+  assert(data.capabilities && data.capabilities.appFeedback === true, 'health missing app feedback capability');
   console.log(`PASS health ${data.version}`);
 }
 

@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=229';
-import { getInspection } from './state.js?v=229';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=230';
+import { getInspection } from './state.js?v=230';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -96,7 +96,7 @@ export function getArrivalFields() {
       { key: 'allergenPlacement', label: 'If allergen concerns: placed in client-requested location' }
     ]},
     text('boulderBlueSampleId', 'Boulder Blue Sample ID', { placeholder: 'e.g. B2BJC43G' }),
-    { key: 'boulderBlueTestLocation', type: 'inspection-room-select', label: 'Boulder Blue Test Location' },
+    { key: 'boulderBlueTestLocation', type: 'inspection-level-select', label: 'Boulder Blue Test Location' },
     timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (2 hrs needed)'),
     timer('boulderBlueTimer', 'Boulder Blue Timer (2 hours)', 7200),
     divider(),
@@ -612,18 +612,10 @@ export const STEP_FIELDS = {
   'post-assessment': getPostAssessmentFields
 };
 
-// Return the fields that actually belong to this specific step instance.
-// The first Radon/lower-level room uses its stable default name, so its old required
-// Room Name field must stay absent everywhere: entry, search, review, and
-// validation. Saved legacy roomName data remains untouched.
 export function getStepFields(stepDef) {
   const fieldGen = STEP_FIELDS[stepDef?.type];
   if (!fieldGen) return [];
-  const fields = fieldGen();
-  if (stepDef?.dynamic === 'lowest' && stepDef?.index === 0) {
-    return fields.filter(field => !(field && field.key === 'roomName'));
-  }
-  return fields;
+  return fieldGen();
 }
 
 // ── Phases ─────────────────────────────────────────────────
@@ -667,6 +659,25 @@ function legacyAdditionalKind(room, data) {
   return 'additional';
 }
 
+function isLegacyRadonPlaceholder(value) {
+  const name = String(value || '').trim().toLowerCase();
+  return name === 'radon' || name.startsWith('radon - room ');
+}
+
+function hasMeaningfulLegacyLowestData(data) {
+  if (!data || typeof data !== 'object') return false;
+  const hasMeaningfulValue = value => {
+    if (Array.isArray(value)) return value.some(hasMeaningfulValue);
+    if (value && typeof value === 'object') return Object.values(value).some(hasMeaningfulValue);
+    return value !== undefined && value !== null && value !== '' && value !== false;
+  };
+  return Object.entries(data).some(([key, value]) => {
+    if (['_stepId', '_visited', '_completedAt', '_updatedAt', '_roomName'].includes(key)) return false;
+    if (key === 'roomName' && isLegacyRadonPlaceholder(value)) return false;
+    return hasMeaningfulValue(value);
+  });
+}
+
 function linkedBathroomName(relationship, bedroomSteps, insp) {
   const linkedIds = Array.isArray(relationship?.linkedBedroomIds)
     ? relationship.linkedBedroomIds.filter(Boolean)
@@ -700,6 +711,7 @@ function applyBathroomName(insp, step, bedroomSteps, relationships) {
 // ── Build Step List ────────────────────────────────────────
 export function buildStepList(insp) {
   const steps = [];
+  const legacyLowestRooms = [];
   const relationships = ensureRoomRelationships(insp);
   const additionalRooms = (insp.dynamicRooms && insp.dynamicRooms.additional) || [];
   const legacyBedrooms = [];
@@ -724,11 +736,20 @@ export function buildStepList(insp) {
   // Exterior Assessment (#2)
   steps.push({ id: 'exterior', type: 'exterior', phase: 'exterior', name: 'Exterior Assessment' });
 
-  // Radon / lower-level room context
+  // Radon is equipment setup, not a room inspection. Legacy lower-level room
+  // records with real saved data remain accessible under Additional Rooms.
   steps.push({ id: 'radon', type: 'radon', phase: 'lowest', name: 'Radon Monitor Setup' });
-  const lowestRooms = (insp.dynamicRooms && insp.dynamicRooms.lowest) || [{ name: 'Radon - Room 1' }];
+  const lowestRooms = (insp.dynamicRooms && insp.dynamicRooms.lowest) || [];
   lowestRooms.forEach((r, i) => {
-    steps.push({ id: 'lowest-room-' + i, type: 'room-test', phase: 'lowest', name: r.name, dynamic: 'lowest', index: i });
+    const id = 'lowest-room-' + i;
+    const saved = insp.stepData && insp.stepData[id];
+    const placeholder = isLegacyRadonPlaceholder(r && r.name);
+    if (placeholder && !hasMeaningfulLegacyLowestData(saved)) return;
+    const savedName = String(saved && saved.roomName || '').trim();
+    const name = savedName && !isLegacyRadonPlaceholder(savedName)
+      ? savedName
+      : (placeholder ? 'Lower Level Room' : String(r && r.name || 'Lower Level Room'));
+    legacyLowestRooms.push({ id, type: 'room-test', phase: 'supplementary', name, dynamic: 'lowest', index: i, legacyLowest: true });
   });
 
   // Bedrooms are their own report/navigation group. Existing fixed bedroom IDs
@@ -770,6 +791,7 @@ export function buildStepList(insp) {
   supplementaryRooms.forEach(({ room, index, id }) => {
     steps.push({ id, type: 'additional-room', phase: 'supplementary', name: room.name, dynamic: 'additional', index, roomCategory: 'additional' });
   });
+  steps.push(...legacyLowestRooms);
 
   // Utility equipment questions are easiest to complete after the inspector
   // has walked the home and has the room/system context needed to answer them.

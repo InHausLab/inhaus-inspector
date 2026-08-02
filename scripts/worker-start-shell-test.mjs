@@ -38,6 +38,8 @@ function baseEnv(overrides = {}) {
     GOOGLE_SERVICE_ACCOUNT: JSON.stringify(makeServiceAccount()),
     ASSESSMENTS_FOLDER_ID: 'assessments-root',
     REPORT_TRACKER_SHEET_ID: 'tracker-sheet',
+    FEEDBACK_TRACKER_SHEET_ID: 'feedback-sheet',
+    FEEDBACK_FOLDER_ID: 'feedback-folder',
     ...overrides
   };
 }
@@ -74,6 +76,14 @@ function trackerValues() {
   ];
 }
 
+function feedbackTrackerValues() {
+  return [[
+    'Timestamp', 'Feedback ID', 'Status', 'Inspector', 'Inspection ID',
+    'Property', 'App Version', 'Screen', 'Step', 'Note', 'Screenshot',
+    'Voice Note', 'Page URL', 'User Agent', 'Online', 'Notification Sent'
+  ]];
+}
+
 function cloneSheetValues(values) {
   return (values || []).map(row => Array.isArray(row) ? row.slice() : []);
 }
@@ -87,7 +97,7 @@ function columnIndexFromLetters(letters) {
 }
 
 function applySheetValueUpdate(values, update) {
-  const match = String(update.range || '').match(/!([A-Z]+)(\d+)$/);
+  const match = String(update.range || '').match(/!([A-Z]+)(\d+)(?::[A-Z]+\d+)?$/);
   if (!match) return;
   const startCol = columnIndexFromLetters(match[1]) - 1;
   const startRow = Number(match[2]) - 1;
@@ -135,10 +145,12 @@ function makeMockFetch(options = {}) {
   const state = {
     reviewRow: options.reviewRow || null,
     trackerValues: cloneSheetValues(options.trackerValues || trackerValues()),
+    feedbackTrackerValues: cloneSheetValues(options.feedbackTrackerValues || feedbackTrackerValues()),
     reviewWrites: [],
     reviewWriteConflicts: 0,
     assessmentWrites: [],
     trackerUpdates: [],
+    feedbackTrackerUpdates: [],
     spreadsheetUpdates: [],
     sheetValueWrites: [],
     sheetClears: [],
@@ -156,6 +168,8 @@ function makeMockFetch(options = {}) {
     inspectionEvents: (options.inspectionEvents || []).map(row => structuredClone(row)),
     inspectionEventWrites: [],
     appFeedbackWrites: [],
+    appFeedbackMirrorWrites: [],
+    appFeedbackRows: (options.appFeedbackRows || []).map(row => structuredClone(row)),
     commentRows: (options.commentRows || []).map(row => structuredClone(row)),
     commentWrites: [],
     handoffJobs: (options.handoffJobs || []).map(row => ({ ...row })),
@@ -183,6 +197,9 @@ function makeMockFetch(options = {}) {
         state.trackerUpdates.push(...(body.data || []));
         (body.data || []).forEach(update => applySheetValueUpdate(state.trackerValues, update));
         if (typeof options.afterTrackerBatchUpdate === 'function') options.afterTrackerBatchUpdate(state);
+      } else if (url.includes('/spreadsheets/feedback-sheet/')) {
+        state.feedbackTrackerUpdates.push(...(body.data || []));
+        (body.data || []).forEach(update => applySheetValueUpdate(state.feedbackTrackerValues, update));
       } else {
         if (options.failPackageSheetValueWrite) return jsonResponse({ error: 'forced_sheet_value_failure' }, 500);
         state.sheetValueWrites.push(...(body.data || []));
@@ -203,7 +220,10 @@ function makeMockFetch(options = {}) {
     }
 
     if (url.includes('sheets.googleapis.com') && url.includes('/values/') && method === 'GET') {
-      return jsonResponse({ values: state.trackerValues });
+      const values = url.includes('/spreadsheets/feedback-sheet/')
+        ? state.feedbackTrackerValues
+        : state.trackerValues;
+      return jsonResponse({ values });
     }
 
     if (url.includes('sheets.googleapis.com/v4/spreadsheets/') && method === 'GET') {
@@ -528,7 +548,21 @@ function makeMockFetch(options = {}) {
 
     if (url.includes('/rest/v1/app_feedback') && method === 'POST') {
       const body = JSON.parse(String(init.body || '{}'));
-      state.appFeedbackWrites.push(body);
+      if (!state.appFeedbackRows.some(row => row.feedback_id === body.feedback_id)) {
+        state.appFeedbackRows.push(structuredClone(body));
+        state.appFeedbackWrites.push(body);
+      }
+      return jsonResponse([]);
+    }
+
+    if (url.includes('/rest/v1/app_feedback') && method === 'PATCH') {
+      const body = JSON.parse(String(init.body || '{}'));
+      const feedbackFilter = new URL(url).searchParams.get('feedback_id') || '';
+      const feedbackMatch = feedbackFilter.match(/^eq\.(.+)$/);
+      state.appFeedbackRows.forEach(row => {
+        if (!feedbackMatch || row.feedback_id === feedbackMatch[1]) Object.assign(row, structuredClone(body));
+      });
+      state.appFeedbackMirrorWrites.push(body);
       return jsonResponse([]);
     }
 
@@ -600,10 +634,12 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w27', 'health exposes Worker version');
+  assert(data.version === 'handoff-w28', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
+  assert(data.dependencies.feedbackTrackerSheetId === true, 'health checks feedback tracker config');
+  assert(data.dependencies.feedbackFolderId === true, 'health checks feedback attachment folder config');
   assert(data.dependencies.supabaseBucket === true, 'health checks Supabase bucket config');
   assert(data.dependencies.reviewAccessToken === true, 'health checks review access token config');
   assert(data.dependencies.assessmentNumberSource === 'supabase_sequence', 'health exposes DB-backed assessment-number source');
@@ -677,24 +713,47 @@ async function testReviewActivityEventWritesMetadataOnly() {
   assert(row.event_payload.changes[1].valueMeta.size === 1, 'review activity event keeps array nested value metadata');
 }
 
-async function testAppFeedbackUsesSupabaseStore() {
+async function testAppFeedbackUsesSupabaseAndTracker() {
   const { mockFetch, state } = makeMockFetch();
-  const { response, data } = await callWorker('/app-feedback', {
+  const request = {
     sharedSecret: 'upload-secret',
     feedback: {
       feedbackId: 'APP-FEEDBACK-001',
-      inspectionId: 'INH-20260801-FEEDBACK01',
       note: 'Cloud list should load faster',
-      screen: 'cloud-resume'
+      screenshotName: 'iphone-capture.heic',
+      screenshotDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      context: {
+        inspectionId: 'INH-20260801-FEEDBACK01',
+        inspectorName: 'Codex QA',
+        screen: 'cloud-resume',
+        appVersion: 'v230',
+        online: true
+      }
     }
-  }, baseEnv(), mockFetch);
+  };
+  const { response, data } = await callWorker('/app-feedback', request, baseEnv(), mockFetch);
 
   assert(response.status === 200, 'app feedback returns 200');
   assert(data.status === 'ok' && data.saved === true, 'app feedback returns save confirmation');
+  assert(data.trackerMirrored === true && data.trackerRow === 2, 'app feedback confirms tracker row');
   assert(state.appFeedbackWrites.length === 1, 'app feedback writes one Supabase row');
   assert(state.appFeedbackWrites[0].feedback_id === 'APP-FEEDBACK-001', 'app feedback keeps stable ID');
+  assert(state.appFeedbackWrites[0].inspection_id === 'INH-20260801-FEEDBACK01', 'app feedback reads nested inspection context');
   assert(state.appFeedbackWrites[0].payload.note === 'Cloud list should load faster', 'app feedback keeps user note');
   assert(state.appFeedbackWrites[0].payload.sharedSecret === undefined, 'app feedback never stores shared secret');
+  assert(state.feedbackTrackerValues[1][1] === 'APP-FEEDBACK-001', 'app feedback writes the shared tracker ID');
+  assert(state.feedbackTrackerValues[1][9] === 'Cloud list should load faster', 'app feedback writes the tracker note');
+  assert(String(state.feedbackTrackerValues[1][10]).includes('drive.google.com/file/d/'), 'app feedback writes the screenshot Drive link');
+  assert(state.rawUploads.length === 1, 'app feedback uploads one screenshot attachment');
+  assert(state.rawUploads[0].bodyText.includes('APP-FEEDBACK-001 - screenshot.jpg'), 'app feedback names compressed screenshots by their actual MIME type');
+  assert(state.appFeedbackMirrorWrites[0].payload.system.trackerMirror.mirrored === true, 'app feedback persists tracker receipt');
+
+  const retry = await callWorker('/app-feedback', request, baseEnv(), mockFetch);
+  const matchingRows = state.feedbackTrackerValues.filter(row => row[1] === 'APP-FEEDBACK-001');
+  assert(retry.data.trackerRow === 2, 'app feedback retry reuses the original tracker row');
+  assert(matchingRows.length === 1, 'app feedback retry does not append a duplicate tracker row');
+  assert(state.appFeedbackWrites.length === 1, 'app feedback retry does not duplicate the Supabase row');
+  assert(state.rawUploads.length === 1, 'app feedback retry does not upload a duplicate screenshot');
 }
 
 async function testCommentLibraryCandidateAndAdminFlow() {
@@ -2771,7 +2830,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w27', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w28', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
@@ -2832,7 +2891,7 @@ const tests = [
   testHealthRoute,
   testCorsAllowsWorkerTokenHeader,
   testReviewActivityEventWritesMetadataOnly,
-  testAppFeedbackUsesSupabaseStore,
+  testAppFeedbackUsesSupabaseAndTracker,
   testCommentLibraryCandidateAndAdminFlow,
   testSignRouteDoesNotCreateAssessmentParentRow,
   testTrainingCreatesTestArtifactsOnly,

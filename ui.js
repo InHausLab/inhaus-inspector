@@ -2636,6 +2636,15 @@
         if (data[f.key]) addChoice(data[f.key]);
         return renderSelect(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, choices);
       }
+      case 'inspection-level-select': {
+        const choices = ['Basement'];
+        const levelNames = ['First Floor', 'Second Floor', 'Third Floor', 'Fourth Floor', 'Fifth Floor'];
+        const levelCount = Math.max(1, Math.min(5, Number.parseInt(inspection?.numberOfLevels, 10) || 1));
+        levelNames.slice(0, levelCount).forEach(level => choices.push(level));
+        const savedValue = String(data[f.key] || '').trim();
+        if (savedValue && !choices.includes(savedValue)) choices.push(savedValue);
+        return renderSelect(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, choices);
+      }
       case 'yesno': return renderYesNo(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, 'yesno');
       case 'yesnona': return renderYesNo(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, 'yesnona');
       case 'radio': return renderRadio(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f.choices);
