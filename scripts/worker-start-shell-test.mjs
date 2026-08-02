@@ -577,7 +577,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w18', 'health exposes Worker version');
+  assert(data.version === 'handoff-w20', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -2584,6 +2584,21 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
     trackerStatus: 'skipped_test_training'
   };
   const { mockFetch, state } = makeMockFetch({
+    assessmentRows: [{
+      inspection_id: 'INH-TRAINING-LEGACY01',
+      assessment_num: 'INH-TRAINING-LEGACY01',
+      status: 'In Review',
+      drive_folder_id: legacyReceipt.folderId,
+      assessment_folder_url: legacyReceipt.folderUrl,
+      raw_jsonb: {
+        inspectionId: 'INH-TRAINING-LEGACY01',
+        isTestTraining: true,
+        rooms: [
+          { stepId: 'bedroom-0', roomName: 'Bedroom', notes: 'Canonical bedroom.' },
+          { stepId: 'office-0', roomName: 'Office', notes: 'Canonical office.' }
+        ]
+      }
+    }],
     reviewRow: {
       inspection_id: 'INH-TRAINING-LEGACY01',
       field_data: {
@@ -2626,6 +2641,17 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(state.handoffJobQueueTransitions[0].matched === 1, 'queue transition acquires the observed durable row');
   assert(state.handoffJobs[0].status === 'queued', 'legacy durable job becomes queued');
   assert(state.handoffJobs[0].receipt.workerVersion === 'handoff-w15', 'queue keeps the prior receipt until the runner replaces it');
+
+  const run = await callWorker('/handoff-jobs/run', {
+    inspectionId: 'INH-TRAINING-LEGACY01',
+    token: 'review-token',
+    requestedBy: 'portal-runner'
+  }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
+
+  assert(run.response.status === 200, 'runner repairs a stale ready receipt');
+  assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
+  assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w20', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {

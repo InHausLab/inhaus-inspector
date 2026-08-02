@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w19';
+const WORKER_VERSION = 'handoff-w20';
 
 export default {
   async fetch(request, env, ctx) {
@@ -1052,7 +1052,7 @@ async function handleHandoffJob(request, env, ctx) {
     if (!queued.acquired) {
       const activeJob = durableJobToPublicJob(queued.row) || queuedJob;
       const activeReceipt = queued.row && isPlainObject(queued.row.receipt) ? queued.row.receipt : durableReceipt;
-      if (activeReceipt && isReadyHandoffReceipt(activeReceipt)) {
+      if (activeReceipt && isReadyHandoffReceipt(activeReceipt, receiptExpectations)) {
         return json({
           ...activeJob,
           status: 'ready',
@@ -1082,7 +1082,7 @@ async function handleHandoffJob(request, env, ctx) {
   if (!claim.acquired) {
     const existingJob = durableJobToPublicJob(claim.row) || runningJob;
     const activeReceipt = isPlainObject(claim.row && claim.row.receipt) ? claim.row.receipt : null;
-    if (activeReceipt && isReadyHandoffReceipt(activeReceipt)) {
+    if (activeReceipt && isReadyHandoffReceipt(activeReceipt, receiptExpectations)) {
       return json({
         ...existingJob,
         status: 'ready',
@@ -1132,10 +1132,15 @@ async function handleHandoffJobRunner(request, env, ctx) {
     const reviewFieldData = reviewRow && isPlainObject(reviewRow.field_data) ? reviewRow.field_data : {};
     const reviewSystem = isPlainObject(reviewFieldData.system) ? reviewFieldData.system : {};
     const reviewJob = isPlainObject(reviewSystem.handoffJob) ? reviewSystem.handoffJob : {};
+    const assessmentRow = await getAssessmentRow(env, inspectionId);
+    const canonicalSource = buildCanonicalAssessmentSource(assessmentRow);
+    const receiptExpectations = {
+      expectedRoomCount: Array.isArray(canonicalSource.rooms) ? canonicalSource.rooms.length : 0
+    };
     const durableReceipt = durableJob && isPlainObject(durableJob.receipt)
       ? durableJob.receipt
       : (isPlainObject(reviewSystem.tannerHandoff) ? reviewSystem.tannerHandoff : null);
-    if (durableReceipt && isReadyHandoffReceipt(durableReceipt)) {
+    if (durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
       return json({
         processed: 1,
         results: [{
