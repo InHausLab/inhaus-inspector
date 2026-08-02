@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v225 — Multi-Photo Rendering Release Correction
+**Date:** August 1, 2026
+
+- Corrected v224 so the completed multi-photo render does not depend on the optional
+  global toast helper.
+- v224 failed deployed E2E because no cards rendered when that helper was absent and
+  is superseded by v225.
+- Acceptance requires the complete clean deployed browser and handoff workflow.
+
 ## v224 — Multi-Photo Library Rendering Fix
 **Date:** August 1, 2026
 
