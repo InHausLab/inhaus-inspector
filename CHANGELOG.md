@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v229 — Preserve Test / Training Classification During Phone Backup
+**Date:** August 2, 2026
+
+- Checkpoint payloads now retain the Test / Training classification from the active inspection and its start-shell receipt.
+- Worker saves now trust an existing Test / Training shell when a checkpoint omits the classification flag, so test inspections never require a real assessment-number reservation.
+- Added a regression that reproduces the phone `missing_assessment_number_reservation` failure and verifies the cloud backup succeeds without creating a real assessment number.
+
 ## v228 — Current Room Name Applied at Photo Selection
 - Standard room photo controls now resolve the live room-name field when files are selected, preventing photos from retaining a default room name after the inspector renames the room.
 

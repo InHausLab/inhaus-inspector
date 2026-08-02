@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w24';
+const WORKER_VERSION = 'handoff-w25';
 
 export default {
   async fetch(request, env, ctx) {
@@ -560,7 +560,11 @@ async function saveInspectionAssessment(env, source, knownRow = null) {
   const row = knownRow || await getAssessmentRow(env, inspectionId);
   const resume = isPlainObject(source.resumeData) ? source.resumeData : source;
   const shell = await getStartInspectionShellState(env, inspectionId);
-  const isTestTraining = isTestTrainingInspection(source) || isTestTrainingInspection(resume);
+  const payloadShell = isPlainObject(source.startInspectionShell) ? source.startInspectionShell : null;
+  const isTestTraining = isTestTrainingInspection(source) ||
+    isTestTrainingInspection(resume) ||
+    isTestTrainingInspection(shell) ||
+    isTestTrainingInspection(payloadShell);
   const assessmentNumber = firstNonEmpty(
     row && row.assessment_num,
     source.assessmentNumber,

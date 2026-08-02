@@ -578,7 +578,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w24', 'health exposes Worker version');
+  assert(data.version === 'handoff-w25', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -801,6 +801,55 @@ async function testInspectionSaveCreatesDurableCheckpoint() {
   assert(state.inspectionEventWrites.length === 1, 'inspection save writes one durable checkpoint event');
   assert(state.assessmentWrites.length === 1, 'inspection save updates the canonical assessment row');
   assert(state.assessmentWrites[0].raw_jsonb.resumeData.stepData.kitchen.notes === 'Dry at sink', 'inspection save stores complete resume data');
+}
+
+async function testTrainingCheckpointUsesReadyShellClassification() {
+  const inspectionId = 'INH-20260802-PHONE01';
+  const { mockFetch, state } = makeMockFetch({
+    assessmentRows: [{
+      inspection_id: inspectionId,
+      assessment_num: '',
+      status: 'In Progress',
+      drive_folder_id: 'drive-training',
+      assessment_folder_url: 'https://drive.google.com/drive/folders/drive-training',
+      raw_jsonb: {}
+    }],
+    reviewRow: {
+      inspection_id: inspectionId,
+      field_data: {
+        system: {
+          startInspectionShell: {
+            status: 'ready',
+            shellStatus: 'ready',
+            isTestTraining: true,
+            assessmentNumber: '',
+            folderId: 'drive-training',
+            folderUrl: 'https://drive.google.com/drive/folders/drive-training',
+            trackerStatus: 'skipped_test_training'
+          }
+        }
+      },
+      updated_at: '2026-08-02T16:00:00.000Z'
+    }
+  });
+  const { response, data } = await callWorker('/inspections/save', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    clientName: 'Phone Test Client',
+    propertyAddress: '1 Phone Test Way, Basalt CO',
+    status: 'in-progress',
+    resumeData: {
+      inspectionId,
+      clientName: 'Phone Test Client',
+      status: 'in-progress',
+      stepData: {}
+    }
+  }, baseEnv(), mockFetch);
+
+  assert(response.status === 200, 'training checkpoint with a ready test shell returns 200');
+  assert(data.status === 'ok' && data.saved === true, 'training checkpoint confirms the cloud backup');
+  assert(state.assessmentWrites[0].assessment_num === inspectionId, 'training checkpoint uses the inspection ID instead of a real assessment number');
+  assert(state.assessmentWrites[0].source_system === 'worker_test_training', 'training checkpoint stays classified as test/training');
 }
 
 async function testActiveInspectionListUsesCanonicalSupabaseRows() {
@@ -2700,7 +2749,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w24', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w25', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
@@ -2766,6 +2815,7 @@ const tests = [
   testSignRouteDoesNotCreateAssessmentParentRow,
   testTrainingCreatesTestArtifactsOnly,
   testInspectionSaveCreatesDurableCheckpoint,
+  testTrainingCheckpointUsesReadyShellClassification,
   testActiveInspectionListUsesCanonicalSupabaseRows,
   testInspectionOpenRecoversConcurrentTeamEvents,
   testInspectionOpenAppliesPhotoTombstones,

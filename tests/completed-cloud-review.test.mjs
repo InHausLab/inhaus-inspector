@@ -98,6 +98,15 @@ test('start shell receipt uses shell/action status instead of transport ok', () 
   assert.match(rememberShell, /inspection\._startInspectionShellStatus = receiptStatus/);
 });
 
+test('checkpoint payload preserves test training classification from the local inspection and shell', () => {
+  const start = syncSource.indexOf('function attachKnownShellMetadata(exportData)');
+  const end = syncSource.indexOf('export async function ensureStartInspectionShell', start);
+  const attachShell = syncSource.slice(start, end);
+  assert.match(attachShell, /isTestTrainingInspection\(inspection\)/);
+  assert.match(attachShell, /exportData\.isTestTraining = true/);
+  assert.match(attachShell, /exportData\.is_test = true/);
+});
+
 test('advanced smoke shortcut creates a test pickup without walking every intake field', () => {
   assert.match(screensSource, /Create Test Pickup Inspection/);
   assert.match(screensSource, /function quickTestPickupData\(\)/);
