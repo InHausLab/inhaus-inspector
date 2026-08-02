@@ -29,7 +29,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w18';
+const WORKER_VERSION = 'handoff-w19';
 
 export default {
   async fetch(request, env, ctx) {
@@ -978,7 +978,12 @@ async function handleHandoffJob(request, env, ctx) {
     }
   };
   const system = isPlainObject(fieldData.system) ? fieldData.system : {};
-  const existingReceipt = getReadyHandoffReceipt(fieldData);
+  const assessmentRow = await getAssessmentRow(env, inspectionId);
+  const canonicalSource = buildCanonicalAssessmentSource(assessmentRow);
+  const receiptExpectations = {
+    expectedRoomCount: Array.isArray(canonicalSource.rooms) ? canonicalSource.rooms.length : 0
+  };
+  const existingReceipt = getReadyHandoffReceipt(fieldData, receiptExpectations);
   if (existingReceipt) {
     const cachedJob = {
       jobId: handoffJobId(inspectionId),
@@ -998,7 +1003,7 @@ async function handleHandoffJob(request, env, ctx) {
 
   const durableJob = await getDurableHandoffJob(env, inspectionId);
   const durableReceipt = durableJob && isPlainObject(durableJob.receipt) ? durableJob.receipt : null;
-  if (durableReceipt && isReadyHandoffReceipt(durableReceipt)) {
+  if (durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
     const cachedJob = durableJobToPublicJob(durableJob);
     return json({
       ...cachedJob,
@@ -2076,10 +2081,10 @@ function getHandoffReceiptFromFieldData(fieldData = {}) {
   return candidates.find(candidate => candidate && isPlainObject(candidate)) || null;
 }
 
-function getReadyHandoffReceipt(fieldData = {}) {
+function getReadyHandoffReceipt(fieldData = {}, expectations = {}) {
   const receipt = getHandoffReceiptFromFieldData(fieldData);
-  const expectedRoomCount = getHandoffRoomRecords(fieldData).length;
-  return receipt && isReadyHandoffReceipt(receipt, { expectedRoomCount }) ? receipt : null;
+  const expectedRoomCount = Number(expectations.expectedRoomCount || getHandoffRoomRecords(fieldData).length || 0);
+  return receipt && isReadyHandoffReceipt(receipt, { ...expectations, expectedRoomCount }) ? receipt : null;
 }
 
 function buildPartialFailedHandoffReceipt(fieldData = {}) {
@@ -2143,10 +2148,15 @@ function isReadyHandoffReceipt(receipt = {}, expectations = {}) {
 }
 
 async function createOrRepairTannerHandoff(env, accessToken, inspectionId, fieldData, body) {
-  const source = buildHandoffSource(inspectionId, fieldData, body);
+  const assessmentRow = await getAssessmentRow(env, inspectionId);
+  const canonicalSource = buildCanonicalAssessmentSource(assessmentRow);
+  const source = buildHandoffSource(inspectionId, fieldData, body, canonicalSource);
+  const handoffFieldData = buildCanonicalHandoffFieldData(fieldData, source, canonicalSource);
+  fieldData.rooms = handoffFieldData.rooms;
+  fieldData.system = handoffFieldData.system;
   const isTestTraining = isTestTrainingInspection(source);
   const previousReceipt = getHandoffReceiptFromFieldData(fieldData) || {};
-  const sourceRoomCount = getHandoffRoomRecords(fieldData).length;
+  const sourceRoomCount = getHandoffRoomRecords(handoffFieldData).length;
   const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
   const previousRoomDetailCount = Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0);
   const previousPhotoDriveUrlCount = Number(previousReceipt.photoDriveUrlCount || previousCounts.photoDriveUrlCount || 0);
@@ -2168,13 +2178,13 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
         photoLogCount: Number(previousReceipt.photoLogCount || previousCounts.photoLogCount || photoRows.length),
         roomDetailCount: Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0)
       }
-    : await createOrUpdateReviewDataSpreadsheet(accessToken, shell.folderId, source, fieldData, photoRows);
+    : await createOrUpdateReviewDataSpreadsheet(accessToken, shell.folderId, source, handoffFieldData, photoRows);
   const rawBackup = canReuseStaticArtifacts
     ? {
         rawJsonId: previousReceipt.rawJsonId || '',
         rawJsonUrl: previousReceipt.rawJsonUrl || previousReceipt.rawReviewDataUrl
       }
-    : await createRawReviewDataBackup(accessToken, shell.backupFolderId, source, fieldData);
+    : await createRawReviewDataBackup(accessToken, shell.backupFolderId, source, handoffFieldData);
   const photoPackage = await createOrRepairPhotoPackage(env, accessToken, shell.photosFolderId, photoRows, {
     copyLimit: Number(body.photoCopyLimit || env.HANDOFF_PHOTO_COPY_LIMIT || HANDOFF_PHOTO_COPY_LIMIT_DEFAULT)
   });
@@ -2189,7 +2199,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       accessToken,
       shell.folderId,
       source,
-      fieldData,
+      handoffFieldData,
       finalizedPhotoRows
     );
   }
@@ -2264,8 +2274,8 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     roomDetailCount: spreadsheet.roomDetailCount,
     sourceRoomCount,
     checksums: {
-      sourceSnapshotHash: stableHash(fieldData.system && fieldData.system.inspectionRecovery),
-      reviewDataHash: stableHash(fieldData),
+      sourceSnapshotHash: stableHash(handoffFieldData.system && handoffFieldData.system.inspectionRecovery),
+      reviewDataHash: stableHash(handoffFieldData),
       photoManifestHash: stableHash(photoRows)
     },
     createdAt: now,
@@ -2447,17 +2457,63 @@ async function ensureTestHandoffShell(env, accessToken, source) {
   };
 }
 
-function buildHandoffSource(inspectionId, fieldData, body) {
+function buildCanonicalAssessmentSource(assessmentRow) {
+  const raw = assessmentRow && isPlainObject(assessmentRow.raw_jsonb)
+    ? structuredClone(assessmentRow.raw_jsonb)
+    : {};
+  const resume = isPlainObject(raw.resumeData) ? structuredClone(raw.resumeData) : {};
+  const source = { ...resume, ...raw };
+  source.stepData = {
+    ...(isPlainObject(resume.stepData) ? resume.stepData : {}),
+    ...(isPlainObject(raw.stepData) ? raw.stepData : {})
+  };
+  source.rooms = Array.isArray(raw.rooms) && raw.rooms.length
+    ? structuredClone(raw.rooms)
+    : (Array.isArray(resume.rooms) ? structuredClone(resume.rooms) : []);
+  delete source.resumeData;
+  return source;
+}
+
+function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
+  const current = isPlainObject(fieldData) ? structuredClone(fieldData) : {};
+  const system = isPlainObject(current.system) ? structuredClone(current.system) : {};
+  const recovery = isPlainObject(system.inspectionRecovery) ? system.inspectionRecovery : {};
+  const canonicalRecovery = {
+    ...structuredClone(recovery),
+    ...structuredClone(canonicalSource),
+    rooms: Array.isArray(source.rooms) ? structuredClone(source.rooms) : [],
+    stepData: isPlainObject(source.stepData) ? structuredClone(source.stepData) : {}
+  };
+  current.rooms = canonicalRecovery.rooms;
+  current.system = { ...system, inspectionRecovery: canonicalRecovery };
+  return current;
+}
+
+function buildHandoffSource(inspectionId, fieldData, body, canonicalSource = {}) {
   const recovery = fieldData.system && isPlainObject(fieldData.system.inspectionRecovery)
     ? fieldData.system.inspectionRecovery
     : {};
   const reviewedData = isPlainObject(body.reviewedData) ? body.reviewedData : {};
   const source = {
     ...recovery,
+    ...canonicalSource,
     ...fieldData,
     ...reviewedData,
     ...body,
     inspectionId
+  };
+  source.rooms = Array.isArray(canonicalSource.rooms) && canonicalSource.rooms.length
+    ? structuredClone(canonicalSource.rooms)
+    : (Array.isArray(fieldData.rooms) && fieldData.rooms.length
+        ? structuredClone(fieldData.rooms)
+        : (Array.isArray(reviewedData.rooms) && reviewedData.rooms.length
+            ? structuredClone(reviewedData.rooms)
+            : (Array.isArray(body.rooms) && body.rooms.length
+                ? structuredClone(body.rooms)
+                : (Array.isArray(recovery.rooms) ? structuredClone(recovery.rooms) : []))));
+  source.stepData = {
+    ...(isPlainObject(recovery.stepData) ? recovery.stepData : {}),
+    ...(isPlainObject(canonicalSource.stepData) ? canonicalSource.stepData : {})
   };
   source.system = {
     ...(isPlainObject(fieldData.system) ? fieldData.system : {}),

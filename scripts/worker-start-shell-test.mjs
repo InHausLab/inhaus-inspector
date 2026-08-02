@@ -1274,6 +1274,17 @@ async function testHandoffJobCreatesPackageReceipt() {
     system: { startInspectionShell: shellReceipt }
   };
   const { mockFetch, state } = makeMockFetch({
+    assessmentRows: [{
+      inspection_id: 'INH-20260801-HAND01',
+      assessment_num: '018',
+      status: 'In Review',
+      drive_folder_id: 'drive-assessment',
+      assessment_folder_url: 'https://drive.google.com/drive/folders/drive-assessment',
+      raw_jsonb: {
+        inspectionId: 'INH-20260801-HAND01',
+        rooms: [{ name: 'Kitchen', inspectorNotes: 'Canonical assessment note.', photoIds: ['photo-1'] }]
+      }
+    }],
     reviewRow: {
       inspection_id: 'INH-20260801-HAND01',
       field_data: fieldData,
@@ -1316,6 +1327,10 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(data.artifactReceipt.rawJsonUrl, 'receipt has raw JSON backup');
   assert(data.artifactReceipt.photoLogCount === 2, 'receipt counts photo log rows');
   assert(data.artifactReceipt.roomDetailCount === 1, 'receipt counts room detail rows');
+  assert(
+    hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Canonical assessment note.']),
+    `room details use canonical assessment data over stale review rooms: ${JSON.stringify(sheetRowsForTab(state, 'Room Details'))}`
+  );
   assert(data.artifactReceipt.photoFolderLinkedCount === 2, 'receipt links existing Drive photos');
   assert(data.artifactReceipt.photoFolderOperationLimit === 5, 'receipt records conservative default photo operation batch limit');
   assert(state.driveFolderLists.some(list => list.parentId === 'drive-photos'), 'lists Photos folder once for package repair');
@@ -1335,7 +1350,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(sheetDataRowsForTab(state, 'Photo Log').length === 2, 'photo log has one row per photo');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-1', 'Kitchen', 'ATP Before', 'Before photo', 'https://drive.google.com/file/d/drive-photo-1/view']), 'photo log includes first photo details');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-2', 'Kitchen', 'ATP After', 'After photo', 'https://drive.google.com/file/d/drive-photo-2/view']), 'photo log includes second photo details');
-  assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Observed staining.', 'photo-1, photo-2']), 'room details include inspector notes and every assigned room photo ID');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Canonical assessment note.', 'photo-1, photo-2']), 'room details include canonical inspector notes and every assigned room photo ID');
   assert(state.rawUploads.length === 1, 'writes raw JSON backup file');
   assert(state.rawUploads[0].bodyText.includes('"obs_6_note": "Sixth observation"'), 'raw JSON backup includes late observation key');
   assert(state.rawUploads[0].bodyText.includes('"actionTaken_1_desc": "Cleaned test surface"'), 'raw JSON backup includes action-taken key');
