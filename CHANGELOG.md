@@ -6,6 +6,20 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v232 — Final Submission Starts Tanner Handoff
+**Date:** August 3, 2026
+
+- Final submission now requests the retryable Worker handoff job after the authoritative cloud save succeeds and before the app reports success.
+- The app records the accepted handoff receipt and distinguishes a queued Tanner package from a package that is already ready.
+- A failed or unconfirmed handoff request now keeps submission in the failed state instead of incorrectly reporting that the workflow is complete.
+
+## v231 — Mobile Walkthrough Navigation Corrections
+**Date:** August 3, 2026
+
+- Kept all four development navigation controls visible at phone width during controlled walkthroughs.
+- Automatically scrolls the active inspection phase and active room substep into view on mobile.
+- Verified every inspection screen at the production mobile viewport before the final-submission handoff correction.
+
 ## v230 — Feedback Workflow Corrections
 **Date:** August 2, 2026
 

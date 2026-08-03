@@ -53,6 +53,14 @@ test('Drive photo packaging belongs to the retryable Worker handoff', () => {
   assert.doesNotMatch(photoClient, /workerUrl\('\/mirror'\)/);
 });
 
+test('final app submission queues the Tanner handoff before reporting success', () => {
+  assert.match(sync, /await requestTannerHandoff\(exportData\)/);
+  assert.match(sync, /PHOTO_WORKER_URL \+ '\/handoff-jobs'/);
+  assert.match(sync, /Authorization: 'Bearer ' \+ FIELD_RESUME_TOKEN/);
+  assert.match(sync, /inspector-app-final-submit/);
+  assert.match(sync, /Cloud save verified; Tanner package queued/);
+});
+
 test('final app verification requires the real assessment row and Supabase originals', () => {
   assert.match(worker, /const assessmentExists = await assessmentExistsForInspection\(env, inspectionId\)/);
   assert.match(sync, /status\.complete !== true \|\| status\.assessmentExists !== true/);

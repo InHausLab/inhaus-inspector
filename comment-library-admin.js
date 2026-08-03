@@ -1,4 +1,4 @@
-import { cloudFetch } from './sync.js?v=231';
+import { cloudFetch } from './sync.js?v=232';
 
 const tokenInput = document.getElementById('admin-token');
 const loadButton = document.getElementById('load-library');
@@ -24,7 +24,7 @@ function el(tag, attrs, children) {
 
 function setStatus(message, error) {
   statusEl.textContent = message;
-  statusEl.style.color = error ? '#b42318' : '';
+  statusEl.style.color = error ? '#b42328' : '';
 }
 
 async function loadLibrary() {

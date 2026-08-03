@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=231';
-import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=231';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=232';
+import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=232';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=231';
-import { scheduleSave } from './storage.js?v=231';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=231';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=231';
+         getBestCloudSyncAt } from './state.js?v=232';
+import { scheduleSave } from './storage.js?v=232';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=232';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=232';
 
 const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
 const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
@@ -560,7 +560,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=231');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=232');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {
@@ -902,15 +902,21 @@ export async function submitInspection(exportData, stepList) {
       }
     }
     await sendInspectionToCloud(exportData);
+    const handoffJob = await requestTannerHandoff(exportData);
     await window.DB.removeFromQueue(exportData.inspectionId);
     setLastSuccessfulCloudSyncAt(Date.now()); // Change 1
     const inspection = getInspection();
     if (inspection) {
       inspection._lastFinalSyncError = '';
+      inspection._handoffJob = handoffJob;
+      inspection._handoffRequestedAt = new Date().toISOString();
       scheduleSave();
     }
     updateSyncStatus('synced'); // Change 2
-    showUploadBanner('success', '\u2713 Cloud save verified');
+    const handoffStatus = String(handoffJob.status || '').toLowerCase();
+    showUploadBanner('success', handoffStatus === 'ready'
+      ? '\u2713 Tanner package ready'
+      : '\u2713 Cloud save verified; Tanner package queued');
     // Auto-disable Dev Mode after successful final sync
     if (localStorage.getItem('inhausDevMode') === 'true') {
       localStorage.setItem('inhausDevMode', 'false');
@@ -936,4 +942,52 @@ export async function submitInspection(exportData, stepList) {
     );
     return false;
   }
+}
+
+async function requestTannerHandoff(exportData) {
+  const inspectionId = String(exportData && exportData.inspectionId || '').trim();
+  if (!inspectionId) throw new Error('Tanner package request is missing the inspection ID.');
+  const activeInspection = getInspection() || {};
+  const isTestTraining = isTestTrainingInspection(activeInspection) || isTestTrainingInspection(exportData);
+  const response = await fetchWithTimeout(PHOTO_WORKER_URL + '/handoff-jobs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + FIELD_RESUME_TOKEN
+    },
+    body: JSON.stringify({
+      inspectionId,
+      requestedBy: 'inspector-app-final-submit',
+      runInline: false,
+      reviewedData: {
+        assessmentType: isTestTraining ? 'Test / Training' : (exportData.assessmentType || ''),
+        isTestTraining,
+        clientName: exportData.clientName || '',
+        propertyAddress: exportData.propertyAddress || '',
+        inspectionDate: exportData.inspectionDate || '',
+        inspectorName: exportData.inspectorName || ''
+      },
+      submitAttempt: {
+        requestedAt: new Date().toISOString(),
+        completedAt: exportData.completedAt || exportData.endedAt || '',
+        expectedPhotoCount: extractAllPhotosFromExport(exportData).length
+      }
+    })
+  }, CLOUD_POST_TIMEOUT_MS, 'Tanner package request');
+  const responseText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (err) {
+    throw new Error('Tanner package service returned invalid JSON.');
+  }
+  if (!response.ok || !data || data.error) {
+    throw new Error((data && (data.message || data.error)) ||
+      'Tanner package request failed with HTTP ' + response.status + '.');
+  }
+  const status = String(data.status || '').trim().toLowerCase();
+  if (!['queued', 'running', 'repairing', 'ready', 'complete', 'completed'].includes(status)) {
+    throw new Error('Tanner package request was not accepted: ' + (status || 'missing status'));
+  }
+  return data;
 }
