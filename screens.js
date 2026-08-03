@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=230';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=230';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=230';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=230';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=230';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=230';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=231';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=231';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=231';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=231';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=231';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=231';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=230';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=230';
-import { updatePhotoMetadata } from './supabase-photos.js?v=230';
-import { FIELD_RESUME_TOKEN } from './config.js?v=230';
+} from './findings.js?v=231';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=231';
+import { updatePhotoMetadata } from './supabase-photos.js?v=231';
+import { FIELD_RESUME_TOKEN } from './config.js?v=231';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=230';
+} from './comment-library.js?v=231';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -2158,6 +2158,12 @@ export function renderStep() {
       subNav.appendChild(addBtn);
     }
     c.appendChild(subNav);
+    requestAnimationFrame(() => {
+      const activeButton = subNav.querySelector('.sub-nav-btn.active');
+      if (!activeButton) return;
+      subNav.scrollLeft = Math.max(0,
+        activeButton.offsetLeft - ((subNav.clientWidth - activeButton.offsetWidth) / 2));
+    });
   }
 
   // Back to page 1 (edit intake) button
@@ -2391,7 +2397,9 @@ export function renderStep() {
       saveNow().then(() => { ctx.render(); window.scrollTo(0, 0); });
     }}, 'Skip \u23e9'));
   }
-  const nav = ui().el('div', { className: 'bottom-nav' }, navButtons);
+  const nav = ui().el('div', {
+    className: 'bottom-nav' + (isDevMode() ? ' dev-bottom-nav' : '')
+  }, navButtons);
   c.appendChild(nav);
   ctx.root.appendChild(c);
 

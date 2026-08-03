@@ -1243,6 +1243,24 @@ body {
 @media (max-width: 420px) {
   html { font-size: 18px; }
   .btn-nav { min-width: 110px; font-size: 1rem; padding: 14px 16px; }
+  .bottom-nav.dev-bottom-nav {
+    gap: 6px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .bottom-nav.dev-bottom-nav > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .bottom-nav.dev-bottom-nav .btn {
+    font-size: 0.78rem;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .bottom-nav.dev-bottom-nav .btn-home {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
 }
 
 /* ── Room Navigation Drawer ──────────────── */

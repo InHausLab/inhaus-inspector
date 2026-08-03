@@ -2878,6 +2878,12 @@
     nameBarChildren.push(el('span', null, stepName || ''));
     const nameBar = el('div', { className: 'step-name-bar' }, nameBarChildren);
     const wrapper = el('div', { className: 'progress-wrapper' }, [bar, nameBar]);
+    requestAnimationFrame(() => {
+      const activeDot = bar.querySelector('.phase-dot.active');
+      if (!activeDot) return;
+      bar.scrollLeft = Math.max(0,
+        activeDot.offsetLeft - ((bar.clientWidth - activeDot.offsetWidth) / 2));
+    });
     return wrapper;
   }
 

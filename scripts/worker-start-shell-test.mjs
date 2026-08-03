@@ -726,7 +726,7 @@ async function testAppFeedbackUsesSupabaseAndTracker() {
         inspectionId: 'INH-20260801-FEEDBACK01',
         inspectorName: 'Codex QA',
         screen: 'cloud-resume',
-        appVersion: 'v230',
+        appVersion: 'v231',
         online: true
       }
     }

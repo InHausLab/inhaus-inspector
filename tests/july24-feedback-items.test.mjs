@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const steps = readFileSync(new URL('../steps.js', import.meta.url), 'utf8');
 const screens = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../ui.js', import.meta.url), 'utf8');
+const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
 test('precheck lets the inspector add or remove tests on site', () => {
   assert.match(screens, /Add or remove tests for this inspection/);
@@ -42,4 +43,11 @@ test('shipping tracking numbers can be scanned from a label and corrected', () =
   assert.match(steps, /Preserve every letter and digit exactly/);
   assert.match(ui, /const scanPrompt = f\.prompt/);
   assert.match(ui, /renderField\(subField, data/);
+});
+
+test('mobile navigation keeps the active phase and room controls visible', () => {
+  assert.match(screens, /className: 'bottom-nav' \+ \(isDevMode\(\) \? ' dev-bottom-nav' : ''\)/);
+  assert.match(styles, /\.bottom-nav\.dev-bottom-nav > \*/);
+  assert.match(screens, /activeButton\.offsetLeft - \(\(subNav\.clientWidth - activeButton\.offsetWidth\) \/ 2\)/);
+  assert.match(ui, /activeDot\.offsetLeft - \(\(bar\.clientWidth - activeDot\.offsetWidth\) \/ 2\)/);
 });
