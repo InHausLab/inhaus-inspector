@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v233 — Lock Assessment Type After Shell Creation
+**Date:** August 3, 2026
+
+- The inspection type becomes read-only as soon as its assessment shell is ready, preventing a real assessment number, Drive folder, or tracker row from later being relabeled as Test / Training.
+- The Worker rejects conflicting start-shell, checkpoint, and team-merge payloads before writing events or canonical inspection data.
+- Worker responses now preserve intentional HTTP conflict status codes so the app receives a stable classification-lock error instead of a generic server failure.
+
 ## v232 — Final Submission Starts Tanner Handoff
 **Date:** August 3, 2026
 

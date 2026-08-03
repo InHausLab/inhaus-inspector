@@ -22,6 +22,7 @@ const {
 
 const screensSource = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 const syncSource = readFileSync(new URL('../sync.js', import.meta.url), 'utf8');
+const uiSource = readFileSync(new URL('../ui.js', import.meta.url), 'utf8');
 
 test('active cloud continue list excludes completed review inspections by default', () => {
   assert.equal(isContinuableCloudInspection({ status: 'prepared' }), true);
@@ -105,6 +106,15 @@ test('checkpoint payload preserves test training classification from the local i
   assert.match(attachShell, /isTestTrainingInspection\(inspection\)/);
   assert.match(attachShell, /exportData\.isTestTraining = true/);
   assert.match(attachShell, /exportData\.is_test = true/);
+});
+
+test('assessment type is immutable after the assessment shell is ready', () => {
+  assert.match(screensSource, /function lockedAssessmentTypeForInspection\(inspection\)/);
+  assert.match(screensSource, /receipt\.isTestTraining === true \|\| trackerStatus === 'skipped_test_training'/);
+  assert.match(screensSource, /disabled: !!lockedAssessmentType/);
+  assert.match(screensSource, /applyLockedAssessmentType\(data, lockedAssessmentType\)/);
+  assert.match(uiSource, /if \(opts\.disabled\) sel\.disabled = true/);
+  assert.match(uiSource, /f\.choices, f\)/);
 });
 
 test('advanced smoke shortcut creates a test pickup without walking every intake field', () => {

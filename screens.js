@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=232';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=232';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=232';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=232';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=232';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=232';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=233';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=233';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=233';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=233';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=233';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=233';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=232';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=232';
-import { updatePhotoMetadata } from './supabase-photos.js?v=232';
-import { FIELD_RESUME_TOKEN } from './config.js?v=232';
+} from './findings.js?v=233';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=233';
+import { updatePhotoMetadata } from './supabase-photos.js?v=233';
+import { FIELD_RESUME_TOKEN } from './config.js?v=233';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=232';
+} from './comment-library.js?v=233';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1441,6 +1441,33 @@ const OFFICE_PREP_FIELDS = [
 
 const ASSESSMENT_TYPE_OPTIONS = ['Home Health Assessment', 'Test / Training'];
 
+function lockedAssessmentTypeForInspection(inspection) {
+  if (!inspection) return '';
+  const receipt = inspection._startInspectionShellReceipt ||
+    inspection.startInspectionShell ||
+    inspection.system?.startInspectionShell;
+  if (!receipt) return '';
+  const status = String(receipt.shellStatus || receipt.status || inspection._startInspectionShellStatus || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  if (status !== 'ready' && status !== 'skipped_test_training') return '';
+  const trackerStatus = String(receipt.trackerStatus || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return receipt.isTestTraining === true || trackerStatus === 'skipped_test_training'
+    ? 'Test / Training'
+    : 'Home Health Assessment';
+}
+
+function applyLockedAssessmentType(target, assessmentType) {
+  if (!target || !assessmentType) return;
+  const isTestTraining = assessmentType === 'Test / Training';
+  target.assessmentType = assessmentType;
+  target.isTestTraining = isTestTraining;
+  target.isTest = isTestTraining;
+  target.is_test = isTestTraining;
+  target.testTraining = isTestTraining;
+}
+
 function applyOfficePreparation(inspection, data) {
   ensureInspectionWorkspace(inspection);
   inspection.requiredTests = Array.isArray(data.requiredTests) ? data.requiredTests.slice() : [];
@@ -1475,6 +1502,7 @@ function intakeValuesOnly(data) {
 export function renderIntake() {
   const isPrepare = _intakeMode === 'prepare';
   const isEdit = !!ctx.inspection;
+  const lockedAssessmentType = isEdit ? lockedAssessmentTypeForInspection(ctx.inspection) : '';
   const existingDevice = ctx.inspection?.stepData?.['device-setup'] || {};
   const existingWater = ctx.inspection?.stepData?.['water-sample'] || {};
   const data = isEdit ? {
@@ -1535,6 +1563,7 @@ export function renderIntake() {
     officePrepNotes: '',
     teamInspectorNames: ''
   };
+  if (lockedAssessmentType) applyLockedAssessmentType(data, lockedAssessmentType);
 
   const c = ui().el('div', { className: 'screen' });
   c.appendChild(buildAppHeader(isPrepare ? 'Office Inspection Preparation' : (isEdit ? 'Edit Intake Details' : 'Customer & Property Intake')));
@@ -1550,7 +1579,7 @@ export function renderIntake() {
   const card = ui().el('div', { className: 'card' });
   const fields = [
     { ...text('inspectionId', 'Inspection ID'), disabled: true },
-    sel('assessmentType', 'Assessment Type *', ASSESSMENT_TYPE_OPTIONS),
+    sel('assessmentType', 'Assessment Type *', ASSESSMENT_TYPE_OPTIONS, { disabled: !!lockedAssessmentType }),
     text('inspectorName', 'Inspector Name *'),
     text('inspectorEmail', 'Inspector Email'),
     date('inspectionDate', 'Inspection Date'),
@@ -1615,6 +1644,7 @@ export function renderIntake() {
   } }, isPrepare ? '\u2190 Home' : (isEdit ? '\u2190 Back to Steps' : '\u2190 Back'));
 
   const submitBtn = ui().el('button', { className: 'btn btn-primary btn-nav', onClick: async () => {
+      if (lockedAssessmentType) applyLockedAssessmentType(data, lockedAssessmentType);
       const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms'];
       const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
       if (!data.waterSource || (Array.isArray(data.waterSource) ? data.waterSource.length === 0 : !data.waterSource)) missing.push('waterSource');

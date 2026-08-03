@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w28';
+const WORKER_VERSION = 'handoff-w29';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 
 export default {
@@ -70,7 +70,11 @@ export default {
       if (url.pathname === '/submit-smoke' && request.method === 'GET') return await handleSubmitSmoke(request, url, env);
       return json({ error: 'not_found' }, 404);
     } catch (err) {
-      return json({ error: err && err.message ? err.message : String(err) }, 500);
+      const status = Number(err && err.statusCode);
+      return json(
+        { error: err && err.message ? err.message : String(err) },
+        Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500
+      );
     }
   },
 
@@ -541,12 +545,13 @@ async function handleInspectionSave(request, env) {
   const inspectionId = cleanId(source.inspectionId || source.id, 'inspectionId');
   source.inspectionId = inspectionId;
   source.id = source.id || inspectionId;
+  const shell = await getStartInspectionShellState(env, inspectionId);
+  assertAssessmentClassificationMatchesShell(shell, source);
   await recordInspectionSyncEvent(env, inspectionId, source, {
     eventType: body.eventType || (body.final === true ? 'final' : 'checkpoint'),
     sourceDevice: inspectionSourceDevice(source)
   });
-  const row = await saveInspectionAssessment(env, source);
-  const shell = await getStartInspectionShellState(env, inspectionId);
+  const row = await saveInspectionAssessment(env, source, null, shell);
   return json(inspectionSaveReceipt(source, row, shell));
 }
 
@@ -559,6 +564,8 @@ async function handleInspectionTeamMerge(request, env) {
   const inspectionId = cleanId(incomingResume.inspectionId || incoming.inspectionId || body.inspectionId, 'inspectionId');
   incoming.inspectionId = inspectionId;
   incoming.id = incoming.id || inspectionId;
+  const shell = await getStartInspectionShellState(env, inspectionId);
+  assertAssessmentClassificationMatchesShell(shell, incoming);
   await recordInspectionSyncEvent(env, inspectionId, incoming, {
     eventType: 'team_merge',
     sourceDevice: inspectionSourceDevice(incomingResume)
@@ -580,7 +587,7 @@ async function handleInspectionTeamMerge(request, env) {
     mergedResume.collaboration.serverMergedAt = mergedResume._serverMergedAt;
   }
   merged.resumeData = mergedResume;
-  await saveInspectionAssessment(env, merged, existingRow);
+  await saveInspectionAssessment(env, merged, existingRow, shell);
   return json({
     status: 'ok',
     merged: true,
@@ -739,13 +746,18 @@ async function getAssessmentRow(env, inspectionId) {
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
-async function saveInspectionAssessment(env, source, knownRow = null) {
+async function saveInspectionAssessment(env, source, knownRow = null, knownShell = null) {
   const inspectionId = cleanId(source.inspectionId || source.id, 'inspectionId');
   const row = knownRow || await getAssessmentRow(env, inspectionId);
+  const shell = knownShell || await getStartInspectionShellState(env, inspectionId);
+  const lockedClassification = shellAssessmentClassification(shell);
+  if (lockedClassification) {
+    source = withAssessmentClassification(source, lockedClassification);
+  }
   const resume = isPlainObject(source.resumeData) ? source.resumeData : source;
-  const shell = await getStartInspectionShellState(env, inspectionId);
   const payloadShell = isPlainObject(source.startInspectionShell) ? source.startInspectionShell : null;
-  const isTestTraining = isTestTrainingInspection(source) ||
+  const isTestTraining = lockedClassification === 'test' ||
+    isTestTrainingInspection(source) ||
     isTestTrainingInspection(resume) ||
     isTestTrainingInspection(shell) ||
     isTestTrainingInspection(payloadShell);
@@ -1076,19 +1088,21 @@ async function handleStartInspectionShell(request, env) {
 
   const inspectionId = cleanId(body.inspectionId || body.id, 'inspectionId');
   const existing = await getStartInspectionShellState(env, inspectionId);
-  if (isTestTrainingInspection(body)) {
-    if (existing && existing.status === 'ready' && existing.isTestTraining === true && existing.folderId) {
+  assertAssessmentClassificationMatchesShell(existing, body);
+  if (startInspectionShellIsReady(existing)) {
+    if (existing.isTestTraining === true && existing.folderId) {
       return json({ ...existing, cached: true });
     }
+    if (existing.isTestTraining !== true && existing.folderId && existing.trackerRow && existing.trackerUrl) {
+      return json({ ...existing, cached: true });
+    }
+  }
+  if (isTestTrainingInspection(body)) {
     const accessToken = await getGoogleAccessToken(env);
     const receipt = await ensureTestHandoffShell(env, accessToken, { ...body, inspectionId });
     await upsertAssessmentShellRecord(env, { ...body, inspectionId }, receipt);
     await saveStartInspectionShellState(env, inspectionId, receipt);
     return json(receipt);
-  }
-
-  if (existing && existing.status === 'ready' && existing.folderId && existing.trackerRow && existing.trackerUrl) {
-    return json({ ...existing, cached: true });
   }
 
   const trackerSheetId = String(env.REPORT_TRACKER_SHEET_ID || body.reportTrackerSheetId || '').trim();
@@ -3521,6 +3535,67 @@ function isTestTrainingInspection(source) {
     source.assessmentType
   ].filter(Boolean).join(' ');
   return /(^|\b)(test|training|practice|demo)(\b|$)/i.test(explicit);
+}
+
+function explicitAssessmentClassification(source) {
+  if (!isPlainObject(source)) return '';
+  const candidates = [source];
+  if (isPlainObject(source.resumeData)) candidates.push(source.resumeData);
+  if (candidates.some(candidate => isTestTrainingInspection(candidate))) return 'test';
+  const explicitType = candidates.map(candidate => firstNonEmpty(
+    candidate.assessmentType,
+    candidate.inspectionType
+  )).find(Boolean);
+  return explicitType ? 'real' : '';
+}
+
+function normalizeClassificationStatus(value) {
+  return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function startInspectionShellIsReady(shell) {
+  if (!isPlainObject(shell)) return false;
+  const status = normalizeClassificationStatus(shell.shellStatus || shell.status || '');
+  return status === 'ready' || status === 'skipped_test_training';
+}
+
+function shellAssessmentClassification(shell) {
+  if (!startInspectionShellIsReady(shell)) return '';
+  if (shell.isTestTraining === true || normalizeClassificationStatus(shell.trackerStatus) === 'skipped_test_training') {
+    return 'test';
+  }
+  return 'real';
+}
+
+function assessmentClassificationLabel(classification) {
+  return classification === 'test' ? 'Test / Training' : 'Home Health Assessment';
+}
+
+function assertAssessmentClassificationMatchesShell(shell, source) {
+  const locked = shellAssessmentClassification(shell);
+  const requested = explicitAssessmentClassification(source);
+  if (!locked || !requested || locked === requested) return locked || requested;
+  const error = new Error(
+    `assessment_type_locked_after_shell:expected_${locked}:received_${requested}`
+  );
+  error.statusCode = 409;
+  throw error;
+}
+
+function withAssessmentClassification(source, classification) {
+  const normalized = isPlainObject(source) ? structuredClone(source) : {};
+  const isTestTraining = classification === 'test';
+  const apply = target => {
+    if (!isPlainObject(target)) return;
+    target.assessmentType = assessmentClassificationLabel(classification);
+    target.isTestTraining = isTestTraining;
+    target.isTest = isTestTraining;
+    target.is_test = isTestTraining;
+    target.testTraining = isTestTraining;
+  };
+  apply(normalized);
+  apply(normalized.resumeData);
+  return normalized;
 }
 
 function generateAssessmentFolderName(assessmentNumber, source) {

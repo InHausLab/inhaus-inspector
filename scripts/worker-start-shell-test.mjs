@@ -634,7 +634,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w28', 'health exposes Worker version');
+  assert(data.version === 'handoff-w29', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -726,7 +726,7 @@ async function testAppFeedbackUsesSupabaseAndTracker() {
         inspectionId: 'INH-20260801-FEEDBACK01',
         inspectorName: 'Codex QA',
         screen: 'cloud-resume',
-        appVersion: 'v232',
+        appVersion: 'v233',
         online: true
       }
     }
@@ -846,6 +846,165 @@ async function testTrainingCreatesTestArtifactsOnly() {
   assert(state.assessmentWrites[0].inspection_id === 'INH-TRAINING-001', 'training parent row matches inspection ID');
   assert(state.assessmentWrites[0].assessment_num === 'INH-TRAINING-001', 'training parent row uses inspection ID instead of a real number');
   assert(state.reviewWrites.length === 1, 'training route saves ready receipt');
+}
+
+async function testRealShellRejectsLaterTrainingClassification() {
+  const inspectionId = 'INH-LOCKED-REAL01';
+  const { mockFetch, state } = makeMockFetch();
+  const first = await callWorker('/start-inspection-shell', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    assessmentType: 'Home Health Assessment',
+    clientName: 'Locked Real Client',
+    propertyAddress: '20 Main St, Basalt CO',
+    inspectionDate: '2026-08-03'
+  }, baseEnv(), mockFetch);
+  assert(first.response.status === 200, 'real shell setup succeeds');
+  const reservationCount = state.assessmentReservations.length;
+  const trackerUpdateCount = state.trackerUpdates.length;
+  const driveCreateCount = state.driveCreates.length;
+
+  const second = await callWorker('/start-inspection-shell', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    assessmentType: 'Test / Training',
+    isTestTraining: true,
+    clientName: 'Locked Real Client',
+    propertyAddress: '20 Main St, Basalt CO',
+    inspectionDate: '2026-08-03'
+  }, baseEnv(), mockFetch);
+
+  assert(second.response.status === 409, 'real shell rejects later training classification');
+  assert(/assessment_type_locked_after_shell/.test(second.data.error || ''), 'classification rejection has stable error code');
+  assert(state.assessmentReservations.length === reservationCount, 'classification rejection does not reserve another number');
+  assert(state.trackerUpdates.length === trackerUpdateCount, 'classification rejection does not alter the tracker');
+  assert(state.driveCreates.length === driveCreateCount, 'classification rejection does not create a test folder');
+}
+
+async function testTrainingShellRejectsLaterRealClassification() {
+  const inspectionId = 'INH-LOCKED-TRAIN01';
+  const { mockFetch, state } = makeMockFetch();
+  const first = await callWorker('/start-inspection-shell', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    assessmentType: 'Test / Training',
+    isTestTraining: true,
+    clientName: 'Locked Training Client',
+    propertyAddress: '21 Practice Way, Basalt CO',
+    inspectionDate: '2026-08-03'
+  }, baseEnv(), mockFetch);
+  assert(first.response.status === 200, 'training shell setup succeeds');
+
+  const second = await callWorker('/start-inspection-shell', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    assessmentType: 'Home Health Assessment',
+    clientName: 'Locked Training Client',
+    propertyAddress: '21 Practice Way, Basalt CO',
+    inspectionDate: '2026-08-03'
+  }, baseEnv(), mockFetch);
+
+  assert(second.response.status === 409, 'training shell rejects later real classification');
+  assert(state.assessmentReservations.length === 0, 'classification rejection does not consume a real number');
+  assert(state.trackerUpdates.length === 0, 'classification rejection does not create a tracker row');
+}
+
+async function testInspectionSaveRejectsClassificationChangeBeforeEventWrite() {
+  const inspectionId = 'INH-LOCKED-SAVE01';
+  const { mockFetch, state } = makeMockFetch({
+    assessmentRows: [{
+      inspection_id: inspectionId,
+      assessment_num: '020',
+      status: 'In Progress',
+      drive_folder_id: 'drive-real-shell',
+      assessment_folder_url: 'https://drive.google.com/drive/folders/drive-real-shell',
+      raw_jsonb: { assessmentType: 'Home Health Assessment' }
+    }],
+    reviewRow: {
+      inspection_id: inspectionId,
+      field_data: {
+        system: {
+          startInspectionShell: {
+            status: 'ready',
+            shellStatus: 'ready',
+            isTestTraining: false,
+            assessmentNumber: '020',
+            folderId: 'drive-real-shell',
+            trackerRow: 28,
+            trackerUrl: 'https://docs.google.com/spreadsheets/d/tracker-sheet/edit#range=A28',
+            trackerStatus: 'In Progress'
+          }
+        }
+      },
+      updated_at: '2026-08-03T18:00:00.000Z'
+    }
+  });
+  const result = await callWorker('/inspections/save', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    assessmentType: 'Test / Training',
+    isTestTraining: true,
+    resumeData: {
+      inspectionId,
+      assessmentType: 'Test / Training',
+      isTestTraining: true,
+      status: 'in-progress'
+    }
+  }, baseEnv(), mockFetch);
+
+  assert(result.response.status === 409, 'checkpoint rejects a post-shell classification change');
+  assert(state.inspectionEventWrites.length === 0, 'rejected classification is not written to sync history');
+  assert(state.assessmentWrites.length === 0, 'rejected classification does not overwrite the assessment row');
+}
+
+async function testInspectionTeamMergeRejectsClassificationChangeBeforeEventWrite() {
+  const inspectionId = 'INH-LOCKED-MERGE01';
+  const { mockFetch, state } = makeMockFetch({
+    assessmentRows: [{
+      inspection_id: inspectionId,
+      assessment_num: '020',
+      status: 'In Progress',
+      drive_folder_id: 'drive-real-shell',
+      assessment_folder_url: 'https://drive.google.com/drive/folders/drive-real-shell',
+      raw_jsonb: { assessmentType: 'Home Health Assessment' }
+    }],
+    reviewRow: {
+      inspection_id: inspectionId,
+      field_data: {
+        system: {
+          startInspectionShell: {
+            status: 'ready',
+            shellStatus: 'ready',
+            isTestTraining: false,
+            assessmentNumber: '020',
+            folderId: 'drive-real-shell',
+            trackerRow: 28,
+            trackerUrl: 'https://docs.google.com/spreadsheets/d/tracker-sheet/edit#range=A28',
+            trackerStatus: 'In Progress'
+          }
+        }
+      },
+      updated_at: '2026-08-03T18:00:00.000Z'
+    }
+  });
+  const result = await callWorker('/inspections/team-merge', {
+    sharedSecret: 'upload-secret',
+    inspection: {
+      inspectionId,
+      assessmentType: 'Test / Training',
+      isTestTraining: true,
+      resumeData: {
+        inspectionId,
+        assessmentType: 'Test / Training',
+        isTestTraining: true,
+        status: 'in-progress'
+      }
+    }
+  }, baseEnv(), mockFetch);
+
+  assert(result.response.status === 409, 'team merge rejects a post-shell classification change');
+  assert(state.inspectionEventWrites.length === 0, 'rejected team classification is not written to sync history');
+  assert(state.assessmentWrites.length === 0, 'rejected team classification does not overwrite the assessment row');
 }
 
 async function testInspectionSaveCreatesDurableCheckpoint() {
@@ -2830,7 +2989,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w28', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w29', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
@@ -2895,6 +3054,10 @@ const tests = [
   testCommentLibraryCandidateAndAdminFlow,
   testSignRouteDoesNotCreateAssessmentParentRow,
   testTrainingCreatesTestArtifactsOnly,
+  testRealShellRejectsLaterTrainingClassification,
+  testTrainingShellRejectsLaterRealClassification,
+  testInspectionSaveRejectsClassificationChangeBeforeEventWrite,
+  testInspectionTeamMergeRejectsClassificationChangeBeforeEventWrite,
   testInspectionSaveCreatesDurableCheckpoint,
   testTrainingCheckpointUsesReadyShellClassification,
   testActiveInspectionListUsesCanonicalSupabaseRows,

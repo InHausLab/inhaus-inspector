@@ -643,10 +643,12 @@
   }
 
   // ── Field: Select ──────────────────────────────────────────
-  function renderSelect(key, label, value, onChange, choices) {
+  function renderSelect(key, label, value, onChange, choices, opts) {
+    opts = opts || {};
     const g = el('div', { className: 'field-group' });
     g.appendChild(el('label', { className: 'field-label' }, label));
     const sel = el('select', { className: 'field-select', 'data-field-key': key });
+    if (opts.disabled) sel.disabled = true;
     sel.appendChild(el('option', { value: '' }, '-- Select --'));
     choices.forEach(c => {
       const opt = el('option', { value: typeof c === 'string' ? c : c.value }, typeof c === 'string' ? c : c.label);
@@ -2609,7 +2611,7 @@
       case 'textarea': return renderTextarea(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);
       case 'number': return renderNumber(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f);
       case 'date': return renderDate(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); });
-      case 'select': return renderSelect(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f.choices);
+      case 'select': return renderSelect(f.key, f.label, data[f.key], v => { data[f.key] = v; changed(); }, f.choices, f);
       case 'inspection-room-select': {
         const choices = [];
         const seen = new Set();
