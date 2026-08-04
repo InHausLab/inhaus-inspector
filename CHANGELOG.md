@@ -6,6 +6,16 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v234 — August 4 Field Feedback Corrections
+**Date:** August 4, 2026
+
+- Added a required Boulder Blue fan placement photo at the selected test location.
+- Consolidated PFAS kit and sample identification into one shared value across preparation, device setup, export, and water collection.
+- Renamed the full water panel workflow to Safe Home Premium Water Test and made its sample-label scanner explicit.
+- Added required photo prompts for each selected heating and cooling system and made the HVAC scanner identify the selected equipment.
+- Raised the annotation editor above the fixed app navigation so Undo and Clear All remain usable on phones.
+- Added automatic pending-photo upload progress and a manual retry action to Final Review.
+
 ## v233 — Lock Assessment Type After Shell Creation
 **Date:** August 3, 2026
 

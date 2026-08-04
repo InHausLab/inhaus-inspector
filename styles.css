@@ -1610,7 +1610,7 @@ body {
 .annot-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 20000;
   background: #1a1a1a;
   display: flex;
   flex-direction: column;

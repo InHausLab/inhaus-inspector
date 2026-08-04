@@ -5,7 +5,7 @@ import { getInspection } from './state.js?v=233';
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
   'Boulder Blue allergen filter',
-  'Water panel',
+  'Safe Home premium water test',
   'PFAS water test',
   'Microplastics water test',
   'Radon monitor',
@@ -16,6 +16,10 @@ export const REQUIRED_TEST_OPTIONS = [
 export function deriveRequiredTests(insp) {
   if (!insp || typeof insp !== 'object') return [];
   const required = new Set(Array.isArray(insp.requiredTests) ? insp.requiredTests.filter(Boolean) : []);
+  if (required.has('Water panel')) {
+    required.delete('Water panel');
+    required.add('Safe Home premium water test');
+  }
   const device = insp.stepData?.['device-setup'] || {};
   const water = insp.stepData?.['water-sample'] || {};
 
@@ -23,7 +27,7 @@ export function deriveRequiredTests(insp) {
     required.add('PFAS water test');
   }
   if (water.waterPanelPlanned === 'Requested — collect on site' || water.waterPanelCollected === 'Yes') {
-    required.add('Water panel');
+    required.add('Safe Home premium water test');
   }
   if (water.microplasticsStatus === 'Requested — collect on site' || water.microplasticsStatus === 'Collected') {
     required.add('Microplastics water test');
@@ -97,6 +101,10 @@ export function getArrivalFields() {
     ]},
     text('boulderBlueSampleId', 'Boulder Blue Sample ID', { placeholder: 'e.g. B2BJC43G' }),
     { key: 'boulderBlueTestLocation', type: 'inspection-level-select', label: 'Boulder Blue Test Location' },
+    photo('Boulder Blue Fan Placement', '_boulderBluePlacementPhotos', {
+      label: 'Boulder Blue Fan Placement Photo *',
+      required: true
+    }),
     timeInput('boulderBlueStartTime', 'Boulder Blue Start Time (2 hrs needed)'),
     timer('boulderBlueTimer', 'Boulder Blue Timer (2 hours)', 7200),
     divider(),
@@ -116,7 +124,7 @@ export function getDeviceSetupFields() {
   return [
     heading('PFAS Water Test'),
     radio('pfasSetup', 'PFAS water test at kitchen faucet', ['Yes', 'No', 'Not requested']),
-    showIf({ type: 'sample-id-scanner', dataKey: 'pfasKitNum', label: 'PFAS Kit #' }, 'pfasSetup', 'Yes'),
+    showIf({ type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS Kit / Sample ID' }, 'pfasSetup', 'Yes'),
     showIf(photo('PFAS Kit Registration Card', '_pfasKitPhotos'), 'pfasSetup', 'Yes'),
     showIf(timer('pfasTimer', 'PFAS Drain Timer', 3600), 'pfasSetup', 'Yes'),
     showIf(info('Note: needs ~1 hour to drain'), 'pfasSetup', 'Yes'),
@@ -219,8 +227,21 @@ export function getRoomTestFields() {
   ];
 }
 
+function selectedSystemPhotoFields(dataKey, choices, photoKey) {
+  return choices.map(systemName => showIf(
+    photo(systemName, photoKey, {
+      label: systemName + ' Photos *',
+      required: true
+    }),
+    dataKey,
+    systemName
+  ));
+}
+
 // ── Utility Room (expanded for #8) ─────────────────────────
 export function getUtilityFields() {
+  const heatingTypes = ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)'];
+  const coolingTypes = ['Central AC', 'Ductless Mini-Split System', 'Window AC Unit(s)', 'Portable AC Unit(s)', 'Heat Pump (Cooling Mode)', 'Other (specify)'];
   return [
     { type: 'process-checklist', title: 'Equipment Needed', items: [
       { key: 'flirUtil', label: 'FLIR MR277' },
@@ -232,8 +253,15 @@ export function getUtilityFields() {
     divider(),
     heading('HVAC System'),
     yesno('forcedHVAC', 'Forced HVAC System present?'),
-    showIf(sel('heatingType', 'Heating Source Type', ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)']), 'forcedHVAC', 'Yes'),
-    showIf(sel('acType', 'Air Conditioning Source Type', ['Central AC', 'Ductless Mini-Split System', 'Window AC Unit(s)', 'Portable AC Unit(s)', 'Heat Pump (Cooling Mode)', 'No Air Conditioning', 'Other (specify)']), 'forcedHVAC', 'Yes'),
+    showIf(sel('heatingType', 'Heating Source Type', heatingTypes), 'forcedHVAC', 'Yes'),
+    showIf(sel('acType', 'Air Conditioning Source Type', [...coolingTypes, 'No Air Conditioning']), 'forcedHVAC', 'Yes'),
+    showIf({
+      type: 'conditional-fields',
+      fields: [
+        ...selectedSystemPhotoFields('heatingType', heatingTypes, '_heatingSystemPhotos'),
+        ...selectedSystemPhotoFields('acType', coolingTypes, '_coolingSystemPhotos')
+      ]
+    }, 'forcedHVAC', 'Yes'),
     showIf(checklist('ventilationType', 'Ventilation Type', [
       { key: 'bathExhaust', label: 'Bathroom Exhaust Fan(s)' },
       { key: 'hrv', label: 'HRV (Heat Recovery Ventilator)' },
@@ -394,19 +422,19 @@ export function getWaterSampleFields() {
   return [
     info('Label each bottle with customer last name and property address. Ensure chain of custody forms are completed for each test.'),
     textarea('officePrepNotes', 'Office preparation notes', { placeholder: 'Kit locations, pre-assigned sample IDs, and special instructions from the office.' }),
-    sel('waterPanelPlanned', 'Water panel test plan', ['Requested — collect on site', 'Not requested']),
+    sel('waterPanelPlanned', 'Safe Home premium water test plan', ['Requested — collect on site', 'Not requested']),
     { type: 'process-checklist', title: 'Sample Labeling', items: [
       { key: 'bottlesLabeled', label: 'Bottles labeled with client last name and property address' },
       { key: 'preMadeLabels', label: 'Pre-made labels applied (if available)' },
       { key: 'chainOfCustody', label: 'Chain of custody forms completed for each sample' }
     ]},
     divider(),
-    heading('Water Panel'),
-    yesno('waterPanelCollected', 'Water panel collected'),
+    heading('Safe Home Premium Water Test'),
+    yesno('waterPanelCollected', 'Safe Home premium water sample collected'),
     showIf(sel('waterSampleType', 'Water test sample type', ['Unfiltered', 'Filtered', 'Both filtered and unfiltered']), 'waterPanelCollected', 'Yes'),
-    showIf({ type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Water Panel Sample ID' }, 'waterPanelCollected', 'Yes'),
+    showIf({ type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Safe Home Premium Water Sample ID' }, 'waterPanelCollected', 'Yes'),
     showIf(text('waterFaucetLocation', 'Faucet location'), 'waterPanelCollected', 'Yes'),
-    showIf(photo('Water Panel'), 'waterPanelCollected', 'Yes'),
+    showIf(photo('Safe Home Premium Water Test'), 'waterPanelCollected', 'Yes'),
     divider(),
     heading('Microplastics Test'),
     radio('microplasticsStatus', 'Microplastics test', ['Requested — collect on site', 'Collected', 'Not requested']),
@@ -868,7 +896,7 @@ function collectRequiredIssues(fields, data, missing) {
   for (const field of fields) {
     if (!field || !showIfMatches(field, data)) continue;
 
-    if (field.type === 'collapsible-section') {
+    if (field.type === 'collapsible-section' || field.type === 'conditional-fields') {
       collectRequiredIssues(field.fields || [], data, missing);
       continue;
     }

@@ -241,7 +241,9 @@ export function buildExportJSON(stepList) {
     boulderBlueTestDuration: (inspection.stepData?.debrief?.boulderBlueTestDuration) || '',
     radonMonitorLocation: (inspection.stepData?.radon?.radonLocation) || '',
     secondRadonMonitorLocation: (inspection.stepData?.radon?.secondMonitorLocation) || '',
-    pfasKitNum: (inspection.stepData?.['device-setup']?.pfasKitNum) || '',
+    pfasKitNum: (inspection.stepData?.['device-setup']?.pfasSampleId) ||
+      (inspection.stepData?.['device-setup']?.pfasKitNum) ||
+      (inspection.stepData?.['water-sample']?.pfasSampleId) || '',
     exhaustHoodType: (inspection.stepData?.['kitchen-appliance']?.exhaustHoodType) || '',
     exhaustVented: (inspection.stepData?.['kitchen-appliance']?.exhaustVented) || '',
 

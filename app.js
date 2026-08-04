@@ -302,6 +302,33 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=233';
     return result;
   }
 
+  async function uploadPendingInspectionPhotos(onProgress) {
+    const insp = inspection || getInspection();
+    if (!insp) return getPhotoHealth();
+    await hydrateInspectionPhotosFromVault(insp);
+    const vaultPhotos = window.DB && window.DB.getPhotosForInspection
+      ? await window.DB.getPhotosForInspection(insp.inspectionId)
+      : [];
+    const vaultMap = new Map(vaultPhotos.map(function(photo) { return [photo.photoId, photo]; }));
+    let queued = 0;
+    visitInspectionPhotos(insp, function(photo) {
+      if (!photo || !photo.photoId) return;
+      const vaulted = vaultMap.get(photo.photoId);
+      if (photoIsCloudConfirmed(photo, vaulted)) return;
+      if ((!photo.dataUrl || photo.dataUrl === '__uploaded__') && vaulted && vaulted.dataUrl) {
+        photo.dataUrl = vaulted.dataUrl;
+      }
+      if (photo.dataUrl && photo.dataUrl !== '__uploaded__') {
+        addToPhotoRetryQueue(photo);
+        queued++;
+      }
+    });
+    if (queued > 0) {
+      await retryFailedPhotos({ quiet: false, limit: queued, onProgress });
+    }
+    return getPhotoHealth();
+  }
+
   function escapeHtml(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
@@ -372,6 +399,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=233';
   }
 
   window.getPhotoHealth = getPhotoHealth;
+  window.uploadPendingInspectionPhotos = uploadPendingInspectionPhotos;
   window.exportLocalPhotoBackup = exportLocalPhotoBackup;
   window.runCloudPreflight = runCloudPreflight;
   window.hydrateInspectionPhotosFromVault = hydrateInspectionPhotosFromVault;
@@ -601,7 +629,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=233';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v233',
+      appVersion: 'v234',
       success: success
     };
   }

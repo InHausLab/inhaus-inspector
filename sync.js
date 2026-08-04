@@ -69,7 +69,7 @@ export async function cloudFetch(payload) {
 
 function photoNeedsUpload(photo) {
   if (!photo) return false;
-  if (photo._driveConfirmed === true || photo._uploaded === true || getPhotoDriveLink(photo)) return false;
+  if (photo._driveConfirmed === true || photo._uploaded === true || photo.storagePath || getPhotoDriveLink(photo)) return false;
   const imageData = photo.imageData || photo.dataUrl || '';
   return !!(imageData && imageData !== '__uploaded__');
 }
@@ -510,15 +510,15 @@ export function schedulePhotoRetry(delayMs) {
 export async function retryFailedPhotos(options) {
   const opts = options || {};
   const inspection = getInspection();
-  if (!inspection || !PHOTO_WORKER_URL || !navigator.onLine) return;
-  if (_photoRetryInProgress) return;
+  if (!inspection || !PHOTO_WORKER_URL || !navigator.onLine) return { total: 0, completed: 0, confirmed: 0, remaining: 0 };
+  if (_photoRetryInProgress) return { total: 0, completed: 0, confirmed: 0, remaining: (inspection._photoRetryQueue || []).filter(photoNeedsUpload).length };
   const queue = (inspection._photoRetryQueue || []).filter(photoNeedsUpload);
-  if (!queue.length) return;
+  if (!queue.length) return { total: 0, completed: 0, confirmed: 0, remaining: 0 };
   if (opts.automatic) {
     const retryIn = PHOTO_RETRY_BACKOFF_MS - (Date.now() - _lastAutomaticPhotoRetryAt);
     if (retryIn > 0) {
       schedulePhotoRetry(retryIn);
-      return;
+      return { total: queue.length, completed: 0, confirmed: 0, remaining: queue.length };
     }
     _lastAutomaticPhotoRetryAt = Date.now();
   }
@@ -528,6 +528,7 @@ export async function retryFailedPhotos(options) {
   const batch = queue.slice(0, Math.max(1, limit));
   if (!opts.quiet) updateSyncStatus('syncing');
   let confirmed = 0;
+  let completed = 0;
   try {
     for (const photo of batch) {
       try {
@@ -537,6 +538,10 @@ export async function retryFailedPhotos(options) {
           confirmed++;
         }
       } catch(e) { /* keep in queue */ }
+      completed++;
+      if (typeof opts.onProgress === 'function') {
+        opts.onProgress({ total: batch.length, completed, confirmed });
+      }
     }
   } finally {
     _photoRetryInProgress = false;
@@ -545,7 +550,9 @@ export async function retryFailedPhotos(options) {
     scheduleSave();
     updateSyncStatus('checkpoint', 'photos +' + confirmed);
   }
-  if ((inspection._photoRetryQueue || []).length > 0) schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
+  const remaining = (inspection._photoRetryQueue || []).filter(photoNeedsUpload).length;
+  if (remaining > 0) schedulePhotoRetry(PHOTO_RETRY_BACKOFF_MS);
+  return { total: batch.length, completed, confirmed, remaining };
 }
 
 // Phase 2 final-submit path: ensure every photo is stored in Supabase (upload any

@@ -1468,13 +1468,21 @@ function applyLockedAssessmentType(target, assessmentType) {
   target.testTraining = isTestTraining;
 }
 
+function normalizeRequiredTests(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : []).map(value =>
+    value === 'Water panel' ? 'Safe Home premium water test' : value
+  ).filter(Boolean)));
+}
+
 function applyOfficePreparation(inspection, data) {
   ensureInspectionWorkspace(inspection);
-  inspection.requiredTests = Array.isArray(data.requiredTests) ? data.requiredTests.slice() : [];
+  const pfasId = String(data.pfasSampleId || data.pfasKitNum || '').trim();
+  inspection.requiredTests = normalizeRequiredTests(data.requiredTests);
   if (!inspection.stepData) inspection.stepData = {};
   inspection.stepData['device-setup'] = Object.assign({}, inspection.stepData['device-setup'] || {}, {
     pfasSetup: data.pfasSetup || '',
-    pfasKitNum: data.pfasKitNum || ''
+    pfasSampleId: pfasId,
+    pfasKitNum: pfasId
   });
   inspection.stepData['water-sample'] = Object.assign({}, inspection.stepData['water-sample'] || {}, {
     waterPanelPlanned: data.waterPanelPlanned || '',
@@ -1483,7 +1491,7 @@ function applyOfficePreparation(inspection, data) {
     microplasticsStatus: data.microplasticsStatus || '',
     microplasticsSampleId: data.microplasticsSampleId || '',
     pfasStatus: data.pfasStatus || '',
-    pfasSampleId: data.pfasSampleId || '',
+    pfasSampleId: pfasId,
     officePrepNotes: data.officePrepNotes || ''
   });
   String(data.teamInspectorNames || '').split(/\n|,/).map(name => name.trim()).filter(Boolean).forEach(name => {
@@ -1523,15 +1531,15 @@ export function renderIntake() {
     inspectorEmail: ctx.inspection.inspectorEmail || '',
     assessmentType: ctx.inspection.assessmentType || 'Home Health Assessment',
     pfasSetup: existingDevice.pfasSetup || '',
-    pfasKitNum: existingDevice.pfasKitNum || '',
+    pfasKitNum: existingDevice.pfasSampleId || existingWater.pfasSampleId || existingDevice.pfasKitNum || '',
     waterPanelPlanned: existingWater.waterPanelPlanned || '',
     waterSampleId: existingWater.waterSampleId || '',
     waterSampleType: existingWater.waterSampleType || '',
-    requiredTests: Array.isArray(ctx.inspection.requiredTests) ? ctx.inspection.requiredTests.slice() : [],
+    requiredTests: normalizeRequiredTests(ctx.inspection.requiredTests),
     microplasticsStatus: existingWater.microplasticsStatus || '',
     microplasticsSampleId: existingWater.microplasticsSampleId || '',
     pfasStatus: existingWater.pfasStatus || '',
-    pfasSampleId: existingWater.pfasSampleId || '',
+    pfasSampleId: existingWater.pfasSampleId || existingDevice.pfasSampleId || existingDevice.pfasKitNum || '',
     officePrepNotes: existingWater.officePrepNotes || '',
     teamInspectorNames: (ctx.inspection.collaboration?.members || []).slice(1).map(member => member.name).join('\n')
   } : {
@@ -1609,12 +1617,11 @@ export function renderIntake() {
       divider(),
       heading('Water Test Kit Preparation'),
       chips('requiredTests', 'Required tests for this inspection', REQUIRED_TEST_OPTIONS),
-      sel('waterPanelPlanned', 'Water panel test', ['Requested — collect on site', 'Not requested']),
-      sel('waterSampleType', 'Water test sample type', ['Unfiltered', 'Filtered', 'Both filtered and unfiltered', 'Not determined']),
-      { type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Water panel kit / sample ID' },
+      sel('waterPanelPlanned', 'Safe Home premium water test', ['Requested — collect on site', 'Not requested']),
+      sel('waterSampleType', 'Safe Home water sample type', ['Unfiltered', 'Filtered', 'Both filtered and unfiltered', 'Not determined']),
+      { type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Safe Home Premium Water Kit / Sample ID' },
       sel('pfasSetup', 'PFAS water test', ['Yes', 'No', 'Not requested']),
-      showIf({ type: 'sample-id-scanner', dataKey: 'pfasKitNum', label: 'PFAS Kit #' }, 'pfasSetup', 'Yes'),
-      { type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS sample ID (if pre-assigned)' },
+      showIf({ type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS Kit / Sample ID' }, 'pfasSetup', 'Yes'),
       sel('microplasticsStatus', 'Microplastics test', ['Requested — collect on site', 'Not requested']),
       { type: 'sample-id-scanner', dataKey: 'microplasticsSampleId', label: 'Microplastics sample ID (if pre-assigned)' },
       textarea('officePrepNotes', 'Office preparation notes', { placeholder: 'Kit locations, special customer instructions, labels prepared, or anything the inspector needs to know.' })
@@ -2063,6 +2070,21 @@ export function renderStep() {
   // Auto-populate roomName from step name if blank
   if (!data.roomName && step.name) { data.roomName = step.name; }
 
+  // PFAS uses one physical identifier. Preserve the legacy kit-number alias for
+  // existing exports while carrying the same value through setup and collection.
+  if (step.id === 'device-setup' || step.id === 'water-sample') {
+    const deviceData = getStepData('device-setup');
+    const waterData = getStepData('water-sample');
+    const pfasId = String(
+      data.pfasSampleId || waterData.pfasSampleId || deviceData.pfasSampleId || deviceData.pfasKitNum || ''
+    ).trim();
+    if (pfasId) {
+      deviceData.pfasSampleId = pfasId;
+      deviceData.pfasKitNum = pfasId;
+      waterData.pfasSampleId = pfasId;
+    }
+  }
+
   if (step.type === 'debrief') {
     setTimeout(() => {
       if (data.radonPickupTime && !document.getElementById('radon-cal-btn')) {
@@ -2302,6 +2324,11 @@ export function renderStep() {
       markStepUpdated(ctx.inspection, step.id, step.name, fieldKey);
       scheduleSave();
       ui().updateShowIf(card, data);
+      if (fieldKey === 'heatingType' || fieldKey === 'acType') {
+        card.querySelectorAll('.ai-hvac-scanner').forEach(scanner => {
+          if (typeof scanner.refreshSelectedSystems === 'function') scanner.refreshSelectedSystems();
+        });
+      }
       // Update heading live when inspector types a room name
       if (fieldKey === 'roomName' && data.roomName) {
         stepHeading.textContent = data.roomName;
@@ -3732,6 +3759,12 @@ export function renderReview() {
   leaveCard.appendChild(leaveDetail);
   leaveCard.appendChild(leaveMetrics);
   const leaveActions = ui().el('div', { className: 'leave-actions' });
+  let photoUploadRunning = false;
+  const uploadNowBtn = ui().el('button', {
+    className: 'btn btn-primary',
+    style: 'display:none;',
+    onClick: () => runPendingPhotoUpload()
+  }, 'Upload Photos Now');
   const photosBtn = ui().el('button', {
     className: 'btn btn-primary',
     onClick: () => { _photosReturnScreen = 'review'; setScreen('photos'); ctx.render(); }
@@ -3764,6 +3797,7 @@ export function renderReview() {
       refreshLeaveStatus();
     }
   }, 'Cloud Check');
+  leaveActions.appendChild(uploadNowBtn);
   leaveActions.appendChild(photosBtn);
   leaveActions.appendChild(rescueBtn);
   leaveActions.appendChild(cloudCheckBtn);
@@ -3777,7 +3811,38 @@ export function renderReview() {
     ]);
   }
 
-  async function refreshLeaveStatus() {
+  async function runPendingPhotoUpload() {
+    if (photoUploadRunning || !window.uploadPendingInspectionPhotos) return;
+    photoUploadRunning = true;
+    uploadNowBtn.style.display = '';
+    uploadNowBtn.disabled = true;
+    uploadNowBtn.textContent = 'Starting Upload...';
+    leaveStatus.className = 'leave-status leave-wait';
+    leaveStatus.textContent = 'Uploading photos';
+    leaveDetail.textContent = 'Keep this screen open while the remaining photos are saved to the cloud.';
+    try {
+      const finalHealth = await window.uploadPendingInspectionPhotos(progress => {
+        if (!leaveCard.isConnected) return;
+        uploadNowBtn.textContent = 'Uploading ' + progress.completed + ' of ' + progress.total;
+        leaveDetail.textContent = progress.completed + ' of ' + progress.total + ' photos processed. Keep this screen open.';
+      });
+      if (finalHealth.pending > 0) {
+        uploadNowBtn.textContent = 'Retry ' + finalHealth.pending + ' Photo' + (finalHealth.pending === 1 ? '' : 's');
+      } else {
+        uploadNowBtn.textContent = 'Photos Saved';
+      }
+    } catch (err) {
+      uploadNowBtn.textContent = 'Retry Photo Upload';
+      leaveDetail.textContent = 'Photo upload stopped: ' + (err && err.message ? err.message : String(err));
+    } finally {
+      photoUploadRunning = false;
+      uploadNowBtn.disabled = false;
+      if (leaveCard.isConnected) refreshLeaveStatus({ skipAutomaticUpload: true });
+    }
+  }
+
+  async function refreshLeaveStatus(options) {
+    const opts = options || {};
     const departureDone = depItems.every(i => !!depData[i.key]);
     const lastCloud = getBestCloudSyncAt();
     const syncStatus = getSyncStatus();
@@ -3800,7 +3865,7 @@ export function renderReview() {
     if (reviewIssues.length) blockers.push(reviewIssues.length + ' required item' + (reviewIssues.length === 1 ? '' : 's'));
     if (!departureDone) blockers.push('Leave checklist open');
     if (!lastCloud) blockers.push('No cloud backup yet');
-    if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' waiting to upload');
+    if (health.pending > 0) warnings.push(health.pending + ' photo' + (health.pending === 1 ? '' : 's') + ' safe on this phone and still uploading');
     if ((syncStatus === 'failed' || syncStatus === 'final-failed') && lastCloud) warnings.push('Cloud retry needed');
 
     let tone = 'go';
@@ -3810,12 +3875,23 @@ export function renderReview() {
       title = 'Not yet';
     } else if (warnings.length) {
       tone = 'wait';
-      title = 'Almost ready';
+      title = health.pending > 0 ? 'Uploading photos' : 'Almost ready';
     }
 
     leaveStatus.className = 'leave-status leave-' + tone;
     leaveStatus.textContent = title;
-    leaveDetail.textContent = blockers.length ? blockers.join(' | ') : (warnings.length ? warnings.join(' | ') : 'Photos, backup, checklist, and required fields are clear.');
+    const statusDetails = blockers.concat(warnings);
+    leaveDetail.textContent = statusDetails.length
+      ? statusDetails.join(' | ') + (health.pending > 0 ? '. Keep this screen open.' : '')
+      : 'Photos, backup, checklist, and required fields are clear.';
+    if (health.pending > 0) {
+      uploadNowBtn.style.display = '';
+      if (!photoUploadRunning) {
+        uploadNowBtn.textContent = 'Upload ' + health.pending + ' Photo' + (health.pending === 1 ? '' : 's') + ' Now';
+      }
+    } else {
+      uploadNowBtn.style.display = 'none';
+    }
     function makeMetricTappable(el, onClick) {
       el.style.cursor = 'pointer';
       el.addEventListener('click', onClick);
@@ -3866,6 +3942,10 @@ export function renderReview() {
       leaveStatus.onclick = scrollToIssues;
       leaveDetail.style.cursor = 'pointer';
       leaveDetail.onclick = scrollToIssues;
+    }
+    if (health.pending > 0 && navigator.onLine && !opts.skipAutomaticUpload && leaveCard.dataset.autoUploadStarted !== 'true') {
+      leaveCard.dataset.autoUploadStarted = 'true';
+      runPendingPhotoUpload();
     }
   }
   refreshLeaveStatus();

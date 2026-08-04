@@ -1618,6 +1618,15 @@
     const changed = () => onChange(f.key || f.dataKey || f.type || 'field');
 
     switch (f.type) {
+      case 'conditional-fields': {
+        const group = document.createElement('div');
+        group.className = 'conditional-fields';
+        (f.fields || []).forEach(field => {
+          const rendered = renderField(field, data, onChange, inspection, onSave);
+          if (rendered) group.appendChild(rendered);
+        });
+        return group;
+      }
       case 'weather-link': {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -2128,6 +2137,10 @@
         wrap.className = 'ai-hvac-scanner';
         wrap.style = 'display:flex;flex-direction:column;gap:0;';
 
+        const selectedSystemsBanner = document.createElement('div');
+        selectedSystemsBanner.className = 'hvac-selected-systems';
+        selectedSystemsBanner.style = 'background:#eaf2e4;border:2px solid #8daa75;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-weight:700;color:#2C3F16;';
+
         const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
 
         async function callAnthropic(imageDataUrl, promptText) {
@@ -2212,7 +2225,26 @@
 
         const step1Hint = document.createElement('div');
         step1Hint.style = 'font-size:0.85rem;color:#6a7a60;margin-bottom:12px;';
-        step1Hint.textContent = 'Take a clear photo of the data tag on the HVAC unit. AI will read the model, serial number, and specs.';
+
+        function selectedSystemNames() {
+          return [data.heatingType, data.acType]
+            .map(value => String(value || '').trim())
+            .filter(value => value && value !== 'No Air Conditioning')
+            .filter((value, index, values) => values.indexOf(value) === index);
+        }
+        function refreshSelectedSystems() {
+          const systems = selectedSystemNames();
+          const primary = systems[0] || 'HVAC Unit';
+          selectedSystemsBanner.textContent = systems.length
+            ? 'Selected systems: ' + systems.join(' • ')
+            : 'Select the heating and cooling systems above before taking equipment photos.';
+          step1Title.textContent = 'Photo: ' + primary + ' Data Tag';
+          step1Hint.textContent = systems.length > 1
+            ? 'Start with the ' + primary + ' data tag. Use the system-specific photo sections above for every selected system: ' + systems.join(' and ') + '.'
+            : 'Take a clear photo of the ' + primary + ' data tag. AI will read the model, serial number, and specs.';
+        }
+        wrap.refreshSelectedSystems = refreshSelectedSystems;
+        refreshSelectedSystems();
 
         const tagInp = document.createElement('input');
         tagInp.type = 'file'; tagInp.accept = 'image/*'; tagInp.capture = 'environment'; tagInp.style = 'display:none;';
@@ -2527,6 +2559,7 @@
         }
         revealConfirmIfReady();
 
+        wrap.appendChild(selectedSystemsBanner);
         wrap.appendChild(step1);
         wrap.appendChild(step2);
         wrap.appendChild(confirmCard);

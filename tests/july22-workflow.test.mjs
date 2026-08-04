@@ -80,7 +80,7 @@ test('required tests combine explicit office selections with prepared kit choice
   }));
 
   assert.deepEqual(required, [
-    'Water panel',
+    'Safe Home premium water test',
     'PFAS water test',
     'Microplastics water test',
     'Radon monitor',
