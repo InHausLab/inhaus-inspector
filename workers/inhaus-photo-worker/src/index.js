@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w30';
+const WORKER_VERSION = 'handoff-w31';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -4458,7 +4458,14 @@ function buildRawAppRows(fieldData) {
   const rows = [['Key', 'Value', 'Type']];
   Object.keys(recovery || {}).sort().forEach(function(key) {
     const serialized = serializeReviewValue(recovery[key]);
-    rows.push([key, serialized.value, serialized.type]);
+    const chunks = splitSpreadsheetCellText(serialized.value);
+    chunks.forEach(function(chunk, index) {
+      rows.push([
+        key,
+        chunk,
+        chunks.length > 1 ? `${serialized.type} part ${index + 1}/${chunks.length}` : serialized.type
+      ]);
+    });
   });
   return rows;
 }
@@ -5009,5 +5016,6 @@ async function listStoredPhotoNames(env, inspectionId) {
 export {
   SHEET_CELL_SAFE_CHARS,
   buildFormattedReviewRows,
+  buildRawAppRows,
   buildRawReviewRows
 };

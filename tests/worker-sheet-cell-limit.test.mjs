@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   SHEET_CELL_SAFE_CHARS,
   buildFormattedReviewRows,
+  buildRawAppRows,
   buildRawReviewRows
 } from '../workers/inhaus-photo-worker/src/index.js';
 
@@ -43,4 +44,14 @@ test('formatted review data points to the raw safety files instead of embedding 
   assert.match(recoveryRow[2], /Raw Review Data and the raw JSON backup/);
   assert.ok(rows.flat().every(value => String(value).length <= SHEET_CELL_SAFE_CHARS));
   assert.equal(rows.some(row => String(row[2]).includes('x'.repeat(1000))), false);
+});
+
+test('raw app data preserves oversized recovery values in sheet-safe parts', () => {
+  const oversized = `start-${'z'.repeat(SHEET_CELL_SAFE_CHARS * 2)}-end`;
+  const rows = buildRawAppRows({ system: { inspectionRecovery: { stepData: oversized } } });
+  const parts = rows.slice(1).filter(row => row[0] === 'stepData');
+
+  assert.ok(parts.length > 1);
+  assert.equal(parts.map(row => row[1]).join(''), oversized);
+  assert.ok(parts.every(row => row[1].length <= SHEET_CELL_SAFE_CHARS));
 });
