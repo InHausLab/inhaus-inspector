@@ -6,6 +6,12 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v236 — Fixed Mobile Navigation Footer
+**Date:** August 5, 2026
+
+- Kept the Home/Next navigation footer attached to the bottom of the phone viewport while the inspection page scrolls.
+- Removed the manual Safari viewport offset and compositor rules that could move the footer into the middle of a long page.
+
 ## v235 — Accurate On-Site Test Selection Copy
 **Date:** August 5, 2026
 

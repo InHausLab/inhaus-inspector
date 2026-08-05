@@ -729,12 +729,6 @@ body {
   background: #fff; border-top: 2px solid var(--accent-light);
   box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
   z-index: 10000;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  will-change: transform;
-  contain: layout;
 }
 
 /* ── Badges ──────────────────────────────── */

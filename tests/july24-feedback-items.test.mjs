@@ -45,8 +45,12 @@ test('shipping tracking numbers can be scanned from a label and corrected', () =
   assert.match(ui, /renderField\(subField, data/);
 });
 
-test('mobile navigation keeps the active phase and room controls visible', () => {
+test('mobile navigation stays attached to the viewport and keeps controls visible', () => {
   assert.match(screens, /className: 'bottom-nav' \+ \(isDevMode\(\) \? ' dev-bottom-nav' : ''\)/);
+  assert.match(screens, /document\.body\.appendChild\(bottomNav\)/);
+  assert.doesNotMatch(screens, /window\.visualViewport/);
+  assert.match(styles, /\.bottom-nav \{[\s\S]*?position: fixed !important;[\s\S]*?bottom: 0 !important;/);
+  assert.doesNotMatch(styles, /\.bottom-nav \{[\s\S]*?contain: layout;/);
   assert.match(styles, /\.bottom-nav\.dev-bottom-nav > \*/);
   assert.match(screens, /activeButton\.offsetLeft - \(\(subNav\.clientWidth - activeButton\.offsetWidth\) \/ 2\)/);
   assert.match(ui, /activeDot\.offsetLeft - \(\(bar\.clientWidth - activeDot\.offsetWidth\) \/ 2\)/);

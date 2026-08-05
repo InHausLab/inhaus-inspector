@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=235';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=235';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=235';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=235';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=235';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=235';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=236';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=236';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=236';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=236';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=236';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=236';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=235';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=235';
-import { updatePhotoMetadata } from './supabase-photos.js?v=235';
-import { FIELD_RESUME_TOKEN } from './config.js?v=235';
+} from './findings.js?v=236';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=236';
+import { updatePhotoMetadata } from './supabase-photos.js?v=236';
+import { FIELD_RESUME_TOKEN } from './config.js?v=236';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=235';
+} from './comment-library.js?v=236';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -511,24 +511,6 @@ export function render() {
     bottomNav.id = 'fixed-bottom-nav';
     bottomNav.setAttribute('data-fixed-footer', 'true');
     document.body.appendChild(bottomNav);
-  }
-  // Re-pin nav on Safari visual viewport resize (toolbar show/hide)
-  if (window.visualViewport && !window._vpNavListener) {
-    window._vpNavListener = true;
-    window.visualViewport.addEventListener('resize', () => {
-      const nav = document.getElementById('fixed-bottom-nav');
-      if (nav) {
-        const offset = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-        nav.style.bottom = Math.max(0, offset) + 'px';
-      }
-    });
-    window.visualViewport.addEventListener('scroll', () => {
-      const nav = document.getElementById('fixed-bottom-nav');
-      if (nav) {
-        const offset = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-        nav.style.bottom = Math.max(0, offset) + 'px';
-      }
-    });
   }
 }
 
