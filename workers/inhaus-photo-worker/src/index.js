@@ -30,8 +30,9 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w29';
+const WORKER_VERSION = 'handoff-w30';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
+const SHEET_CELL_SAFE_CHARS = 45000;
 
 export default {
   async fetch(request, env, ctx) {
@@ -4001,7 +4002,7 @@ async function createOrUpdateReviewDataSpreadsheet(accessToken, folderId, source
   return {
     spreadsheetId: spreadsheet.id,
     spreadsheetUrl: spreadsheet.webViewLink || `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheet.id)}/edit`,
-    rawReviewKeyCount: Math.max(0, rawRows.length - 1),
+    rawReviewKeyCount: Object.keys(fieldData || {}).length,
     formattedReviewRowCount: Math.max(0, formattedRows.length - 1),
     photoLogCount: Math.max(0, photoLogRows.length - 1),
     roomDetailCount: Math.max(0, roomRows.length - 1)
@@ -4117,9 +4118,36 @@ function buildRawReviewRows(fieldData) {
   const rows = [['Key', 'Value', 'Type']];
   Object.keys(fieldData || {}).sort().forEach(function(key) {
     const serialized = serializeReviewValue(fieldData[key]);
-    rows.push([key, serialized.value, serialized.type]);
+    const chunks = splitSpreadsheetCellText(serialized.value);
+    chunks.forEach(function(chunk, index) {
+      rows.push([
+        key,
+        chunk,
+        chunks.length > 1 ? `${serialized.type} part ${index + 1}/${chunks.length}` : serialized.type
+      ]);
+    });
   });
   return rows;
+}
+
+function splitSpreadsheetCellText(value, limit = SHEET_CELL_SAFE_CHARS) {
+  const text = value === undefined || value === null ? '' : String(value);
+  const safeLimit = Math.max(2, Math.min(Number(limit) || SHEET_CELL_SAFE_CHARS, SHEET_CELL_SAFE_CHARS));
+  if (text.length <= safeLimit) return [text];
+
+  const chunks = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(start + safeLimit, text.length);
+    if (end < text.length) {
+      const before = text.charCodeAt(end - 1);
+      const after = text.charCodeAt(end);
+      if (before >= 0xD800 && before <= 0xDBFF && after >= 0xDC00 && after <= 0xDFFF) end--;
+    }
+    chunks.push(text.slice(start, end));
+    start = end;
+  }
+  return chunks;
 }
 
 function serializeReviewValue(value) {
@@ -4145,18 +4173,37 @@ function buildFormattedReviewRows(fieldData) {
   ];
   summaryKeys.forEach(function(key) {
     if (fieldData && fieldData[key] !== undefined && fieldData[key] !== null && String(fieldData[key]).trim() !== '') {
-      rows.push(['Summary', key, serializeReviewValue(fieldData[key]).value]);
+      appendFormattedReviewRows(rows, 'Summary', key, serializeReviewValue(fieldData[key]).value);
     }
   });
   Object.keys(fieldData || {}).sort().forEach(function(key) {
     if (/^(obs|actionTaken|followUp)_\d+_/i.test(key)) {
-      rows.push(['Dynamic Review', key, serializeReviewValue(fieldData[key]).value]);
+      appendFormattedReviewRows(rows, 'Dynamic Review', key, serializeReviewValue(fieldData[key]).value);
     }
   });
   const system = isPlainObject(fieldData.system) ? fieldData.system : {};
-  if (system.inspectionRecovery) rows.push(['System', 'inspectionRecovery', JSON.stringify(system.inspectionRecovery)]);
-  if (system.startInspectionShell) rows.push(['System', 'startInspectionShell', JSON.stringify(system.startInspectionShell)]);
+  if (system.inspectionRecovery) {
+    rows.push([
+      'System',
+      'inspectionRecovery',
+      `Complete source snapshot is preserved in Raw Review Data and the raw JSON backup (${JSON.stringify(system.inspectionRecovery).length} characters).`
+    ]);
+  }
+  if (system.startInspectionShell) {
+    appendFormattedReviewRows(rows, 'System', 'startInspectionShell', JSON.stringify(system.startInspectionShell));
+  }
   return rows;
+}
+
+function appendFormattedReviewRows(rows, section, key, value) {
+  const chunks = splitSpreadsheetCellText(value);
+  chunks.forEach(function(chunk, index) {
+    rows.push([
+      section,
+      chunks.length > 1 ? `${key} [part ${index + 1}/${chunks.length}]` : key,
+      chunk
+    ]);
+  });
 }
 
 function buildPhotoLogRows(photoRows) {
@@ -4958,3 +5005,9 @@ async function listStoredPhotoNames(env, inspectionId) {
   const rows = text ? JSON.parse(text) : [];
   return Array.isArray(rows) ? rows.map(function(row) { return row.name || ''; }) : [];
 }
+
+export {
+  SHEET_CELL_SAFE_CHARS,
+  buildFormattedReviewRows,
+  buildRawReviewRows
+};
