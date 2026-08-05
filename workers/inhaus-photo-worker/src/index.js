@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w31';
+const WORKER_VERSION = 'handoff-w32';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -1088,6 +1088,7 @@ async function handleStartInspectionShell(request, env) {
   validateSharedSecret(body, env);
 
   const inspectionId = cleanId(body.inspectionId || body.id, 'inspectionId');
+  const requestedClassification = requireExplicitAssessmentClassification(body);
   const existing = await getStartInspectionShellState(env, inspectionId);
   assertAssessmentClassificationMatchesShell(existing, body);
   if (startInspectionShellIsReady(existing)) {
@@ -1098,7 +1099,7 @@ async function handleStartInspectionShell(request, env) {
       return json({ ...existing, cached: true });
     }
   }
-  if (isTestTrainingInspection(body)) {
+  if (requestedClassification === 'test') {
     const accessToken = await getGoogleAccessToken(env);
     const receipt = await ensureTestHandoffShell(env, accessToken, { ...body, inspectionId });
     await upsertAssessmentShellRecord(env, { ...body, inspectionId }, receipt);
@@ -2383,8 +2384,15 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const handoffFieldData = buildCanonicalHandoffFieldData(fieldData, source, canonicalSource);
   fieldData.rooms = handoffFieldData.rooms;
   fieldData.system = handoffFieldData.system;
-  const isTestTraining = isTestTrainingInspection(source);
   const previousReceipt = getHandoffReceiptFromFieldData(fieldData) || {};
+  const sourceShell = isPlainObject(source.system?.startInspectionShell)
+    ? source.system.startInspectionShell
+    : (isPlainObject(source.startInspectionShell)
+        ? source.startInspectionShell
+        : (isPlainObject(previousReceipt) ? previousReceipt : null));
+  const classification = assertAssessmentClassificationMatchesShell(sourceShell, source) ||
+    requireExplicitAssessmentClassification(source);
+  const isTestTraining = classification === 'test';
   const sourceRoomCount = getHandoffRoomRecords(handoffFieldData).length;
   const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
   const previousRoomDetailCount = Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0);
@@ -3543,11 +3551,19 @@ function explicitAssessmentClassification(source) {
   const candidates = [source];
   if (isPlainObject(source.resumeData)) candidates.push(source.resumeData);
   if (candidates.some(candidate => isTestTrainingInspection(candidate))) return 'test';
-  const explicitType = candidates.map(candidate => firstNonEmpty(
+  const explicitTypes = candidates.flatMap(candidate => [
     candidate.assessmentType,
     candidate.inspectionType
-  )).find(Boolean);
-  return explicitType ? 'real' : '';
+  ]).map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+  return explicitTypes.some(value => value === 'home health assessment' || value === 'real assessment') ? 'real' : '';
+}
+
+function requireExplicitAssessmentClassification(source) {
+  const classification = explicitAssessmentClassification(source);
+  if (classification) return classification;
+  const error = new Error('assessment_type_required:choose_home_health_assessment_or_test_training');
+  error.statusCode = 400;
+  throw error;
 }
 
 function normalizeClassificationStatus(value) {

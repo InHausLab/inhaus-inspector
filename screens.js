@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=237';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=237';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=237';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=237';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=237';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=237';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=238';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=238';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=238';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=238';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=238';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=238';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=237';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=237';
-import { updatePhotoMetadata } from './supabase-photos.js?v=237';
-import { FIELD_RESUME_TOKEN } from './config.js?v=237';
+} from './findings.js?v=238';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=238';
+import { updatePhotoMetadata } from './supabase-photos.js?v=238';
+import { FIELD_RESUME_TOKEN } from './config.js?v=238';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=237';
+} from './comment-library.js?v=238';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -1511,7 +1511,7 @@ export function renderIntake() {
     clientConcerns: ctx.inspection.clientConcerns || '',
     blueprintNotes: ctx.inspection.blueprintNotes || '',
     inspectorEmail: ctx.inspection.inspectorEmail || '',
-    assessmentType: ctx.inspection.assessmentType || 'Home Health Assessment',
+    assessmentType: ctx.inspection.assessmentType || '',
     pfasSetup: existingDevice.pfasSetup || '',
     pfasKitNum: existingDevice.pfasSampleId || existingWater.pfasSampleId || existingDevice.pfasKitNum || '',
     waterPanelPlanned: existingWater.waterPanelPlanned || '',
@@ -1539,7 +1539,7 @@ export function renderIntake() {
     wifiPassword: '',
     clientConcerns: '',
     blueprintNotes: '',
-    assessmentType: 'Home Health Assessment',
+    assessmentType: '',
     pfasSetup: '',
     pfasKitNum: '',
     waterPanelPlanned: '',
@@ -1634,10 +1634,18 @@ export function renderIntake() {
 
   const submitBtn = ui().el('button', { className: 'btn btn-primary btn-nav', onClick: async () => {
       if (lockedAssessmentType) applyLockedAssessmentType(data, lockedAssessmentType);
-      const required = ['inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms'];
+      const required = ['assessmentType', 'inspectorName', 'clientName', 'propertyAddress', 'numberOfLevels', 'numberOfBedrooms', 'numberOfBathrooms'];
       const missing = required.filter(k => !data[k] || !data[k].trim || !data[k].trim());
       if (!data.waterSource || (Array.isArray(data.waterSource) ? data.waterSource.length === 0 : !data.waterSource)) missing.push('waterSource');
       if (missing.length) { alert('Please fill in all required fields (marked with *).'); return; }
+
+      if (!lockedAssessmentType) {
+        const isTestTraining = data.assessmentType === 'Test / Training';
+        const confirmed = confirm(isTestTraining
+          ? 'Confirm TEST / TRAINING inspection.\n\nThis creates a folder under _Test Assessments. It will not reserve an assessment number or create a tracker row.'
+          : 'Confirm REAL HOME ASSESSMENT.\n\nThis reserves the next assessment number, creates a folder in Assessments, and writes a tracker row.');
+        if (!confirmed) return;
+      }
 
       if (isPrepare) {
         submitBtn.disabled = true;

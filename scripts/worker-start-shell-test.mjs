@@ -634,7 +634,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w29', 'health exposes Worker version');
+  assert(data.version === 'handoff-w32', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -846,6 +846,24 @@ async function testTrainingCreatesTestArtifactsOnly() {
   assert(state.assessmentWrites[0].inspection_id === 'INH-TRAINING-001', 'training parent row matches inspection ID');
   assert(state.assessmentWrites[0].assessment_num === 'INH-TRAINING-001', 'training parent row uses inspection ID instead of a real number');
   assert(state.reviewWrites.length === 1, 'training route saves ready receipt');
+}
+
+async function testStartShellRequiresExplicitAssessmentClassification() {
+  const { mockFetch, state } = makeMockFetch();
+  const { response, data } = await callWorker('/start-inspection-shell', {
+    sharedSecret: 'upload-secret',
+    inspectionId: 'INH-UNCLASSIFIED-001',
+    clientName: 'Unclassified Client',
+    propertyAddress: '1 Unknown Way, Basalt CO',
+    inspectionDate: '2026-08-05'
+  }, baseEnv(), mockFetch);
+
+  assert(response.status === 400, 'unclassified start-shell returns 400');
+  assert(data.error === 'assessment_type_required:choose_home_health_assessment_or_test_training', 'unclassified start-shell explains the required choice');
+  assert(state.assessmentReservations.length === 0, 'unclassified start-shell does not reserve an assessment number');
+  assert(state.driveCreates.length === 0, 'unclassified start-shell does not create Drive folders');
+  assert(state.trackerUpdates.length === 0, 'unclassified start-shell does not write a tracker row');
+  assert(state.assessmentWrites.length === 0, 'unclassified start-shell does not create an assessment row');
 }
 
 async function testRealShellRejectsLaterTrainingClassification() {
@@ -2989,7 +3007,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w29', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w32', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
@@ -3054,6 +3072,7 @@ const tests = [
   testCommentLibraryCandidateAndAdminFlow,
   testSignRouteDoesNotCreateAssessmentParentRow,
   testTrainingCreatesTestArtifactsOnly,
+  testStartShellRequiresExplicitAssessmentClassification,
   testRealShellRejectsLaterTrainingClassification,
   testTrainingShellRejectsLaterRealClassification,
   testInspectionSaveRejectsClassificationChangeBeforeEventWrite,

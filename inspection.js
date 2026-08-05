@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=237';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=237';
-import { ensureInspectionWorkspace } from './findings.js?v=237';
+import { getInspection } from './state.js?v=238';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=238';
+import { ensureInspectionWorkspace } from './findings.js?v=238';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -196,7 +196,7 @@ export function buildExportJSON(stepList) {
     inspectorName: inspection.inspectorName,
     inspectionDate: inspection.inspectionDate,
     clientName: inspection.clientName,
-    assessmentType: inspection.assessmentType || 'Home Health Assessment',
+    assessmentType: inspection.assessmentType || '',
     numberOfLevels: inspection.numberOfLevels,
     numberOfBedrooms: inspection.numberOfBedrooms,
     numberOfBathrooms: inspection.numberOfBathrooms,

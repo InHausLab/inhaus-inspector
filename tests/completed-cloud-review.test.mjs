@@ -23,6 +23,7 @@ const {
 const screensSource = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 const syncSource = readFileSync(new URL('../sync.js', import.meta.url), 'utf8');
 const uiSource = readFileSync(new URL('../ui.js', import.meta.url), 'utf8');
+const inspectionSource = readFileSync(new URL('../inspection.js', import.meta.url), 'utf8');
 
 test('active cloud continue list excludes completed review inspections by default', () => {
   assert.equal(isContinuableCloudInspection({ status: 'prepared' }), true);
@@ -115,6 +116,14 @@ test('assessment type is immutable after the assessment shell is ready', () => {
   assert.match(screensSource, /applyLockedAssessmentType\(data, lockedAssessmentType\)/);
   assert.match(uiSource, /if \(opts\.disabled\) sel\.disabled = true/);
   assert.match(uiSource, /f\.choices, f\)/);
+});
+
+test('new inspections require an explicit real or test classification before shell creation', () => {
+  assert.match(screensSource, /assessmentType: ''/);
+  assert.match(screensSource, /const required = \['assessmentType'/);
+  assert.match(screensSource, /Confirm TEST \/ TRAINING inspection/);
+  assert.match(screensSource, /Confirm REAL HOME ASSESSMENT/);
+  assert.doesNotMatch(inspectionSource, /assessmentType: inspection\.assessmentType \|\| 'Home Health Assessment'/);
 });
 
 test('advanced smoke shortcut creates a test pickup without walking every intake field', () => {

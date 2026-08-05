@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v238 — Explicit Assessment Classification
+**Date:** August 5, 2026
+
+- Removed the automatic real-assessment default from new inspections.
+- Require an explicit Real or Test / Training choice and confirmation before creating a Drive shell.
+- Worker W32 rejects unclassified shell requests before reserving a number, creating Drive folders, or writing a tracker row.
+
 ## v237 — Clear Required-Photo Validation
 **Date:** August 5, 2026
 
