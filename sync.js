@@ -1,14 +1,14 @@
 // InHaus Inspector - Sync & Upload Logic
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=236';
-import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=236';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET, FIELD_RESUME_TOKEN } from './config.js?v=237';
+import { uploadPhotoToSupabase, verifyInspectionStatus } from './supabase-photos.js?v=237';
 import { getInspection, getSyncStatus, setSyncStatus, setLastSaveText,
          getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt,
          getLastCheckpointAttemptAt, setLastCheckpointAttemptAt,
          getLastCheckpointSucceededAt, setLastCheckpointSucceededAt,
-         getBestCloudSyncAt } from './state.js?v=236';
-import { scheduleSave } from './storage.js?v=236';
-import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=236';
-import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=236';
+         getBestCloudSyncAt } from './state.js?v=237';
+import { scheduleSave } from './storage.js?v=237';
+import { buildExportJSON, stripPhotosFromExport, extractAllPhotosFromExport } from './inspection.js?v=237';
+import { ensureInspectionWorkspace, mergeRemoteInspection } from './findings.js?v=237';
 
 const PHOTO_BACKGROUND_RETRY_LIMIT = 4;
 const PHOTO_RETRY_BACKOFF_MS = 5 * 60 * 1000;
@@ -567,7 +567,7 @@ async function uploadPhotosViaSupabase(photosToUpload, exportData, inspection) {
   // state as __uploaded__ — avoids redundant re-uploads and unblocks submit.
   const supabaseConfirmed = new Set();
   try {
-    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=236');
+    const { checkSupabaseConfirmed } = await import('./supabase-photos.js?v=237');
     const confirmedIds = await checkSupabaseConfirmed(inspectionId);
     confirmedIds.forEach(id => supabaseConfirmed.add(id));
     if (supabaseConfirmed.size > 0) {

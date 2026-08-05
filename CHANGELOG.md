@@ -6,6 +6,12 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v237 — Clear Required-Photo Validation
+**Date:** August 5, 2026
+
+- Required photo controls now say that a photo is required before continuing.
+- When Next is blocked, the missing photo control is highlighted, scrolled into view, and named in the alert.
+
 ## v236 — Fixed Mobile Navigation Footer
 **Date:** August 5, 2026
 

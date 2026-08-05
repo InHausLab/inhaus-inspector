@@ -28,6 +28,11 @@ test('Boulder Blue setup requires a placement photo', () => {
   assert.ok(field);
   assert.equal(field.required, true);
   assert.equal(field.stepName, 'Boulder Blue Fan Placement');
+  assert.match(ui, /'data-required-photo': isRequired \? 'true' : 'false'/);
+  assert.match(ui, /Photo required before continuing/);
+  assert.match(ui, /\.photo-section\[data-required-photo="true"\]\[data-photo-count="0"\]/);
+  assert.match(styles, /\.photo-section\.validation-error/);
+  assert.match(screens, /missing\.length === 1[\s\S]*?missing\[0\]/);
 });
 
 test('PFAS setup and collection share one sample identifier', () => {

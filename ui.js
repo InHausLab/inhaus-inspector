@@ -1307,9 +1307,20 @@
     const destinationLabel = roomLabel && stepLabel && roomLabel.toLowerCase() !== stepLabel.toLowerCase()
       ? roomLabel + ' → ' + stepLabel
       : roomLabel || stepLabel || 'Needs placement';
-    const section = el('div', { className: 'field-group photo-section' });
+    const isRequired = photoOptions.required === true;
+    const section = el('div', {
+      className: 'field-group photo-section' + (isRequired ? ' required-photo-field' : ''),
+      'data-required-photo': isRequired ? 'true' : 'false',
+      'data-photo-count': String(photos.length)
+    });
     if (!photoOptions.hideLabel) {
       section.appendChild(el('label', { className: 'field-label' }, photoOptions.label || 'Photos'));
+    }
+    if (isRequired && !photos.length) {
+      section.appendChild(el('div', {
+        className: 'photo-required-message',
+        role: 'alert'
+      }, 'Photo required before continuing'));
     }
 
     if (photos.length) {
@@ -2722,6 +2733,7 @@
           {
             label: f.label || f.photoLabel || 'Photos',
             hideLabel: !!f.hideLabel,
+            required: f.required === true,
             getRoomName: () => data.roomName || data._roomName || ''
           }
         );
@@ -2967,6 +2979,11 @@
         setTimeout(() => row.classList.remove('validation-flash'), 1500);
         if (!firstMissing) firstMissing = row;
       }
+    });
+    const requiredPhotos = container.querySelectorAll('.photo-section[data-required-photo="true"][data-photo-count="0"]');
+    requiredPhotos.forEach(section => {
+      section.classList.add('validation-error');
+      if (!firstMissing) firstMissing = section;
     });
     // Also catch empty required inputs/selects/textareas
     if (!firstMissing) {
