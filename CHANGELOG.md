@@ -6,6 +6,12 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v235 — Accurate On-Site Test Selection Copy
+**Date:** August 5, 2026
+
+- Changed the pre-inspection test selector heading from “Add or remove” to “Select or unselect” so the wording matches the control's actual behavior.
+- Updated the empty-state instruction to tell inspectors to select an existing test.
+
 ## v234 — August 4 Field Feedback Corrections
 **Date:** August 4, 2026
 

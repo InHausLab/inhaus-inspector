@@ -7,9 +7,9 @@ const screens = readFileSync(new URL('../screens.js', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../ui.js', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
-test('precheck lets the inspector add or remove tests on site', () => {
-  assert.match(screens, /Add or remove tests for this inspection/);
-  assert.match(screens, /No tests are selected\. Add any test the office missed/);
+test('precheck lets the inspector select or unselect tests on site', () => {
+  assert.match(screens, /Select or unselect tests for this inspection/);
+  assert.match(screens, /No tests are selected\. Select any test the office missed/);
   assert.match(screens, /ctx\.inspection\.requiredTests/);
 });
 
