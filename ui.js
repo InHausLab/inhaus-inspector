@@ -221,6 +221,9 @@
         inspectionId: targetInspectionId,
         roomName: photo.roomName || '',
         stepName: photo.stepName || '',
+        photoKey: photo.photoKey || '',
+        photoRole: photo.photoRole || '',
+        sectionLabel: photo.sectionLabel || '',
         caption: photo.caption || '',
         placementSource: photo.placementSource || '',
         routingStatus: photo.routingStatus || '',
@@ -688,7 +691,7 @@
 
   // ── Field: Custom Radio ────────────────────────────────────
   function renderRadio(key, label, value, onChange, choices) {
-    const g = el('div', { className: 'field-group' });
+    const g = el('div', { className: 'field-group', 'data-radio-key': key });
     g.appendChild(el('label', { className: 'field-label' }, label));
     const row = el('div', { className: 'radio-row' });
     const btns = [];
@@ -698,6 +701,7 @@
       const btn = el('button', {
         type: 'button',
         className: 'radio-btn' + (value === v ? ' active' : ''),
+        'data-radio-val': v,
         onClick: () => {
           btns.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
@@ -1951,31 +1955,43 @@
         return wrap;
       }
       case 'number-scanner': {
-        // Photo → AI reads a numeric display/result → inspector confirms.
-        // Kept separate from sample-id-scanner so ID extraction behavior is unchanged.
+        // Photo → managed high-resolution evidence → AI reading → inspector confirmation.
         const dataKey = f.dataKey || 'scannedNumber';
         const labelText = f.label || 'Reading';
         const unitText = f.unit ? ' (' + f.unit + ')' : '';
-        const prompt = f.prompt || 'Read the number displayed on this ATP meter screen or printed on this test result. Return JSON: {"value": <number or null>}. Return ONLY the JSON.';
-
+        const statusKey = f.statusKey || '';
+        const photoKey = f.photoKey || (dataKey + '_photos');
+        const photoRole = f.photoRole || f.stepName || labelText;
+        const phase = f.phase === 'after' ? 'after' : 'before';
+        const prompt = f.prompt || ('Read the numeric RLU result clearly visible on this ATP testing device display ' + phase + ' cleaning. ' +
+          'Do not estimate or infer a number that is not clearly visible. Return ONLY JSON with these exact keys: ' +
+          '{"value": <number or null>, "displayText": "exact visible text", "confidence": "high|medium|low", "readable": <true|false>}.');
         const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+
+        if (!Array.isArray(data[photoKey])) data[photoKey] = [];
+        const existingPhoto = data[photoKey][0] || null;
+
         const wrap = document.createElement('div');
         wrap.style = 'background:#f0f7ff;border:2px solid #93c5fd;border-radius:12px;padding:14px;margin:4px 0 8px;';
 
         const hdr = document.createElement('div');
-        hdr.style = 'font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;';
+        hdr.style = 'font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;';
         hdr.textContent = labelText + unitText;
+        const photoNote = document.createElement('div');
+        photoNote.style = 'font-size:0.82rem;color:#475569;margin-bottom:10px;line-height:1.4;';
+        photoNote.textContent = 'Take a clear device photo. The original is retained for Tanner and the AI-filled value remains editable.';
 
         const inp = document.createElement('input');
         inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.style = 'display:none;';
 
         const previewWrap = document.createElement('div');
-        previewWrap.style = 'position:relative;margin-bottom:10px;display:none;';
+        previewWrap.style = 'position:relative;margin-bottom:10px;' + (existingPhoto ? '' : 'display:none;');
         const preview = document.createElement('img');
-        preview.style = 'width:100%;border-radius:8px;border:1.5px solid #93c5fd;max-height:140px;object-fit:cover;';
+        preview.style = 'width:100%;border-radius:8px;border:1.5px solid #93c5fd;max-height:220px;object-fit:contain;background:#fff;';
+        if (existingPhoto) preview.src = existingPhoto.thumbnailDataUrl || existingPhoto.dataUrl || '';
         const retakeBtn = document.createElement('button');
         retakeBtn.type = 'button';
-        retakeBtn.style = 'position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;';
+        retakeBtn.style = 'position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;';
         retakeBtn.textContent = '\u21a9 Retake';
         retakeBtn.onclick = () => inp.click();
         previewWrap.appendChild(preview); previewWrap.appendChild(retakeBtn);
@@ -1983,14 +1999,25 @@
         const shootBtn = document.createElement('button');
         shootBtn.type = 'button';
         shootBtn.style = 'width:100%;padding:10px;background:#1e40af;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:0.9rem;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;';
-        shootBtn.innerHTML = '\uD83D\uDCF7 Scan Meter Display';
+        shootBtn.textContent = existingPhoto ? 'Retake Device Photo' : 'Take Device Photo';
 
         const status = document.createElement('div');
         status.style = 'font-size:0.82rem;margin-bottom:8px;min-height:18px;';
-        if (data[dataKey] !== undefined && data[dataKey] !== null && data[dataKey] !== '') {
-          shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
-          status.textContent = '\u2713 Reading confirmed';
-          status.style += 'color:#15803d;font-weight:600;';
+        if (existingPhoto && data[dataKey] !== undefined && data[dataKey] !== null && data[dataKey] !== '') {
+          status.textContent = '\u2713 Photo retained and reading confirmed';
+          status.style.color = '#15803d';
+          status.style.fontWeight = '600';
+        } else if (existingPhoto) {
+          status.textContent = '\u2713 Photo retained \u2014 enter the reading below';
+          status.style.color = '#b45309';
+          status.style.fontWeight = '600';
+        }
+
+        function syncStatusButtons() {
+          if (!statusKey) return;
+          document.querySelectorAll('[data-radio-key="' + statusKey + '"] [data-radio-val]').forEach(button => {
+            button.classList.toggle('active', button.getAttribute('data-radio-val') === data[statusKey]);
+          });
         }
 
         const confirmRow = document.createElement('div');
@@ -2002,11 +2029,14 @@
         confirmInp.type = 'number';
         confirmInp.step = 'any';
         confirmInp.inputMode = 'decimal';
+        confirmInp.setAttribute('data-field-key', dataKey);
         confirmInp.style = 'width:100%;padding:9px 12px;border:2px solid #93c5fd;border-radius:8px;font-size:1rem;font-weight:700;background:#fff;box-sizing:border-box;';
         confirmInp.value = data[dataKey] !== undefined && data[dataKey] !== null ? data[dataKey] : '';
         confirmInp.placeholder = 'Enter value' + unitText;
         confirmInp.addEventListener('input', () => {
           data[dataKey] = confirmInp.value === '' ? null : parseFloat(confirmInp.value);
+          if (statusKey) data[statusKey] = data[dataKey] == null ? '' : (Number(data[dataKey]) < 100 ? 'Pass' : 'Fail');
+          syncStatusButtons();
           changed();
         });
         confirmRow.appendChild(confirmLbl); confirmRow.appendChild(confirmInp);
@@ -2015,37 +2045,76 @@
           const file = e.target.files[0]; if (!file) return;
           inp.value = '';
           shootBtn.disabled = true;
-          status.textContent = '\u23f3 Reading number...';
+          status.textContent = '\u23f3 Saving photo and reading device...';
           status.style.color = '#92400e';
           status.style.fontWeight = '600';
+          let retainedPhoto = null;
           try {
             const dataUrl = await compressImage(file);
-            data[dataKey + '_photo'] = { dataUrl, timestamp: new Date().toISOString() };
-            preview.src = dataUrl;
+            const thumbnailDataUrl = await imageVariant(dataUrl, 420, 0.62);
+            const previousPhoto = data[photoKey][0] || {};
+            retainedPhoto = {
+              photoId: previousPhoto.photoId || (phase === 'after' ? 'atp-after-' : 'atp-before-') + Math.random().toString(36).substr(2, 9),
+              roomName: data.roomName || data._roomName || 'ATP Testing',
+              stepName: f.stepName || photoRole,
+              photoKey,
+              photoRole,
+              sectionLabel: photoRole,
+              timestamp: new Date().toISOString(),
+              caption: phase === 'after' ? 'ATP device reading after cleaning' : 'ATP device reading before cleaning',
+              dataUrl,
+              thumbnailDataUrl,
+              placementSource: 'capture_context',
+              routingStatus: 'auto',
+              _uploaded: false,
+              _vaultSaved: false
+            };
+            await savePhotoRecordToVault(retainedPhoto, inspection && inspection.inspectionId);
+            if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(retainedPhoto);
+            data[photoKey] = [retainedPhoto];
+            delete data[dataKey + '_photo'];
+            preview.src = retainedPhoto.thumbnailDataUrl || retainedPhoto.dataUrl;
             previewWrap.style.display = '';
-            shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
+            shootBtn.textContent = 'Retake Device Photo';
+            changed();
+
             const resp = await fetchWithTimeout(PROXY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ imageBase64: dataUrl.split(',')[1], mimeType: 'image/jpeg', prompt })
-            }, 60000, 'AI number scan');
+              body: JSON.stringify({
+                imageBase64: dataUrl.split(',')[1],
+                mimeType: (dataUrl.split(';')[0].split(':')[1]) || 'image/jpeg',
+                prompt
+              })
+            }, 60000, 'AI ATP display read');
+            if (!resp.ok) throw new Error('API_ERROR ' + resp.status);
             const result = await resp.json();
             const txt = result.content && result.content[0] && result.content[0].text;
             const parsed = parseVisionJson(txt);
-            const value = typeof parsed.value === 'number' ? parsed.value : Number(parsed.value);
-            if (parsed.value !== null && parsed.value !== '' && Number.isFinite(value)) {
+            const value = typeof parsed.value === 'number' ? parsed.value : Number(String(parsed.value || '').replace(/,/g, ''));
+            if (parsed.readable !== false && parsed.value !== null && parsed.value !== '' && Number.isFinite(value) && value >= 0) {
               data[dataKey] = value;
+              if (statusKey) data[statusKey] = value < 100 ? 'Pass' : 'Fail';
+              retainedPhoto.aiAtpReading = value;
+              retainedPhoto.aiAtpStatus = statusKey ? data[statusKey] : '';
+              retainedPhoto.aiAtpConfidence = String(parsed.confidence || '');
+              retainedPhoto.aiAtpDisplayText = String(parsed.displayText || '');
+              retainedPhoto.aiAtpReadAt = new Date().toISOString();
               confirmInp.value = String(value);
-              status.textContent = '\u2713 Number read \u2014 confirm below';
+              syncStatusButtons();
+              status.textContent = '\u2713 Photo retained and number read \u2014 confirm below';
               status.style.color = '#15803d';
             } else {
-              status.textContent = '\u26a0\ufe0f Could not read number \u2014 type it below';
+              status.textContent = '\u2713 Photo retained; AI could not read the display \u2014 enter it below';
               status.style.color = '#b45309';
             }
             changed();
           } catch (err) {
-            status.textContent = '\u26a0\ufe0f Scan failed \u2014 type the number below';
-            status.style.color = '#b45309';
+            console.warn('ATP device photo AI read failed:', err);
+            status.textContent = retainedPhoto
+              ? '\u2713 Photo retained; AI read failed \u2014 enter the number below'
+              : '\u26a0\ufe0f Photo could not be saved \u2014 retry';
+            status.style.color = retainedPhoto ? '#b45309' : '#b91c1c';
           } finally {
             shootBtn.disabled = false;
           }
@@ -2053,6 +2122,7 @@
         shootBtn.onclick = () => inp.click();
 
         wrap.appendChild(hdr);
+        wrap.appendChild(photoNote);
         wrap.appendChild(inp);
         wrap.appendChild(previewWrap);
         wrap.appendChild(shootBtn);

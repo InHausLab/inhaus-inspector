@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=238';
-import { getInspection } from './state.js?v=238';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=239';
+import { getInspection } from './state.js?v=239';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -452,11 +452,34 @@ export function getAtpKitchenFields() {
   return [
     sel('atpSurface', 'Surface tested *', ['Kitchen counter', 'Kitchen sink', 'Bathroom counter', 'Bathroom sink', 'Other']),
     showIf(text('atpSurfaceOther', 'Describe surface', { placeholder: 'e.g. Laundry room sink', required: true }), 'atpSurface', 'Other'),
-    { type: 'number-scanner', dataKey: 'atpPreRLU', label: 'Pre-test RLU reading', unit: 'RLU' },
+    info('Photograph the ATP device display before and after cleaning. AI reads the RLU value; confirm or correct it below. Both original photos are kept for Tanner\'s report.'),
+    {
+      type: 'number-scanner',
+      dataKey: 'atpPreRLU',
+      statusKey: 'atpPreStatus',
+      photoKey: '_atpBeforePhotos',
+      photoRole: 'ATP Before',
+      stepName: 'ATP Before',
+      phase: 'before',
+      label: 'Pre-test RLU reading',
+      unit: 'RLU',
+      required: true
+    },
     radio('atpPreStatus', 'Pre-test status (Pass if below 100 RLU, Fail if 100 or above)', ['Pass', 'Fail']),
     divider(),
     yesno('atpCleaned', 'Surface cleaned with soap and water'),
-    { type: 'number-scanner', dataKey: 'atpPostRLU', label: 'Post-test RLU reading', unit: 'RLU' },
+    {
+      type: 'number-scanner',
+      dataKey: 'atpPostRLU',
+      statusKey: 'atpPostStatus',
+      photoKey: '_atpAfterPhotos',
+      photoRole: 'ATP After',
+      stepName: 'ATP After',
+      phase: 'after',
+      label: 'Post-test RLU reading',
+      unit: 'RLU',
+      required: true
+    },
     radio('atpPostStatus', 'Post-test status (Pass if below 100 RLU, Fail if 100 or more)', ['Pass', 'Fail']),
     textarea('notes', 'Notes')
   ];
@@ -921,6 +944,11 @@ export function validateStep(stepDef, existingData) {
 
   const missing = [];
   collectRequiredIssues(getStepFields(stepDef), data, missing);
+
+  if (stepDef.type === 'atp-kitchen') {
+    if (!hasPhoto(data, '_atpBeforePhotos')) missing.push('ATP Before device photo is required');
+    if (!hasPhoto(data, '_atpAfterPhotos')) missing.push('ATP After device photo is required');
+  }
 
   return missing;
 }

@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v239 — Retained ATP Device Photos
+**Date:** August 5, 2026
+
+- ATP before/after scans now save managed high-resolution photos to the normal upload and Tanner handoff pipeline.
+- AI reads each retained device photo into the existing RLU and Pass/Fail fields; inspectors can confirm or correct both results.
+- Both ATP device photos are required before the inspector can leave the ATP step.
+
 ## v238 — Explicit Assessment Classification
 **Date:** August 5, 2026
 
