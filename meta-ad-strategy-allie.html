@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InHaus | Aspen Meta Ad Strategy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #ffffff;
+    color: #1a1a2e;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ─── PAGE LAYOUT ──────────────────────────────────── */
+  .page {
+    width: 870px;
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  /* ─── HEADER ────────────────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, #0f2544 0%, #1a4068 60%, #0e6b72 100%);
+    color: white;
+    padding: 40px 52px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; right: 80px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.03);
+  }
+
+  .header-eyebrow {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 10px;
+  }
+
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .header-sub {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.72);
+    font-weight: 400;
+    max-width: 560px;
+  }
+
+  .header-meta {
+    margin-top: 18px;
+    display: flex;
+    gap: 24px;
+  }
+
+  .header-badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.3px;
+  }
+
+  /* ─── BODY CONTENT ───────────────────────────────────── */
+  .body {
+    padding: 36px 52px 48px;
+  }
+
+  /* ─── CALLOUT BOX ─────────────────────────────────────── */
+  .callout {
+    background: #f0f9fa;
+    border-left: 4px solid #0e6b72;
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+  }
+
+  .callout p {
+    color: #1a3d4a;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .callout strong {
+    color: #0e6b72;
+  }
+
+  /* ─── SECTION ─────────────────────────────────────────── */
+  .section {
+    margin-bottom: 36px;
+  }
+
+  .section-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #0e6b72;
+    margin-bottom: 10px;
+  }
+
+  .section h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f2544;
+    margin-bottom: 14px;
+    letter-spacing: -0.3px;
+  }
+
+  .section p {
+    color: #374151;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+
+  /* ─── TABLES ──────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+    font-size: 12.5px;
+  }
+
+  thead tr {
+    background: #0f2544;
+    color: white;
+  }
+
+  thead th {
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11.5px;
+    letter-spacing: 0.3px;
+  }
+
+  thead th:not(:first-child) {
+    text-align: center;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #e8ecf0;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f8fafc;
+  }
+
+  tbody tr:hover {
+    background: #f0f6ff;
+  }
+
+  tbody td {
+    padding: 10px 14px;
+    color: #374151;
+    vertical-align: top;
+  }
+
+  tbody td:not(:first-child) {
+    text-align: center;
+  }
+
+  .td-left {
+    text-align: left !important;
+  }
+
+  .phase-label {
+    font-weight: 600;
+    color: #0f2544;
+    white-space: nowrap;
+  }
+
+  .spend-val {
+    font-weight: 700;
+    color: #0e6b72;
+    font-size: 13px;
+  }
+
+  .tag-green {
+    display: inline-block;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .tag-blue {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .tag-amber {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* ─── CREATIVE TABLE ADJUSTMENT COL ─────────────────── */
+  .adj-col {
+    text-align: left !important;
+    color: #374151;
+    font-size: 12px;
+  }
+
+  .adj-col .highlight {
+    color: #0e6b72;
+    font-weight: 600;
+  }
+
+  /* ─── TWO-COLUMN FLOW ─────────────────────────────────── */
+  .two-col {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+
+  .two-col .col {
+    flex: 1;
+  }
+
+  /* ─── OS BOXES ────────────────────────────────────────── */
+  .os-row {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+
+  .os-box {
+    flex: 1;
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .os-box.green {
+    background: #f0faf5;
+    border: 1.5px solid #6ee7b7;
+  }
+
+  .os-box.red {
+    background: #fff7f7;
+    border: 1.5px solid #fca5a5;
+  }
+
+  .os-box .os-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .os-box.green .os-title { color: #047857; }
+  .os-box.red .os-title { color: #b91c1c; }
+
+  .os-box .os-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: #374151;
+  }
+
+  .os-box .os-step .num {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .os-box.green .num { background: #d1fae5; color: #047857; }
+  .os-box.red .num { background: #fee2e2; color: #b91c1c; }
+
+  /* ─── CREATIVE PIPELINE ────────────────────────────────── */
+  .pipeline-grid {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .pipeline-item {
+    flex: 1;
+    min-width: 120px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+
+  .pipeline-item .pi-territory {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #0f2544;
+    margin-bottom: 4px;
+  }
+
+  .pipeline-item .pi-count {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0e6b72;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .pipeline-item .pi-label {
+    font-size: 10px;
+    color: #94a3b8;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  /* ─── PRINCIPLE BOX ───────────────────────────────────── */
+  .principle-box {
+    background: #0f2544;
+    border-radius: 10px;
+    padding: 22px 26px;
+    color: white;
+    margin-bottom: 30px;
+  }
+
+  .principle-box .pb-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 10px;
+  }
+
+  .principle-box p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.9);
+    font-weight: 400;
+  }
+
+  .principle-box strong {
+    color: #5de8f0;
+    font-weight: 600;
+  }
+
+  /* ─── FOOTER ──────────────────────────────────────────── */
+  .footer {
+    border-top: 1px solid #e2e8f0;
+    padding: 16px 52px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-left {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .footer-right {
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  /* ─── PRINT ───────────────────────────────────────────── */
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-eyebrow">InHaus Lab · Marketing Strategy</div>
+    <h1>Aspen Meta Ad Strategy<br>Revised Approach</h1>
+    <p class="header-sub">
+      Building on Allie's territory framework — adjusted for Meta's Performance 5 practices and the realities of a small, high-value Aspen audience.
+    </p>
+    <div class="header-meta">
+      <span class="header-badge">Aspen Market · Phase 1</span>
+      <span class="header-badge">Meta Advantage+ Leads</span>
+      <span class="header-badge">August 2026</span>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- CALLOUT: Context -->
+    <div class="callout">
+      <p>
+        <strong>Allie's territory framework is solid.</strong> Health Optimizer, Water, Radon, Verification, and Luxury are the right conceptual segments for this market. This document proposes one structural shift: rather than testing concepts sequentially (launch → find winner → then build variations), Meta's current recommendations point toward <strong>launching creative diversity from day one</strong> and letting the algorithm decide where to concentrate spend.
+      </p>
+    </div>
+
+    <!-- SECTION 1: The Core Shift -->
+    <div class="section">
+      <div class="section-label">The Core Principle</div>
+      <h2>Run the Operating System, Not the Linear Test</h2>
+
+      <div class="os-row">
+        <div class="os-box green">
+          <div class="os-title">✓ Recommended</div>
+          <div class="os-step"><span class="num">1</span><span>Launch 5–6 ads across multiple territories + formats</span></div>
+          <div class="os-step"><span class="num">2</span><span>Meta allocates delivery to what resonates</span></div>
+          <div class="os-step"><span class="num">3</span><span>Remove clear losers (low CTR, no leads)</span></div>
+          <div class="os-step"><span class="num">4</span><span>Replace with 2–3 new challengers from the pipeline</span></div>
+          <div class="os-step"><span class="num">5</span><span>Scale spend as CPL stabilizes. Repeat.</span></div>
+        </div>
+
+        <div class="os-box red">
+          <div class="os-title">✗ Avoid</div>
+          <div class="os-step"><span class="num">1</span><span>Launch 3 statics</span></div>
+          <div class="os-step"><span class="num">2</span><span>Declare a winner after 7–10 days</span></div>
+          <div class="os-step"><span class="num">3</span><span>Stop testing while production catches up</span></div>
+          <div class="os-step"><span class="num">4</span><span>Make video of winning static</span></div>
+          <div class="os-step"><span class="num">5</span><span>Repeat from scratch</span></div>
+        </div>
+      </div>
+
+      <div class="principle-box">
+        <div class="pb-label">Why it matters for Aspen</div>
+        <p>
+          The Aspen audience is <strong>small</strong>. We don't want to fragment targeting by territory or persona. <strong>Creative is where we create the diversity</strong> — keep the account consolidated (one campaign, one ad set), and let multiple creative concepts compete simultaneously inside it. Meta's own Performance 5 framework explicitly recommends account simplification + creative diversification as a paired strategy.
+        </p>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Phase Spend Table -->
+    <div class="section">
+      <div class="section-label">Spend Ramp</div>
+      <h2>Phase-by-Phase Planning Ranges</h2>
+      <p style="margin-bottom:14px; color:#6b7280; font-size:12px;">These are planning ranges, not Meta-prescribed formulas. The principle is: consolidated structure + diversified creative + automated delivery.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Daily Spend</th>
+            <th>Live Ads</th>
+            <th style="text-align:left; padding-left:14px;">What's Running</th>
+            <th>Creative Bank</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="phase-label">Launch</td>
+            <td><span class="spend-val">$35</span></td>
+            <td><span class="tag-green">5–6</span></td>
+            <td class="td-left">3–4 statics + 1–2 Higgsfield videos</td>
+            <td><span class="tag-blue">20–25 ready</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Early Scale</td>
+            <td><span class="spend-val">$75</span></td>
+            <td><span class="tag-green">6–8</span></td>
+            <td class="td-left">Winners + 3–4 challengers</td>
+            <td><span class="tag-blue">25+</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Scale</td>
+            <td><span class="spend-val">$150</span></td>
+            <td><span class="tag-green">8–10</span></td>
+            <td class="td-left">Best concepts + new static/video executions</td>
+            <td><span class="tag-blue">30+</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Higher Scale</td>
+            <td><span class="spend-val">$300</span></td>
+            <td><span class="tag-green">10–15</span></td>
+            <td class="td-left">Multiple proven winners + continuous testing</td>
+            <td><span class="tag-blue">35–40+</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top:10px; font-size:11.5px; color:#94a3b8;">
+        <strong>Budget note:</strong> Set the budget at the campaign or ad-set level. Do not manually assign $7 to each ad. Advantage+ Leads is built around automated audience, placement, and budget optimization — let Meta decide where impressions go.
+      </p>
+    </div>
+
+    <!-- SECTION 3: Creative Plan Per Territory -->
+    <div class="section">
+      <div class="section-label">Creative Strategy</div>
+      <h2>Adjustments by Territory</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Territory</th>
+            <th style="text-align:left; padding-left:14px;">Original Plan</th>
+            <th style="text-align:left; padding-left:14px;">Revised Approach</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="phase-label">Health Optimizer</td>
+            <td class="td-left">S-01 + copy variation</td>
+            <td class="adj-col"><span class="highlight">3–4 executions</span><br><span style="font-size:11px; color:#6b7280;">Existing static, new visual, different hook, Higgsfield/video</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Water</td>
+            <td class="td-left">S-14 only</td>
+            <td class="adj-col"><span class="highlight">3–4 executions</span><br><span style="font-size:11px; color:#6b7280;">194 parameters, PFAS/microplastics, broader exposure angle, video</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Radon</td>
+            <td class="td-left">S-13 only</td>
+            <td class="adj-col"><span class="highlight">2–3 executions</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Verification</td>
+            <td class="td-left">Hold until later</td>
+            <td class="adj-col"><span class="highlight">Launch as a challenger from Day 1</span><br><span style="font-size:11px; color:#6b7280;">2–3 executions ready at launch</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Luxury / Whole Home</td>
+            <td class="td-left">Hold</td>
+            <td class="adj-col"><span class="highlight">Have 2–3 ready; introduce quickly</span><br><span style="font-size:11px; color:#6b7280;">Don't wait — challenger slot</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Higgsfield Video</td>
+            <td class="td-left">Wait for a static winner first</td>
+            <td class="adj-col"><span class="highlight">Run 1–2 from Day 1</span><br><span style="font-size:11px; color:#6b7280;">Video is a legitimate creative variable, not a reward for a winning static</span></td>
+          </tr>
+          <tr>
+            <td class="phase-label">Annual Checkup / Mold</td>
+            <td class="td-left">Later</td>
+            <td class="adj-col">Fine to hold initially — <span class="highlight">have creative ready to insert</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SECTION 4: Creative Pipeline Target -->
+    <div class="section">
+      <div class="section-label">Pre-Launch Target</div>
+      <h2>Get 20–25 Assets into the Pipeline Before Launch</h2>
+      <p style="margin-bottom:16px;">They don't all need to be live on Day 1. But having them ready means we can replace losers immediately rather than waiting a week for production.</p>
+
+      <div class="pipeline-grid">
+        <div class="pipeline-item">
+          <div class="pi-territory">Health Optimizer</div>
+          <div class="pi-count">5</div>
+          <div class="pi-label">assets</div>
+        </div>
+        <div class="pipeline-item">
+          <div class="pi-territory">Water</div>
+          <div class="pi-count">4</div>
+          <div class="pi-label">assets</div>
+        </div>
+        <div class="pipeline-item">
+          <div class="pi-territory">Radon</div>
+          <div class="pi-count">3</div>
+          <div class="pi-label">assets</div>
+        </div>
+        <div class="pipeline-item">
+          <div class="pi-territory">Verification</div>
+          <div class="pi-count">4</div>
+          <div class="pi-label">assets</div>
+        </div>
+        <div class="pipeline-item">
+          <div class="pi-territory">Luxury / Whole Home</div>
+          <div class="pi-count">3</div>
+          <div class="pi-label">assets</div>
+        </div>
+        <div class="pipeline-item">
+          <div class="pi-territory">Higgsfield / Video</div>
+          <div class="pi-count">4–6</div>
+          <div class="pi-label">executions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 5: Why Higgsfield now -->
+    <div class="section">
+      <div class="section-label">On Video</div>
+      <h2>Why Higgsfield Goes In at Launch</h2>
+      <p>Meta explicitly advocates a mixed-format creative strategy and recommends expanding across formats and placements. Video/Reels is a legitimate creative variable to test — it doesn't need to wait for a static to prove the underlying concept first.</p>
+      <p>If the Higgsfield ad produces qualified Aspen leads, we make several more in that style. If it doesn't, it comes out. That's the test.</p>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">InHaus Lab · Aspen Market · August 2026</div>
+    <div class="footer-right">Based on Meta Performance 5 practices — Advantage+ Leads</div>
+  </div>
+
+</div>
+</body>
+</html>
