@@ -1,5 +1,5 @@
 // InHaus Inspector - Storage (save/load/backup logic)
-import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=239';
+import { getInspection, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt } from './state.js?v=240';
 
 let _onSyncStatusChange = null;
 let _onInspectionDirty = null;
@@ -101,6 +101,8 @@ export function backupToLocalStorage() {
             step[k] = step[k].map(p => ({
               photoId: p.photoId, stepName: p.stepName, roomName: p.roomName,
               caption: p.caption, timestamp: p.timestamp,
+              photoPurpose: p.photoPurpose || '',
+              photoPurposeLabel: p.photoPurposeLabel || '',
               placementSource: p.placementSource || '',
               routingStatus: p.routingStatus || '',
               assignedSlot: p.assignedSlot || null,
@@ -117,6 +119,8 @@ export function backupToLocalStorage() {
         roomName: p.roomName,
         caption: p.caption,
         timestamp: p.timestamp,
+        photoPurpose: p.photoPurpose || '',
+        photoPurposeLabel: p.photoPurposeLabel || '',
         placementSource: p.placementSource || '',
         routingStatus: p.routingStatus || '',
         assignedSlot: p.assignedSlot || null,
@@ -130,6 +134,8 @@ export function backupToLocalStorage() {
         roomName: p.roomName,
         caption: p.caption,
         timestamp: p.timestamp,
+        photoPurpose: p.photoPurpose || '',
+        photoPurposeLabel: p.photoPurposeLabel || '',
         placementSource: p.placementSource || '',
         routingStatus: p.routingStatus || '',
         uploaded: p.dataUrl === '__uploaded__'

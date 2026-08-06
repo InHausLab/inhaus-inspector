@@ -1,4 +1,4 @@
-import { cloudFetch } from './sync.js?v=239';
+import { cloudFetch } from './sync.js?v=240';
 
 const tokenInput = document.getElementById('admin-token');
 const loadButton = document.getElementById('load-library');

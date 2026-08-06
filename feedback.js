@@ -1,7 +1,7 @@
 // InHaus Inspector - App improvement feedback capture and durable retry queue
-import { getInspection, getScreen } from './state.js?v=239';
-import { cloudFetch } from './sync.js?v=239';
-import { PHOTO_WORKER_URL } from './config.js?v=239';
+import { getInspection, getScreen } from './state.js?v=240';
+import { cloudFetch } from './sync.js?v=240';
+import { PHOTO_WORKER_URL } from './config.js?v=240';
 
 let initialized = false;
 let retryInProgress = false;

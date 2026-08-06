@@ -1,13 +1,13 @@
 // InHaus Inspector - Main Application
-import { PHOTO_WORKER_URL } from './config.js?v=239';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=239';
-import { initStorage, saveNow, scheduleSave } from './storage.js?v=239';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=239';
-import { cloudFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendInspectionToCloud, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=239';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=239';
-import { initScreens, render } from './screens.js?v=239';
-import { initAppFeedback } from './feedback.js?v=239';
-import { deletePhotoFromSupabase } from './supabase-photos.js?v=239';
+import { PHOTO_WORKER_URL } from './config.js?v=240';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=240';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=240';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=240';
+import { cloudFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendInspectionToCloud, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=240';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=240';
+import { initScreens, render } from './screens.js?v=240';
+import { initAppFeedback } from './feedback.js?v=240';
+import { deletePhotoFromSupabase, updatePhotoMetadata } from './supabase-photos.js?v=240';
 
 (function () {
   'use strict';
@@ -54,6 +54,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=239';
 
   const root = document.getElementById('app');
   window.deletePhotoFromSupabase = deletePhotoFromSupabase;
+  window.updatePhotoMetadata = updatePhotoMetadata;
   const RESTORABLE_SCREENS = new Set([
     'truck-check', 'intake', 'cloud-resume', 'precheck', 'step',
     'photos', 'rapid-capture', 'findings', 'team', 'my-work', 'recovery'
@@ -629,7 +630,7 @@ import { deletePhotoFromSupabase } from './supabase-photos.js?v=239';
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v239',
+      appVersion: 'v240',
       success: success
     };
   }

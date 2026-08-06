@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v240 — Photo Type Shortcuts
+**Date:** August 6, 2026
+
+- Adds an optional photo-type selector to every photo card.
+- Includes common field choices for overview, location, concern, detail, equipment, before, and after photos.
+- Prefills an empty inspector caption from the selected type without replacing inspector-entered wording.
+- Preserves photo-type metadata in local recovery data and inspection exports.
+
 ## v239 — Retained ATP Device Photos
 **Date:** August 5, 2026
 

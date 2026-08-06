@@ -223,6 +223,8 @@
         stepName: photo.stepName || '',
         photoKey: photo.photoKey || '',
         photoRole: photo.photoRole || '',
+        photoPurpose: photo.photoPurpose || '',
+        photoPurposeLabel: photo.photoPurposeLabel || '',
         sectionLabel: photo.sectionLabel || '',
         caption: photo.caption || '',
         placementSource: photo.placementSource || '',
@@ -244,6 +246,18 @@
       return false;
     }
   }
+
+  const PHOTO_PURPOSE_OPTIONS = [
+    { value: '', label: 'Select photo type (optional)' },
+    { value: 'overview', label: 'Zoomed-out overview' },
+    { value: 'location', label: 'Location / context' },
+    { value: 'fault', label: 'Area of concern / fault' },
+    { value: 'detail', label: 'Close-up detail' },
+    { value: 'equipment', label: 'Equipment / data label' },
+    { value: 'before', label: 'Before work' },
+    { value: 'after', label: 'After work' },
+    { value: 'other', label: 'Other' }
+  ];
 
   // ── Global Timer Alarm ─────────────────────────────────────
   // Timer expiration cannot belong to a room's DOM: that DOM is destroyed as
@@ -1400,6 +1414,39 @@
           }
           onUpdate();
         });
+
+        const purposeRow = el('label', { className: 'photo-purpose-field' });
+        purposeRow.appendChild(el('span', { className: 'field-label' }, 'Photo type'));
+        const purposeSelect = el('select', { className: 'field-input photo-purpose-select' });
+        PHOTO_PURPOSE_OPTIONS.forEach(option => {
+          purposeSelect.appendChild(el('option', { value: option.value }, option.label));
+        });
+        purposeSelect.value = p.photoPurpose || '';
+        purposeSelect.addEventListener('change', () => {
+          const option = PHOTO_PURPOSE_OPTIONS.find(item => item.value === purposeSelect.value);
+          p.photoPurpose = purposeSelect.value;
+          p.photoPurposeLabel = option && option.value ? option.label : '';
+          if (p.photoPurposeLabel && !String(p.caption || '').trim()) {
+            p.caption = p.photoPurposeLabel;
+            capInp.value = p.caption;
+          }
+          if (window.DB && window.DB.updatePhoto && p.photoId) {
+            window.DB.updatePhoto(p.photoId, {
+              photoPurpose: p.photoPurpose,
+              photoPurposeLabel: p.photoPurposeLabel,
+              caption: p.caption || '',
+              updatedAt: Date.now()
+            });
+          }
+          if (window.updatePhotoMetadata && p.photoId && (p.storagePath || p._storedConfirmed || p._driveConfirmed)) {
+            window.updatePhotoMetadata(p, inspectionId).catch(err => {
+              console.warn('Photo type cloud update will retry with the inspection checkpoint:', err);
+            });
+          }
+          onUpdate();
+        });
+        purposeRow.appendChild(purposeSelect);
+        card.appendChild(purposeRow);
         capRow.appendChild(capInp);
         card.appendChild(capRow);
 
@@ -1536,7 +1583,7 @@
           const newPhoto = {
             photoId: 'p-' + Math.random().toString(36).substr(2, 9),
             roomName: resolvedRoomName, stepName: stepName || '',
-            timestamp: new Date().toISOString(), caption: '', dataUrl, thumbnailDataUrl,
+            timestamp: new Date().toISOString(), caption: '', photoPurpose: '', photoPurposeLabel: '', dataUrl, thumbnailDataUrl,
             placementSource: resolvedRoomName || stepName ? 'capture_context' : 'unassigned',
             routingStatus: resolvedRoomName || stepName ? 'auto' : 'needs_review',
             _uploaded: false, _vaultSaved: false

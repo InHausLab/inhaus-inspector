@@ -656,6 +656,20 @@ body {
   border: none; border-top: 1px solid var(--border);
   border-radius: 0; min-height: 72px; font-size: 0.95rem; width:100%; padding: 8px;
 }
+
+.photo-purpose-field {
+  display: block;
+  margin: 8px 0 4px;
+}
+
+.photo-purpose-field .field-label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.photo-purpose-select {
+  width: 100%;
+}
 .photo-caption-input:focus {
   box-shadow: none; border-color: var(--accent);
 }

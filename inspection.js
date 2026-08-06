@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=239';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=239';
-import { ensureInspectionWorkspace } from './findings.js?v=239';
+import { getInspection } from './state.js?v=240';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=240';
+import { ensureInspectionWorkspace } from './findings.js?v=240';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -16,6 +16,8 @@ export function extractAllPhotosFromExport(exportData) {
       photoId: p.photoId || '',
       imageData: hasData ? imageData : '',
       caption: p.caption || '',
+      photoPurpose: p.photoPurpose || '',
+      photoPurposeLabel: p.photoPurposeLabel || '',
       roomName: p.roomName || fallbackRoomName || '',
       stepName: p.stepName || '',
       timestamp: p.timestamp || '',
@@ -98,6 +100,8 @@ function exportPhotoArray(arr) {
     stepName: p.stepName,
     timestamp: p.timestamp,
     caption: p.caption,
+    photoPurpose: p.photoPurpose || '',
+    photoPurposeLabel: p.photoPurposeLabel || '',
     placementSource: p.placementSource || '',
     routingStatus: p.routingStatus || '',
     assignedSlot: p.assignedSlot || null,
