@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w33';
+const WORKER_VERSION = 'handoff-w34';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -1185,9 +1185,7 @@ async function handleHandoffJob(request, env, ctx) {
   const system = isPlainObject(fieldData.system) ? fieldData.system : {};
   const assessmentRow = await getAssessmentRow(env, inspectionId);
   const canonicalSource = buildCanonicalAssessmentSource(assessmentRow);
-  const receiptExpectations = {
-    expectedRoomCount: Array.isArray(canonicalSource.rooms) ? canonicalSource.rooms.length : 0
-  };
+  const receiptExpectations = await getHandoffReceiptExpectations(env, inspectionId, canonicalSource);
   const existingReceipt = getReadyHandoffReceipt(fieldData, receiptExpectations);
   if (body.forceFullRepair !== true && existingReceipt) {
     const cachedJob = {
@@ -1339,9 +1337,7 @@ async function handleHandoffJobRunner(request, env, ctx) {
     const reviewJob = isPlainObject(reviewSystem.handoffJob) ? reviewSystem.handoffJob : {};
     const assessmentRow = await getAssessmentRow(env, inspectionId);
     const canonicalSource = buildCanonicalAssessmentSource(assessmentRow);
-    const receiptExpectations = {
-      expectedRoomCount: Array.isArray(canonicalSource.rooms) ? canonicalSource.rooms.length : 0
-    };
+    const receiptExpectations = await getHandoffReceiptExpectations(env, inspectionId, canonicalSource);
     const durableReceipt = durableJob && isPlainObject(durableJob.receipt)
       ? durableJob.receipt
       : (isPlainObject(reviewSystem.tannerHandoff) ? reviewSystem.tannerHandoff : null);
@@ -5080,6 +5076,14 @@ async function getPhotoRowsForInspection(env, inspectionId) {
   const text = await res.text();
   if (!res.ok) throw new Error(`photo_status_failed:${res.status}:${text.slice(0, 200)}`);
   return text ? JSON.parse(text) : [];
+}
+
+async function getHandoffReceiptExpectations(env, inspectionId, canonicalSource = {}) {
+  const photoRows = await getPhotoRowsForInspection(env, inspectionId);
+  return {
+    expectedRoomCount: Array.isArray(canonicalSource.rooms) ? canonicalSource.rooms.length : 0,
+    expectedPhotoCount: Array.isArray(photoRows) ? photoRows.length : 0
+  };
 }
 
 async function getPhotoManifestRows(env, inspectionId) {

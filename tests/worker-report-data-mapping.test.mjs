@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   buildInspectionSummaryRows,
   normalizeInspectionReportData
 } from '../workers/inhaus-photo-worker/src/index.js';
+
+const workerSource = fs.readFileSync(
+  new URL('../workers/inhaus-photo-worker/src/index.js', import.meta.url),
+  'utf8'
+);
 
 function ericksonShape() {
   return {
@@ -64,4 +70,14 @@ test('inspection spreadsheet summary uses the canonical Tanner fields', () => {
   assert.equal(values.get('Radon Mitigation'), 'No');
   assert.equal(values.get('Fireplace(s)'), 'Yes — Gas — 1 total');
   assert.equal(values.get('Stove Ventilation'), 'Ducted (to outside)');
+});
+
+test('ready handoff receipts are checked against the current photo table', () => {
+  assert.match(
+    workerSource,
+    /async function getHandoffReceiptExpectations[\s\S]*?getPhotoRowsForInspection[\s\S]*?expectedPhotoCount: Array\.isArray\(photoRows\) \? photoRows\.length : 0/
+  );
+  assert.ok(
+    [...workerSource.matchAll(/await getHandoffReceiptExpectations\(env, inspectionId, canonicalSource\)/g)].length >= 2
+  );
 });
