@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w32';
+const WORKER_VERSION = 'handoff-w33';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -654,6 +654,7 @@ async function handleInspectionGet(request, url, env) {
     if (isPlainObject(event.payload)) inspection = mergeInspectionExports(inspection, event.payload);
   }
   inspection = applyInspectionPhotoTombstones(inspection, inspection.photoTombstones);
+  inspection = normalizeInspectionReportData(inspection);
   inspection.inspectionId = inspection.inspectionId || inspectionId;
   inspection.id = inspection.id || inspectionId;
   inspection.status = row.status || inspection.status || '';
@@ -2741,6 +2742,75 @@ async function ensureTestHandoffShell(env, accessToken, source) {
   };
 }
 
+function reportValue(value, labels = {}) {
+  if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean).join(', ');
+  if (isPlainObject(value)) {
+    return Object.entries(value)
+      .filter(([, selected]) => selected === true || String(selected || '').toLowerCase() === 'yes')
+      .map(([key]) => labels[key] || key)
+      .join(', ');
+  }
+  return String(value === undefined || value === null ? '' : value).trim();
+}
+
+function reportSystemSummary(present, detail) {
+  const presence = reportValue(present);
+  const description = reportValue(detail);
+  if (presence && description) return `${presence} — ${description}`;
+  return presence || description || '';
+}
+
+function setReportDefault(target, key, value) {
+  if (reportValue(target[key])) return;
+  const normalized = reportValue(value);
+  if (normalized) target[key] = normalized;
+}
+
+function normalizeInspectionReportData(input) {
+  const source = isPlainObject(input) ? structuredClone(input) : {};
+  const steps = isPlainObject(source.stepData) ? source.stepData : {};
+  const utility = {
+    ...(isPlainObject(source.utilityRoom) ? source.utilityRoom : {}),
+    ...(isPlainObject(steps.utility) ? steps.utility : {})
+  };
+  const property = isPlainObject(steps['property-details']) ? steps['property-details'] : {};
+  const kitchen = isPlainObject(steps['kitchen-appliance']) ? steps['kitchen-appliance'] : {};
+  const ventilationLabels = {
+    bathExhaust: 'Bathroom Exhaust Fan(s)',
+    hrv: 'HRV',
+    erv: 'ERV',
+    ventNone: 'None',
+    none: 'None',
+    ventNotSure: 'Not sure',
+    notSure: 'Not sure'
+  };
+
+  setReportDefault(source, 'waterFiltration', reportSystemSummary(utility.waterFiltrationPresent, utility.waterFiltType));
+  setReportDefault(source, 'waterSoftener', reportSystemSummary(utility.waterSofteningPresent, utility.waterSoftType));
+  setReportDefault(source, 'heating', utility.heatingType);
+  setReportDefault(source, 'ac', utility.acType);
+  setReportDefault(source, 'ventilation', reportValue(utility.ventilationType, ventilationLabels));
+  setReportDefault(source, 'ventilationReadable', source.ventilation);
+  setReportDefault(source, 'airFiltration', reportSystemSummary(utility.airFiltrationPresent, utility.airFiltType));
+  setReportDefault(source, 'otherAirCleaning', reportSystemSummary(utility.otherAirPurifierPresent, utility.otherAirPurifierType));
+  setReportDefault(source, 'radonMitigation', reportSystemSummary(
+    utility.radonMitigationPresent,
+    firstNonEmpty(utility.radonMitType, utility.radonMitigationOther)
+  ));
+  setReportDefault(source, 'fireplace', property.fireplace);
+  setReportDefault(source, 'fireplacePresent', property.fireplacePresent);
+  setReportDefault(source, 'fireplaceCount', property.fireplaceCount);
+  setReportDefault(source, 'fireplaceSummary', [
+    reportValue(property.fireplacePresent),
+    reportValue(property.fireplace),
+    property.fireplaceCount ? `${property.fireplaceCount} total` : ''
+  ].filter(Boolean).join(' — '));
+  setReportDefault(source, 'stoveType', kitchen.stoveType);
+  setReportDefault(source, 'stoveVentilation', kitchen.exhaustVented);
+  setReportDefault(source, 'stoveSummary', [reportValue(kitchen.stoveType), reportValue(kitchen.exhaustVented)].filter(Boolean).join(' — '));
+  return source;
+}
+
 function buildCanonicalAssessmentSource(assessmentRow) {
   const raw = assessmentRow && isPlainObject(assessmentRow.raw_jsonb)
     ? structuredClone(assessmentRow.raw_jsonb)
@@ -2755,7 +2825,7 @@ function buildCanonicalAssessmentSource(assessmentRow) {
     ? structuredClone(raw.rooms)
     : (Array.isArray(resume.rooms) ? structuredClone(resume.rooms) : []);
   delete source.resumeData;
-  return source;
+  return normalizeInspectionReportData(source);
 }
 
 function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
@@ -4184,7 +4254,8 @@ function buildFormattedReviewRows(fieldData) {
   const rows = [['Section', 'Key', 'Value']];
   const summaryKeys = [
     'clientName', 'propertyAddress', 'inspectionDate', 'inspectorName', 'inspectionType',
-    'waterSource', 'waterFiltration', 'heating', 'ac', 'ventilation', 'weather',
+    'waterSource', 'waterFiltration', 'waterSoftener', 'heating', 'ac', 'ventilation',
+    'airFiltration', 'otherAirCleaning', 'radonMitigation', 'fireplaceSummary', 'stoveSummary', 'weather',
     'clientConcerns', 'knownProblemAreas', 'reportBuilderNotes', 'followUpPlan'
   ];
   summaryKeys.forEach(function(key) {
@@ -4354,6 +4425,12 @@ function buildInspectionSummaryRows(source, fieldData) {
     ['Heating', exportValue(record, ['heating', 'heatingSystem'])],
     ['Air Conditioning', exportValue(record, ['ac', 'airConditioning'])],
     ['Ventilation', exportValue(record, ['ventilation'])],
+    ['Air Filtration / Cleansing', exportValue(record, ['airFiltration'])],
+    ['Other Air Cleaning Devices', exportValue(record, ['otherAirCleaning'])],
+    ['Radon Mitigation', exportValue(record, ['radonMitigation'])],
+    ['Fireplace(s)', exportValue(record, ['fireplaceSummary', 'fireplace'])],
+    ['Stove / Range', exportValue(record, ['stoveSummary', 'stoveType'])],
+    ['Stove Ventilation', exportValue(record, ['stoveVentilation', 'exhaustVented'])],
     ['Weather', exportValue(record, ['weather', 'weatherConditions'])],
     ['Occupancy', exportValue(record, ['occupancy', 'occupied'])],
     ['Client Concerns', firstNonEmpty(fieldData.clientConcerns, exportValue(record, ['clientConcerns']))],
@@ -4417,7 +4494,9 @@ function buildInspectionCsvRows(source, fieldData, photoRows = []) {
   const headers = [
     'Inspection ID', 'Inspector', 'Inspection Date', 'Client', 'Property Address', 'Inspection Type',
     'Residence Type', 'Year Built', 'Square Feet', 'Bedrooms', 'Bathrooms', 'Levels', 'Basement',
-    'Water Source', 'Water Filtration', 'Heating', 'Air Conditioning', 'Ventilation', 'Weather',
+    'Water Source', 'Water Filtration', 'Water Softener', 'Heating', 'Air Conditioning', 'Ventilation',
+    'Air Filtration / Cleansing', 'Other Air Cleaning Devices', 'Radon Mitigation',
+    'Fireplace(s)', 'Stove / Range', 'Stove Ventilation', 'Weather',
     'Client Concerns', 'Known Problem Areas', 'Room Count', 'Photo Count'
   ];
   const values = [
@@ -4436,9 +4515,16 @@ function buildInspectionCsvRows(source, fieldData, photoRows = []) {
     exportValue(record, ['basement', 'hasBasement']),
     exportValue(record, ['waterSource']),
     exportValue(record, ['waterFiltration', 'filtration']),
+    exportValue(record, ['waterSoftener', 'softener']),
     exportValue(record, ['heating', 'heatingSystem']),
     exportValue(record, ['ac', 'airConditioning']),
     exportValue(record, ['ventilation']),
+    exportValue(record, ['airFiltration']),
+    exportValue(record, ['otherAirCleaning']),
+    exportValue(record, ['radonMitigation']),
+    exportValue(record, ['fireplaceSummary', 'fireplace']),
+    exportValue(record, ['stoveSummary', 'stoveType']),
+    exportValue(record, ['stoveVentilation', 'exhaustVented']),
     exportValue(record, ['weather', 'weatherConditions']),
     firstNonEmpty(fieldData.clientConcerns, exportValue(record, ['clientConcerns'])),
     firstNonEmpty(fieldData.knownProblemAreas, exportValue(record, ['knownProblemAreas'])),
@@ -4508,9 +4594,11 @@ function roomPhotoIds(room, photoRows) {
 }
 
 function exportValue(record, keys) {
-  const wanted = new Set((keys || []).map(normalizeExportKey));
-  const found = findExportValue(record, wanted);
-  return found === undefined ? '' : spreadsheetCellValue(found);
+  for (const key of keys || []) {
+    const found = findExportValue(record, new Set([normalizeExportKey(key)]));
+    if (found !== undefined) return spreadsheetCellValue(found);
+  }
+  return '';
 }
 
 function findExportValue(value, wanted, depth = 0, seen = new Set()) {
@@ -5032,6 +5120,8 @@ async function listStoredPhotoNames(env, inspectionId) {
 export {
   SHEET_CELL_SAFE_CHARS,
   buildFormattedReviewRows,
+  buildInspectionSummaryRows,
   buildRawAppRows,
-  buildRawReviewRows
+  buildRawReviewRows,
+  normalizeInspectionReportData
 };

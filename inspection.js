@@ -1,7 +1,7 @@
 // InHaus Inspector - Inspection Export Logic
-import { getInspection } from './state.js?v=240';
-import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=240';
-import { ensureInspectionWorkspace } from './findings.js?v=240';
+import { getInspection } from './state.js?v=241';
+import { SHARED_DRIVE_FOLDER_ID } from './config.js?v=241';
+import { ensureInspectionWorkspace } from './findings.js?v=241';
 
 export function extractAllPhotosFromExport(exportData) {
   const photos = [];
@@ -190,10 +190,19 @@ function cleanStepData(data) {
   return clean;
 }
 
+function systemSummary(present, detail) {
+  const presence = String(present || '').trim();
+  const description = String(detail || '').trim();
+  if (presence && description) return `${presence} — ${description}`;
+  return presence || description || '';
+}
+
 // ── Export JSON Builder ────────────────────────────────────
 export function buildExportJSON(stepList) {
   const inspection = getInspection();
   ensureInspectionWorkspace(inspection);
+  const utilityData = inspection.stepData?.utility || {};
+  const propertyData = inspection.stepData?.['property-details'] || {};
   const exp = {
     inspectionId: inspection.inspectionId,
     propertyAddress: inspection.propertyAddress,
@@ -211,7 +220,9 @@ export function buildExportJSON(stepList) {
     squareFootage: (inspection.stepData?.['property-details']?.squareFootage) || '',
     basement: (inspection.stepData?.['property-details']?.basement) || '',
     carpetedRooms: (inspection.stepData?.['property-details']?.carpetedRooms) || '',
-    fireplace: (inspection.stepData?.['property-details']?.fireplace) || '',
+    fireplace: (() => { const v = propertyData.fireplace || ''; return Array.isArray(v) ? v.join(', ') : v; })(),
+    fireplacePresent: propertyData.fireplacePresent || '',
+    fireplaceCount: propertyData.fireplaceCount || '',
     // NOTE: pets + stoveType are now chips (arrays) — normalize to string immediately so
     // Keep the stored timestamp compatible with older inspection records.
     pets: (() => { const v = (inspection.stepData?.['property-details']?.pets) || ''; return Array.isArray(v) ? v.join(', ') : v; })(),
@@ -219,6 +230,14 @@ export function buildExportJSON(stepList) {
     smokingVaping: (inspection.stepData?.['property-details']?.smokingVaping) || '',
     stoveType: (() => { const v = (inspection.stepData?.['kitchen-appliance']?.stoveType) || (inspection.stepData?.['property-details']?.stoveType) || ''; return Array.isArray(v) ? v.join(', ') : v; })(),
     stoveTypeOther: (inspection.stepData?.['kitchen-appliance']?.stoveTypeOther) || (inspection.stepData?.['property-details']?.stoveTypeOther) || '',
+    stoveVentilation: (inspection.stepData?.['kitchen-appliance']?.exhaustVented) || '',
+    waterFiltration: systemSummary(utilityData.waterFiltrationPresent, utilityData.waterFiltType),
+    waterSoftener: systemSummary(utilityData.waterSofteningPresent, utilityData.waterSoftType),
+    heating: utilityData.heatingType || '',
+    ac: utilityData.acType || '',
+    airFiltration: systemSummary(utilityData.airFiltrationPresent, utilityData.airFiltType),
+    otherAirCleaning: systemSummary(utilityData.otherAirPurifierPresent, utilityData.otherAirPurifierType),
+    radonMitigation: systemSummary(utilityData.radonMitigationPresent, utilityData.radonMitType || utilityData.radonMitigationOther),
     wifiNetwork: inspection.wifiNetwork || '',
     clientConcerns: inspection.clientConcerns || '',
 
@@ -286,6 +305,7 @@ export function buildExportJSON(stepList) {
   const ventType = inspection.stepData?.utility?.ventilationType || {};
   const ventLabels = { hrv: 'HRV', erv: 'ERV', bathExhaust: 'Bathroom Exhaust Fan(s)', none: 'None', notSure: 'Not Sure' };
   exp.ventilationReadable = Object.entries(ventType).filter(([, v]) => v === true).map(([k]) => ventLabels[k] || k).join(', ');
+  exp.ventilation = exp.ventilationReadable;
 
   const roomTypes = ['room-test', 'bedroom', 'bathroom', 'living-area', 'kitchen-appliance', 'water-sample', 'atp-kitchen', 'kitchen-air', 'additional-room'];
   stepList.forEach(step => {

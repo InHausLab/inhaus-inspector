@@ -67,7 +67,8 @@ test('selected heating and cooling systems each require their own photo', () => 
   const missing = validateStep({ id: 'utility', type: 'utility' }, {
     forcedHVAC: 'Yes',
     heatingType: 'Natural Gas Furnace',
-    acType: 'Ductless Mini-Split System'
+    acType: 'Ductless Mini-Split System',
+    ventilationType: { ventNone: true }
   });
   assert.deepEqual(missing, [
     'Natural Gas Furnace Photos * is required',

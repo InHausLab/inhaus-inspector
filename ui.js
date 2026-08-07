@@ -1892,9 +1892,13 @@
         const scanLabel = f.scanLabel || 'Scan Sample Label';
         const confirmLabel = f.confirmLabel || 'Confirm ID \u2014 correct if needed';
         const inputPlaceholder = f.placeholder || 'e.g. WP-123456';
+        const photoKey = f.photoKey || (dataKey + '_photos');
+        const photoRole = f.photoRole || f.stepName || labelText;
         const scanPrompt = f.prompt || 'This is a water test kit label with a barcode. Ignore the barcode stripes. Read the human-readable text printed below or near the barcode \u2014 it is the sample ID or kit number (e.g. wtk_pfas_27079 or WP-123456). Return JSON with one key: sampleId (string). Return ONLY the JSON object. If you cannot find readable text, return {"sampleId": null}.';
 
         const PROXY_URL = 'https://inhaus-vision-proxy.mjordanjay.workers.dev';
+        if (!Array.isArray(data[photoKey])) data[photoKey] = [];
+        const existingPhoto = data[photoKey][0] || data[dataKey + '_photo'] || null;
         const wrap = document.createElement('div');
         wrap.style = 'background:#f0f7ff;border:2px solid #93c5fd;border-radius:12px;padding:14px;margin:4px 0 8px;';
 
@@ -1909,9 +1913,10 @@
 
         // Preview
         const previewWrap = document.createElement('div');
-        previewWrap.style = 'position:relative;margin-bottom:10px;display:none;';
+        previewWrap.style = 'position:relative;margin-bottom:10px;' + (existingPhoto ? '' : 'display:none;');
         const preview = document.createElement('img');
-        preview.style = 'width:100%;border-radius:8px;border:1.5px solid #93c5fd;max-height:140px;object-fit:cover;';
+        preview.style = 'width:100%;border-radius:8px;border:1.5px solid #93c5fd;max-height:220px;object-fit:contain;background:#fff;';
+        if (existingPhoto) preview.src = existingPhoto.thumbnailDataUrl || existingPhoto.dataUrl || '';
         const retakeBtn = document.createElement('button');
         retakeBtn.type = 'button';
         retakeBtn.style = 'position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;';
@@ -1923,14 +1928,14 @@
         const shootBtn = document.createElement('button');
         shootBtn.type = 'button';
         shootBtn.style = 'width:100%;padding:10px;background:#1e40af;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:0.9rem;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;';
-        shootBtn.innerHTML = '\uD83D\uDCF7 ' + scanLabel;
+        shootBtn.textContent = existingPhoto ? 'Retake Sample Label Photo' : scanLabel;
 
         // Status
         const status = document.createElement('div');
         status.style = 'font-size:0.82rem;margin-bottom:8px;min-height:18px;';
         if (data[dataKey]) {
-          shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
-          status.textContent = '\u2713 ID confirmed';
+          shootBtn.textContent = 'Retake Sample Label Photo';
+          status.textContent = existingPhoto ? '\u2713 Label photo retained and ID confirmed' : '\u2713 ID confirmed';
           status.style += 'color:#15803d;font-weight:600;';
         }
 
@@ -1955,13 +1960,36 @@
           status.textContent = '\u23f3 Reading label...';
           status.style.color = '#92400e';
           status.style.fontWeight = '600';
+          let retainedPhoto = null;
           try {
-            const dataUrl = await compressImage(file, { minWidth: 800 });
-            // store photo reference
-            data[dataKey + '_photo'] = { dataUrl, timestamp: new Date().toISOString() };
-            preview.src = dataUrl;
+            const dataUrl = await compressImage(file);
+            const thumbnailDataUrl = await imageVariant(dataUrl, 420, 0.62);
+            const previousPhoto = data[photoKey][0] || {};
+            const capturedPhoto = {
+              photoId: previousPhoto.photoId || 'sample-label-' + Math.random().toString(36).substr(2, 9),
+              roomName: data.roomName || data._roomName || photoRole,
+              stepName: f.stepName || photoRole,
+              photoKey,
+              photoRole,
+              sectionLabel: photoRole,
+              timestamp: new Date().toISOString(),
+              caption: photoRole,
+              dataUrl,
+              thumbnailDataUrl,
+              placementSource: 'capture_context',
+              routingStatus: 'auto',
+              _uploaded: false,
+              _vaultSaved: false
+            };
+            await savePhotoRecordToVault(capturedPhoto, inspection && inspection.inspectionId);
+            retainedPhoto = capturedPhoto;
+            if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(capturedPhoto);
+            data[photoKey] = [capturedPhoto];
+            delete data[dataKey + '_photo'];
+            preview.src = retainedPhoto.thumbnailDataUrl || retainedPhoto.dataUrl;
             previewWrap.style.display = '';
-            shootBtn.innerHTML = '\uD83D\uDCF7 Retake Photo';
+            shootBtn.textContent = 'Retake Sample Label Photo';
+            changed();
             const resp = await fetchWithTimeout(PROXY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
@@ -1974,19 +2002,21 @@
               data[dataKey] = parsed.sampleId;
               confirmInp.value = parsed.sampleId;
               confirmRow.style.display = '';
-              status.textContent = '\u2713 ID read \u2014 confirm below';
+              status.textContent = '\u2713 Label photo retained and ID read \u2014 confirm below';
               status.style.color = '#15803d';
             } else {
               confirmRow.style.display = '';
               confirmInp.value = data[dataKey] || '';
-              status.textContent = '\u26a0\ufe0f Could not read ID \u2014 type it below';
+              status.textContent = '\u2713 Label photo retained; AI could not read the ID \u2014 type it below';
               status.style.color = '#b45309';
             }
             changed();
           } catch (err) {
             confirmRow.style.display = '';
-            status.textContent = '\u26a0\ufe0f Scan failed \u2014 type ID below';
-            status.style.color = '#b45309';
+            status.textContent = retainedPhoto
+              ? '\u2713 Label photo retained; AI read failed \u2014 type the ID below'
+              : '\u26a0\ufe0f Label photo could not be saved \u2014 retry';
+            status.style.color = retainedPhoto ? '#b45309' : '#b91c1c';
           } finally {
             shootBtn.disabled = false;
           }

@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v241 — Report Evidence Completeness
+**Date:** August 7, 2026
+
+- Retains Boulder Blue and water-sample label images as managed high-resolution report photos while AI reads the editable sample ID.
+- Requires an explicit exterior issue decision and at least one correctly routed exterior photo; issue descriptions are required when the inspector selects Yes.
+- Captures heating, cooling, and ventilation independently from the forced-HVAC answer.
+- Projects the system, fireplace, stove, and ventilation fields into one report-facing data shape for the portal and Tanner package.
+- Tightens the Worker handoff mapping and photo-package receipt used by the review portal.
+
 ## v240 — Photo Type Shortcuts
 **Date:** August 6, 2026
 

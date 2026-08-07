@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=240';
-import { getInspection } from './state.js?v=240';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=241';
+import { getInspection } from './state.js?v=241';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -99,7 +99,17 @@ export function getArrivalFields() {
       { key: 'fanPluggedIn', label: 'Fan plugged in at main living space with access to airflow' },
       { key: 'allergenPlacement', label: 'If allergen concerns: placed in client-requested location' }
     ]},
-    text('boulderBlueSampleId', 'Boulder Blue Sample ID', { placeholder: 'e.g. B2BJC43G' }),
+    {
+      type: 'sample-id-scanner',
+      dataKey: 'boulderBlueSampleId',
+      label: 'Boulder Blue Sample ID',
+      placeholder: 'e.g. B2BJC43G',
+      scanLabel: 'Photograph Boulder Blue Sample Label',
+      photoKey: '_boulderBlueLabelPhotos',
+      photoRole: 'Boulder Blue Sample Label',
+      required: true,
+      photoRequired: true
+    },
     { key: 'boulderBlueTestLocation', type: 'inspection-level-select', label: 'Boulder Blue Test Location' },
     photo('Boulder Blue Fan Placement', '_boulderBluePlacementPhotos', {
       label: 'Boulder Blue Fan Placement Photo *',
@@ -184,8 +194,12 @@ export function getExteriorFields() {
         { key: 'weatherScreenshot', label: 'Weather app screenshot' }
       ])
     ], { defaultOpen: false }),
-    textarea('exteriorNotes', 'Observations & Notes'),
-    photo('Exterior Assessment')
+    { ...yesno('exteriorIssuesFound', 'Were any exterior issues found?'), required: true },
+    showIf(textarea('exteriorNotes', 'Describe the exterior issues found', { required: true }), 'exteriorIssuesFound', 'Yes'),
+    photo('Exterior Assessment', '_exteriorAssessmentPhotos', {
+      label: 'Exterior Assessment Photo *',
+      required: true
+    })
   ];
 }
 
@@ -240,7 +254,8 @@ function selectedSystemPhotoFields(dataKey, choices, photoKey) {
 
 // ── Utility Room (expanded for #8) ─────────────────────────
 export function getUtilityFields() {
-  const heatingTypes = ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)'];
+  const heatingPhotoTypes = ['Natural Gas Furnace', 'Electric Furnace', 'Electric Baseboard', 'Heat Pump', 'Radiant Floor Heating', 'Boiler', 'Wood Stove / Pellet Stove', 'Propane', 'Other (specify)'];
+  const heatingTypes = [...heatingPhotoTypes, 'No Heating System', 'Not Sure'];
   const coolingTypes = ['Central AC', 'Ductless Mini-Split System', 'Window AC Unit(s)', 'Portable AC Unit(s)', 'Heat Pump (Cooling Mode)', 'Other (specify)'];
   return [
     { type: 'process-checklist', title: 'Equipment Needed', items: [
@@ -252,23 +267,23 @@ export function getUtilityFields() {
     ...flirFields(),
     divider(),
     heading('HVAC System'),
-    yesno('forcedHVAC', 'Forced HVAC System present?'),
-    showIf(sel('heatingType', 'Heating Source Type', heatingTypes), 'forcedHVAC', 'Yes'),
-    showIf(sel('acType', 'Air Conditioning Source Type', [...coolingTypes, 'No Air Conditioning']), 'forcedHVAC', 'Yes'),
-    showIf({
+    { ...yesno('forcedHVAC', 'Forced HVAC System present?'), required: true },
+    sel('heatingType', 'Heating Source Type', heatingTypes, { required: true }),
+    sel('acType', 'Air Conditioning Source Type', [...coolingTypes, 'No Air Conditioning', 'Not Sure'], { required: true }),
+    {
       type: 'conditional-fields',
       fields: [
-        ...selectedSystemPhotoFields('heatingType', heatingTypes, '_heatingSystemPhotos'),
+        ...selectedSystemPhotoFields('heatingType', heatingPhotoTypes, '_heatingSystemPhotos'),
         ...selectedSystemPhotoFields('acType', coolingTypes, '_coolingSystemPhotos')
       ]
-    }, 'forcedHVAC', 'Yes'),
-    showIf(checklist('ventilationType', 'Ventilation Type', [
+    },
+    checklist('ventilationType', 'Ventilation Type', [
       { key: 'bathExhaust', label: 'Bathroom Exhaust Fan(s)' },
       { key: 'hrv', label: 'HRV (Heat Recovery Ventilator)' },
       { key: 'erv', label: 'ERV (Energy Recovery Ventilator)' },
       { key: 'ventNone', label: 'None' },
       { key: 'ventNotSure', label: 'Not sure' }
-    ]), 'forcedHVAC', 'Yes'),
+    ], { required: true }),
     showIf(divider(), 'forcedHVAC', 'Yes'),
     showIf(heading('HVAC Filter & Unit Scan'), 'forcedHVAC', 'Yes'),
     showIf({ type: 'ai-hvac-scanner' }, 'forcedHVAC', 'Yes'),
@@ -432,18 +447,42 @@ export function getWaterSampleFields() {
     heading('Safe Home Premium Water Test'),
     yesno('waterPanelCollected', 'Safe Home premium water sample collected'),
     showIf(sel('waterSampleType', 'Water test sample type', ['Unfiltered', 'Filtered', 'Both filtered and unfiltered']), 'waterPanelCollected', 'Yes'),
-    showIf({ type: 'sample-id-scanner', dataKey: 'waterSampleId', label: 'Safe Home Premium Water Sample ID' }, 'waterPanelCollected', 'Yes'),
+    showIf({
+      type: 'sample-id-scanner',
+      dataKey: 'waterSampleId',
+      label: 'Safe Home Premium Water Sample ID',
+      photoKey: '_waterSampleLabelPhotos',
+      photoRole: 'Safe Home Premium Water Sample Label',
+      required: true,
+      photoRequired: true
+    }, 'waterPanelCollected', 'Yes'),
     showIf(text('waterFaucetLocation', 'Faucet location'), 'waterPanelCollected', 'Yes'),
     showIf(photo('Safe Home Premium Water Test'), 'waterPanelCollected', 'Yes'),
     divider(),
     heading('Microplastics Test'),
     radio('microplasticsStatus', 'Microplastics test', ['Requested — collect on site', 'Collected', 'Not requested']),
-    showIf({ type: 'sample-id-scanner', dataKey: 'microplasticsSampleId', label: 'Microplastics Sample ID' }, 'microplasticsStatus', 'Collected'),
+    showIf({
+      type: 'sample-id-scanner',
+      dataKey: 'microplasticsSampleId',
+      label: 'Microplastics Sample ID',
+      photoKey: '_microplasticsSampleLabelPhotos',
+      photoRole: 'Microplastics Sample Label',
+      required: true,
+      photoRequired: true
+    }, 'microplasticsStatus', 'Collected'),
     divider(),
     heading('PFAS Test'),
     info('Reminder: Collect PFAS sample from kitchen faucet (should have been draining since Device Setup)'),
     radio('pfasStatus', 'PFAS test', ['Requested — collect on site', 'Collected', 'Not requested']),
-    showIf({ type: 'sample-id-scanner', dataKey: 'pfasSampleId', label: 'PFAS Sample ID' }, 'pfasStatus', 'Collected'),
+    showIf({
+      type: 'sample-id-scanner',
+      dataKey: 'pfasSampleId',
+      label: 'PFAS Sample ID',
+      photoKey: '_pfasSampleLabelPhotos',
+      photoRole: 'PFAS Sample Label',
+      required: true,
+      photoRequired: true
+    }, 'pfasStatus', 'Collected'),
     textarea('notes', 'Notes')
   ];
 }
@@ -928,8 +967,14 @@ function collectRequiredIssues(fields, data, missing) {
 
     if (field.type === 'sample-id-scanner' || field.type === 'number-scanner') {
       if (isBlank(data[field.dataKey || field.key])) missing.push(requiredLabel(field));
+      if (field.photoRequired && !hasPhoto(data, field.photoKey || ((field.dataKey || field.key) + '_photos'))) {
+        missing.push((field.photoRole || field.label || 'Sample label') + ' photo is required');
+      }
     } else if (field.type === 'photo') {
       if (!hasPhoto(data, field.photoKey)) missing.push(requiredLabel(field));
+    } else if (field.type === 'checklist') {
+      const selected = data[field.key];
+      if (!selected || !Object.values(selected).some(Boolean)) missing.push(requiredLabel(field));
     } else if (isBlank(data[field.key])) {
       missing.push(requiredLabel(field));
     }
