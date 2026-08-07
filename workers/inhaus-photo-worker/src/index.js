@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w34';
+const WORKER_VERSION = 'handoff-w35';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -1241,6 +1241,7 @@ async function handleHandoffJob(request, env, ctx) {
     startedAt: now,
     finishedAt: '',
     submitAttempt: isPlainObject(body.submitAttempt) ? body.submitAttempt : null,
+    forceFullRepair: body.forceFullRepair === true,
     artifactReceipt: null
   };
   if (body.runInline !== true) {
@@ -1341,7 +1342,8 @@ async function handleHandoffJobRunner(request, env, ctx) {
     const durableReceipt = durableJob && isPlainObject(durableJob.receipt)
       ? durableJob.receipt
       : (isPlainObject(reviewSystem.tannerHandoff) ? reviewSystem.tannerHandoff : null);
-    if (body.forceFullRepair !== true && durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
+    const forceFullRepair = body.forceFullRepair === true || durableJob?.payload?.forceFullRepair === true;
+    if (!forceFullRepair && durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
       return json({
         processed: 1,
         results: [{
@@ -1372,7 +1374,7 @@ async function handleHandoffJobRunner(request, env, ctx) {
       attemptCount: (Number(previousJob.attemptCount) || 0) + 1,
       artifactReceipt: durableReceipt
     };
-    const claim = await claimDirectHandoffJob(env, inspectionId, runnerJob, body.forceFullRepair === true);
+    const claim = await claimDirectHandoffJob(env, inspectionId, runnerJob, forceFullRepair);
     if (!claim.acquired) {
       return json({
         processed: 0,
@@ -1396,6 +1398,7 @@ async function handleHandoffJobRunner(request, env, ctx) {
     };
     const result = await processHandoffJobBatch(env, inspectionId, {
       ...body,
+      forceFullRepair,
       requestedBy: body.requestedBy || 'handoff-runner'
     }, claimedJob);
     return json(
@@ -1445,8 +1448,13 @@ async function handleHandoffJobStatus(request, url, env) {
 
 async function processHandoffJobBatch(env, inspectionId, body = {}, seedJob = null) {
   let fieldData = {};
+  let effectiveBody = { ...body };
   try {
     const durableJob = await getDurableHandoffJob(env, inspectionId);
+    effectiveBody = {
+      ...body,
+      forceFullRepair: body.forceFullRepair === true || durableJob?.payload?.forceFullRepair === true
+    };
     const row = await getReviewRow(env, inspectionId);
     fieldData = row && isPlainObject(row.field_data) ? structuredClone(row.field_data) : {};
     const system = isPlainObject(fieldData.system) ? fieldData.system : {};
@@ -1478,7 +1486,7 @@ async function processHandoffJobBatch(env, inspectionId, body = {}, seedJob = nu
     };
 
     const accessToken = await getGoogleAccessToken(env);
-    const receipt = await createOrRepairTannerHandoff(env, accessToken, inspectionId, fieldData, body);
+    const receipt = await createOrRepairTannerHandoff(env, accessToken, inspectionId, fieldData, effectiveBody);
     const ready = isReadyHandoffReceipt(receipt);
     const pending = !ready && receipt.status === 'running';
     const finishedAt = new Date().toISOString();
@@ -1512,7 +1520,7 @@ async function processHandoffJobBatch(env, inspectionId, body = {}, seedJob = nu
       ...partialReceipt,
       status: 'failed',
       inspectionId,
-      isTestTraining: isTestTrainingInspection({ ...fieldData, ...body }),
+      isTestTraining: isTestTrainingInspection({ ...fieldData, ...effectiveBody }),
       error: err && err.message ? err.message : String(err),
       attemptCount,
       lastRunAt: failedAt,
@@ -3007,6 +3015,7 @@ function buildDurableHandoffJobPayload(inspectionId, job, receipt) {
     payload: {
       submitAttempt: cleanJob.submitAttempt || null,
       isTestTraining: cleanJob.isTestTraining === true,
+      forceFullRepair: cleanJob.forceFullRepair === true,
       source: 'cloudflare_worker',
       workerVersion: WORKER_VERSION
     },

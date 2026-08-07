@@ -81,3 +81,16 @@ test('ready handoff receipts are checked against the current photo table', () =>
     [...workerSource.matchAll(/await getHandoffReceiptExpectations\(env, inspectionId, canonicalSource\)/g)].length >= 2
   );
 });
+
+test('a forced repair survives the durable queue until its first processing batch', () => {
+  assert.match(workerSource, /forceFullRepair: body\.forceFullRepair === true/);
+  assert.match(workerSource, /forceFullRepair: cleanJob\.forceFullRepair === true/);
+  assert.match(
+    workerSource,
+    /forceFullRepair: body\.forceFullRepair === true \|\| durableJob\?\.payload\?\.forceFullRepair === true/
+  );
+  assert.match(
+    workerSource,
+    /createOrRepairTannerHandoff\(env, accessToken, inspectionId, fieldData, effectiveBody\)/
+  );
+});
