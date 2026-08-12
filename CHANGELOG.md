@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v243 — Clean Start New Inspection
+**Date:** August 12, 2026
+
+- Clears any restored prior inspection from memory before entering the new-inspection workflow.
+- Clears only the local auto-resume pointer; the prior inspection and its saved/cloud data remain intact.
+- Adds a regression test proving Start New cannot reuse a completed inspection's intake values.
+
 ## v242 — Single-Step Back Navigation
 **Date:** August 11, 2026  
 **Commit:** `2388cde`
