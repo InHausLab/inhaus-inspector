@@ -6,6 +6,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v244 — Cloud Continue Loop Fix
+**Date:** August 12, 2026
+
+- Prevents a claimed inspection from restoring back into the cloud-inspection picker.
+- Sends a newly claimed inspection to Pre-Inspection and an established inspection back to field work.
+- Adds regression coverage for both new and established cloud-resume states.
+
 ## v243 — Clean Start New Inspection
 **Date:** August 12, 2026
 

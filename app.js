@@ -1,13 +1,13 @@
 // InHaus Inspector - Main Application
-import { PHOTO_WORKER_URL } from './config.js?v=243';
-import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=243';
-import { initStorage, saveNow, scheduleSave } from './storage.js?v=243';
-import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=243';
-import { cloudFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendInspectionToCloud, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=243';
-import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=243';
-import { initScreens, render } from './screens.js?v=243';
-import { initAppFeedback } from './feedback.js?v=243';
-import { deletePhotoFromSupabase, updatePhotoMetadata } from './supabase-photos.js?v=243';
+import { PHOTO_WORKER_URL } from './config.js?v=244';
+import { getInspection, setInspection, getScreen, setScreen, getSyncStatus, setSyncStatus, isDirty, setDirty, getLastSaveText, setLastSaveText, getLastLocalSaveAt, setLastLocalSaveAt, getLastSuccessfulCloudSyncAt, setLastSuccessfulCloudSyncAt, getLastCheckpointAttemptAt, setLastCheckpointAttemptAt, getLastCheckpointSucceededAt, setLastCheckpointSucceededAt, getBestCloudSyncAt, saveActivePosition, loadActivePosition, clearActivePosition } from './state.js?v=244';
+import { initStorage, saveNow, scheduleSave } from './storage.js?v=244';
+import { buildExportJSON, stripPhotosFromExport } from './inspection.js?v=244';
+import { cloudFetch, updateSyncStatus, showUploadBanner, uploadPhotoImmediate, addToPhotoRetryQueue, queuePhotoForBackgroundUpload, retryFailedPhotos, sendInspectionToCloud, checkpointToCloud, getCheckpointBackoffMs, submitInspection } from './sync.js?v=244';
+import { STEP_FIELDS, PHASES, buildStepList, getStepData, getEquipmentFields, validateEquipment, validateStep, warnStep } from './steps.js?v=244';
+import { initScreens, render } from './screens.js?v=244';
+import { initAppFeedback } from './feedback.js?v=244';
+import { deletePhotoFromSupabase, updatePhotoMetadata } from './supabase-photos.js?v=244';
 
 (function () {
   'use strict';
@@ -56,9 +56,19 @@ import { deletePhotoFromSupabase, updatePhotoMetadata } from './supabase-photos.
   window.deletePhotoFromSupabase = deletePhotoFromSupabase;
   window.updatePhotoMetadata = updatePhotoMetadata;
   const RESTORABLE_SCREENS = new Set([
-    'truck-check', 'intake', 'cloud-resume', 'precheck', 'step',
+    'truck-check', 'intake', 'precheck', 'step',
     'photos', 'rapid-capture', 'findings', 'team', 'my-work', 'recovery'
   ]);
+
+  function resumeScreenForSavedPosition(saved, restored) {
+    const savedScreen = String(saved?.screen || 'step');
+    if (savedScreen === 'cloud-resume') {
+      const hasStartedFieldWork = Number(restored?._lastStepIdx || 0) > 0 ||
+        Object.values(restored?.stepData || {}).some(step => step && (step._visited || step._completedAt));
+      return hasStartedFieldWork ? 'step' : 'precheck';
+    }
+    return RESTORABLE_SCREENS.has(savedScreen) ? savedScreen : 'step';
+  }
 
   function clampStepIndex(idx) {
     return Math.max(0, Math.min(Number(idx) || 0, Math.max(stepList.length - 1, 0)));
@@ -109,7 +119,7 @@ import { deletePhotoFromSupabase, updatePhotoMetadata } from './supabase-photos.
       const savedStepIdx = stableStepIdx >= 0 ? stableStepIdx : saved.stepIdx;
       currentStepIdx = lastWorkingStepIndex(savedStepIdx);
       // Migrate old saved Home/Final Review positions back to the last field step.
-      setScreen(RESTORABLE_SCREENS.has(saved.screen) ? saved.screen : 'step');
+      setScreen(resumeScreenForSavedPosition(saved, restored));
       persistActivePosition();
       startAutoSave();
       return true;
@@ -630,7 +640,7 @@ import { deletePhotoFromSupabase, updatePhotoMetadata } from './supabase-photos.
         (inspection && (inspection._driveFolderId || inspection.driveFolderId || inspection.folderId)) ||
         'pending',
       errorMessage: success ? '' : ((inspection && inspection._lastFinalSyncError) || ''),
-      appVersion: 'v243',
+      appVersion: 'v244',
       success: success
     };
   }
