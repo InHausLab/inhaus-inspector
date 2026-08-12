@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=241';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=241';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=241';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=241';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=241';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=241';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=242';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=242';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=242';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=242';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=242';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=242';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=241';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=241';
-import { updatePhotoMetadata } from './supabase-photos.js?v=241';
-import { FIELD_RESUME_TOKEN } from './config.js?v=241';
+} from './findings.js?v=242';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=242';
+import { updatePhotoMetadata } from './supabase-photos.js?v=242';
+import { FIELD_RESUME_TOKEN } from './config.js?v=242';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=241';
+} from './comment-library.js?v=242';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -34,6 +34,8 @@ let _rapidReturnScreen = 'step';
 let _photosReturnScreen = 'review';
 let _rapidCaptureContext = null;
 let _globalWorkspaceListenersReady = false;
+let _stepBackLockedUntil = 0;
+const STEP_BACK_LOCK_MS = 700;
 const _companyLibraryRequested = new Set();
 
 export function initScreens(context) {
@@ -94,6 +96,16 @@ function renderFieldsIncrementally({ card, fields, data, onFieldChange, inspecti
 function goToStep(idx) {
   ctx.currentStepIdx = idx;
   setScreen('step');
+  ctx.render();
+  window.scrollTo(0, 0);
+}
+
+function navigateBackOneStep(event) {
+  const now = Date.now();
+  if (!ctx || ctx.currentStepIdx <= 0 || now < _stepBackLockedUntil) return;
+  _stepBackLockedUntil = now + STEP_BACK_LOCK_MS;
+  if (event?.currentTarget) event.currentTarget.disabled = true;
+  ctx.currentStepIdx = Math.max(0, ctx.currentStepIdx - 1);
   ctx.render();
   window.scrollTo(0, 0);
 }
@@ -2395,7 +2407,7 @@ export function renderStep() {
 
   const fieldsStillRendering = !!pendingFieldRender;
   const backButton = ctx.currentStepIdx > 0
-    ? ui().el('button', { className: 'btn btn-outline btn-nav', onClick: () => { ctx.currentStepIdx--; ctx.render(); window.scrollTo(0, 0); } }, '\u2190 Back')
+    ? ui().el('button', { className: 'btn btn-outline btn-nav', onClick: navigateBackOneStep }, '\u2190 Back')
     : ui().el('div');
   const homeButton = ui().el('button', {
     type: 'button',
