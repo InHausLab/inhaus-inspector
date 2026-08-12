@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v242 — Single-Step Back Navigation
+**Date:** August 11, 2026  
+**Commit:** `2388cde`
+
+- Prevents duplicate touch/click activations from moving backward more than one inspection step.
+- Disables the current Back control immediately and applies a 700 ms re-entry guard across re-renders.
+- Adds a regression test proving one rapid double activation moves exactly one step while a later intentional activation still works.
+
 ## v241 — Report Evidence Completeness
 **Date:** August 7, 2026
 
