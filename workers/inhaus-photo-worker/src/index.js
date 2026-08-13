@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w35';
+const WORKER_VERSION = 'handoff-w36';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -883,28 +883,31 @@ function portalInspectionListEntry(row, reviewRow) {
   const source = isPlainObject(row.raw_jsonb) ? row.raw_jsonb : {};
   const resume = isPlainObject(source.resumeData) ? source.resumeData : {};
   const review = reviewRow && isPlainObject(reviewRow.field_data) ? reviewRow.field_data : {};
+  const reviewSystem = isPlainObject(review.system) ? review.system : {};
+  const recovery = isPlainObject(reviewSystem.inspectionRecovery)
+    ? reviewSystem.inspectionRecovery
+    : (isPlainObject(review.inspectionRecovery) ? review.inspectionRecovery : {});
+  const recoveryResume = isPlainObject(recovery.resumeData) ? recovery.resumeData : {};
   const submission = isPlainObject(review.submission) ? review.submission : {};
-  const inspectionId = String(source.inspectionId || resume.inspectionId || row.inspection_id);
-  const sourcePhotos = Array.isArray(source.photos)
-    ? source.photos
-    : (Array.isArray(resume.photos) ? resume.photos : []);
-  const manifest = Array.isArray(source.photoManifest)
-    ? source.photoManifest
-    : (Array.isArray(resume.photoManifest) ? resume.photoManifest : []);
+  const inspectionId = String(source.inspectionId || resume.inspectionId || recovery.inspectionId || recoveryResume.inspectionId || row.inspection_id);
+  const sourcePhotos = [source.photos, resume.photos, recovery.photos, recoveryResume.photos]
+    .find(Array.isArray) || [];
+  const manifest = [source.photoManifest, resume.photoManifest, recovery.photoManifest, recoveryResume.photoManifest]
+    .find(Array.isArray) || [];
   return {
     inspectionId,
-    id: source.id || resume.id || inspectionId,
-    assessmentNumber: String(row.assessment_num || source.assessmentNumber || ''),
-    clientName: firstNonEmpty(source.clientName, resume.clientName),
-    propertyAddress: firstNonEmpty(source.propertyAddress, resume.propertyAddress),
-    inspectionDate: firstNonEmpty(source.inspectionDate, resume.inspectionDate, row.inspection_date),
-    inspectorName: firstNonEmpty(source.inspectorName, resume.inspectorName),
-    status: firstNonEmpty(submission.status, review.status, source.reviewStatus, source.status, resume.status, row.status, 'In Progress'),
-    photoCount: Number(source.photoCount || resume.photoCount || manifest.length || sourcePhotos.length || 0),
-    missingCount: Number(review.missingCount || source.missingCount || resume.missingCount || 0),
-    folderId: firstNonEmpty(source.folderId, source.driveFolderId, row.drive_folder_id),
-    folderUrl: firstNonEmpty(source.folderUrl, source.driveFolderUrl, row.assessment_folder_url),
-    lastUpdated: firstNonEmpty(reviewRow && reviewRow.updated_at, resume.updatedAt, source.updatedAt, source.completedAt, source.endedAt, source.syncedAt),
+    id: source.id || resume.id || recovery.id || recoveryResume.id || inspectionId,
+    assessmentNumber: String(row.assessment_num || source.assessmentNumber || recovery.assessmentNumber || ''),
+    clientName: firstNonEmpty(source.clientName, resume.clientName, recovery.clientName, recoveryResume.clientName),
+    propertyAddress: firstNonEmpty(source.propertyAddress, resume.propertyAddress, recovery.propertyAddress, recoveryResume.propertyAddress),
+    inspectionDate: firstNonEmpty(source.inspectionDate, resume.inspectionDate, recovery.inspectionDate, recoveryResume.inspectionDate, row.inspection_date),
+    inspectorName: firstNonEmpty(source.inspectorName, resume.inspectorName, recovery.inspectorName, recoveryResume.inspectorName),
+    status: firstNonEmpty(submission.status, review.status, source.reviewStatus, source.status, resume.status, recovery.reviewStatus, recovery.status, recoveryResume.status, row.status, 'In Progress'),
+    photoCount: Number(source.photoCount || resume.photoCount || recovery.photoCount || recoveryResume.photoCount || manifest.length || sourcePhotos.length || 0),
+    missingCount: Number(review.missingCount || source.missingCount || resume.missingCount || recovery.missingCount || recoveryResume.missingCount || 0),
+    folderId: firstNonEmpty(source.folderId, source.driveFolderId, recovery.folderId, recovery.driveFolderId, row.drive_folder_id),
+    folderUrl: firstNonEmpty(source.folderUrl, source.driveFolderUrl, recovery.folderUrl, recovery.driveFolderUrl, row.assessment_folder_url),
+    lastUpdated: firstNonEmpty(reviewRow && reviewRow.updated_at, resume.updatedAt, source.updatedAt, source.completedAt, source.endedAt, source.syncedAt, recoveryResume.updatedAt, recovery.updatedAt, recovery.completedAt, recovery.endedAt, recovery.syncedAt),
     reviewToken: inspectionId.toLowerCase()
   };
 }

@@ -97,6 +97,60 @@ test('portal inspection inventory merges assessment and review status', async ()
   }
 });
 
+test('portal inspection inventory keeps legacy recovery records discoverable', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const requestUrl = String(url);
+    if (requestUrl.includes('/rest/v1/ihl_assessments?')) {
+      return Response.json([{
+        inspection_id: 'INH-LEGACY-123',
+        assessment_num: 'INH-LEGACY-123',
+        report_id: null,
+        status: 'In Review',
+        drive_folder_id: null,
+        assessment_folder_url: null,
+        inspection_date: '2026-07-22',
+        raw_jsonb: {
+          inspectionId: 'INH-LEGACY-123',
+          status: 'In Review'
+        }
+      }]);
+    }
+    if (requestUrl.includes('/rest/v1/review_data?')) {
+      return Response.json([{
+        inspection_id: 'INH-LEGACY-123',
+        field_data: {
+          status: 'In Review',
+          system: {
+            inspectionRecovery: {
+              inspectionId: 'INH-LEGACY-123',
+              clientName: 'Legacy Client',
+              propertyAddress: '123 History Rd',
+              inspectionDate: '2026-07-22',
+              inspectorName: 'Legacy Inspector',
+              photos: [{ photoId: 'photo-1' }, { photoId: 'photo-2' }]
+            }
+          }
+        },
+        updated_at: '2026-08-13T18:54:25.092Z'
+      }]);
+    }
+    throw new Error(`unexpected request: ${requestUrl}`);
+  };
+  try {
+    const response = await worker.fetch(reviewRequest('/inspections'), ENV);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.count, 1);
+    assert.equal(result.inspections[0].clientName, 'Legacy Client');
+    assert.equal(result.inspections[0].propertyAddress, '123 History Rd');
+    assert.equal(result.inspections[0].inspectorName, 'Legacy Inspector');
+    assert.equal(result.inspections[0].photoCount, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('admin unlock updates review storage and assessment status', async () => {
   const originalFetch = globalThis.fetch;
   const requests = [];
