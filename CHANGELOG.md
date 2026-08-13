@@ -6,6 +6,16 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v245 / Worker W36 — Past Inspection History Recovery
+**Date:** August 13, 2026  
+**Commit:** `e7b3c23`
+
+- Keeps legacy and recovered inspections recognizable in the Review Portal's existing All Inspections history.
+- Uses `review_data.system.inspectionRecovery` only as a fallback when the canonical assessment row lacks client, property, inspector, date, photo, or folder metadata.
+- Adds a synthetic regression reproducing a legacy blank-row case and proving the list returns its preserved identity and photo count.
+- Bumps the Worker to `handoff-w36` and the inspector release/cache graph to `v245`.
+- Local verification passed: 106 Node tests and all 49 Worker integration tests. Production deployment and deployed E2E-1 verification remain pending while the live safety feed contains a potentially active real assessment.
+
 ## v244 — Cloud Continue Loop Fix
 **Date:** August 12, 2026
 
