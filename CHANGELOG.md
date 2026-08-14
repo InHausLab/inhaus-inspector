@@ -14,7 +14,10 @@ This file is the authoritative record of every significant change, decision, bug
 - Uses `review_data.system.inspectionRecovery` only as a fallback when the canonical assessment row lacks client, property, inspector, date, photo, or folder metadata.
 - Adds a synthetic regression reproducing a legacy blank-row case and proving the list returns its preserved identity and photo count.
 - Bumps the Worker to `handoff-w36` and the inspector release/cache graph to `v245`.
-- Local verification passed: 106 Node tests and all 49 Worker integration tests. Production deployment and deployed E2E-1 verification remain pending while the live safety feed contains a potentially active real assessment.
+- Local verification passed: 106 Node tests and all 49 Worker integration tests.
+- Production deployment passed on August 13, 2026 at 6:33 PM MDT: Cloudflare Worker `handoff-w36`, version ID `b6c85a89-b6ed-4e85-b621-0ce14ab80960`; Netlify and the public inspector shell both served `v245`.
+- Deployed browser acceptance passed at 6:40 PM MDT through Tanner's normal All Inspections workflow: 52 records listed; the recovered July 22 Riverside row showed client, address, inspector, status, and 56 recovered photos; Open Review restored 17 rooms, 52 findings, and the saved full client/property fields without console errors.
+- Dedicated production E2E-1 automation was not present in this checkout, so no separate data-creating E2E-1 run was executed; the affected read-only deployed workflow was exercised directly instead.
 
 ## v244 — Cloud Continue Loop Fix
 **Date:** August 12, 2026
