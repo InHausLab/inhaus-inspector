@@ -634,7 +634,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w36', 'health exposes Worker version');
+  assert(data.version === 'handoff-w37', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1578,7 +1578,23 @@ async function testHandoffJobCreatesPackageReceipt() {
     followUp_3_timeframe: '6 months',
     followUp_3_photoIds: ['photo-1', 'photo-2'],
     testsConfirmed: { pfas: true, waterPanel: true },
-    rooms: [{ name: 'Kitchen', inspectorNotes: 'Observed staining.', photoIds: ['photo-1'] }],
+    roomData: {
+      followUpItems: JSON.stringify([
+        { stepId: 'kitchen', room: 'Kitchen', recheckIn: '6 months', watchFor: 'Confirm the repaired drain remains dry.' },
+        { stepId: 'basement', room: 'Basement', recheckIn: '3 months', watchFor: 'Recheck the east wall for moisture.' }
+      ])
+    },
+    kitchen: {
+      inspectorNotes: 'Reviewer clarified the staining is below the sink.',
+      noIssuesFound: false
+    },
+    photoAnnotations: {
+      'photo-1': [
+        { type: 'circle', color: '#ef4444', points: [{ x: 0.2, y: 0.2 }, { x: 0.6, y: 0.6 }] },
+        { type: 'text', color: '#facc15', text: 'Recheck here', points: [{ x: 0.25, y: 0.18 }] }
+      ]
+    },
+    rooms: [{ stepId: 'kitchen', name: 'Kitchen', inspectorNotes: 'Observed staining.', photoIds: ['photo-1'] }],
     system: { startInspectionShell: shellReceipt }
   };
   const { mockFetch, state } = makeMockFetch({
@@ -1591,7 +1607,15 @@ async function testHandoffJobCreatesPackageReceipt() {
       raw_jsonb: {
         inspectionId: 'INH-20260801-HAND01',
         boulderBlueSampleId: 'BB-TEST-123',
-        rooms: [{ name: 'Kitchen', inspectorNotes: 'Canonical assessment note.', photoIds: ['photo-1'] }],
+        rooms: [{
+          stepId: 'kitchen',
+          name: 'Kitchen',
+          inspectorNotes: 'Canonical assessment note.',
+          followUpNeeded: 'Yes',
+          followUpTimeframe: '3 months',
+          followUpNote: 'Confirm the repaired drain remains dry.',
+          photoIds: ['photo-1']
+        }],
         stepData: {
           kitchen: {
             qtrakLocation: 'Kitchen',
@@ -1645,10 +1669,11 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(data.artifactReceipt.photoLogCount === 2, 'receipt counts photo log rows');
   assert(data.artifactReceipt.roomDetailCount === 1, 'receipt counts room detail rows');
   assert(
-    hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Canonical assessment note.']),
-    `room details use canonical assessment data over stale review rooms: ${JSON.stringify(sheetRowsForTab(state, 'Room Details'))}`
+    hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Reviewer clarified the staining is below the sink.']),
+    `room details use the reviewer-edited note while preserving source notes in the curated tab: ${JSON.stringify(sheetRowsForTab(state, 'Room Details'))}`
   );
-  assert(data.artifactReceipt.photoFolderLinkedCount === 2, 'receipt links existing Drive photos');
+  assert(data.artifactReceipt.photoFolderLinkedCount === 1, 'receipt links the unannotated existing Drive photo');
+  assert(data.artifactReceipt.photoFolderAnnotatedCount === 1, 'receipt records the composited annotated photo');
   assert(data.artifactReceipt.photoFolderOperationLimit === 5, 'receipt records conservative default photo operation batch limit');
   assert(state.calls.length < 50, `handoff stays below Cloudflare's 50-subrequest limit: ${state.calls.length}`);
   assert(state.driveFolderLists.some(list => list.parentId === 'drive-photos'), 'lists Photos folder once for package repair');
@@ -1659,7 +1684,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Raw App Data')), 'writes Raw App Data tab');
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Air Data')), 'writes Air Data tab');
   assert(hasSheetCellValue(state, 'Summary', 'INHAUS LAB — INSPECTION DATA'), 'writes InHaus Inspection summary');
-  assert(sheetDataRowsForTab(state, 'Raw Review Data').length === Object.keys(fieldData).length, 'raw tab has one row for every field_data key');
+  assert(sheetDataRowsForTab(state, 'Raw Review Data').length >= Object.keys(fieldData).length, 'raw tab has at least one row for every submitted field_data key');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_2_note', 'Second observation', 'string']), 'raw tab includes obs_2_note');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_6_note', 'Sixth observation', 'string']), 'raw tab includes obs_6_note');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['actionTaken_1_desc', 'Cleaned test surface', 'string']), 'raw tab includes actionTaken_1_desc');
@@ -1668,17 +1693,33 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(hasSheetRowContaining(state, 'Review Portal Data', ['Dynamic Review', 'obs_6_note', 'Sixth observation']), 'formatted tab includes dynamic observation rows');
   assert(hasSheetRowContaining(state, 'Review Portal Data', ['Dynamic Review', 'actionTaken_1_desc', 'Cleaned test surface']), 'formatted tab includes dynamic action rows');
   assert(hasSheetRowContaining(state, 'Review Portal Data', ['Dynamic Review', 'followUp_3_timeframe', '6 months']), 'formatted tab includes dynamic follow-up rows');
+  assert(hasSheetRowContaining(state, 'Review Portal Data', [
+    'Summary',
+    'Client Follow-Up Plan',
+    'Kitchen: Recheck in 6 months: Confirm the repaired drain remains dry.\nBasement: Recheck in 3 months: Recheck the east wall for moisture.'
+  ]), 'formatted tab includes the complete merged Client Follow-Up Plan');
+  assert(hasSheetRowContaining(state, 'Review Portal Data', ['Room — Kitchen', 'Inspector Notes', 'Canonical assessment note.']), 'formatted tab includes source inspector notes');
+  assert(hasSheetRowContaining(state, 'Review Portal Data', ['Room — Kitchen', 'Reviewer-Edited Notes', 'Reviewer clarified the staining is below the sink.']), 'formatted tab includes reviewer-edited room notes');
+  assert(hasSheetRowContaining(state, 'Review Portal Data', ['Room — Kitchen', 'Follow-Up Flag', 'TRUE']), 'formatted tab includes room follow-up flags');
+  assert(hasSheetRowContaining(state, 'Follow-Up Items', ['Kitchen', '6 months', 'Confirm the repaired drain remains dry.']), 'app spreadsheet uses the merged Kitchen follow-up');
+  assert(hasSheetRowContaining(state, 'Follow-Up Items', ['Basement', '3 months', 'Recheck the east wall for moisture.']), 'app spreadsheet includes reviewer-added follow-up rooms');
   assert(sheetDataRowsForTab(state, 'Photo Log').length === 2, 'photo log has one row per photo');
-  assert(hasSheetRowContaining(state, 'Photo Log', ['photo-1', 'Kitchen', 'ATP Before', 'Before photo', 'https://drive.google.com/file/d/drive-photo-1/view']), 'photo log includes first photo details');
+  assert(hasSheetRowContaining(state, 'Photo Log', ['photo-1', 'Kitchen', 'ATP Before', 'Before photo']), 'photo log includes first photo details');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-2', 'Kitchen', 'ATP After', 'After photo', 'https://drive.google.com/file/d/drive-photo-2/view']), 'photo log includes second photo details');
-  assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Canonical assessment note.', 'photo-1, photo-2']), 'room details include canonical inspector notes and every assigned room photo ID');
-  assert(state.rawUploads.length === 2, 'writes raw JSON backup and assessment context files');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Reviewer clarified the staining is below the sink.', 'photo-1, photo-2']), 'room details include reviewer-edited notes and every assigned room photo ID');
+  assert(state.rawUploads.length === 3, 'writes raw JSON, annotated image, and assessment context files');
+  const annotatedUpload = state.rawUploads.find(upload => /Content-Type:\s*image\/svg\+xml/i.test(upload.bodyText || ''));
   const rawJsonUpload = state.rawUploads.find(upload => upload.bodyText.includes('"obs_6_note": "Sixth observation"'));
   const contextUpload = state.rawUploads.find(upload => upload.bodyText.includes('# _context.md'));
   assert(rawJsonUpload, 'raw JSON backup includes late observation key');
   assert(rawJsonUpload.bodyText.includes('"actionTaken_1_desc": "Cleaned test surface"'), 'raw JSON backup includes action-taken key');
   assert(rawJsonUpload.bodyText.includes('"followUp_3_photoIds"'), 'raw JSON backup includes follow-up photo IDs');
   assert(contextUpload, 'assessment context file has the expected heading');
+  assert(annotatedUpload, 'annotated photo is uploaded as a self-contained SVG image');
+  assert(annotatedUpload.bodyText.includes('Recheck here'), 'annotated Drive image contains the saved text overlay');
+  assert(annotatedUpload.bodyText.includes('<ellipse'), 'annotated Drive image contains the saved circle overlay');
+  assert(contextUpload.bodyText.includes('Kitchen: Recheck in 6 months: Confirm the repaired drain remains dry'), 'assessment context includes merged inspector and reviewer follow-up');
+  assert(contextUpload.bodyText.includes('Basement: Recheck in 3 months: Recheck the east wall for moisture'), 'assessment context includes reviewer-added follow-up room');
   assert(contextUpload.bodyText.includes('## Files'), 'assessment context links Tanner package files');
   assert(contextUpload.bodyText.includes('BB\\-TEST\\-123'), 'assessment context includes the actual sample ID');
   assert(!contextUpload.bodyText.includes('internal\\-device\\-id'), 'assessment context excludes internal device metadata');
@@ -1701,6 +1742,8 @@ async function testHandoffJobCreatesPackageReceipt() {
 async function testHandoffJobCachedReceiptDoesNotDuplicateWork() {
   const receipt = {
     status: 'ready',
+    schemaVersion: 'handoff-receipt-v3',
+    workerVersion: 'handoff-w37',
     inspectionId: 'INH-20260801-HAND02',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -2313,6 +2356,8 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
   };
   const runningReceipt = {
     status: 'running',
+    schemaVersion: 'handoff-receipt-v3',
+    workerVersion: 'handoff-w37',
     inspectionId: 'INH-20260801-RUN01',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -3007,7 +3052,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w36', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w37', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {

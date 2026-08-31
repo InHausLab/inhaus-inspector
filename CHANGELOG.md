@@ -6,6 +6,17 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## v246 / Worker W37 / Review Portal V90 — Unified Follow-Up and Annotated Handoff
+**Date:** August 31, 2026
+
+- Replaces the three divergent follow-up computations with one room-deduplicated list that starts with inspector room flags and merges Review Portal additions and edits.
+- Uses that same list for Review Portal suggestions, Report Copy, the InHaus Inspection Follow-Up Items tab, and `_context.md`; an empty reviewer plan is filled from the list while reviewer-authored text remains authoritative.
+- Expands Review Portal Data with source and reviewer room notes, no-issues and follow-up flags, follow-up timing/details/photos, all populated observation/action fields, and recursively captured reviewer-edited values.
+- Renders saved arrow, circle, and text annotations into self-contained annotated images in Drive Technician Photos and replaces the photo metadata Drive URL with the annotated image URL.
+- Keeps incomplete photo packages retryable and exposes the partial receipt/error in the persistent Tanner Package Check.
+- Bumps the Worker receipt schema to `handoff-receipt-v3`, Worker release to `handoff-w37`, Review Portal to `V90`, and the Inspector app/cache graph to `v246`.
+- Local verification passed: 106 Inspector Node tests, all 49 Worker integration tests, 68 Review Portal Node tests, and Apps Script syntax validation. Deployed acceptance evidence is recorded after the production rollout.
+
 ## v245 / Worker W36 — Past Inspection History Recovery
 **Date:** August 13, 2026  
 **Commit:** `e7b3c23`

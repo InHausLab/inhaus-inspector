@@ -22,7 +22,7 @@ const TRACKER_TAB_REPORT = 'Report Tracker';
 const FEEDBACK_TRACKER_TAB = 'Things to Fix';
 const TRACKER_DATA_START = 8;
 const TEST_ASSESSMENTS_FOLDER_NAME = '_Test Assessments';
-const HANDOFF_RECEIPT_SCHEMA_VERSION = 'handoff-receipt-v2';
+const HANDOFF_RECEIPT_SCHEMA_VERSION = 'handoff-receipt-v3';
 const HANDOFF_PHOTO_COPY_LIMIT_DEFAULT = 5;
 const HANDOFF_RUNNER_LIMIT_DEFAULT = 5;
 const HANDOFF_RETRY_BASE_DELAY_MS = 2 * 60 * 1000;
@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w36';
+const WORKER_VERSION = 'handoff-w37';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -1209,7 +1209,7 @@ async function handleHandoffJob(request, env, ctx) {
 
   const durableJob = await getDurableHandoffJob(env, inspectionId);
   const durableReceipt = durableJob && isPlainObject(durableJob.receipt) ? durableJob.receipt : null;
-  if (body.forceFullRepair !== true && durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
+  if (body.forceFullRepair !== true && durableReceipt && isCurrentHandoffReceipt(durableReceipt) && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
     const cachedJob = durableJobToPublicJob(durableJob);
     return json({
       ...cachedJob,
@@ -1259,7 +1259,7 @@ async function handleHandoffJob(request, env, ctx) {
     if (!queued.acquired) {
       const activeJob = durableJobToPublicJob(queued.row) || queuedJob;
       const activeReceipt = queued.row && isPlainObject(queued.row.receipt) ? queued.row.receipt : durableReceipt;
-      if (activeReceipt && isReadyHandoffReceipt(activeReceipt, receiptExpectations)) {
+      if (activeReceipt && isCurrentHandoffReceipt(activeReceipt) && isReadyHandoffReceipt(activeReceipt, receiptExpectations)) {
         return json({
           ...activeJob,
           status: 'ready',
@@ -1289,7 +1289,7 @@ async function handleHandoffJob(request, env, ctx) {
   if (!claim.acquired) {
     const existingJob = durableJobToPublicJob(claim.row) || runningJob;
     const activeReceipt = isPlainObject(claim.row && claim.row.receipt) ? claim.row.receipt : null;
-    if (activeReceipt && isReadyHandoffReceipt(activeReceipt, receiptExpectations)) {
+    if (activeReceipt && isCurrentHandoffReceipt(activeReceipt) && isReadyHandoffReceipt(activeReceipt, receiptExpectations)) {
       return json({
         ...existingJob,
         status: 'ready',
@@ -1346,7 +1346,7 @@ async function handleHandoffJobRunner(request, env, ctx) {
       ? durableJob.receipt
       : (isPlainObject(reviewSystem.tannerHandoff) ? reviewSystem.tannerHandoff : null);
     const forceFullRepair = body.forceFullRepair === true || durableJob?.payload?.forceFullRepair === true;
-    if (!forceFullRepair && durableReceipt && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
+    if (!forceFullRepair && durableReceipt && isCurrentHandoffReceipt(durableReceipt) && isReadyHandoffReceipt(durableReceipt, receiptExpectations)) {
       return json({
         processed: 1,
         results: [{
@@ -2310,7 +2310,11 @@ function getHandoffReceiptFromFieldData(fieldData = {}) {
 function getReadyHandoffReceipt(fieldData = {}, expectations = {}) {
   const receipt = getHandoffReceiptFromFieldData(fieldData);
   const expectedRoomCount = Number(expectations.expectedRoomCount || getHandoffRoomRecords(fieldData).length || 0);
-  return receipt && isReadyHandoffReceipt(receipt, { ...expectations, expectedRoomCount }) ? receipt : null;
+  return receipt && isCurrentHandoffReceipt(receipt) && isReadyHandoffReceipt(receipt, { ...expectations, expectedRoomCount }) ? receipt : null;
+}
+
+function isCurrentHandoffReceipt(receipt = {}) {
+  return receipt.workerVersion === WORKER_VERSION && receipt.schemaVersion === HANDOFF_RECEIPT_SCHEMA_VERSION;
 }
 
 function buildPartialFailedHandoffReceipt(fieldData = {}) {
@@ -2407,6 +2411,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const previousAppRoomDetailCount = Number(previousReceipt.appRoomDetailCount || previousCounts.appRoomDetailCount || 0);
   const previousPhotoDriveUrlCount = Number(previousReceipt.photoDriveUrlCount || previousCounts.photoDriveUrlCount || 0);
   const canReuseStaticArtifacts = !!(body.forceFullRepair !== true &&
+    isCurrentHandoffReceipt(previousReceipt) &&
     previousReceipt.spreadsheetId &&
     previousReceipt.spreadsheetUrl &&
     (previousReceipt.rawJsonUrl || previousReceipt.rawReviewDataUrl) &&
@@ -2438,7 +2443,8 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       }
     : await createRawReviewDataBackup(accessToken, shell.backupFolderId, source, handoffFieldData);
   const photoPackage = await createOrRepairPhotoPackage(env, accessToken, shell.photosFolderId, photoRows, {
-    copyLimit: Number(body.photoCopyLimit || env.HANDOFF_PHOTO_COPY_LIMIT || HANDOFF_PHOTO_COPY_LIMIT_DEFAULT)
+    copyLimit: Number(body.photoCopyLimit || env.HANDOFF_PHOTO_COPY_LIMIT || HANDOFF_PHOTO_COPY_LIMIT_DEFAULT),
+    photoAnnotations: handoffFieldData.photoAnnotations || body.photoAnnotations || {}
   });
   const finalizedPhotoRows = await getPhotoManifestRows(env, inspectionId);
   const photoDriveUrlCount = finalizedPhotoRows.filter(row => !!row.drive_url).length;
@@ -2532,6 +2538,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
       photoLogCount: spreadsheet.photoLogCount,
       photoFolderAlreadyPackagedCount: photoPackage.alreadyPackagedCount,
       photoFolderCopiedCount: photoPackage.copiedCount,
+      photoFolderAnnotatedCount: photoPackage.annotatedCount,
       photoFolderLinkedCount: photoPackage.linkedCount,
       photoFolderSkippedCount: photoPackage.skippedCount,
       photoFolderFailedCount: photoPackage.failedCount,
@@ -2551,6 +2558,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     photoLogCount: spreadsheet.photoLogCount,
     photoFolderAlreadyPackagedCount: photoPackage.alreadyPackagedCount,
     photoFolderCopiedCount: photoPackage.copiedCount,
+    photoFolderAnnotatedCount: photoPackage.annotatedCount,
     photoFolderLinkedCount: photoPackage.linkedCount,
     photoFolderSkippedCount: photoPackage.skippedCount,
     photoFolderFailedCount: photoPackage.failedCount,
@@ -2847,6 +2855,12 @@ function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
   };
   current.rooms = canonicalRecovery.rooms;
   current.system = { ...system, inspectionRecovery: canonicalRecovery };
+  const authoritativeFollowUpItems = buildAuthoritativeFollowUpItems(current);
+  current.roomData = {
+    ...(isPlainObject(current.roomData) ? current.roomData : {}),
+    authoritativeFollowUpItems
+  };
+  current.clientFollowUpPlan = getClientFollowUpPlan(current) || formatClientFollowUpPlan(authoritativeFollowUpItems);
   return current;
 }
 
@@ -3182,6 +3196,7 @@ function handoffArtifactRows(inspectionId, jobRow, receipt) {
   add('assessment_folder', 'drive_folder', receipt.folderId, receipt.folderUrl, 'ready', { name: receipt.folderName || '' });
   add('photos_folder', 'drive_folder', receipt.photosFolderId || receipt.technicianPhotosFolderId, receipt.photosFolderUrl || receipt.technicianPhotosFolderUrl, photoArtifactStatus, {
     copied: Number(receipt.photoFolderCopiedCount || receipt.technicianPhotoCopyCount || 0),
+    annotated: Number(receipt.photoFolderAnnotatedCount || 0),
     existing: Number(receipt.photoFolderAlreadyPackagedCount || receipt.technicianPhotoExistingCount || 0),
     linked: Number(receipt.photoFolderLinkedCount || 0),
     pending: photoPendingCount,
@@ -3983,6 +3998,121 @@ function fileNameForPhoto(row) {
   return `${pieces.join(' - ')}.jpg`;
 }
 
+function fileNameForAnnotatedPhoto(row) {
+  return fileNameForPhoto(row).replace(/\.jpg$/i, ' - Annotated.svg');
+}
+
+function normalizeSavedPhotoAnnotations(value) {
+  let raw = value;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch (err) { raw = []; }
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw.map(function(item) {
+    if (!isPlainObject(item) || !['arrow', 'circle', 'text'].includes(item.type)) return null;
+    const points = (Array.isArray(item.points) ? item.points : [])
+      .map(function(point) {
+        if (!isPlainObject(point)) return null;
+        const x = Number(point.x);
+        const y = Number(point.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+      })
+      .filter(Boolean);
+    if (item.type === 'text' && !points.length && Number.isFinite(Number(item.x)) && Number.isFinite(Number(item.y))) {
+      points.push({ x: Math.max(0, Math.min(1, Number(item.x))), y: Math.max(0, Math.min(1, Number(item.y))) });
+    }
+    if (item.type === 'text' ? points.length < 1 : points.length < 2) return null;
+    const text = String(firstNonEmpty(item.text, item.label, item.value) || '').trim();
+    if (item.type === 'text' && !text) return null;
+    const color = /^#[0-9a-f]{3,8}$/i.test(String(item.color || '')) ? String(item.color) : '#ef4444';
+    return { type: item.type, points: points.slice(0, 2), color, text };
+  }).filter(Boolean);
+}
+
+function xmlText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function imageDimensionsFromBytes(bytes) {
+  if (bytes.length >= 24 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { width: view.getUint32(16), height: view.getUint32(20) };
+  }
+  if (bytes.length >= 10 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
+    return { width: bytes[6] | (bytes[7] << 8), height: bytes[8] | (bytes[9] << 8) };
+  }
+  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let offset = 2;
+    while (offset + 8 < bytes.length) {
+      if (bytes[offset] !== 0xff) { offset += 1; continue; }
+      const marker = bytes[offset + 1];
+      if (marker === 0xd8 || marker === 0xd9) { offset += 2; continue; }
+      const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      if (length < 2 || offset + 2 + length > bytes.length) break;
+      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+        return {
+          height: (bytes[offset + 5] << 8) | bytes[offset + 6],
+          width: (bytes[offset + 7] << 8) | bytes[offset + 8]
+        };
+      }
+      offset += 2 + length;
+    }
+  }
+  return { width: 1600, height: 1200 };
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+  }
+  return btoa(binary);
+}
+
+async function buildAnnotatedPhotoBlob(originalBlob, annotations) {
+  const bytes = new Uint8Array(await originalBlob.arrayBuffer());
+  const dimensions = imageDimensionsFromBytes(bytes);
+  const width = Math.max(1, Number(dimensions.width) || 1600);
+  const height = Math.max(1, Number(dimensions.height) || 1200);
+  const lineWidth = Math.max(4, Math.min(width, height) * 0.006);
+  const sourceType = String(originalBlob.type || 'image/jpeg').replace(/[^a-z0-9.+/-]/gi, '') || 'image/jpeg';
+  const source = `data:${sourceType};base64,${bytesToBase64(bytes)}`;
+  const shapes = annotations.map(function(annotation) {
+    const start = annotation.points[0];
+    const end = annotation.points[1] || start;
+    const x1 = start.x * width;
+    const y1 = start.y * height;
+    const x2 = end.x * width;
+    const y2 = end.y * height;
+    if (annotation.type === 'circle') {
+      const rx = Math.max(Math.abs(x2 - x1) / 2, lineWidth * 2);
+      const ry = Math.max(Math.abs(y2 - y1) / 2, lineWidth * 2);
+      return `<ellipse cx="${(x1 + x2) / 2}" cy="${(y1 + y2) / 2}" rx="${rx}" ry="${ry}" fill="none" stroke="${annotation.color}" stroke-width="${lineWidth}"/>`;
+    }
+    if (annotation.type === 'text') {
+      const fontSize = Math.max(18, Math.min(width, height) * 0.035);
+      return `<text x="${x1}" y="${y1}" fill="${annotation.color}" stroke="#000000" stroke-width="${Math.max(2, lineWidth / 2)}" paint-order="stroke" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="700">${xmlText(annotation.text)}</text>`;
+    }
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLength = Math.max(18, Math.min(width, height) * 0.035);
+    const headAngle = Math.PI / 7;
+    const hx1 = x2 - headLength * Math.cos(angle - headAngle);
+    const hy1 = y2 - headLength * Math.sin(angle - headAngle);
+    const hx2 = x2 - headLength * Math.cos(angle + headAngle);
+    const hy2 = y2 - headLength * Math.sin(angle + headAngle);
+    return `<path d="M ${x1} ${y1} L ${x2} ${y2} M ${x2} ${y2} L ${hx1} ${hy1} M ${x2} ${y2} L ${hx2} ${hy2}" fill="none" stroke="${annotation.color}" stroke-width="${lineWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><image href="${source}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="none"/>${shapes}</svg>`;
+  return new Blob([svg], { type: 'image/svg+xml' });
+}
+
 function safeDriveNamePart(value, maxLength) {
   return String(value || '')
     .replace(/[\u0000-\u001f/\\:*?"<>|]+/g, ' ')
@@ -4260,22 +4390,76 @@ function serializeReviewValue(value) {
 
 function buildFormattedReviewRows(fieldData) {
   const rows = [['Section', 'Key', 'Value']];
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const appended = new Set();
+  const append = (section, key, value, path = `${section}.${key}`) => {
+    if (value === undefined || value === null || String(value).trim() === '' || appended.has(path)) return;
+    appended.add(path);
+    appendFormattedReviewRows(rows, section, key, serializeReviewValue(value).value);
+  };
   const summaryKeys = [
     'clientName', 'propertyAddress', 'inspectionDate', 'inspectorName', 'inspectionType',
     'waterSource', 'waterFiltration', 'waterSoftener', 'heating', 'ac', 'ventilation',
     'airFiltration', 'otherAirCleaning', 'radonMitigation', 'fireplaceSummary', 'stoveSummary', 'weather',
-    'clientConcerns', 'knownProblemAreas', 'reportBuilderNotes', 'followUpPlan'
+    'clientConcerns', 'knownProblemAreas', 'reportBuilderNotes'
   ];
   summaryKeys.forEach(function(key) {
-    if (fieldData && fieldData[key] !== undefined && fieldData[key] !== null && String(fieldData[key]).trim() !== '') {
-      appendFormattedReviewRows(rows, 'Summary', key, serializeReviewValue(fieldData[key]).value);
+    append('Summary', key, firstNonEmpty(fieldData && fieldData[key], recovery[key]), `summary.${key}`);
+  });
+  append('Summary', 'Client Follow-Up Plan', getClientFollowUpPlan(fieldData), 'summary.clientFollowUpPlan');
+
+  const authoritativeItems = buildAuthoritativeFollowUpItems(fieldData);
+  const authoritativeByStep = new Map(authoritativeItems.filter(item => item.stepId).map(item => [String(item.stepId), item]));
+  const authoritativeByRoom = new Map(authoritativeItems.filter(item => item.room).map(item => [followUpRoomKey(item.room), item]));
+  getHandoffRoomRecords(fieldData).forEach(function(room) {
+    if (!isPlainObject(room)) return;
+    const data = roomExportData(room, recovery);
+    const stepId = String(firstNonEmpty(room.stepId, room.id) || '');
+    const roomName = roomDisplayName(room);
+    const section = `Room — ${roomName}`;
+    const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const sourceNotes = firstNonEmpty(
+      exportValue(data, ['inspectorNotes', 'notes', 'roomNotes']),
+      room.inspectorNotes,
+      room.notes
+    );
+    const sourceSummary = firstNonEmpty(exportValue(data, ['aiSummary']), room.aiSummary);
+    const reviewerNotes = firstNonEmpty(
+      reviewedRoom.polishedInspectorNotes,
+      reviewedRoom.inspectorNotes,
+      reviewedRoom.notes
+    );
+    const reviewerSummary = firstNonEmpty(reviewedRoom.aiSummary, reviewedRoom.polishedAiSummary);
+    const sourceNoIssues = isAffirmativeValue(exportValue(data, ['noIssuesFound', 'noIssues']));
+    const effectiveNoIssues = reviewedRoom.noIssuesFound !== undefined
+      ? isAffirmativeValue(reviewedRoom.noIssuesFound)
+      : sourceNoIssues;
+    const followUp = authoritativeByStep.get(stepId) || authoritativeByRoom.get(followUpRoomKey(roomName));
+
+    append(section, 'Inspector Notes', sourceNotes, `room.${stepId}.sourceNotes`);
+    append(section, 'Inspector AI Summary', sourceSummary, `room.${stepId}.sourceSummary`);
+    if (reviewerNotes && String(reviewerNotes) !== String(sourceNotes)) {
+      append(section, 'Reviewer-Edited Notes', reviewerNotes, `room.${stepId}.reviewerNotes`);
+    }
+    if (reviewerSummary && String(reviewerSummary) !== String(sourceSummary)) {
+      append(section, 'Reviewer-Edited AI Summary', reviewerSummary, `room.${stepId}.reviewerSummary`);
+    }
+    append(section, 'No Issues Flag', effectiveNoIssues ? 'TRUE' : 'FALSE', `room.${stepId}.noIssues`);
+    append(section, 'Follow-Up Flag', followUp ? 'TRUE' : 'FALSE', `room.${stepId}.followUpFlag`);
+    if (followUp) {
+      append(section, 'Follow-Up Recheck In', followUp.recheckIn || '', `room.${stepId}.followUpRecheckIn`);
+      append(section, 'Follow-Up Watch For', followUp.watchFor || '', `room.${stepId}.followUpWatchFor`);
+      append(section, 'Follow-Up Photo IDs', (followUp.photoIds || []).join(', '), `room.${stepId}.followUpPhotoIds`);
     }
   });
+
   Object.keys(fieldData || {}).sort().forEach(function(key) {
     if (/^(obs|actionTaken|followUp)_\d+_/i.test(key)) {
-      appendFormattedReviewRows(rows, 'Dynamic Review', key, serializeReviewValue(fieldData[key]).value);
+      append('Dynamic Review', key, fieldData[key], `review.${key}`);
     }
   });
+
+  appendReviewerEditedRows(rows, fieldData, appended);
   const system = isPlainObject(fieldData.system) ? fieldData.system : {};
   if (system.inspectionRecovery) {
     rows.push([
@@ -4285,9 +4469,35 @@ function buildFormattedReviewRows(fieldData) {
     ]);
   }
   if (system.startInspectionShell) {
-    appendFormattedReviewRows(rows, 'System', 'startInspectionShell', JSON.stringify(system.startInspectionShell));
+    append('System', 'startInspectionShell', system.startInspectionShell, 'system.startInspectionShell');
   }
   return rows;
+}
+
+function appendReviewerEditedRows(rows, fieldData, appended) {
+  const visit = (value, path, depth) => {
+    if (value === undefined || value === null || value === '' || depth > 6) return;
+    if (Array.isArray(value)) {
+      if (!appended.has(path)) {
+        appended.add(path);
+        appendFormattedReviewRows(rows, 'Reviewer-Edited Values', path, JSON.stringify(value));
+      }
+      return;
+    }
+    if (!isPlainObject(value)) {
+      if (!appended.has(path)) {
+        appended.add(path);
+        appendFormattedReviewRows(rows, 'Reviewer-Edited Values', path, spreadsheetCellValue(value));
+      }
+      return;
+    }
+    Object.keys(value).sort().forEach(key => visit(value[key], path ? `${path}.${key}` : key, depth + 1));
+  };
+
+  Object.keys(fieldData || {}).sort().forEach(function(key) {
+    if (key === 'rooms' || key === 'system') return;
+    visit(fieldData[key], key, 0);
+  });
 }
 
 function appendFormattedReviewRows(rows, section, key, value) {
@@ -4332,9 +4542,144 @@ function getHandoffRoomRecords(fieldData = {}) {
   return Array.isArray(recovery.rooms) ? recovery.rooms : [];
 }
 
+function parseReviewArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function followUpRoomKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function normalizeFollowUpPhotoIds(value) {
+  return Array.from(new Set([].concat(Array.isArray(value) ? value : [])
+    .map(item => isPlainObject(item) ? firstNonEmpty(item.id, item.photoId, item.photo_id) : item)
+    .map(item => String(item || '').trim())
+    .filter(Boolean)));
+}
+
+function buildAuthoritativeFollowUpItems(fieldData = {}) {
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const items = [];
+  const itemIndexByStepId = new Map();
+  const itemIndexByRoom = new Map();
+  const remember = item => {
+    const index = items.length;
+    items.push(item);
+    if (item.stepId) itemIndexByStepId.set(String(item.stepId), index);
+    const roomKey = followUpRoomKey(item.room);
+    if (roomKey) itemIndexByRoom.set(roomKey, index);
+    return index;
+  };
+
+  getHandoffRoomRecords(fieldData).forEach(function(room) {
+    if (!isPlainObject(room)) return;
+    const data = roomExportData(room, recovery);
+    const stepId = String(firstNonEmpty(room.stepId, room.id) || '');
+    const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const needed = firstNonEmpty(reviewedRoom.followUpNeeded, exportValue(data, ['followUpNeeded']));
+    const recheckIn = firstNonEmpty(
+      reviewedRoom.followUpTimeframe,
+      reviewedRoom.recheckIn,
+      exportValue(data, ['followUpTimeframe', 'recheckIn'])
+    );
+    const watchFor = firstNonEmpty(
+      reviewedRoom.followUpNote,
+      reviewedRoom.watchFor,
+      reviewedRoom.followUpPlan,
+      exportValue(data, ['followUpNote', 'watchFor', 'followUpPlan'])
+    );
+    const photoIds = normalizeFollowUpPhotoIds([].concat(
+      Array.isArray(reviewedRoom.followUpPhotoIds) ? reviewedRoom.followUpPhotoIds : [],
+      Array.isArray(data._followUpPhotos) ? data._followUpPhotos : []
+    ));
+    if (!isAffirmativeValue(needed) && !recheckIn && !watchFor && !photoIds.length) return;
+    remember({
+      stepId,
+      room: roomDisplayName(room),
+      recheckIn: String(recheckIn || ''),
+      watchFor: String(watchFor || ''),
+      photoIds,
+      inspectorFlagged: isAffirmativeValue(needed)
+    });
+  });
+
+  const roomData = isPlainObject(fieldData.roomData) ? fieldData.roomData : {};
+  const reviewerItems = parseReviewArray(roomData.followUpItems);
+  reviewerItems.forEach(function(raw) {
+    if (!isPlainObject(raw)) return;
+    const stepId = String(raw.stepId || '');
+    const room = String(raw.room || '').trim();
+    const roomKey = followUpRoomKey(room);
+    let index = stepId && itemIndexByStepId.has(stepId) ? itemIndexByStepId.get(stepId) : undefined;
+    if (index === undefined && roomKey && itemIndexByRoom.has(roomKey)) index = itemIndexByRoom.get(roomKey);
+    const incoming = {
+      stepId,
+      room,
+      recheckIn: String(raw.recheckIn || raw.followUpTimeframe || ''),
+      watchFor: String(raw.watchFor || raw.followUpNote || raw.followUpPlan || ''),
+      photoIds: normalizeFollowUpPhotoIds(raw.photoIds || raw.followUpPhotoIds || []),
+      reviewerAdded: true
+    };
+    if (index === undefined) {
+      if (!incoming.room && !incoming.stepId) return;
+      remember(incoming);
+      return;
+    }
+    const existing = items[index];
+    items[index] = {
+      ...existing,
+      stepId: incoming.stepId || existing.stepId,
+      room: incoming.room || existing.room,
+      recheckIn: incoming.recheckIn || existing.recheckIn,
+      watchFor: incoming.watchFor || existing.watchFor,
+      photoIds: Array.from(new Set([...(existing.photoIds || []), ...incoming.photoIds])),
+      reviewerAdded: true
+    };
+  });
+
+  return items.filter(item =>
+    item.room || item.stepId
+  );
+}
+
+function formatClientFollowUpPlan(items) {
+  return (items || []).map(function(item) {
+    const room = String(item.room || item.stepId || 'Inspection').trim();
+    const detail = [
+      item.recheckIn ? `Recheck in ${item.recheckIn}` : '',
+      item.watchFor || ''
+    ].filter(Boolean).join(': ');
+    return `${room}: ${detail || 'Follow-up recommended.'}`;
+  }).join('\n');
+}
+
+function getClientFollowUpPlan(fieldData = {}) {
+  return String(firstNonEmpty(
+    fieldData.clientFollowUpPlan,
+    fieldData.aiFollowUpPlan,
+    fieldData.followUpPlan,
+    fieldData.summary && fieldData.summary.clientFollowUpPlan,
+    fieldData.summary && fieldData.summary.aiFollowUpPlan,
+    fieldData.summary && fieldData.summary.followUpPlan,
+    formatClientFollowUpPlan(buildAuthoritativeFollowUpItems(fieldData))
+  ) || '');
+}
+
 function buildRoomDetailRows(fieldData, photoRows = []) {
   const rows = [['Room', 'Notes', 'No Issues', 'Follow Up', 'Photos']];
   const rooms = getHandoffRoomRecords(fieldData);
+  const authoritativeItems = buildAuthoritativeFollowUpItems(fieldData);
   rooms.forEach(function(room) {
     if (!isPlainObject(room)) return;
     const stepId = firstNonEmpty(room.stepId, room.id);
@@ -4347,13 +4692,13 @@ function buildRoomDetailRows(fieldData, photoRows = []) {
         .filter(photo => String(photo.room_name || '').trim().toLowerCase() === String(roomName || '').trim().toLowerCase())
         .map(photo => photo.photo_id || ''))
       .filter(Boolean);
-    const followUp = firstNonEmpty(
-      reviewedRoom.followUp,
-      reviewedRoom.followUpPlan,
-      room.followUp,
-      room.followUpPlan,
-      [reviewedRoom.recheckIn ? `Recheck in: ${reviewedRoom.recheckIn}` : '', reviewedRoom.watchFor ? `Watch for: ${reviewedRoom.watchFor}` : ''].filter(Boolean).join(' · ')
+    const followUpItem = authoritativeItems.find(item =>
+      (stepId && item.stepId && String(item.stepId) === String(stepId)) ||
+      followUpRoomKey(item.room) === followUpRoomKey(roomName)
     );
+    const followUp = followUpItem
+      ? [followUpItem.recheckIn ? `Recheck in: ${followUpItem.recheckIn}` : '', followUpItem.watchFor ? `Watch for: ${followUpItem.watchFor}` : ''].filter(Boolean).join(' · ') || 'Follow-up recommended'
+      : '';
     rows.push([
       roomName,
       firstNonEmpty(reviewedRoom.polishedInspectorNotes, reviewedRoom.inspectorNotes, room.inspectorNotes, room.notes, room.polishedInspectorNotes),
@@ -4543,22 +4888,14 @@ function buildInspectionCsvRows(source, fieldData, photoRows = []) {
 }
 
 function buildInspectionFollowUpRows(fieldData) {
-  const recovery = getHandoffInspectionRecovery(fieldData);
   const rows = [['Room', 'Re-check In', 'What to Watch For', 'Photo IDs']];
-  getHandoffRoomRecords(fieldData).forEach(function(room) {
-    if (!isPlainObject(room)) return;
-    const data = roomExportData(room, recovery);
-    const stepId = firstNonEmpty(room.stepId, room.id);
-    const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
-    const needed = firstNonEmpty(reviewedRoom.followUpNeeded, exportValue(data, ['followUpNeeded']));
-    const timeframe = firstNonEmpty(reviewedRoom.followUpTimeframe, reviewedRoom.recheckIn, exportValue(data, ['followUpTimeframe', 'recheckIn']));
-    const note = firstNonEmpty(reviewedRoom.followUpNote, reviewedRoom.watchFor, reviewedRoom.followUpPlan, exportValue(data, ['followUpNote', 'watchFor', 'followUpPlan']));
-    const photoIds = [].concat(
-      Array.isArray(reviewedRoom.followUpPhotoIds) ? reviewedRoom.followUpPhotoIds : [],
-      Array.isArray(data._followUpPhotos) ? data._followUpPhotos : []
-    ).map(item => isPlainObject(item) ? firstNonEmpty(item.id, item.photoId, item.photo_id) : item).filter(Boolean);
-    if (!isAffirmativeValue(needed) && !timeframe && !note && !photoIds.length) return;
-    rows.push([roomDisplayName(room), timeframe, note, Array.from(new Set(photoIds)).join(', ')].map(spreadsheetCellValue));
+  buildAuthoritativeFollowUpItems(fieldData).forEach(function(item) {
+    rows.push([
+      item.room || item.stepId || 'Inspection',
+      item.recheckIn || '',
+      item.watchFor || '',
+      (item.photoIds || []).join(', ')
+    ].map(spreadsheetCellValue));
   });
   return rows;
 }
@@ -4704,7 +5041,7 @@ function buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, ins
     '## Review Notes',
     '',
     `- **Report builder notes:** ${markdownText(firstNonEmpty(fieldData.reportBuilderNotes, 'Not recorded'))}`,
-    `- **Client follow-up plan:** ${markdownText(firstNonEmpty(fieldData.followUpPlan, 'Not recorded'))}`,
+    `- **Client follow-up plan:** ${markdownText(firstNonEmpty(getClientFollowUpPlan(fieldData), 'Not recorded'))}`,
     '',
     '## Files',
     '',
@@ -4826,10 +5163,12 @@ async function uploadDriveBlob(accessToken, folderId, fileName, fileBlob, mimeTy
 
 async function createOrRepairPhotoPackage(env, accessToken, photosFolderId, photoRows, options = {}) {
   const rows = Array.isArray(photoRows) ? photoRows : [];
+  const photoAnnotations = isPlainObject(options.photoAnnotations) ? options.photoAnnotations : {};
   const operationLimit = Math.max(0, Number.isFinite(Number(options.copyLimit)) ? Number(options.copyLimit) : HANDOFF_PHOTO_COPY_LIMIT_DEFAULT);
   const existingByName = await listDriveFolderFilesByName(accessToken, photosFolderId);
   let operationCount = 0;
   let copiedCount = 0;
+  let annotatedCount = 0;
   let linkedCount = 0;
   let alreadyPackagedCount = 0;
   let skippedCount = 0;
@@ -4838,12 +5177,14 @@ async function createOrRepairPhotoPackage(env, accessToken, photosFolderId, phot
   const failures = [];
 
   for (const row of rows) {
-    const fileName = fileNameForPhoto(row);
+    const annotations = normalizeSavedPhotoAnnotations(photoAnnotations[row.photo_id]);
+    const fileName = annotations.length ? fileNameForAnnotatedPhoto(row) : fileNameForPhoto(row);
     try {
       const existing = existingByName.get(fileName);
       if (existing) {
         alreadyPackagedCount += 1;
-        if (!row.drive_url && existing.webViewLink) {
+        if (annotations.length) annotatedCount += 1;
+        if (existing.webViewLink && row.drive_url !== existing.webViewLink) {
           await updatePhotoDriveUrl(env, row.photo_id, row.inspection_id, existing.webViewLink);
         }
         continue;
@@ -4853,7 +5194,7 @@ async function createOrRepairPhotoPackage(env, accessToken, photosFolderId, phot
         continue;
       }
       const existingDriveId = extractDriveFileId(row.drive_url);
-      if (existingDriveId) {
+      if (existingDriveId && !annotations.length) {
         const shortcut = await createDriveShortcut(accessToken, photosFolderId, fileName, existingDriveId);
         existingByName.set(fileName, shortcut);
         linkedCount += 1;
@@ -4866,11 +5207,15 @@ async function createOrRepairPhotoPackage(env, accessToken, photosFolderId, phot
         continue;
       }
       const blob = await downloadSupabaseObject(env, row.storage_path);
-      const driveFile = await uploadDriveFile(accessToken, photosFolderId, fileName, blob);
+      const fileBlob = annotations.length ? await buildAnnotatedPhotoBlob(blob, annotations) : blob;
+      const driveFile = annotations.length
+        ? await uploadDriveBlob(accessToken, photosFolderId, fileName, fileBlob, 'image/svg+xml')
+        : await uploadDriveFile(accessToken, photosFolderId, fileName, fileBlob);
       const driveUrl = driveFile.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(driveFile.id)}/view`;
       await updatePhotoDriveUrl(env, row.photo_id, row.inspection_id, driveUrl);
       existingByName.set(fileName, driveFile);
       copiedCount += 1;
+      if (annotations.length) annotatedCount += 1;
       operationCount += 1;
     } catch (err) {
       failedCount += 1;
@@ -4880,6 +5225,7 @@ async function createOrRepairPhotoPackage(env, accessToken, photosFolderId, phot
 
   return {
     copiedCount,
+    annotatedCount,
     linkedCount,
     alreadyPackagedCount,
     skippedCount,
