@@ -15,7 +15,10 @@ This file is the authoritative record of every significant change, decision, bug
 - Renders saved arrow, circle, and text annotations into self-contained annotated images in Drive Technician Photos and replaces the photo metadata Drive URL with the annotated image URL.
 - Keeps incomplete photo packages retryable and exposes the partial receipt/error in the persistent Tanner Package Check.
 - Bumps the Worker receipt schema to `handoff-receipt-v3`, Worker release to `handoff-w37`, Review Portal to `V90`, and the Inspector app/cache graph to `v246`.
-- Local verification passed: 106 Inspector Node tests, all 49 Worker integration tests, 68 Review Portal Node tests, and Apps Script syntax validation. Deployed acceptance evidence is recorded after the production rollout.
+- Local verification passed: 106 Inspector Node tests, all 49 Worker integration tests, 68 Review Portal Node tests, and Apps Script syntax validation.
+- Production rollout passed: Cloudflare Worker `handoff-w37` version `4fa3519f-7124-4b50-8aa8-db95e95f8f43`; GitHub Pages served Review Portal `V90`; Netlify served Inspector `v246` and live `service-worker.js` declared `CACHE_NAME = 'inhaus-v246'`.
+- Deployed end-to-end acceptance passed through the normal Review Portal submission workflow with isolated Test / Training inspection `INH-E2E-TEST-20260831-FUP90`: Tanner package job `c7f7d50d-7fdf-4714-8ff4-def60c132484` completed with zero pending/failed items, 161 Review Portal Data rows, two authoritative follow-up rooms, and one annotated Technician Photos image.
+- Generated acceptance artifacts: InHaus Inspection sheet `1YuUm4r09nWXx0M7Sdp5RtACP0TKKiue5mCZGwwgAic0`, Review Portal Data sheet `1QzZHOD8_UP9cYDAtxnFmLJTja-NTyHst4hM8Xp00r54`, `_context.md` `1HFpz1ych-FjNCbnIS_74TVl1ixvkmL_1`, and annotated Drive image `1xF_r8xZzwsP1LM5V0HjNFNkP0ICUkyAo`.
 
 ## v245 / Worker W36 — Past Inspection History Recovery
 **Date:** August 13, 2026  
