@@ -6,6 +6,16 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Worker W38 — Inspection-Specific Test Folders
+**Date:** September 1, 2026  
+**Commit:** `534e208`
+
+- Fixes Test / Training Drive package collisions when separate inspections share the same date, client surname, and street address.
+- Appends the inspection ID to every new test assessment folder name and migrates ambiguous legacy test shells to a new inspection-specific folder during start-shell or full handoff repair.
+- Preserves idempotent reuse when the saved shell already belongs to the same inspection-specific folder.
+- Local verification passed: all 106 Inspector Node tests and all 50 Worker integration tests.
+- No Inspector App runtime files changed; Inspector remains v246 and its Netlify cache remains `inhaus-v246`.
+
 ## Review Portal V91 — ATP Task Placement Gate
 **Date:** September 1, 2026
 
