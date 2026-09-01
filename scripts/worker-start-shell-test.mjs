@@ -639,7 +639,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w39', 'health exposes Worker version');
+  assert(data.version === 'handoff-w40', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1607,6 +1607,7 @@ async function testHandoffJobCreatesPackageReceipt() {
     propertyAddress: '123 Main St, Basalt CO',
     inspectionDate: '2026-08-01',
     inspectorName: 'David Kline',
+    clientConcerns: 'Previous kitchen leak and utility-room odor.',
     obs_1_note: 'Example observation',
     obs_1_location: 'Kitchen',
     obs_1_photoIds: ['photo-1'],
@@ -1639,6 +1640,10 @@ async function testHandoffJobCreatesPackageReceipt() {
       noIssuesFound: false,
       qtrakLocation: 'Reviewer Kitchen Counter',
       breezeLocation: 'Reviewer Kitchen Sink'
+    },
+    utility: {
+      inspectorNotes: 'Reviewer confirmed the expansion tank needs follow-up.',
+      qtrakLocation: 'Mechanical closet'
     },
     photoAnnotations: {
       'photo-1': [
@@ -1677,6 +1682,14 @@ async function testHandoffJobCreatesPackageReceipt() {
             flirConcerns: 'Cold spot below sink',
             qtrakCaptured: true,
             _fieldUpdates: { qtrakLocation: { deviceId: 'internal-device-id' } }
+          },
+          utility: {
+            roomName: 'Utility Room',
+            inspectorNotes: 'Water-logged expansion tank observed.',
+            breezeDone: true,
+            breezeLocation: 'Near expansion tank',
+            qtrakCaptured: true,
+            qtrakLocation: 'Utility Room'
           }
         }
       }
@@ -1729,7 +1742,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(data.artifactReceipt.contextFileId, 'receipt has assessment context file');
   assert(data.artifactReceipt.rawJsonUrl, 'receipt has raw JSON backup');
   assert(data.artifactReceipt.photoLogCount === 2, 'receipt counts photo log rows');
-  assert(data.artifactReceipt.roomDetailCount === 1, 'receipt counts room detail rows');
+  assert(data.artifactReceipt.roomDetailCount === 2, 'receipt counts source rooms plus the structured Utility Room');
   assert(
     hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Reviewer clarified the staining is below the sink.']),
     `room details use the reviewer-edited note while preserving source notes in the curated tab: ${JSON.stringify(sheetRowsForTab(state, 'Room Details'))}`
@@ -1750,6 +1763,8 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(state.spreadsheetUpdates.some(update => update.repeatCell?.cell?.userEnteredFormat?.textFormat?.bold === true), 'formats generated spreadsheet header rows');
   assert(state.spreadsheetUpdates.some(update => update.updateDimensionProperties?.range?.dimension === 'COLUMNS'), 'sets readable generated spreadsheet column widths');
   assert(hasSheetCellValue(state, 'Summary', 'INHAUS LAB — INSPECTION DATA'), 'writes InHaus Inspection summary');
+  assert(hasSheetRowContaining(state, 'Summary', ['Correction Source', 'Review Portal — edit property corrections there; this generated sheet is refreshed from the reviewed record.']), 'generated inspection sheet identifies the Review Portal as the property-correction source');
+  assert(hasSheetRowContaining(state, 'Summary', ['Known Problem Areas', 'Previous kitchen leak and utility-room odor.']), 'known problem areas fall back to captured client concerns when the unused field is blank');
   assert(sheetDataRowsForTab(state, 'Raw Review Data').length >= Object.keys(fieldData).length, 'raw tab has at least one row for every submitted field_data key');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_2_note', 'Second observation', 'string']), 'raw tab includes obs_2_note');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_6_note', 'Sixth observation', 'string']), 'raw tab includes obs_6_note');
@@ -1775,6 +1790,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Reviewer clarified the staining is below the sink.', 'photo-1, photo-2']), 'room details include reviewer-edited notes and every assigned room photo ID');
   assert(hasSheetRowContaining(state, 'Room Details', ['Reviewer Kitchen Sink', 'Reviewer Kitchen Counter']), 'room details use reviewer-edited Breeze and Q-Trak locations');
   assert(hasSheetRowContaining(state, 'Room Details', ['415', 'Fail', '21', 'Pass', 'TRUE']), 'room details include structured ATP readings and statuses');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Utility Room', 'Reviewer confirmed the expansion tank needs follow-up.', 'Mechanical closet']), 'room details include the separately modeled Utility Room and its reviewed values');
   assert(state.rawUploads.length === 3, 'writes raw JSON, annotated image, and assessment context files');
   const annotatedUpload = state.rawUploads.find(upload => /Content-Type:\s*image\/svg\+xml/i.test(upload.bodyText || ''));
   const rawJsonUpload = state.rawUploads.find(upload => upload.bodyText.includes('"obs_6_note": "Sixth observation"'));
@@ -1799,7 +1815,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'review_portal_data_spreadsheet'), 'durable artifacts include review data spreadsheet');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'inhaus_inspection_spreadsheet'), 'durable artifacts include InHaus Inspection spreadsheet');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'assessment_context'), 'durable artifacts include assessment context');
-  assert(state.handoffArtifacts.find(row => row.artifact_key === 'review_portal_data_spreadsheet').metadata.roomDetailCount === 1, 'durable spreadsheet artifact records room detail count');
+  assert(state.handoffArtifacts.find(row => row.artifact_key === 'review_portal_data_spreadsheet').metadata.roomDetailCount === 2, 'durable spreadsheet artifact records room detail count');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'raw_review_data'), 'durable artifacts include raw review data backup');
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'photos_folder'), 'durable artifacts include photos folder');
   assert(state.handoffArtifacts.find(row => row.artifact_key === 'photos_folder').status === 'ready', 'complete photo artifact is ready');
@@ -1813,7 +1829,7 @@ async function testHandoffJobCachedReceiptDoesNotDuplicateWork() {
   const receipt = {
     status: 'ready',
     schemaVersion: 'handoff-receipt-v3',
-    workerVersion: 'handoff-w39',
+    workerVersion: 'handoff-w40',
     inspectionId: 'INH-20260801-HAND02',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -2427,7 +2443,7 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
   const runningReceipt = {
     status: 'running',
     schemaVersion: 'handoff-receipt-v3',
-    workerVersion: 'handoff-w39',
+    workerVersion: 'handoff-w40',
     inspectionId: 'INH-20260801-RUN01',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -3122,7 +3138,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w39', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w40', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {

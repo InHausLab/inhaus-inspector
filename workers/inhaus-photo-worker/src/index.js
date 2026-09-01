@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w39';
+const WORKER_VERSION = 'handoff-w40';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -2396,6 +2396,10 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const handoffFieldData = buildCanonicalHandoffFieldData(fieldData, source, canonicalSource);
   fieldData.rooms = handoffFieldData.rooms;
   fieldData.system = handoffFieldData.system;
+  fieldData.roomData = handoffFieldData.roomData;
+  fieldData.clientFollowUpPlan = handoffFieldData.clientFollowUpPlan;
+  fieldData.knownProblemAreas = handoffFieldData.knownProblemAreas;
+  if (handoffFieldData.status) fieldData.status = handoffFieldData.status;
   const previousReceipt = getHandoffReceiptFromFieldData(fieldData) || {};
   const sourceShell = isPlainObject(source.system?.startInspectionShell)
     ? source.system.startInspectionShell
@@ -2878,12 +2882,19 @@ function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
     current.status = submittedStatus;
   }
   current.system = { ...system, inspectionRecovery: canonicalRecovery };
+  current.rooms = getHandoffRoomRecords(current);
   const authoritativeFollowUpItems = buildAuthoritativeFollowUpItems(current);
   current.roomData = {
     ...(isPlainObject(current.roomData) ? current.roomData : {}),
     authoritativeFollowUpItems
   };
   current.clientFollowUpPlan = getClientFollowUpPlan(current) || formatClientFollowUpPlan(authoritativeFollowUpItems);
+  current.knownProblemAreas = firstNonEmpty(
+    current.knownProblemAreas,
+    source.knownProblemAreas,
+    current.clientConcerns,
+    source.clientConcerns
+  );
   return current;
 }
 
@@ -4638,9 +4649,30 @@ function getHandoffInspectionRecovery(fieldData = {}) {
 }
 
 function getHandoffRoomRecords(fieldData = {}) {
-  if (Array.isArray(fieldData.rooms)) return fieldData.rooms;
   const recovery = getHandoffInspectionRecovery(fieldData);
-  return Array.isArray(recovery.rooms) ? recovery.rooms : [];
+  const rooms = Array.isArray(fieldData.rooms)
+    ? structuredClone(fieldData.rooms)
+    : (Array.isArray(recovery.rooms) ? structuredClone(recovery.rooms) : []);
+  const hasUtilityRoom = rooms.some(room => isPlainObject(room) && /utility|mechanical/i.test(String(firstNonEmpty(room.roomName, room.name, room.stepId, room.id))));
+  const utility = {
+    ...(isPlainObject(recovery.utilityRoom) ? recovery.utilityRoom : {}),
+    ...(isPlainObject(recovery.stepData?.utility) ? recovery.stepData.utility : {}),
+    ...(isPlainObject(fieldData.utility) ? fieldData.utility : {})
+  };
+  const hasUtilityData = Object.entries(utility).some(([key, value]) =>
+    !String(key).startsWith('_') && value !== undefined && value !== null && String(value).trim() !== ''
+  );
+  if (!hasUtilityRoom && hasUtilityData) {
+    rooms.push({
+      stepId: 'utility',
+      id: 'utility',
+      name: 'Utility Room',
+      roomName: 'Utility Room',
+      type: 'utility',
+      ...utility
+    });
+  }
+  return rooms;
 }
 
 function parseReviewArray(value) {
@@ -4881,6 +4913,7 @@ function buildInspectionSummaryRows(source, fieldData) {
     ['Client', firstNonEmpty(record.clientName, record.client)],
     ['Property Address', firstNonEmpty(record.propertyAddress, record.address)],
     ['Inspection Type', firstNonEmpty(record.inspectionType, record.assessmentType)],
+    ['Correction Source', 'Review Portal — edit property corrections there; this generated sheet is refreshed from the reviewed record.'],
     ['', ''],
     ['PROPERTY DETAILS', ''],
     ['Residence Type', exportValue(record, ['residenceType', 'propertyType', 'homeType'])],

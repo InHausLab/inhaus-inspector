@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Worker W40 — Structured Utility Room and Correction Source
+**Date:** September 1, 2026
+
+- Adds separately modeled Utility Room data to the canonical reviewed room list and both generated Room Details tabs.
+- Makes the Review Portal the explicit post-inspection correction source; generated spreadsheets identify where property corrections must be made before regeneration.
+- Uses captured Client Concerns as the Known Problem Areas fallback when the legacy standalone field is blank.
+- Persists canonical follow-ups, final submission status, reviewed rooms, and the fallback problem-area value back into review storage.
+
 ## Worker W39 — Complete, Readable Review Exports
 **Date:** September 1, 2026
 
