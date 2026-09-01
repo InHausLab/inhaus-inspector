@@ -4,6 +4,13 @@ This file is the authoritative record of every significant change, decision, bug
 
 **Update this file every time something changes.** When handing off to Codex/Claude Code, include this file. When rebuilding, read this first.
 
+## Worker W42 — Explicit Final Status in App Spreadsheet
+**Date:** September 1, 2026
+
+- Adds a dedicated `Review Status` row to the InHaus Inspection spreadsheet Summary tab.
+- Uses the same terminal-status preference as Review Portal Data and `_context.md`, while leaving original app lifecycle values intact in Raw App Data.
+- No Inspector App runtime files changed; Inspector remains v248 and its Netlify cache remains `inhaus-v248`.
+
 ## Worker W41 — Fresh Final Exports and Clean Room Notes
 **Date:** September 1, 2026
 

@@ -63,6 +63,8 @@ test('one canonical mapping projects nested app values for portal and handoff', 
 test('inspection spreadsheet summary uses the canonical Tanner fields', () => {
   const mapped = normalizeInspectionReportData(ericksonShape());
   const rows = buildInspectionSummaryRows(mapped, {
+    status: 'In Review',
+    submission: { status: 'Submitted to Tanner' },
     system: { inspectionRecovery: mapped }
   });
   const values = new Map(rows.map(([label, value]) => [label, value]));
@@ -73,6 +75,7 @@ test('inspection spreadsheet summary uses the canonical Tanner fields', () => {
   assert.equal(values.get('Radon Mitigation'), 'No');
   assert.equal(values.get('Fireplace(s)'), 'Yes — Gas — 1 total');
   assert.equal(values.get('Stove Ventilation'), 'Ducted (to outside)');
+  assert.equal(values.get('Review Status'), 'Submitted to Tanner');
 });
 
 test('ready handoff receipts are checked against the current photo table', () => {

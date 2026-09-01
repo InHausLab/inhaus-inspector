@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w41';
+const WORKER_VERSION = 'handoff-w42';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -4950,6 +4950,14 @@ function inspectionSpreadsheetTitle(source) {
 function buildInspectionSummaryRows(source, fieldData) {
   const recovery = getHandoffInspectionRecovery(fieldData);
   const record = { ...recovery, ...source };
+  const reviewStatus = resolveReviewStatus(
+    fieldData.submission && fieldData.submission.status,
+    fieldData.status,
+    source.submitAttempt && source.submitAttempt.status,
+    source.submission && source.submission.status,
+    source.reviewStatus,
+    source.status
+  );
   const rows = [
     ['INHAUS LAB — INSPECTION DATA', ''],
     ['', ''],
@@ -4960,6 +4968,7 @@ function buildInspectionSummaryRows(source, fieldData) {
     ['Client', firstNonEmpty(record.clientName, record.client)],
     ['Property Address', firstNonEmpty(record.propertyAddress, record.address)],
     ['Inspection Type', firstNonEmpty(record.inspectionType, record.assessmentType)],
+    ['Review Status', reviewStatus],
     ['Correction Source', 'Review Portal — edit property corrections there; this generated sheet is refreshed from the reviewed record.'],
     ['', ''],
     ['PROPERTY DETAILS', ''],
