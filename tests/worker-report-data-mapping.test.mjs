@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
+  buildAssessmentContextMarkdown,
+  buildCanonicalHandoffFieldData,
+  buildInspectionRoomDetailRows,
   buildInspectionSummaryRows,
   normalizeInspectionReportData
 } from '../workers/inhaus-photo-worker/src/index.js';
@@ -93,4 +96,94 @@ test('a forced repair survives the durable queue until its first processing batc
     workerSource,
     /createOrRepairTannerHandoff\(env, accessToken, inspectionId, fieldData, effectiveBody\)/
   );
+});
+
+test('room note export ignores collaboration field metadata', () => {
+  const canonicalSource = {
+    rooms: [{ stepId: 'kitchen-appliance', roomName: 'Kitchen Inspection' }],
+    stepData: {
+      'kitchen-appliance': {
+        notes: '',
+        _fieldUpdates: {
+          notes: {
+            deviceId: 'device-test',
+            updatedAt: '2026-09-01T20:38:16.751Z',
+            updatedBy: 'TJ'
+          }
+        }
+      }
+    }
+  };
+  const fieldData = buildCanonicalHandoffFieldData(
+    {
+      rooms: [{
+        stepId: 'kitchen-appliance',
+        roomName: 'Kitchen Inspection',
+        inspectorNotes: 'Actual kitchen note from Tanner.'
+      }]
+    },
+    {
+      ...canonicalSource,
+      submission: { status: 'Submitted to Tanner' }
+    },
+    canonicalSource
+  );
+  const rows = buildInspectionRoomDetailRows(fieldData);
+  assert.equal(rows[1][4], 'Actual kitchen note from Tanner.');
+  assert.doesNotMatch(String(rows[1][4]), /deviceId|updatedAt/);
+  assert.equal(fieldData.rooms[0].inspectorNotes, 'Actual kitchen note from Tanner.');
+});
+
+test('metadata-only note lookup stays blank instead of exporting audit JSON', () => {
+  const rows = buildInspectionRoomDetailRows({
+    rooms: [{ stepId: 'kitchen-appliance', roomName: 'Kitchen Inspection' }],
+    system: {
+      inspectionRecovery: {
+        rooms: [{ stepId: 'kitchen-appliance', roomName: 'Kitchen Inspection' }],
+        stepData: {
+          'kitchen-appliance': {
+            notes: '',
+            _fieldUpdates: {
+              notes: { deviceId: 'device-test', updatedAt: '2026-09-01T20:38:16.751Z' }
+            }
+          }
+        }
+      }
+    }
+  });
+  assert.equal(rows[1][4], '');
+});
+
+test('context prefers terminal review status over a stale submit attempt', () => {
+  const context = buildAssessmentContextMarkdown(
+    { assessmentNumber: '', folderId: 'folder' },
+    {
+      inspectionId: 'INH-STATUS-TEST',
+      inspectionType: 'Test / Training',
+      isTestTraining: true,
+      submitAttempt: { status: 'In Review' },
+      submission: { status: 'Submitted to Tanner' }
+    },
+    {
+      status: 'In Review',
+      submission: { status: 'Submitted to Tanner' },
+      rooms: [],
+      system: { inspectionRecovery: {} }
+    },
+    [],
+    { spreadsheetUrl: 'https://example.com/inspection' },
+    { spreadsheetUrl: 'https://example.com/review' },
+    { rawJsonUrl: 'https://example.com/raw' }
+  );
+  assert.match(context, /Review status at export:\*\* Submitted to Tanner/);
+  assert.doesNotMatch(context, /Review status at export:\*\* In Review/);
+});
+
+test('ready artifact reuse requires matching review-content checksums', () => {
+  assert.match(workerSource, /artifactInputsMatch/);
+  assert.match(
+    workerSource,
+    /isCurrentHandoffReceipt\(previousReceipt\)[\s\S]*?artifactInputsMatch[\s\S]*?previousReceipt\.spreadsheetId/
+  );
+  assert.match(workerSource, /reviewDataHash: stableHash\(handoffArtifactReviewData\(handoffFieldData\)\)/);
 });

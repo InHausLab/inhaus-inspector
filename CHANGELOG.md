@@ -4,6 +4,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 **Update this file every time something changes.** When handing off to Codex/Claude Code, include this file. When rebuilding, read this first.
 
+## Worker W41 — Fresh Final Exports and Clean Room Notes
+**Date:** September 1, 2026
+
+- Invalidates cached handoff spreadsheets, raw backup, and `_context.md` whenever the reviewed content or canonical inspection snapshot changes.
+- Prefers terminal `Submitted to Tanner` / `Report Complete` status over stale intermediate submit-attempt values in every final export.
+- Excludes collaboration and field-update audit containers from human-readable room-note lookup, preventing device metadata JSON from appearing as Inspector Notes.
+- No Inspector App runtime files changed; Inspector remains v248 and its Netlify cache remains `inhaus-v248`.
+
 ---
 
 ## v248 — Q-Trak Room Label Validation

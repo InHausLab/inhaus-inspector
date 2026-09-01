@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w40';
+const WORKER_VERSION = 'handoff-w41';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -2411,11 +2411,19 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
   const isTestTraining = classification === 'test';
   const sourceRoomCount = getHandoffRoomRecords(handoffFieldData).length;
   const previousCounts = isPlainObject(previousReceipt.counts) ? previousReceipt.counts : {};
+  const previousChecksums = isPlainObject(previousReceipt.checksums) ? previousReceipt.checksums : {};
+  const artifactInputChecksums = {
+    sourceSnapshotHash: stableHash(handoffFieldData.system && handoffFieldData.system.inspectionRecovery),
+    reviewDataHash: stableHash(handoffArtifactReviewData(handoffFieldData))
+  };
+  const artifactInputsMatch = previousChecksums.sourceSnapshotHash === artifactInputChecksums.sourceSnapshotHash &&
+    previousChecksums.reviewDataHash === artifactInputChecksums.reviewDataHash;
   const previousRoomDetailCount = Number(previousReceipt.roomDetailCount || previousCounts.roomDetailCount || 0);
   const previousAppRoomDetailCount = Number(previousReceipt.appRoomDetailCount || previousCounts.appRoomDetailCount || 0);
   const previousPhotoDriveUrlCount = Number(previousReceipt.photoDriveUrlCount || previousCounts.photoDriveUrlCount || 0);
   const canReuseStaticArtifacts = !!(body.forceFullRepair !== true &&
     isCurrentHandoffReceipt(previousReceipt) &&
+    artifactInputsMatch &&
     previousReceipt.spreadsheetId &&
     previousReceipt.spreadsheetUrl &&
     (previousReceipt.rawJsonUrl || previousReceipt.rawReviewDataUrl) &&
@@ -2577,8 +2585,7 @@ async function createOrRepairTannerHandoff(env, accessToken, inspectionId, field
     rawAppKeyCount: inspectionSpreadsheet.rawAppKeyCount,
     sourceRoomCount,
     checksums: {
-      sourceSnapshotHash: stableHash(handoffFieldData.system && handoffFieldData.system.inspectionRecovery),
-      reviewDataHash: stableHash(handoffFieldData),
+      ...artifactInputChecksums,
       photoManifestHash: stableHash(photoRows)
     },
     createdAt: now,
@@ -2849,6 +2856,7 @@ function buildCanonicalAssessmentSource(assessmentRow) {
 
 function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
   const current = isPlainObject(fieldData) ? structuredClone(fieldData) : {};
+  const reviewedRooms = Array.isArray(current.rooms) ? structuredClone(current.rooms) : [];
   const system = isPlainObject(current.system) ? structuredClone(current.system) : {};
   const recovery = isPlainObject(system.inspectionRecovery) ? system.inspectionRecovery : {};
   const canonicalRecovery = {
@@ -2860,7 +2868,16 @@ function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
   current.rooms = canonicalRecovery.rooms.map(function(room) {
     if (!isPlainObject(room)) return room;
     const stepId = firstNonEmpty(room.stepId, room.id);
-    const reviewedRoom = stepId && isPlainObject(current[stepId]) ? current[stepId] : {};
+    const reviewedRoomRecord = reviewedRooms.find(candidate => {
+      if (!isPlainObject(candidate)) return false;
+      const candidateStepId = firstNonEmpty(candidate.stepId, candidate.id);
+      if (stepId && candidateStepId) return String(candidateStepId) === String(stepId);
+      return followUpRoomKey(roomDisplayName(candidate)) === followUpRoomKey(roomDisplayName(room));
+    }) || {};
+    const reviewedRoom = {
+      ...reviewedRoomRecord,
+      ...(stepId && isPlainObject(current[stepId]) ? current[stepId] : {})
+    };
     const overrideKeys = [
       'inspectorNotes', 'polishedInspectorNotes', 'observations', 'noIssuesFound', 'noIssues',
       'followUpNeeded', 'followUpTimeframe', 'followUpNote', 'followUpPlan',
@@ -2874,9 +2891,13 @@ function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
     });
     return { ...room, ...overrides };
   });
-  const submittedStatus = firstNonEmpty(
+  const submittedStatus = resolveReviewStatus(
+    current.submission && current.submission.status,
+    current.status,
     source.submitAttempt && source.submitAttempt.status,
-    source.submission && source.submission.status
+    source.submission && source.submission.status,
+    source.reviewStatus,
+    source.status
   );
   if (/^(submitted to tanner|report complete)$/i.test(String(submittedStatus || '').trim())) {
     current.status = submittedStatus;
@@ -2896,6 +2917,32 @@ function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
     source.clientConcerns
   );
   return current;
+}
+
+function resolveReviewStatus(...values) {
+  const populated = values
+    .map(value => String(value === undefined || value === null ? '' : value).trim())
+    .filter(Boolean);
+  const terminal = populated.find(value => /^(submitted to tanner|report complete)$/i.test(value));
+  return terminal || populated[0] || '';
+}
+
+function handoffArtifactReviewData(fieldData) {
+  const reviewData = isPlainObject(fieldData) ? structuredClone(fieldData) : {};
+  [
+    'reviewPortalData', 'folderId', 'folderUrl', 'assessmentFolderId', 'assessmentFolderUrl',
+    'reviewPortalDataSpreadsheetId', 'reviewPortalDataSpreadsheetUrl', 'reviewPortalDataUrl',
+    'rawReviewDataUrl', 'rawReviewDataJsonUrl', 'technicianPhotosFolderId',
+    'technicianPhotosFolderUrl', 'photosFolderId', 'photosFolderUrl', 'cocsFolderId',
+    'cocsFolderUrl', 'backupFolderId', 'backupFolderUrl', 'trackerRow', 'trackerUrl',
+    'trackerRowUrl', 'trackerStatus', 'handoffStatus', 'handoffUpdatedAt', 'lastHandoffError',
+    'handoffAttemptCount', 'handoffLastRunAt', 'handoffNextRunAt'
+  ].forEach(key => delete reviewData[key]);
+  if (isPlainObject(reviewData.system)) {
+    delete reviewData.system.handoffJob;
+    delete reviewData.system.tannerHandoff;
+  }
+  return reviewData;
 }
 
 function buildHandoffSource(inspectionId, fieldData, body, canonicalSource = {}) {
@@ -5119,7 +5166,8 @@ function findExportValue(value, wanted, depth = 0, seen = new Set()) {
   for (const [key, child] of Object.entries(value)) {
     if (wanted.has(normalizeExportKey(key)) && child !== undefined && child !== null && String(child).trim() !== '') return child;
   }
-  for (const child of Object.values(value)) {
+  for (const [key, child] of Object.entries(value)) {
+    if (/^_/.test(key) || /^(auditTrail|collaboration|fieldUpdates)$/i.test(key)) continue;
     if (!child || typeof child !== 'object') continue;
     const found = findExportValue(child, wanted, depth + 1, seen);
     if (found !== undefined) return found;
@@ -5158,10 +5206,11 @@ function buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, ins
   const assessmentLabel = shell.assessmentNumber ? `Assessment ${shell.assessmentNumber}` : 'Test / Training Assessment';
   const clientName = firstNonEmpty(source.clientName, recovery.clientName, 'Unknown client');
   const propertyAddress = firstNonEmpty(source.propertyAddress, recovery.propertyAddress, 'Unknown address');
-  const status = firstNonEmpty(
+  const status = resolveReviewStatus(
+    fieldData.submission && fieldData.submission.status,
+    fieldData.status,
     source.submitAttempt && source.submitAttempt.status,
     source.submission && source.submission.status,
-    fieldData.status,
     source.status,
     source.reviewStatus,
     'In Progress'
@@ -5655,7 +5704,10 @@ async function listStoredPhotoNames(env, inspectionId) {
 
 export {
   SHEET_CELL_SAFE_CHARS,
+  buildAssessmentContextMarkdown,
+  buildCanonicalHandoffFieldData,
   buildFormattedReviewRows,
+  buildInspectionRoomDetailRows,
   buildInspectionSummaryRows,
   buildRawAppRows,
   buildRawReviewRows,
