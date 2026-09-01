@@ -6,6 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Review Portal V91 — ATP Task Placement Gate
+**Date:** September 1, 2026
+
+- Fixes a Review Portal submission blocker where ATP photos visibly assigned to the explicit `ATP Testing`, `ATP Before`, or `ATP After` task still failed the final room/task placement gate.
+- Keeps generic photo buckets such as `Photos` and `Before/After` blocked until they receive a meaningful destination.
+- Adds a regression reproducing Tanner's two-photo Test / Training inspection state.
+- No Inspector App runtime files changed; Inspector remains v246 and its Netlify cache remains `inhaus-v246`.
+
 ## v246 / Worker W37 / Review Portal V90 — Unified Follow-Up and Annotated Handoff
 **Date:** August 31, 2026
 
