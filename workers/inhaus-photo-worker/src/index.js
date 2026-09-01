@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w38';
+const WORKER_VERSION = 'handoff-w39';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -2853,7 +2853,30 @@ function buildCanonicalHandoffFieldData(fieldData, source, canonicalSource) {
     rooms: Array.isArray(source.rooms) ? structuredClone(source.rooms) : [],
     stepData: isPlainObject(source.stepData) ? structuredClone(source.stepData) : {}
   };
-  current.rooms = canonicalRecovery.rooms;
+  current.rooms = canonicalRecovery.rooms.map(function(room) {
+    if (!isPlainObject(room)) return room;
+    const stepId = firstNonEmpty(room.stepId, room.id);
+    const reviewedRoom = stepId && isPlainObject(current[stepId]) ? current[stepId] : {};
+    const overrideKeys = [
+      'inspectorNotes', 'polishedInspectorNotes', 'observations', 'noIssuesFound', 'noIssues',
+      'followUpNeeded', 'followUpTimeframe', 'followUpNote', 'followUpPlan',
+      'breezeDone', 'breezeLocation', 'sporeTrapId', 'sporeTrapID',
+      'flirDone', 'flirConcerns', 'qtrakCaptured', 'qtrakDone', 'qtrakLocation',
+      'atpPreRLU', 'atpPreStatus', 'atpPostRLU', 'atpPostStatus', 'atpCleaned'
+    ];
+    const overrides = {};
+    overrideKeys.forEach(function(key) {
+      if (Object.prototype.hasOwnProperty.call(reviewedRoom, key)) overrides[key] = structuredClone(reviewedRoom[key]);
+    });
+    return { ...room, ...overrides };
+  });
+  const submittedStatus = firstNonEmpty(
+    source.submitAttempt && source.submitAttempt.status,
+    source.submission && source.submission.status
+  );
+  if (/^(submitted to tanner|report complete)$/i.test(String(submittedStatus || '').trim())) {
+    current.status = submittedStatus;
+  }
   current.system = { ...system, inspectionRecovery: canonicalRecovery };
   const authoritativeFollowUpItems = buildAuthoritativeFollowUpItems(current);
   current.roomData = {
@@ -4231,7 +4254,6 @@ async function createOrUpdateReviewDataSpreadsheet(accessToken, folderId, source
     { tab: 'Photo Log', rows: photoLogRows },
     { tab: 'Room Details', rows: roomRows }
   ]);
-
   return {
     spreadsheetId: spreadsheet.id,
     spreadsheetUrl: spreadsheet.webViewLink || `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheet.id)}/edit`,
@@ -4278,11 +4300,13 @@ async function findDriveFile(accessToken, parentId, name, mimeType) {
   return Array.isArray(data.files) && data.files.length ? data.files[0] : null;
 }
 
-async function ensureSpreadsheetTabs(accessToken, spreadsheetId, desiredTabs) {
+async function ensureSpreadsheetTabs(accessToken, spreadsheetId, desiredTabs, obsoleteTabs = []) {
   const sheets = await getSpreadsheetSheets(accessToken, spreadsheetId);
   const byTitle = new Map(sheets.map(sheet => [sheet.title, sheet]));
   const requests = [];
   const firstSheet = sheets[0] || null;
+  const obsolete = new Set((obsoleteTabs || []).map(title => String(title)));
+  let nextSheetId = sheets.reduce((max, sheet) => Math.max(max, Number(sheet.sheetId) || 0), 0) + 1;
   if (!byTitle.has(desiredTabs[0]) && firstSheet && /^Sheet\d*$/i.test(firstSheet.title || '')) {
     requests.push({
       updateSheetProperties: {
@@ -4290,18 +4314,26 @@ async function ensureSpreadsheetTabs(accessToken, spreadsheetId, desiredTabs) {
         fields: 'title'
       }
     });
+    byTitle.delete(firstSheet.title);
     byTitle.set(desiredTabs[0], { ...firstSheet, title: desiredTabs[0] });
   }
   desiredTabs.forEach(function(title) {
     if (!byTitle.has(title)) {
-      requests.push({ addSheet: { properties: { title } } });
+      const sheet = { sheetId: nextSheetId++, title, gridProperties: { columnCount: 26, rowCount: 1000, frozenRowCount: 0 } };
+      requests.push({ addSheet: { properties: { sheetId: sheet.sheetId, title } } });
+      byTitle.set(title, sheet);
     }
   });
+  sheets.filter(sheet => obsolete.has(String(sheet.title))).forEach(function(sheet) {
+    requests.push({ deleteSheet: { sheetId: sheet.sheetId } });
+    byTitle.delete(sheet.title);
+  });
+  requests.push(...spreadsheetFormatRequests(Array.from(byTitle.values())));
   if (requests.length) await batchUpdateSpreadsheet(accessToken, spreadsheetId, requests);
 }
 
 async function getSpreadsheetSheets(accessToken, spreadsheetId) {
-  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets(properties(sheetId,title))`, {
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets(properties(sheetId,title,gridProperties(columnCount,rowCount,frozenRowCount)))`, {
     headers: driveHeaders(accessToken)
   });
   const data = await res.json().catch(() => ({}));
@@ -4309,6 +4341,63 @@ async function getSpreadsheetSheets(accessToken, spreadsheetId) {
   return Array.isArray(data.sheets)
     ? data.sheets.map(sheet => sheet.properties || {}).filter(sheet => sheet.title)
     : [];
+}
+
+function spreadsheetFormatRequests(sheets) {
+  const requests = [];
+  sheets.forEach(function(sheet) {
+    const columnCount = Math.max(2, Number(sheet.gridProperties && sheet.gridProperties.columnCount) || 26);
+    requests.push(
+      {
+        updateSheetProperties: {
+          properties: { sheetId: sheet.sheetId, gridProperties: { frozenRowCount: 1 } },
+          fields: 'gridProperties.frozenRowCount'
+        }
+      },
+      {
+        repeatCell: {
+          range: { sheetId: sheet.sheetId },
+          cell: { userEnteredFormat: { wrapStrategy: 'WRAP', verticalAlignment: 'TOP' } },
+          fields: 'userEnteredFormat.wrapStrategy,userEnteredFormat.verticalAlignment'
+        }
+      },
+      {
+        repeatCell: {
+          range: { sheetId: sheet.sheetId, startRowIndex: 0, endRowIndex: 1 },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 0.11, green: 0.36, blue: 0.27 },
+              textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+              verticalAlignment: 'MIDDLE'
+            }
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,verticalAlignment)'
+        }
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId: sheet.sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: columnCount },
+          properties: { pixelSize: 180 },
+          fields: 'pixelSize'
+        }
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId: sheet.sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 },
+          properties: { pixelSize: 240 },
+          fields: 'pixelSize'
+        }
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId: sheet.sheetId, dimension: 'ROWS', startIndex: 0, endIndex: 1 },
+          properties: { pixelSize: 32 },
+          fields: 'pixelSize'
+        }
+      }
+    );
+  });
+  return requests;
 }
 
 async function batchUpdateSpreadsheet(accessToken, spreadsheetId, requests) {
@@ -4407,7 +4496,7 @@ function buildFormattedReviewRows(fieldData) {
     appendFormattedReviewRows(rows, section, key, serializeReviewValue(value).value);
   };
   const summaryKeys = [
-    'clientName', 'propertyAddress', 'inspectionDate', 'inspectorName', 'inspectionType',
+    'status', 'clientName', 'propertyAddress', 'inspectionDate', 'inspectorName', 'inspectionType',
     'waterSource', 'waterFiltration', 'waterSoftener', 'heating', 'ac', 'ventilation',
     'airFiltration', 'otherAirCleaning', 'radonMitigation', 'fireplaceSummary', 'stoveSummary', 'weather',
     'clientConcerns', 'knownProblemAreas', 'reportBuilderNotes'
@@ -4422,17 +4511,20 @@ function buildFormattedReviewRows(fieldData) {
   const authoritativeByRoom = new Map(authoritativeItems.filter(item => item.room).map(item => [followUpRoomKey(item.room), item]));
   getHandoffRoomRecords(fieldData).forEach(function(room) {
     if (!isPlainObject(room)) return;
-    const data = roomExportData(room, recovery);
     const stepId = String(firstNonEmpty(room.stepId, room.id) || '');
+    const sourceRoom = Array.isArray(recovery.rooms)
+      ? recovery.rooms.find(candidate => isPlainObject(candidate) && String(firstNonEmpty(candidate.stepId, candidate.id) || '') === stepId) || room
+      : room;
+    const data = roomExportData(sourceRoom, recovery);
     const roomName = roomDisplayName(room);
     const section = `Room — ${roomName}`;
     const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
     const sourceNotes = firstNonEmpty(
       exportValue(data, ['inspectorNotes', 'notes', 'roomNotes']),
-      room.inspectorNotes,
-      room.notes
+      sourceRoom.inspectorNotes,
+      sourceRoom.notes
     );
-    const sourceSummary = firstNonEmpty(exportValue(data, ['aiSummary']), room.aiSummary);
+    const sourceSummary = firstNonEmpty(exportValue(data, ['aiSummary']), sourceRoom.aiSummary);
     const reviewerNotes = firstNonEmpty(
       reviewedRoom.polishedInspectorNotes,
       reviewedRoom.inspectorNotes,
@@ -4686,13 +4778,22 @@ function getClientFollowUpPlan(fieldData = {}) {
 }
 
 function buildRoomDetailRows(fieldData, photoRows = []) {
-  const rows = [['Room', 'Notes', 'No Issues', 'Follow Up', 'Photos']];
+  const rows = [[
+    'Room', 'Type', 'Level', 'Notes', 'No Issues', 'Follow Up',
+    'Breeze Done', 'Breeze Location', 'Spore Trap ID', 'FLIR Done', 'FLIR Concerns',
+    'Q-Trak Captured', 'Q-Trak Location',
+    'ATP Pre RLU', 'ATP Pre Status', 'ATP Post RLU', 'ATP Post Status', 'ATP Cleaned',
+    'Photos'
+  ]];
   const rooms = getHandoffRoomRecords(fieldData);
+  const recovery = getHandoffInspectionRecovery(fieldData);
+  const reviewedTests = isPlainObject(fieldData.tests) ? fieldData.tests : {};
   const authoritativeItems = buildAuthoritativeFollowUpItems(fieldData);
   rooms.forEach(function(room) {
     if (!isPlainObject(room)) return;
     const stepId = firstNonEmpty(room.stepId, room.id);
     const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const data = roomExportData(room, recovery, reviewedRoom);
     const roomName = firstNonEmpty(room.name, room.roomName, room.label, stepId);
     const photoIds = []
       .concat(Array.isArray(room.photoIds) ? room.photoIds : [])
@@ -4710,11 +4811,25 @@ function buildRoomDetailRows(fieldData, photoRows = []) {
       : '';
     rows.push([
       roomName,
+      firstNonEmpty(room.type, room.roomType, room.roomCategory, exportValue(data, ['roomType', 'type'])),
+      firstNonEmpty(room.level, room.floor, exportValue(data, ['level', 'floor'])),
       firstNonEmpty(reviewedRoom.polishedInspectorNotes, reviewedRoom.inspectorNotes, room.inspectorNotes, room.notes, room.polishedInspectorNotes),
       reviewedRoom.noIssuesFound === true || reviewedRoom.noIssues === true || room.noIssuesFound === true || room.noIssues === true ? 'TRUE' : '',
       followUp,
+      exportValue(data, ['breezeDone']),
+      exportValue(data, ['breezeLocation']),
+      exportValue(data, ['sporeTrapId', 'sporeTrapID', 'breezeSampleId', 'breezeSampleID']),
+      exportValue(data, ['flirDone']),
+      exportValue(data, ['flirConcerns']),
+      exportValue(data, ['qtrakCaptured', 'qtrakDone']),
+      exportValue(data, ['qtrakLocation']),
+      firstNonEmpty(reviewedTests.testATP_preRLU, exportValue(data, ['atpPreRLU'])),
+      firstNonEmpty(reviewedTests.testATP_preStatus, exportValue(data, ['atpPreStatus'])),
+      firstNonEmpty(reviewedTests.testATP_postRLU, exportValue(data, ['atpPostRLU'])),
+      firstNonEmpty(reviewedTests.testATP_postStatus, exportValue(data, ['atpPostStatus'])),
+      firstNonEmpty(reviewedTests.testATP_cleaned, exportValue(data, ['atpCleaned'])),
       Array.from(new Set(photoIds)).join(', ')
-    ]);
+    ].map(spreadsheetCellValue));
   });
   return rows;
 }
@@ -4722,11 +4837,10 @@ function buildRoomDetailRows(fieldData, photoRows = []) {
 async function createOrUpdateInspectionSpreadsheet(accessToken, folderId, source, fieldData, photoRows) {
   const title = inspectionSpreadsheetTitle(source);
   const spreadsheet = await getOrCreateDriveFile(accessToken, folderId, title, DRIVE_SPREADSHEET_MIME);
-  const tabs = ['Summary', 'Air Data', 'Room Details', 'CSV Output', 'Follow-Up Items', 'Raw App Data'];
-  await ensureSpreadsheetTabs(accessToken, spreadsheet.id, tabs);
+  const tabs = ['Summary', 'Room Details', 'CSV Output', 'Follow-Up Items', 'Raw App Data'];
+  await ensureSpreadsheetTabs(accessToken, spreadsheet.id, tabs, ['Air Data']);
 
   const summaryRows = buildInspectionSummaryRows(source, fieldData);
-  const airRows = buildInspectionAirDataRows(fieldData);
   const roomRows = buildInspectionRoomDetailRows(fieldData, photoRows);
   const csvRows = buildInspectionCsvRows(source, fieldData, photoRows);
   const followUpRows = buildInspectionFollowUpRows(fieldData);
@@ -4734,18 +4848,16 @@ async function createOrUpdateInspectionSpreadsheet(accessToken, folderId, source
   await clearSheetTabs(accessToken, spreadsheet.id, tabs);
   await writeSheetValueSets(accessToken, spreadsheet.id, [
     { tab: 'Summary', rows: summaryRows },
-    { tab: 'Air Data', rows: airRows },
     { tab: 'Room Details', rows: roomRows },
     { tab: 'CSV Output', rows: csvRows },
     { tab: 'Follow-Up Items', rows: followUpRows },
     { tab: 'Raw App Data', rows: rawRows }
   ]);
-
   return {
     spreadsheetId: spreadsheet.id,
     spreadsheetUrl: spreadsheet.webViewLink || `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheet.id)}/edit`,
     roomDetailCount: Math.max(0, roomRows.length - 1),
-    airDataCount: Math.max(0, airRows.length - 1),
+    airDataCount: 0,
     followUpCount: Math.max(0, followUpRows.length - 1),
     rawAppKeyCount: Math.max(0, rawRows.length - 1)
   };
@@ -4823,12 +4935,19 @@ function buildInspectionAirDataRows(fieldData) {
 
 function buildInspectionRoomDetailRows(fieldData, photoRows = []) {
   const recovery = getHandoffInspectionRecovery(fieldData);
-  const rows = [['Room', 'Type', 'Level', 'Observations', 'Notes', 'Breeze Done', 'Spore Trap ID', 'FLIR Done', 'FLIR Concerns', 'Q-Trak Captured', 'Q-Trak Location', 'Follow-Up', 'Photo IDs']];
+  const reviewedTests = isPlainObject(fieldData.tests) ? fieldData.tests : {};
+  const rows = [[
+    'Room', 'Type', 'Level', 'Observations', 'Notes',
+    'Breeze Done', 'Breeze Location', 'Spore Trap ID', 'FLIR Done', 'FLIR Concerns',
+    'Q-Trak Captured', 'Q-Trak Location', 'Follow-Up',
+    'ATP Pre RLU', 'ATP Pre Status', 'ATP Post RLU', 'ATP Post Status', 'ATP Cleaned',
+    'Photo IDs'
+  ]];
   getHandoffRoomRecords(fieldData).forEach(function(room) {
     if (!isPlainObject(room)) return;
-    const data = roomExportData(room, recovery);
     const stepId = firstNonEmpty(room.stepId, room.id);
     const reviewedRoom = stepId && isPlainObject(fieldData[stepId]) ? fieldData[stepId] : {};
+    const data = roomExportData(room, recovery, reviewedRoom);
     const photoIds = roomPhotoIds(room, photoRows);
     rows.push([
       roomDisplayName(room),
@@ -4837,12 +4956,18 @@ function buildInspectionRoomDetailRows(fieldData, photoRows = []) {
       firstNonEmpty(exportValue(data, ['observations', 'observation', 'finding', 'findings']), reviewedRoom.observations),
       firstNonEmpty(reviewedRoom.polishedInspectorNotes, reviewedRoom.inspectorNotes, exportValue(data, ['inspectorNotes', 'notes', 'roomNotes'])),
       exportValue(data, ['breezeDone']),
+      exportValue(data, ['breezeLocation']),
       exportValue(data, ['sporeTrapId', 'sporeTrapID', 'breezeSampleId', 'breezeSampleID']),
       exportValue(data, ['flirDone']),
       exportValue(data, ['flirConcerns']),
-      exportValue(data, ['qtrakCaptured']),
+      exportValue(data, ['qtrakCaptured', 'qtrakDone']),
       exportValue(data, ['qtrakLocation']),
       firstNonEmpty(reviewedRoom.followUpPlan, reviewedRoom.followUp, exportValue(data, ['followUpNote', 'followUpPlan', 'watchFor'])),
+      firstNonEmpty(reviewedTests.testATP_preRLU, exportValue(data, ['atpPreRLU'])),
+      firstNonEmpty(reviewedTests.testATP_preStatus, exportValue(data, ['atpPreStatus'])),
+      firstNonEmpty(reviewedTests.testATP_postRLU, exportValue(data, ['atpPostRLU'])),
+      firstNonEmpty(reviewedTests.testATP_postStatus, exportValue(data, ['atpPostStatus'])),
+      firstNonEmpty(reviewedTests.testATP_cleaned, exportValue(data, ['atpCleaned'])),
       photoIds.join(', ')
     ].map(spreadsheetCellValue));
   });
@@ -4926,12 +5051,12 @@ function buildRawAppRows(fieldData) {
   return rows;
 }
 
-function roomExportData(room, recovery) {
+function roomExportData(room, recovery, reviewedRoom = {}) {
   const stepId = firstNonEmpty(room.stepId, room.id);
   const stepData = isPlainObject(recovery.stepData) && stepId && isPlainObject(recovery.stepData[stepId])
     ? recovery.stepData[stepId]
     : {};
-  return { ...room, ...stepData };
+  return { ...room, ...stepData, ...(isPlainObject(reviewedRoom) ? reviewedRoom : {}) };
 }
 
 function roomDisplayName(room) {
@@ -5000,7 +5125,14 @@ function buildAssessmentContextMarkdown(shell, source, fieldData, photoRows, ins
   const assessmentLabel = shell.assessmentNumber ? `Assessment ${shell.assessmentNumber}` : 'Test / Training Assessment';
   const clientName = firstNonEmpty(source.clientName, recovery.clientName, 'Unknown client');
   const propertyAddress = firstNonEmpty(source.propertyAddress, recovery.propertyAddress, 'Unknown address');
-  const status = firstNonEmpty(fieldData.status, source.status, source.reviewStatus, 'In Progress');
+  const status = firstNonEmpty(
+    source.submitAttempt && source.submitAttempt.status,
+    source.submission && source.submission.status,
+    fieldData.status,
+    source.status,
+    source.reviewStatus,
+    'In Progress'
+  );
   const sampleLines = collectAssessmentContextValues({ ...recovery, ...fieldData }, function(path) {
     if (/(_fieldUpdates|auditTrail|collaboration|findings|photoManifest|photoTombstones)/i.test(path)) return false;
     const leaf = path.split('.').pop() || '';

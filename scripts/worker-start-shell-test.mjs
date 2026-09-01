@@ -228,7 +228,12 @@ function makeMockFetch(options = {}) {
 
     if (url.includes('sheets.googleapis.com/v4/spreadsheets/') && method === 'GET') {
       return jsonResponse({
-        sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }]
+        sheets: (options.spreadsheetSheets || [{ sheetId: 0, title: 'Sheet1' }]).map(properties => ({
+          properties: {
+            gridProperties: { columnCount: 26, rowCount: 1000, frozenRowCount: 0 },
+            ...properties
+          }
+        }))
       });
     }
 
@@ -634,7 +639,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w38', 'health exposes Worker version');
+  assert(data.version === 'handoff-w39', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -1616,6 +1621,13 @@ async function testHandoffJobCreatesPackageReceipt() {
     followUp_3_timeframe: '6 months',
     followUp_3_photoIds: ['photo-1', 'photo-2'],
     testsConfirmed: { pfas: true, waterPanel: true },
+    tests: {
+      testATP_preRLU: '415',
+      testATP_preStatus: 'Fail',
+      testATP_postRLU: '21',
+      testATP_postStatus: 'Pass',
+      testATP_cleaned: true
+    },
     roomData: {
       followUpItems: JSON.stringify([
         { stepId: 'kitchen', room: 'Kitchen', recheckIn: '6 months', watchFor: 'Confirm the repaired drain remains dry.' },
@@ -1624,7 +1636,9 @@ async function testHandoffJobCreatesPackageReceipt() {
     },
     kitchen: {
       inspectorNotes: 'Reviewer clarified the staining is below the sink.',
-      noIssuesFound: false
+      noIssuesFound: false,
+      qtrakLocation: 'Reviewer Kitchen Counter',
+      breezeLocation: 'Reviewer Kitchen Sink'
     },
     photoAnnotations: {
       'photo-1': [
@@ -1656,7 +1670,12 @@ async function testHandoffJobCreatesPackageReceipt() {
         }],
         stepData: {
           kitchen: {
-            qtrakLocation: 'Kitchen',
+            qtrakLocation: 'Source Kitchen Location',
+            breezeLocation: 'Source Kitchen Island',
+            breezeDone: true,
+            flirDone: true,
+            flirConcerns: 'Cold spot below sink',
+            qtrakCaptured: true,
             _fieldUpdates: { qtrakLocation: { deviceId: 'internal-device-id' } }
           }
         }
@@ -1667,6 +1686,10 @@ async function testHandoffJobCreatesPackageReceipt() {
       field_data: fieldData,
       updated_at: '2026-08-01T15:00:00.000Z'
     },
+    spreadsheetSheets: [
+      { sheetId: 0, title: 'Sheet1' },
+      { sheetId: 7, title: 'Air Data' }
+    ],
     photoRows: [
       {
         photo_id: 'photo-1',
@@ -1694,7 +1717,8 @@ async function testHandoffJobCreatesPackageReceipt() {
   });
   const { response, data } = await callWorker('/handoff-jobs', {
     inspectionId: 'INH-20260801-HAND01',
-    requestedBy: 'review-portal'
+    requestedBy: 'review-portal',
+    submitAttempt: { status: 'Submitted to Tanner' }
   }, baseEnv(), mockFetch, { headers: { Authorization: 'Bearer review-token' } });
 
   assert(response.status === 200, 'handoff job returns 200 when receipt is ready');
@@ -1720,7 +1744,11 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Raw Review Data')), 'writes Raw Review Data tab');
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Photo Log')), 'writes Photo Log tab');
   assert(state.sheetValueWrites.some(update => String(update.range).includes('Raw App Data')), 'writes Raw App Data tab');
-  assert(state.sheetValueWrites.some(update => String(update.range).includes('Air Data')), 'writes Air Data tab');
+  assert(!state.sheetValueWrites.some(update => String(update.range).includes('Air Data')), 'does not write the misleading Air Data tab');
+  assert(state.spreadsheetUpdates.some(update => update.deleteSheet && update.deleteSheet.sheetId === 7), 'removes a stale Air Data tab');
+  assert(state.spreadsheetUpdates.some(update => update.repeatCell?.cell?.userEnteredFormat?.wrapStrategy === 'WRAP'), 'wraps generated spreadsheet cells');
+  assert(state.spreadsheetUpdates.some(update => update.repeatCell?.cell?.userEnteredFormat?.textFormat?.bold === true), 'formats generated spreadsheet header rows');
+  assert(state.spreadsheetUpdates.some(update => update.updateDimensionProperties?.range?.dimension === 'COLUMNS'), 'sets readable generated spreadsheet column widths');
   assert(hasSheetCellValue(state, 'Summary', 'INHAUS LAB — INSPECTION DATA'), 'writes InHaus Inspection summary');
   assert(sheetDataRowsForTab(state, 'Raw Review Data').length >= Object.keys(fieldData).length, 'raw tab has at least one row for every submitted field_data key');
   assert(hasSheetRowContaining(state, 'Raw Review Data', ['obs_2_note', 'Second observation', 'string']), 'raw tab includes obs_2_note');
@@ -1745,6 +1773,8 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-1', 'Kitchen', 'ATP Before', 'Before photo']), 'photo log includes first photo details');
   assert(hasSheetRowContaining(state, 'Photo Log', ['photo-2', 'Kitchen', 'ATP After', 'After photo', 'https://drive.google.com/file/d/drive-photo-2/view']), 'photo log includes second photo details');
   assert(hasSheetRowContaining(state, 'Room Details', ['Kitchen', 'Reviewer clarified the staining is below the sink.', 'photo-1, photo-2']), 'room details include reviewer-edited notes and every assigned room photo ID');
+  assert(hasSheetRowContaining(state, 'Room Details', ['Reviewer Kitchen Sink', 'Reviewer Kitchen Counter']), 'room details use reviewer-edited Breeze and Q-Trak locations');
+  assert(hasSheetRowContaining(state, 'Room Details', ['415', 'Fail', '21', 'Pass', 'TRUE']), 'room details include structured ATP readings and statuses');
   assert(state.rawUploads.length === 3, 'writes raw JSON, annotated image, and assessment context files');
   const annotatedUpload = state.rawUploads.find(upload => /Content-Type:\s*image\/svg\+xml/i.test(upload.bodyText || ''));
   const rawJsonUpload = state.rawUploads.find(upload => upload.bodyText.includes('"obs_6_note": "Sixth observation"'));
@@ -1760,6 +1790,7 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(contextUpload.bodyText.includes('Basement: Recheck in 3 months: Recheck the east wall for moisture'), 'assessment context includes reviewer-added follow-up room');
   assert(contextUpload.bodyText.includes('## Files'), 'assessment context links Tanner package files');
   assert(contextUpload.bodyText.includes('BB\\-TEST\\-123'), 'assessment context includes the actual sample ID');
+  assert(contextUpload.bodyText.includes('Review status at export:** Submitted to Tanner'), 'assessment context records the submitted status instead of stale In Review');
   assert(!contextUpload.bodyText.includes('internal\\-device\\-id'), 'assessment context excludes internal device metadata');
   assert(state.reviewWrites.length >= 2, 'saves running and final handoff states');
   assert(state.handoffJobWrites.length >= 2, 'writes running and final durable handoff job states');
@@ -1775,13 +1806,14 @@ async function testHandoffJobCreatesPackageReceipt() {
   assert(state.handoffArtifacts.some(row => row.artifact_key === 'tracker_row'), 'durable artifacts include tracker row');
   const finalWrite = state.reviewWrites[state.reviewWrites.length - 1];
   assert(finalWrite.field_data.system.tannerHandoff.status === 'ready', 'final review storage has handoff receipt');
+  assert(finalWrite.field_data.system.inspectionRecovery.stepData.kitchen.qtrakLocation === 'Source Kitchen Location', 'preserves the original Q-Trak source value in recovery data');
 }
 
 async function testHandoffJobCachedReceiptDoesNotDuplicateWork() {
   const receipt = {
     status: 'ready',
     schemaVersion: 'handoff-receipt-v3',
-    workerVersion: 'handoff-w38',
+    workerVersion: 'handoff-w39',
     inspectionId: 'INH-20260801-HAND02',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -2395,7 +2427,7 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
   const runningReceipt = {
     status: 'running',
     schemaVersion: 'handoff-receipt-v3',
-    workerVersion: 'handoff-w38',
+    workerVersion: 'handoff-w39',
     inspectionId: 'INH-20260801-RUN01',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -3090,7 +3122,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w38', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w39', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {

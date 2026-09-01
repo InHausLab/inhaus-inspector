@@ -6,6 +6,15 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
+## Worker W39 — Complete, Readable Review Exports
+**Date:** September 1, 2026
+
+- Preserves the original inspector snapshot while applying reviewer-edited room values to the current export.
+- Adds Breeze, FLIR, Q-Trak, and structured ATP values to both generated room-detail sheets.
+- Removes the misleading empty `Air Data` tab and formats generated spreadsheets with frozen headers, wrapped text, and readable widths.
+- Records the final `Submitted to Tanner` status in `_context.md` and Review Portal Data instead of the intermediate `In Review` state.
+- Keeps spreadsheet setup within the Worker's subrequest safety budget by batching tab creation, cleanup, and formatting.
+
 ## Worker W38 — Inspection-Specific Test Folders
 **Date:** September 1, 2026  
 **Commit:** `534e208`
