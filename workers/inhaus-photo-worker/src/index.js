@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w37';
+const WORKER_VERSION = 'handoff-w38';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -1096,7 +1096,7 @@ async function handleStartInspectionShell(request, env) {
   const existing = await getStartInspectionShellState(env, inspectionId);
   assertAssessmentClassificationMatchesShell(existing, body);
   if (startInspectionShellIsReady(existing)) {
-    if (existing.isTestTraining === true && existing.folderId) {
+    if (existing.isTestTraining === true && existing.folderId && testHandoffShellMatchesInspection(existing, { ...body, inspectionId })) {
       return json({ ...existing, cached: true });
     }
     if (existing.isTestTraining !== true && existing.folderId && existing.trackerRow && existing.trackerUrl) {
@@ -2684,7 +2684,7 @@ async function ensureTestHandoffShell(env, accessToken, source) {
   const existing = isPlainObject(source.system?.startInspectionShell)
     ? source.system.startInspectionShell
     : (isPlainObject(source.startInspectionShell) ? source.startInspectionShell : null);
-  if (existing && existing.status === 'ready' && existing.folderId) {
+  if (existing && existing.status === 'ready' && existing.folderId && testHandoffShellMatchesInspection(existing, source)) {
     const folder = driveFileFromReceipt(existing.folderId, existing.folderUrl, existing.folderName);
     const photosFolder = existing.photosFolderId || existing.technicianPhotosFolderId
       ? driveFileFromReceipt(existing.photosFolderId || existing.technicianPhotosFolderId, existing.photosFolderUrl || existing.technicianPhotosFolderUrl)
@@ -2939,7 +2939,16 @@ function generateTestAssessmentFolderName(source) {
   const lastName = getClientLastName(source.clientName);
   const street = getStreetAddressForFolder(source) || source.inspectionId || 'Unknown';
   const date = normalizeInspectionDate(source.inspectionDate || source.startedAt);
-  return `TEST – ${date} – ${lastName} – ${street}`;
+  const inspectionId = String(source.inspectionId || source.id || '').trim() || 'Unknown Inspection';
+  return `TEST – ${date} – ${lastName} – ${street} – ${inspectionId}`;
+}
+
+function testHandoffShellMatchesInspection(shell, source) {
+  if (!isPlainObject(shell) || !isPlainObject(source)) return false;
+  const inspectionId = String(source.inspectionId || source.id || '').trim();
+  const shellInspectionId = String(shell.inspectionId || '').trim();
+  if (!inspectionId || (shellInspectionId && shellInspectionId !== inspectionId)) return false;
+  return String(shell.folderName || '').trim().endsWith(` – ${inspectionId}`);
 }
 
 function getHandoffReceiptMissingReason(receipt = {}) {

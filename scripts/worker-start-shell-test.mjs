@@ -634,7 +634,7 @@ async function testHealthRoute() {
   const response = await worker.fetch(new Request('https://worker.test/health'), env);
   const data = await response.json();
   assert(response.status === 200, 'health returns 200');
-  assert(data.version === 'handoff-w37', 'health exposes Worker version');
+  assert(data.version === 'handoff-w38', 'health exposes Worker version');
   assert(response.headers.get('cache-control')?.includes('no-store'), 'Worker JSON responses prevent stale API caching');
   assert(data.dependencies.assessmentsFolderId === true, 'health checks assessment folder config');
   assert(data.dependencies.reportTrackerSheetId === true, 'health checks tracker sheet config');
@@ -837,7 +837,7 @@ async function testTrainingCreatesTestArtifactsOnly() {
   assert(state.assessmentReservations.length === 0, 'training route does not reserve an assessment number');
   assert(state.driveCreates.length === 5, 'training route creates test root, assessment folder, and three subfolders');
   assert(state.driveCreates.some(folder => folder.name === '_Test Assessments'), 'training route creates or reuses test root');
-  assert(state.driveCreates.some(folder => folder.name === 'TEST – 2026-08-01 – Client – 1 Practice Way'), 'training route creates named test assessment folder');
+  assert(state.driveCreates.some(folder => folder.name === 'TEST – 2026-08-01 – Client – 1 Practice Way – INH-TRAINING-001'), 'training route creates an inspection-specific test assessment folder');
   assert(state.driveCreates.some(folder => folder.name === 'Photos - Client (1 Practice Way)'), 'training route creates Photos subfolder');
   assert(state.driveCreates.some(folder => folder.name === 'COCs - Client'), 'training route creates COCs subfolder');
   assert(state.driveCreates.some(folder => folder.name === 'Backup - Client'), 'training route creates Backup subfolder');
@@ -925,6 +925,44 @@ async function testTrainingShellRejectsLaterRealClassification() {
   assert(second.response.status === 409, 'training shell rejects later real classification');
   assert(state.assessmentReservations.length === 0, 'classification rejection does not consume a real number');
   assert(state.trackerUpdates.length === 0, 'classification rejection does not create a tracker row');
+}
+
+async function testLegacyTrainingShellMigratesToInspectionSpecificFolder() {
+  const inspectionId = 'INH-TRAINING-MIGRATE01';
+  const legacyReceipt = {
+    status: 'ready',
+    shellStatus: 'ready',
+    isTestTraining: true,
+    inspectionId,
+    folderId: 'drive-legacy-test-shell',
+    folderUrl: 'https://drive.google.com/drive/folders/drive-legacy-test-shell',
+    folderName: 'TEST – 2026-08-01 – Client – 1 Practice Way',
+    trackerStatus: 'skipped_test_training'
+  };
+  const { mockFetch, state } = makeMockFetch({
+    reviewRow: {
+      inspection_id: inspectionId,
+      field_data: { system: { startInspectionShell: legacyReceipt } },
+      updated_at: '2026-08-01T15:00:00.000Z'
+    }
+  });
+
+  const { response, data } = await callWorker('/start-inspection-shell', {
+    sharedSecret: 'upload-secret',
+    inspectionId,
+    inspectionType: 'Test / Training',
+    clientName: 'Training Client',
+    propertyAddress: '1 Practice Way, Basalt CO',
+    inspectionDate: '2026-08-01'
+  }, baseEnv(), mockFetch);
+
+  assert(response.status === 200, 'legacy training shell migration returns 200');
+  assert(data.cached !== true, 'legacy date/address shell is not returned from cache');
+  assert(data.folderId !== legacyReceipt.folderId, 'migration does not reuse the ambiguous legacy folder');
+  assert(data.folderName === `TEST – 2026-08-01 – Client – 1 Practice Way – ${inspectionId}`, 'migration creates an inspection-specific folder');
+  assert(state.driveCreates.some(folder => folder.name === data.folderName), 'migration creates the unique Drive folder');
+  assert(state.assessmentWrites.length === 1, 'migration saves the replacement shell on the assessment');
+  assert(state.reviewWrites.length === 1, 'migration saves the replacement shell in review data');
 }
 
 async function testInspectionSaveRejectsClassificationChangeBeforeEventWrite() {
@@ -1743,7 +1781,7 @@ async function testHandoffJobCachedReceiptDoesNotDuplicateWork() {
   const receipt = {
     status: 'ready',
     schemaVersion: 'handoff-receipt-v3',
-    workerVersion: 'handoff-w37',
+    workerVersion: 'handoff-w38',
     inspectionId: 'INH-20260801-HAND02',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -1952,7 +1990,7 @@ async function testTrainingHandoffRepairsMissingRecoveryRoomsInOriginalShell() {
     inspectionId: 'INH-TRAINING-HAND02',
     folderId: 'drive-test-shell',
     folderUrl: 'https://drive.google.com/drive/folders/drive-test-shell',
-    folderName: 'TEST - Original Client',
+    folderName: 'TEST – 2026-08-01 – Reviewed – 2 Practice Way – INH-TRAINING-HAND02',
     photosFolderId: 'drive-test-photos',
     photosFolderUrl: 'https://drive.google.com/drive/folders/drive-test-photos',
     cocsFolderId: 'drive-test-cocs',
@@ -2357,7 +2395,7 @@ async function testManualRunnerProcessesDueJobAndReusesStaticArtifacts() {
   const runningReceipt = {
     status: 'running',
     schemaVersion: 'handoff-receipt-v3',
-    workerVersion: 'handoff-w37',
+    workerVersion: 'handoff-w38',
     inspectionId: 'INH-20260801-RUN01',
     isTestTraining: false,
     folderId: 'drive-assessment',
@@ -3052,7 +3090,7 @@ async function testLegacyReadyReceiptQueuesWithCompareAndSet() {
   assert(run.response.status === 200, 'runner repairs a stale ready receipt');
   assert(run.data.results[0].ready === true, 'runner returns the repaired package as ready');
   assert(state.reviewRow.field_data.system.tannerHandoff.roomDetailCount === 2, 'runner rebuilds every canonical assessment room');
-  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w37', 'runner replaces the stale receipt with the current Worker receipt');
+  assert(state.reviewRow.field_data.system.tannerHandoff.workerVersion === 'handoff-w38', 'runner replaces the stale receipt with the current Worker receipt');
 }
 
 async function testFinalPhotoBatchRefreshesPhotoLogDriveUrls() {
@@ -3120,6 +3158,7 @@ const tests = [
   testStartShellRequiresExplicitAssessmentClassification,
   testRealShellRejectsLaterTrainingClassification,
   testTrainingShellRejectsLaterRealClassification,
+  testLegacyTrainingShellMigratesToInspectionSpecificFolder,
   testInspectionSaveRejectsClassificationChangeBeforeEventWrite,
   testInspectionTeamMergeRejectsClassificationChangeBeforeEventWrite,
   testInspectionSaveCreatesDurableCheckpoint,
