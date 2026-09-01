@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=247';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=247';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=247';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=247';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=247';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=247';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=248';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=248';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=248';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=248';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=248';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=248';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=247';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=247';
-import { updatePhotoMetadata } from './supabase-photos.js?v=247';
-import { FIELD_RESUME_TOKEN } from './config.js?v=247';
+} from './findings.js?v=248';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=248';
+import { updatePhotoMetadata } from './supabase-photos.js?v=248';
+import { FIELD_RESUME_TOKEN } from './config.js?v=248';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=247';
+} from './comment-library.js?v=248';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -155,16 +155,26 @@ function getStepReviewIssues(step) {
 
 function getQtrakCollisionIssues(step, data) {
   const location = String(data?.qtrakLocation || '').trim();
-  if (!location || !ctx?.stepList || !ctx?.inspection?.stepData) return [];
+  if (!location || !ctx?.inspection) return [];
   const key = location.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const collision = ctx.stepList.find(otherStep => {
-    if (!otherStep || otherStep.id === step.id || otherStep.type === 'review') return false;
-    const otherData = ctx.inspection.stepData[otherStep.id] || {};
-    const otherLocation = String(otherData.qtrakLocation || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const candidates = [];
+  (ctx.stepList || []).forEach(otherStep => {
+    if (!otherStep || otherStep.id === step.id || otherStep.type === 'review') return;
+    const otherData = ctx.inspection.stepData?.[otherStep.id] || {};
+    candidates.push({ name: otherData.roomName || otherData._roomName || otherStep.name || otherStep.id, data: otherData });
+  });
+  (ctx.inspection.rooms || []).forEach(room => {
+    if (!room || typeof room !== 'object' || room === data) return;
+    const roomId = String(room.stepId || room.id || '');
+    if (roomId && roomId === String(step.id || '')) return;
+    candidates.push({ name: room.roomName || room.name || room.label || roomId || 'another room', data: room });
+  });
+  const collision = candidates.find(candidate => {
+    const otherLocation = String(candidate.data?.qtrakLocation || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     return otherLocation && otherLocation === key;
   });
   return collision
-    ? [`Q-Trak location "${location}" is already used by ${collision.name || collision.id}; use a unique room label`]
+    ? [`Q-Trak location "${location}" is already used by ${collision.name}; use a unique room label`]
     : [];
 }
 

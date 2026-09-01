@@ -6,7 +6,7 @@
 // bytes to that URL. The Worker owns service-role Supabase writes. Drive photo
 // packaging is generated later by the retryable Tanner handoff job.
 
-import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=247';
+import { PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=248';
 
 async function fetchWithTimeout(url, options, timeoutMs, label) {
   const controller = new AbortController();

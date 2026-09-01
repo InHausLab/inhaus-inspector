@@ -6,13 +6,14 @@ This file is the authoritative record of every significant change, decision, bug
 
 ---
 
-## v247 — Q-Trak Room Label Validation
+## v248 — Q-Trak Room Label Validation
 **Date:** September 1, 2026
 
 - Blocks a room from using the same Q-Trak location label as another room in the same inspection.
 - Warns immediately when a Q-Trak label differs from the current room name so the inspector can confirm it matches the device export.
 - Preserves the existing Kitchen normalization and never overwrites an already saved Q-Trak label.
-- Bumps the Inspector App and service-worker cache together to `inhaus-v247`.
+- Checks both active step data and restored room-array data, covering current and recovered inspections.
+- Bumps the Inspector App and service-worker cache together to `inhaus-v248`.
 
 ## Worker W40 — Structured Utility Room and Correction Source
 **Date:** September 1, 2026
