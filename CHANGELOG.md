@@ -14,6 +14,8 @@ This file is the authoritative record of every significant change, decision, bug
 - Appends the inspection ID to every new test assessment folder name and migrates ambiguous legacy test shells to a new inspection-specific folder during start-shell or full handoff repair.
 - Preserves idempotent reuse when the saved shell already belongs to the same inspection-specific folder.
 - Local verification passed: all 106 Inspector Node tests and all 50 Worker integration tests.
+- Production rollout passed: the live Worker health endpoint served `handoff-w38`.
+- Deployed acceptance passed at 1:18 PM MDT using Tanner's submitted Test / Training inspection `INH-20260901-2RMWXH`: the repaired package was isolated in Drive folder `1s-XiiBklstWkl66-UoogPJc7_8xq_hbt`, contained both spreadsheets, `_context.md`, Backup, COCs, and Photos, and completed with 16/16 photos, zero pending, zero failed, and one composited annotation image.
 - No Inspector App runtime files changed; Inspector remains v246 and its Netlify cache remains `inhaus-v246`.
 
 ## Review Portal V91 — ATP Task Placement Gate
