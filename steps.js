@@ -1,6 +1,6 @@
 // InHaus Inspector - Step Definitions & Step Logic
-import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=246';
-import { getInspection } from './state.js?v=246';
+import { text, textarea, num, date, timeInput, dateTimeInput, sel, yesno, yesnona, radio, check, checklist, chips, reading, photo, timer, heading, collapsible, info, divider, link, showIf, flirFields, flirLogFields, bathroomLeakFields, breezeFields, qtrakSection, formaldehydeField, observationFields, followUpFields, bathroomCheckFields, equipmentFields } from './fields.js?v=247';
+import { getInspection } from './state.js?v=247';
 
 export const REQUIRED_TEST_OPTIONS = [
   'Breeze ET mold spore traps',
@@ -999,7 +999,20 @@ export function validateStep(stepDef, existingData) {
 }
 
 // Returns non-blocking warnings (shown as toast but navigation still allowed)
-export function warnStep(stepDef) {
-  // ATP completion warning removed per Matt's request
-  return [];
+export function warnStep(stepDef, existingData) {
+  const data = existingData || getStepData(stepDef.id);
+  const warnings = [];
+  const qtrakLocation = String(data.qtrakLocation || '').trim();
+  if (qtrakLocation) {
+    const expected = String(
+      stepDef.type === 'kitchen-air'
+        ? 'Kitchen'
+        : (data.roomName || data._roomName || stepDef.name || '')
+    ).trim();
+    const normalized = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (expected && normalized(qtrakLocation) !== normalized(expected)) {
+      warnings.push(`Q-Trak label "${qtrakLocation}" differs from room "${expected}"; confirm it matches the device export`);
+    }
+  }
+  return warnings;
 }

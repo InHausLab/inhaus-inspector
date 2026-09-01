@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=246';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=246';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=246';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=246';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=246';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=246';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=247';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=247';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=247';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=247';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=247';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=247';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=246';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=246';
-import { updatePhotoMetadata } from './supabase-photos.js?v=246';
-import { FIELD_RESUME_TOKEN } from './config.js?v=246';
+} from './findings.js?v=247';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=247';
+import { updatePhotoMetadata } from './supabase-photos.js?v=247';
+import { FIELD_RESUME_TOKEN } from './config.js?v=247';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=246';
+} from './comment-library.js?v=247';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -150,7 +150,22 @@ function getStepReviewIssues(step) {
   if (!ctx || !ctx.inspection || step.type === 'review') return [];
   const data = (ctx.inspection.stepData && ctx.inspection.stepData[step.id]) || {};
   if (!data._visited) return ['Section not visited'];
-  return validateStep(step, data);
+  return validateStep(step, data).concat(getQtrakCollisionIssues(step, data));
+}
+
+function getQtrakCollisionIssues(step, data) {
+  const location = String(data?.qtrakLocation || '').trim();
+  if (!location || !ctx?.stepList || !ctx?.inspection?.stepData) return [];
+  const key = location.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const collision = ctx.stepList.find(otherStep => {
+    if (!otherStep || otherStep.id === step.id || otherStep.type === 'review') return false;
+    const otherData = ctx.inspection.stepData[otherStep.id] || {};
+    const otherLocation = String(otherData.qtrakLocation || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return otherLocation && otherLocation === key;
+  });
+  return collision
+    ? [`Q-Trak location "${location}" is already used by ${collision.name || collision.id}; use a unique room label`]
+    : [];
 }
 
 function collectInspectionIssues() {
@@ -2435,8 +2450,8 @@ export function renderStep() {
         return;
       }
       try {
-        const missing = validateStep(step);
-        const warnings = warnStep(step);
+        const missing = validateStep(step).concat(getQtrakCollisionIssues(step, data));
+        const warnings = warnStep(step, data);
         if (missing.length) {
           const message = missing.length === 1
             ? missing[0]

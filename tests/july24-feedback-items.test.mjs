@@ -29,6 +29,9 @@ test('Radon setup does not create an artificial room inspection', () => {
 
 test('Q-Trak room defaults to the current room without overwriting saved data', () => {
   assert.match(screens, /hasQtrakLocation && !String\(data\.qtrakLocation \|\| ''\)\.trim\(\)/);
+  assert.match(screens, /getQtrakCollisionIssues\(step, data\)/);
+  assert.match(screens, /Q-Trak location .* is already used by/);
+  assert.match(steps, /Q-Trak label .* differs from room/);
   assert.match(screens, /step\.type === 'kitchen-air'/);
   assert.match(screens, /data\.roomName \|\| data\._roomName \|\| step\.name/);
 });
