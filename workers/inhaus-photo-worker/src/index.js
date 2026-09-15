@@ -547,7 +547,19 @@ async function handleInspectionSave(request, env) {
   source.inspectionId = inspectionId;
   source.id = source.id || inspectionId;
   const shell = await getStartInspectionShellState(env, inspectionId);
-  assertAssessmentClassificationMatchesShell(shell, source);
+  // On /inspections/save the locked shell is authoritative. If the payload sends a
+  // conflicting assessmentType (e.g. client app sent wrong type due to a client-side
+  // bug), reconcile to the locked classification rather than hard-rejecting. The
+  // inspection data is still saved correctly under the right shell.
+  const lockedSaveClassification = shellAssessmentClassification(shell);
+  if (lockedSaveClassification) {
+    source = withAssessmentClassification(source, lockedSaveClassification);
+    if (isPlainObject(source.resumeData)) {
+      source.resumeData = withAssessmentClassification(source.resumeData, lockedSaveClassification);
+    }
+  } else {
+    assertAssessmentClassificationMatchesShell(shell, source);
+  }
   await recordInspectionSyncEvent(env, inspectionId, source, {
     eventType: body.eventType || (body.final === true ? 'final' : 'checkpoint'),
     sourceDevice: inspectionSourceDevice(source)
@@ -1094,7 +1106,10 @@ async function handleStartInspectionShell(request, env) {
   const inspectionId = cleanId(body.inspectionId || body.id, 'inspectionId');
   const requestedClassification = requireExplicitAssessmentClassification(body);
   const existing = await getStartInspectionShellState(env, inspectionId);
-  assertAssessmentClassificationMatchesShell(existing, body);
+  // If the shell is already ready, return the cached receipt immediately.
+  // Do NOT assert type match first — a client-side bug that sends the wrong assessmentType
+  // should not block the inspector from getting the existing shell back. The shell's type
+  // was locked correctly when it was first created; the receipt contains the right values.
   if (startInspectionShellIsReady(existing)) {
     if (existing.isTestTraining === true && existing.folderId && testHandoffShellMatchesInspection(existing, { ...body, inspectionId })) {
       return json({ ...existing, cached: true });
@@ -1103,6 +1118,8 @@ async function handleStartInspectionShell(request, env) {
       return json({ ...existing, cached: true });
     }
   }
+  // Shell is not yet ready — assert classification before creating a new one.
+  assertAssessmentClassificationMatchesShell(existing, body);
   if (requestedClassification === 'test') {
     const accessToken = await getGoogleAccessToken(env);
     const receipt = await ensureTestHandoffShell(env, accessToken, { ...body, inspectionId });
