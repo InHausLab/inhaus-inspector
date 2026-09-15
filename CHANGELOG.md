@@ -4,6 +4,33 @@ This file is the authoritative record of every significant change, decision, bug
 
 **Update this file every time something changes.** When handing off to Codex/Claude Code, include this file. When rebuilding, read this first.
 
+## v250 / v249 — Sync Bug Fix: assessment_type_locked_after_shell
+**Date:** September 15, 2026
+**Commits:** 85d7d8f (v249), cccf021 (v250), 356d079 (const→let fix)
+
+### Root cause
+`attachKnownShellMetadata()` in `sync.js` called `isTestTrainingInspection(inspection)` which matched `clientName` and `propertyAddress` against a word-boundary regex for "test/training/practice/demo". If a real client's name or address matched, every checkpoint sent `assessmentType: 'Test / Training'` to a shell already locked as `real`. Worker returned `assessment_type_locked_after_shell:expected_real:received_test` and blocked all syncs.
+
+### Three-layer fix
+
+**Client (sync.js):**
+- New `isTestTrainingByReceipt()` helper — reads only the shell receipt flag and explicit boolean fields; never checks `clientName` or `propertyAddress`.
+- `shellReceiptIsReady`, `attachKnownShellMetadata`, `requestTannerHandoff` all switch to the new helper.
+- `ensureStartInspectionShell` defaults blank `assessmentType` to `'Home Health Assessment'` before calling the Worker.
+
+**Worker `/start-inspection-shell` (v250):**
+- If shell already exists and is ready, return the cached receipt immediately — before asserting type match. Wrong client payload never blocks the inspector from getting the existing shell back.
+
+**Worker `/inspections/save` (v250):**
+- If shell is locked, reconcile payload classification to the locked one using `withAssessmentClassification()` instead of throwing. Save always succeeds under the correct type.
+
+### Also fixed tonight
+- `/mirror` was missing `DRIVE_FOLDER_ID` secret — added via CF API. Mirror endpoint now functional.
+- Worker secrets fully verified and restored after CF API redeploy.
+
+---
+
+
 ## Worker W42 — Explicit Final Status in App Spreadsheet
 **Date:** September 1, 2026
 
