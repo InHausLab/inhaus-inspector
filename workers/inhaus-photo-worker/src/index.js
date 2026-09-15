@@ -542,7 +542,7 @@ async function handleInspectionSave(request, env) {
   requireEnv(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
   const body = await readJson(request);
   validateSharedSecret(body, env);
-  const source = cleanInspectionPayload(body.inspection || body);
+  let source = cleanInspectionPayload(body.inspection || body);
   const inspectionId = cleanId(source.inspectionId || source.id, 'inspectionId');
   source.inspectionId = inspectionId;
   source.id = source.id || inspectionId;
