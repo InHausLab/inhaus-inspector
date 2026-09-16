@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=257';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=257';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=257';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=257';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=257';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=257';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=258';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=258';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=258';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell, uploadPhotoImmediate } from './sync.js?v=258';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=258';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=258';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=257';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=257';
-import { updatePhotoMetadata } from './supabase-photos.js?v=257';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=257';
+} from './findings.js?v=258';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=258';
+import { updatePhotoMetadata } from './supabase-photos.js?v=258';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=258';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=257';
+} from './comment-library.js?v=258';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -40,6 +40,12 @@ const _companyLibraryRequested = new Set();
 
 export function initScreens(context) {
   ctx = context;
+  // Expose immediate photo upload for ui.js capture hooks
+  window.uploadPhotoImmediate = function(photo) {
+    const insp = ctx && ctx.inspection;
+    if (!insp) return Promise.resolve(false);
+    return uploadPhotoImmediate(photo, insp.inspectionId, insp.clientName, insp.propertyAddress);
+  };
   if (!_globalWorkspaceListenersReady) {
     _globalWorkspaceListenersReady = true;
     window.addEventListener('inhaus-photo-deleted', event => {
@@ -2678,7 +2684,14 @@ export function renderStep() {
               console.warn('Spare photo vault save failed:', vaultErr);
             }
           }
-          if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(sp);
+          // Attempt immediate background upload; fall back to retry queue on failure
+          if (window.uploadPhotoImmediate) {
+            window.uploadPhotoImmediate(sp).catch(() => {
+              if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(sp);
+            });
+          } else if (window.queuePhotoForBackgroundUpload) {
+            window.queuePhotoForBackgroundUpload(sp);
+          }
           if (window.savePhotoToDevice) window.savePhotoToDevice(dataUrl, sp.photoId);
           ui().showToast('📸 Saved to ' + formatPhotoDestination(captureRoom, step.name));
         } catch(err) { console.error(err); }

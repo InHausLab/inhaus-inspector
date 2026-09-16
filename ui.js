@@ -1591,7 +1591,12 @@
           await savePhotoRecordToVault(newPhoto, inspectionId);
           photos.push(newPhoto);
           onUpdate();
-          if (window.queuePhotoForBackgroundUpload) {
+          // Immediate background upload — don't wait for checkpoint
+          if (window.uploadPhotoImmediate) {
+            window.uploadPhotoImmediate(newPhoto).catch(() => {
+              if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(newPhoto);
+            });
+          } else if (window.queuePhotoForBackgroundUpload) {
             window.queuePhotoForBackgroundUpload(newPhoto);
           }
           savedCount++;
@@ -1983,7 +1988,13 @@
             };
             await savePhotoRecordToVault(capturedPhoto, inspection && inspection.inspectionId);
             retainedPhoto = capturedPhoto;
-            if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(capturedPhoto);
+            if (window.uploadPhotoImmediate) {
+              window.uploadPhotoImmediate(capturedPhoto).catch(() => {
+                if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(capturedPhoto);
+              });
+            } else if (window.queuePhotoForBackgroundUpload) {
+              window.queuePhotoForBackgroundUpload(capturedPhoto);
+            }
             data[photoKey] = [capturedPhoto];
             delete data[dataKey + '_photo'];
             preview.src = retainedPhoto.thumbnailDataUrl || retainedPhoto.dataUrl;
@@ -2147,7 +2158,13 @@
               _vaultSaved: false
             };
             await savePhotoRecordToVault(retainedPhoto, inspection && inspection.inspectionId);
-            if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(retainedPhoto);
+            if (window.uploadPhotoImmediate) {
+              window.uploadPhotoImmediate(retainedPhoto).catch(() => {
+                if (window.queuePhotoForBackgroundUpload) window.queuePhotoForBackgroundUpload(retainedPhoto);
+              });
+            } else if (window.queuePhotoForBackgroundUpload) {
+              window.queuePhotoForBackgroundUpload(retainedPhoto);
+            }
             data[photoKey] = [retainedPhoto];
             delete data[dataKey + '_photo'];
             preview.src = retainedPhoto.thumbnailDataUrl || retainedPhoto.dataUrl;
