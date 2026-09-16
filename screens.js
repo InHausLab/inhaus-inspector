@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=252';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=252';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=252';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=252';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=252';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=252';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=253';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=253';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=253';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=253';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=253';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=253';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=252';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=252';
-import { updatePhotoMetadata } from './supabase-photos.js?v=252';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=252';
+} from './findings.js?v=253';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=253';
+import { updatePhotoMetadata } from './supabase-photos.js?v=253';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=253';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=252';
+} from './comment-library.js?v=253';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -557,7 +557,7 @@ let _devTapCount = 0, _devTapTimer = null;
 // ── Dev Pipeline Smoke Test ──────────────────────────────────────────────────
 // One-tap full pipeline check: shell → photo sign → photo upload → save →
 // verify → handoff request. No real inspection created. ~5-10 seconds.
-async function runDevSmokeTest(btn) {
+async function runDevSmokeTest(btn, statusEl) {
   const results = [];
   const start = Date.now();
   const inspectionId = 'SMOKE-' + Date.now().toString(36).toUpperCase();
@@ -565,11 +565,12 @@ async function runDevSmokeTest(btn) {
 
   btn.disabled = true;
   btn.textContent = '⏳ Testing…';
-  const statusEl = btn.nextElementSibling || (() => {
-    const el = ui().el('div', { style: 'font-size:0.8rem;margin-top:8px;padding:8px;border-radius:6px;font-family:monospace;white-space:pre-wrap;' });
-    btn.insertAdjacentElement('afterend', el);
-    return el;
-  })();
+  // statusEl is passed directly from the call site — no DOM lookup needed.
+  statusEl.style.display = 'block';
+  statusEl.style.background = '#f8f9fa';
+  statusEl.style.border = '1px solid #dee2e6';
+  statusEl.style.color = '#111';
+  statusEl.textContent = '⏳ Starting…';
 
   function log(label, ok, detail) {
     results.push({ label, ok, detail });
@@ -584,10 +585,12 @@ async function runDevSmokeTest(btn) {
   function done() {
     const allOk = results.every(r => r.ok);
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    const lines = results.map(r =>
-      (r.ok ? '✅' : '❌') + ' ' + r.label + (r.detail ? ' — ' + r.detail : '')
-    ).join('\n');
-    statusEl.textContent = lines + '\n' + (allOk ? '✅ Sync OK' : '❌ Sync Failed') + ' (' + elapsed + 's)';
+    const lines = results.length
+      ? results.map(r => (r.ok ? '✅' : '❌') + ' ' + r.label + (r.detail ? ' — ' + r.detail : '')).join('\n')
+      : '❌ No steps ran';
+    const summary = (allOk ? '✅ Sync OK' : '❌ Sync Failed') + ' (' + elapsed + 's)';
+    statusEl.style.display = 'block';
+    statusEl.textContent = lines + '\n' + summary;
     statusEl.style.background = allOk ? '#f0fdf4' : '#fef2f2';
     statusEl.style.border = '1px solid ' + (allOk ? '#86efac' : '#fca5a5');
     statusEl.style.color = allOk ? '#166534' : '#991b1b';
@@ -722,7 +725,10 @@ async function runDevSmokeTest(btn) {
     }
 
   } catch(e) {
-    log('Smoke test', false, e.message || 'unexpected error');
+    const msg = (e && (e.message || String(e))) || 'unexpected error';
+    log('Smoke test error', false, msg);
+    // Ensure statusEl always shows something even if log/done failed
+    try { statusEl.textContent = (statusEl.textContent || '') + '\n❌ Uncaught: ' + msg; } catch(_) {}
   }
 
   done();
@@ -935,12 +941,12 @@ export function renderHome() {
   const smokeTestBtn = ui().el('button', {
     className: 'btn btn-outline btn-full',
     style: 'margin-top:8px;font-size:0.8rem;color:#7c3aed;border-color:#c4b5fd;',
-    onClick: () => runDevSmokeTest(smokeTestBtn)
+    onClick: () => runDevSmokeTest(smokeTestBtn, smokeTestStatus)
   }, '🔬 Run Smoke Test');
   const smokeTestStatus = ui().el('div', {
     style: 'font-size:0.8rem;margin-top:8px;padding:8px;border-radius:6px;font-family:monospace;white-space:pre-wrap;display:none;'
   });
-  smokeTestBtn.insertAdjacentElement('afterend', smokeTestStatus);
+  // Note: display:none is intentional here — runDevSmokeTest sets display:block on tap.
   advancedSection.appendChild(smokeTestBtn);
   advancedSection.appendChild(smokeTestStatus);
   c.appendChild(advancedSection);
