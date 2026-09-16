@@ -92,9 +92,72 @@
       });
   }
 
+  function wait(milliseconds) {
+    if (!milliseconds) return Promise.resolve();
+    return new Promise(resolve => root.setTimeout(resolve, milliseconds));
+  }
+
+  async function fetchJsonWithRetry(url, options = {}, retryOptions = {}) {
+    const attempts = Math.max(1, Number(retryOptions.attempts) || 5);
+    const baseDelayMs = Math.max(0, Number(retryOptions.baseDelayMs) || 0);
+    const timeoutMs = Math.max(1, Number(retryOptions.timeoutMs) || 15000);
+    let lastError;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      const controller = new root.AbortController();
+      const timeoutId = root.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await root.fetch(url, { ...options, signal: controller.signal });
+        if (!response.ok) {
+          const error = new Error(`Request failed (${response.status})`);
+          error.status = response.status;
+          throw error;
+        }
+        const data = await response.json();
+        if (data.status && data.status !== 'ok') {
+          const error = new Error(data.message || `Service returned ${data.status}`);
+          error.retryable = false;
+          throw error;
+        }
+        return data;
+      } catch (error) {
+        if (error && error.name === 'AbortError') error = new Error('Request timed out');
+        lastError = error;
+        const status = Number(error && error.status);
+        const retryableStatus = !status || status === 408 || status === 425 || status === 429 || status >= 500;
+        if (attempt >= attempts || error.retryable === false || !retryableStatus) throw error;
+        await wait(baseDelayMs * (2 ** (attempt - 1)));
+      } finally {
+        root.clearTimeout(timeoutId);
+      }
+    }
+
+    throw lastError;
+  }
+
+  async function mapWithConcurrency(items, mapper, limit = 3) {
+    const values = Array.isArray(items) ? items : [];
+    const results = new Array(values.length);
+    const workerCount = Math.min(values.length, Math.max(1, Number(limit) || 1));
+    let nextIndex = 0;
+
+    async function work() {
+      while (nextIndex < values.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(values[index], index);
+      }
+    }
+
+    await Promise.all(Array.from({ length: workerCount }, work));
+    return results;
+  }
+
   const api = {
     selectLatestPhotos,
-    extractFollowUps
+    extractFollowUps,
+    fetchJsonWithRetry,
+    mapWithConcurrency
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

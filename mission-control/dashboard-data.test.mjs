@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
 
 const require = createRequire(import.meta.url);
-const { selectLatestPhotos, extractFollowUps } = require('./dashboard-data.js');
+const { selectLatestPhotos, extractFollowUps, fetchJsonWithRetry, mapWithConcurrency } = require('./dashboard-data.js');
 
 test('selectLatestPhotos returns the 12 newest photos in descending timestamp order', () => {
   const photos = Array.from({ length: 13 }, (_, index) => ({
@@ -109,4 +110,81 @@ test('extractFollowUps ignores later unrelated room edits when follow-up timesta
 
   assert.equal(followUps[0].room, 'Kitchen');
   assert.equal(followUps[1].recordedAt, '2026-09-16T10:00:00.000Z');
+});
+
+test('fetchJsonWithRetry recovers when a live-data endpoint returns transient 503 responses', async () => {
+  let requestCount = 0;
+  const server = createServer((request, response) => {
+    requestCount += 1;
+    if (requestCount < 3) {
+      response.writeHead(503, { 'Content-Type': 'text/html' });
+      response.end('<!doctype html><title>Service unavailable</title>');
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ status: 'ok', inspections: [{ inspectionId: 'INH-TEST' }] }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+  try {
+    const address = server.address();
+    const result = await fetchJsonWithRetry(
+      `http://127.0.0.1:${address.port}/inspections/active`,
+      {},
+      { attempts: 3, baseDelayMs: 0 }
+    );
+
+    assert.equal(requestCount, 3);
+    assert.deepEqual(result, { status: 'ok', inspections: [{ inspectionId: 'INH-TEST' }] });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test('fetchJsonWithRetry aborts a hung attempt and retries it', async () => {
+  let requestCount = 0;
+  const server = createServer((request, response) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      setTimeout(() => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: 'ok', recovered: false }));
+      }, 80);
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ status: 'ok', recovered: true }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+  try {
+    const address = server.address();
+    const result = await fetchJsonWithRetry(
+      `http://127.0.0.1:${address.port}/inspections/active`,
+      {},
+      { attempts: 2, baseDelayMs: 0, timeoutMs: 25 }
+    );
+
+    assert.equal(requestCount, 2);
+    assert.deepEqual(result, { status: 'ok', recovered: true });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test('mapWithConcurrency preserves inspection order while limiting simultaneous hydration', async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const inspections = [1, 2, 3, 4, 5, 6, 7];
+
+  const hydrated = await mapWithConcurrency(inspections, async inspection => {
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    active -= 1;
+    return inspection * 10;
+  }, 3);
+
+  assert.deepEqual(hydrated, [10, 20, 30, 40, 50, 60, 70]);
+  assert.equal(maximumActive, 3);
 });

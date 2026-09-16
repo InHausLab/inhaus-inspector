@@ -266,7 +266,7 @@
     </div>
   </dialog>
 
-  <script src="./dashboard-data.js"></script>
+  <script src="./dashboard-data.js?v=retry6-20260916"></script>
   <script>
     (() => {
       'use strict';
@@ -276,7 +276,7 @@
       const LIST_URL = `${WORKER_URL}/inspections/active`;
       const PHOTO_URL = `${WORKER_URL}/inspection-photos`;
       const REFRESH_SECONDS = 30;
-      const { selectLatestPhotos, extractFollowUps } = window.MissionControlData;
+      const { selectLatestPhotos, extractFollowUps, fetchJsonWithRetry, mapWithConcurrency } = window.MissionControlData;
 
       const dashboard = document.getElementById('dashboard');
       const refreshButton = document.getElementById('refresh');
@@ -290,6 +290,8 @@
 
       let secondsRemaining = REFRESH_SECONDS;
       let refreshInFlight = false;
+      const photoCache = new Map();
+      const detailCache = new Map();
 
       function validDate(value) {
         const date = value ? new Date(value) : null;
@@ -429,7 +431,7 @@
         );
 
         body.append(top, metrics);
-        body.append(element('h3', 'section-title', `Last activity · ${relativeTime(lastPhoto)}`));
+        body.append(element('h3', 'section-title', `Last activity · ${relativeTime(lastPhoto)}${inspection.photoStale ? ' · cached' : ''}`));
 
         const photoGrid = element('div', 'photos');
         const latestPhotos = selectLatestPhotos(photos);
@@ -448,7 +450,9 @@
         const followUpHeading = element('div', 'follow-up-heading');
         followUpHeading.append(
           element('h3', 'section-title', 'Follow-up actions'),
-          element('div', 'follow-up-count', inspection.detailError ? 'FOLLOW-UPS: —' : `FOLLOW-UPS: ${followUps.length}`)
+          element('div', 'follow-up-count', inspection.detailError
+            ? 'FOLLOW-UPS: —'
+            : `FOLLOW-UPS: ${followUps.length}${inspection.detailStale ? ' · CACHED' : ''}`)
         );
         body.append(followUpHeading);
         const followUpList = element('div', 'follow-ups');
@@ -497,14 +501,13 @@
       }
 
       async function fetchJson(url, authorized = false) {
-        const response = await fetch(url, {
+        return fetchJsonWithRetry(url, {
           cache: 'no-store',
           headers: authorized ? { Authorization: `Bearer ${REVIEW_TOKEN}` } : {}
+        }, {
+          attempts: 5,
+          baseDelayMs: 300
         });
-        if (!response.ok) throw new Error(`Request failed (${response.status})`);
-        const data = await response.json();
-        if (data.status && data.status !== 'ok') throw new Error(data.message || `Service returned ${data.status}`);
-        return data;
       }
 
       async function fetchPhotos(inspection) {
@@ -513,8 +516,13 @@
         const params = new URLSearchParams({ inspectionId, token: inspectionId.toLowerCase() });
         try {
           const data = await fetchJson(`${PHOTO_URL}?${params}`);
-          return { ...inspection, photos: Array.isArray(data) ? data : (Array.isArray(data.photos) ? data.photos : []) };
+          const photos = Array.isArray(data) ? data : (Array.isArray(data.photos) ? data.photos : []);
+          photoCache.set(inspectionId, photos);
+          return { ...inspection, photos };
         } catch (error) {
+          if (photoCache.has(inspectionId)) {
+            return { ...inspection, photos: photoCache.get(inspectionId), photoStale: true };
+          }
           return { ...inspection, photos: [], photoError: error.message };
         }
       }
@@ -524,8 +532,13 @@
         if (!inspectionId) return { inspectionData: {}, detailError: 'Missing inspection ID' };
         try {
           const data = await fetchJson(`${WORKER_URL}/inspections/${encodeURIComponent(inspectionId)}`, true);
-          return { inspectionData: data.inspection || {}, detailError: '' };
+          const inspectionData = data.inspection || {};
+          detailCache.set(inspectionId, inspectionData);
+          return { inspectionData, detailError: '' };
         } catch (error) {
+          if (detailCache.has(inspectionId)) {
+            return { inspectionData: detailCache.get(inspectionId), detailError: '', detailStale: true };
+          }
           return { inspectionData: {}, detailError: error.message };
         }
       }
@@ -548,7 +561,7 @@
         try {
           const listData = await fetchJson(LIST_URL, true);
           const inspections = Array.isArray(listData) ? listData : (Array.isArray(listData.inspections) ? listData.inspections : []);
-          const hydrated = await Promise.all(inspections.map(fetchInspectionActivity));
+          const hydrated = await mapWithConcurrency(inspections, fetchInspectionActivity, 3);
           dashboard.replaceChildren();
           if (!hydrated.length) {
             const message = element('div', 'message');
@@ -560,16 +573,21 @@
             hydrated.sort((a, b) => String(b.inspectionDate || '').localeCompare(String(a.inspectionDate || '')));
             dashboard.append(...hydrated.map(createCard));
           }
-          updatedNode.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+          const cachedCount = hydrated.filter(inspection => inspection.photoStale || inspection.detailStale).length;
+          updatedNode.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}${cachedCount ? ` · cached data on ${cachedCount} card${cachedCount === 1 ? '' : 's'}` : ''}`;
         } catch (error) {
-          const message = element('div', 'message');
-          const content = element('div');
-          content.append(element('strong', '', 'Unable to load inspections'));
-          content.append(document.createTextNode('The dashboard will retry automatically.'));
-          content.append(element('div', 'error-detail', error.message));
-          message.append(content);
-          dashboard.replaceChildren(message);
-          updatedNode.textContent = 'Last refresh failed';
+          if (!dashboard.querySelector('article')) {
+            const message = element('div', 'message');
+            const content = element('div');
+            content.append(element('strong', '', 'Unable to load inspections'));
+            content.append(document.createTextNode('The dashboard will retry automatically.'));
+            content.append(element('div', 'error-detail', error.message));
+            message.append(content);
+            dashboard.replaceChildren(message);
+          }
+          updatedNode.textContent = dashboard.querySelector('article')
+            ? 'Refresh failed · showing last good data'
+            : 'Last refresh failed';
         } finally {
           refreshInFlight = false;
           refreshButton.disabled = false;
