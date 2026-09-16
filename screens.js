@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=256';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=256';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=256';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=256';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=256';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=256';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=257';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=257';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=257';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=257';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=257';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=257';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=256';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=256';
-import { updatePhotoMetadata } from './supabase-photos.js?v=256';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=256';
+} from './findings.js?v=257';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=257';
+import { updatePhotoMetadata } from './supabase-photos.js?v=257';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=257';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=256';
+} from './comment-library.js?v=257';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -745,6 +745,90 @@ function toggleDevMode() {
   ctx.render();
 }
 
+
+// ── Quick Test Inspection ─────────────────────────────────────────────────────
+// Creates a real inspection with dummy data, drops straight into Kitchen step.
+// Tests the real camera → IndexedDB → upload → sync pipeline.
+// Triggered by "Quick Test Inspection" button in dev mode on home screen.
+async function startQuickTestInspection(btn) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Creating…';
+
+  try {
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    const inspectionId = ctx.genId();
+
+    // Build inspection object — mirrors the intake + createInspection path exactly
+    const inspection = {
+      inspectionId,
+      assessmentType: 'Home Health Assessment',
+      inspectorName: ctx.inspection?.inspectorName || 'QA Inspector',
+      inspectionDate: today,
+      clientName: 'QA Test Client',
+      propertyAddress: '123 Test Street, Aspen CO 81611',
+      numberOfLevels: '2',
+      numberOfBedrooms: '3',
+      numberOfBathrooms: '2',
+      waterSource: 'Municipal',
+      waterSourceDescription: '',
+      wifiNetwork: '',
+      wifiPassword: '',
+      clientConcerns: 'QA smoke test — not a real inspection',
+      blueprintNotes: '',
+      inspectorEmail: '',
+      requiredTests: ['mold', 'air-quality'],
+      startedAt: now,
+      updatedAt: now,
+      endedAt: null,
+      status: 'in-progress',
+      reviewStatus: 'Field Active',
+      stepData: {},
+      timers: {},
+      dynamicRooms: { lowest: [], additional: [] },
+      _lastStepIdx: 0,
+      _quickTestInspection: true,
+      truckCheck: {}
+    };
+
+    ensureInspectionWorkspace(inspection);
+    ctx.inspection = inspection;
+    setInspection(ctx.inspection);
+
+    ctx.stepList = buildStepList(ctx.inspection);
+
+    // Find kitchen-appliance step index — that's where we drop the user
+    const kitchenIdx = ctx.stepList.findIndex(s => s.id === 'kitchen-appliance');
+    const targetIdx = kitchenIdx >= 0 ? kitchenIdx : 0;
+
+    // Save locally first so IndexedDB has the record
+    await saveNow();
+
+    // Kick off shell creation in background — non-blocking
+    // The force-sync bar will show in the step screen; user taps it after taking photos
+    ensureStartInspectionShell(ctx.stepList, { force: false }).then(receipt => {
+      if (receipt && receipt.ok) {
+        console.log('[QuickTest] Shell ready:', receipt.assessmentNumber);
+      }
+    }).catch(e => console.warn('[QuickTest] Shell background error:', e.message));
+
+    // Drop straight into the kitchen step
+    ctx.currentStepIdx = targetIdx;
+    setScreen('step');
+    ctx.startAutoSave && ctx.startAutoSave();
+    ctx.render();
+
+    // Toast instruction
+    ui().showToast('📷 Quick Test — take 3 photos then tap Force Sync', 5000);
+
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = orig;
+    alert('Quick test failed: ' + (err?.message || String(err)));
+  }
+}
+
 function quickTestPickupData() {
   const now = new Date();
   const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 12);
@@ -978,6 +1062,14 @@ export function renderHome() {
       }
     }, '\u26a1 Jump to Step');
     c.appendChild(jumpBtn);
+
+    // Quick Test Inspection — drops straight into Kitchen with a real inspection
+    const quickTestBtn = ui().el('button', {
+      className: 'btn btn-outline btn-full',
+      style: 'margin-top:8px;font-size:0.8rem;color:#7c3aed;border-color:#c4b5fd;font-weight:600;',
+      onClick: () => startQuickTestInspection(quickTestBtn)
+    }, '📷 Quick Test Inspection (Kitchen → Camera → Sync)');
+    c.appendChild(quickTestBtn);
   }
 
   const list = ui().el('div', { className: 'inspection-list' });
