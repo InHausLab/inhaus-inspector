@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=253';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=253';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=253';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=253';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=253';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=253';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=254';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=254';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=254';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=254';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=254';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=254';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=253';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=253';
-import { updatePhotoMetadata } from './supabase-photos.js?v=253';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=253';
+} from './findings.js?v=254';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=254';
+import { updatePhotoMetadata } from './supabase-photos.js?v=254';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=254';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=253';
+} from './comment-library.js?v=254';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -561,7 +561,7 @@ async function runDevSmokeTest(btn, statusEl) {
   const results = [];
   const start = Date.now();
   const inspectionId = 'SMOKE-' + Date.now().toString(36).toUpperCase();
-  const photoId = 'p-smoke-' + Math.random().toString(36).slice(2, 9);
+  const photoId = 'smoke-photo-' + Date.now();
 
   btn.disabled = true;
   btn.textContent = '⏳ Testing…';
@@ -641,7 +641,8 @@ async function runDevSmokeTest(btn, statusEl) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sharedSecret: PHOTO_UPLOAD_SECRET,
-          inspectionId, photoId,
+          inspectionId: inspectionId,
+          photoId: photoId,
           roomName: 'Kitchen', stepName: 'overview', caption: 'smoke test photo'
         })
       });
