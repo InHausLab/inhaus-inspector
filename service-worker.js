@@ -9,29 +9,29 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v254';
+const CACHE_NAME = 'inhaus-v255';
 
 const APP_SHELL = [
   './',
   './index.html',
   './cache-reset.html',
-  './app.js?v=254',
-  './screens.js?v=254',
-  './sync.js?v=254',
-  './ui.js?v=254',
-  './steps.js?v=254',
-  './config.js?v=254',
-  './storage.js?v=254',
-  './fields.js?v=254',
-  './inspection.js?v=254',
-  './findings.js?v=254',
-  './photo-routing.js?v=254',
-  './comment-library.js?v=254',
-  './feedback.js?v=254',
+  './app.js?v=255',
+  './screens.js?v=255',
+  './sync.js?v=255',
+  './ui.js?v=255',
+  './steps.js?v=255',
+  './config.js?v=255',
+  './storage.js?v=255',
+  './fields.js?v=255',
+  './inspection.js?v=255',
+  './findings.js?v=255',
+  './photo-routing.js?v=255',
+  './comment-library.js?v=255',
+  './feedback.js?v=255',
   './comment-library-admin.html',
-  './comment-library-admin.js?v=254',
-  './db.js?v=254',
-  './state.js?v=254',
+  './comment-library-admin.js?v=255',
+  './db.js?v=255',
+  './state.js?v=255',
   './styles.css',
   './manifest.json',
 ];

@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=254';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=254';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=254';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=254';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=254';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=254';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=255';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=255';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=255';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=255';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=255';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=255';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=254';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=254';
-import { updatePhotoMetadata } from './supabase-photos.js?v=254';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=254';
+} from './findings.js?v=255';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=255';
+import { updatePhotoMetadata } from './supabase-photos.js?v=255';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=255';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=254';
+} from './comment-library.js?v=255';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
