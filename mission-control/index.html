@@ -158,15 +158,38 @@
     .metric-value.large { color: #8ab4ff; font-size: 1.15rem; }
 
     .section-title { margin: 0 0 10px; color: #bac7da; font-size: .7rem; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
-    .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 18px; }
-    .photo { position: relative; min-height: 112px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #080f1c; }
-    .photo img { display: block; width: 100%; height: 100%; min-height: 112px; object-fit: cover; }
+    .photos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-bottom: 18px; }
+    .photo { position: relative; min-height: 92px; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #080f1c; color: inherit; cursor: zoom-in; text-align: left; }
+    .photo:hover, .photo:focus-visible { border-color: #5d89ff; box-shadow: 0 0 0 2px rgba(59, 130, 246, .25); outline: none; }
+    .photo img { display: block; width: 100%; height: 100%; min-height: 92px; object-fit: cover; }
     .photo-label { position: absolute; right: 0; bottom: 0; left: 0; padding: 16px 8px 7px; overflow: hidden; background: linear-gradient(transparent, rgba(0,0,0,.86)); font-size: .68rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
     .photo-empty { display: grid; place-items: center; min-height: 112px; color: #6f7f98; font-size: .8rem; text-align: center; }
 
     .rooms { display: flex; flex-wrap: wrap; gap: 7px; }
     .room { padding: 7px 9px; border: 1px solid #293a56; border-radius: 8px; background: #0a1425; color: #c2cee0; font-size: .76rem; }
     .room strong { margin-left: 5px; color: white; }
+
+    .follow-up-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 10px; }
+    .follow-up-heading .section-title { margin: 0; }
+    .follow-up-count { color: #facc15; font-size: .7rem; font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
+    .follow-ups { display: grid; gap: 9px; margin-bottom: 18px; }
+    .follow-up { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px; border: 1px solid #39415a; border-left: 4px solid var(--yellow); border-radius: 10px; background: rgba(234, 179, 8, .055); }
+    .follow-up-room { margin: 0 0 4px; color: #fde68a; font-size: .8rem; font-weight: 850; }
+    .follow-up-text { margin: 0; color: #edf2fb; font-size: .83rem; line-height: 1.4; white-space: pre-wrap; }
+    .follow-up-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; margin-top: 8px; color: var(--muted); font-size: .69rem; }
+    .follow-up-timeframe { color: #fcd34d; font-weight: 800; }
+    .follow-up-thumbnails { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .follow-up-thumbnail { width: 62px; height: 62px; min-height: 0; }
+    .follow-up-thumbnail img { min-height: 0; }
+    .follow-up-empty { padding: 11px 12px; border: 1px dashed #33435e; border-radius: 10px; color: var(--muted); font-size: .8rem; }
+
+    .lightbox { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; overflow: hidden; border: 1px solid #405474; border-radius: 14px; background: #050b16; color: white; box-shadow: 0 28px 90px rgba(0, 0, 0, .72); }
+    .lightbox::backdrop { background: rgba(0, 0, 0, .82); backdrop-filter: blur(4px); }
+    .lightbox-image { display: block; width: 100%; max-height: calc(100vh - 105px); object-fit: contain; background: #02050a; }
+    .lightbox-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 12px 16px; }
+    .lightbox-caption { overflow: hidden; color: #dbe7f8; font-size: .85rem; text-overflow: ellipsis; white-space: nowrap; }
+    .lightbox-close { min-width: 76px; min-height: 38px; border: 1px solid #49617f; border-radius: 8px; background: #13223a; color: white; cursor: pointer; font-weight: 800; }
+    .lightbox-close:hover { background: #1a3154; }
 
     .message {
       grid-column: 1 / -1;
@@ -191,8 +214,8 @@
       .header-right { align-items: flex-end; flex-direction: column; gap: 10px; }
       .clock { font-size: 1.12rem; }
       .metrics { grid-template-columns: repeat(2, 1fr); }
-      .photos { gap: 6px; }
-      .photo, .photo img, .photo-empty { min-height: 90px; }
+      .photos { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .photo, .photo img, .photo-empty { min-height: 88px; }
       .control-bar { align-items: flex-start; flex-direction: column; gap: 7px; }
       .updated { text-align: left; }
     }
@@ -203,6 +226,9 @@
       .refresh-button { padding: 0 12px; }
       .card-top { flex-direction: column; gap: 12px; }
       .status-badge { align-self: flex-start; }
+      .photos { grid-template-columns: repeat(2, 1fr); }
+      .follow-up { grid-template-columns: 1fr; }
+      .follow-up-thumbnails { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -232,6 +258,15 @@
     </section>
   </main>
 
+  <dialog class="lightbox" id="photo-lightbox" aria-label="Enlarged inspection photo">
+    <img class="lightbox-image" id="lightbox-image" alt="">
+    <div class="lightbox-footer">
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+      <button class="lightbox-close" id="lightbox-close" type="button">Close</button>
+    </div>
+  </dialog>
+
+  <script src="./dashboard-data.js"></script>
   <script>
     (() => {
       'use strict';
@@ -241,12 +276,17 @@
       const LIST_URL = `${WORKER_URL}/inspections/active`;
       const PHOTO_URL = `${WORKER_URL}/inspection-photos`;
       const REFRESH_SECONDS = 30;
+      const { selectLatestPhotos, extractFollowUps } = window.MissionControlData;
 
       const dashboard = document.getElementById('dashboard');
       const refreshButton = document.getElementById('refresh');
       const countdownNode = document.getElementById('countdown');
       const updatedNode = document.getElementById('last-updated');
       const clockNode = document.getElementById('clock');
+      const lightbox = document.getElementById('photo-lightbox');
+      const lightboxImage = document.getElementById('lightbox-image');
+      const lightboxCaption = document.getElementById('lightbox-caption');
+      const lightboxClose = document.getElementById('lightbox-close');
 
       let secondsRemaining = REFRESH_SECONDS;
       let refreshInFlight = false;
@@ -282,6 +322,17 @@
         if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
         const days = Math.floor(hours / 24);
         return `${days}d ${hours % 24}h ago`;
+      }
+
+      function formatRecordedTime(value) {
+        const date = validDate(value);
+        if (!date) return 'Time unavailable';
+        return date.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
       }
 
       function elapsedTime(first, last) {
@@ -323,6 +374,31 @@
         return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
       }
 
+      function openPhoto(photo) {
+        lightboxImage.src = photo.url;
+        lightboxImage.alt = photo.caption || `${photo.roomName || photo.stepName || 'Inspection'} photo`;
+        lightboxCaption.textContent = [photo.roomName || photo.stepName || 'Unassigned', photo.caption || ''].filter(Boolean).join(' · ');
+        lightbox.showModal();
+      }
+
+      function photoButton(photo, className = '') {
+        const frame = element('button', `photo${className ? ` ${className}` : ''}`);
+        frame.type = 'button';
+        frame.setAttribute('aria-label', `Enlarge ${photo.roomName || photo.stepName || 'inspection'} photo`);
+        const image = new Image();
+        image.loading = 'lazy';
+        image.alt = photo.caption || `${photo.roomName || 'Inspection'} photo`;
+        image.src = photo.url;
+        image.addEventListener('error', () => {
+          image.remove();
+          frame.prepend(element('div', 'photo-empty', 'Image unavailable'));
+        }, { once: true });
+        frame.append(image);
+        if (!className) frame.append(element('div', 'photo-label', photo.roomName || photo.stepName || 'Unassigned'));
+        frame.addEventListener('click', () => openPhoto(photo));
+        return frame;
+      }
+
       function createCard(inspection) {
         const photos = inspection.photos
           .map(photo => ({ ...photo, parsedTimestamp: validDate(photo.timestamp) }))
@@ -356,27 +432,52 @@
         body.append(element('h3', 'section-title', `Last activity · ${relativeTime(lastPhoto)}`));
 
         const photoGrid = element('div', 'photos');
-        const latestPhotos = photos.slice(-3).reverse();
+        const latestPhotos = selectLatestPhotos(photos);
         if (!latestPhotos.length) {
           const empty = element('div', 'photo-empty', inspection.photoError ? 'Photos unavailable' : 'No photos uploaded');
           empty.style.gridColumn = '1 / -1';
           photoGrid.append(empty);
         } else {
           for (const photo of latestPhotos) {
-            const frame = element('div', 'photo');
-            const image = new Image();
-            image.loading = 'lazy';
-            image.alt = photo.caption || `${photo.roomName || 'Inspection'} photo`;
-            image.src = photo.url;
-            image.addEventListener('error', () => {
-              image.remove();
-              frame.prepend(element('div', 'photo-empty', 'Image unavailable'));
-            }, { once: true });
-            frame.append(image, element('div', 'photo-label', photo.roomName || photo.stepName || 'Unassigned'));
-            photoGrid.append(frame);
+            photoGrid.append(photoButton(photo));
           }
         }
         body.append(photoGrid);
+
+        const followUps = extractFollowUps(inspection.inspectionData, photos);
+        const followUpHeading = element('div', 'follow-up-heading');
+        followUpHeading.append(
+          element('h3', 'section-title', 'Follow-up actions'),
+          element('div', 'follow-up-count', inspection.detailError ? 'FOLLOW-UPS: —' : `FOLLOW-UPS: ${followUps.length}`)
+        );
+        body.append(followUpHeading);
+        const followUpList = element('div', 'follow-ups');
+        if (inspection.detailError) {
+          followUpList.append(element('div', 'follow-up-empty', `Follow-ups unavailable · ${inspection.detailError}`));
+        } else if (!followUps.length) {
+          followUpList.append(element('div', 'follow-up-empty', 'No follow-up actions recorded yet.'));
+        } else {
+          for (const followUp of followUps) {
+            const item = element('div', 'follow-up');
+            const content = element('div');
+            content.append(
+              element('p', 'follow-up-room', followUp.room),
+              element('p', 'follow-up-text', followUp.text)
+            );
+            const meta = element('div', 'follow-up-meta');
+            meta.append(element('span', '', `Recorded ${formatRecordedTime(followUp.recordedAt)}`));
+            if (followUp.timeframe) meta.append(element('span', 'follow-up-timeframe', `Re-check in ${followUp.timeframe}`));
+            content.append(meta);
+            item.append(content);
+            if (followUp.associatedPhotos.length) {
+              const thumbnails = element('div', 'follow-up-thumbnails');
+              for (const photo of followUp.associatedPhotos) thumbnails.append(photoButton(photo, 'follow-up-thumbnail'));
+              item.append(thumbnails);
+            }
+            followUpList.append(item);
+          }
+        }
+        body.append(followUpList);
 
         body.append(element('h3', 'section-title', 'Room breakdown'));
         const rooms = element('div', 'rooms');
@@ -418,6 +519,25 @@
         }
       }
 
+      async function fetchInspectionDetails(inspection) {
+        const inspectionId = inspection.inspectionId || inspection.id;
+        if (!inspectionId) return { inspectionData: {}, detailError: 'Missing inspection ID' };
+        try {
+          const data = await fetchJson(`${WORKER_URL}/inspections/${encodeURIComponent(inspectionId)}`, true);
+          return { inspectionData: data.inspection || {}, detailError: '' };
+        } catch (error) {
+          return { inspectionData: {}, detailError: error.message };
+        }
+      }
+
+      async function fetchInspectionActivity(inspection) {
+        const [withPhotos, details] = await Promise.all([
+          fetchPhotos(inspection),
+          fetchInspectionDetails(inspection)
+        ]);
+        return { ...withPhotos, ...details };
+      }
+
       async function refreshDashboard() {
         if (refreshInFlight) return;
         refreshInFlight = true;
@@ -428,7 +548,7 @@
         try {
           const listData = await fetchJson(LIST_URL, true);
           const inspections = Array.isArray(listData) ? listData : (Array.isArray(listData.inspections) ? listData.inspections : []);
-          const hydrated = await Promise.all(inspections.map(fetchPhotos));
+          const hydrated = await Promise.all(inspections.map(fetchInspectionActivity));
           dashboard.replaceChildren();
           if (!hydrated.length) {
             const message = element('div', 'message');
@@ -461,6 +581,10 @@
       }
 
       refreshButton.addEventListener('click', refreshDashboard);
+      lightboxClose.addEventListener('click', () => lightbox.close());
+      lightbox.addEventListener('click', event => {
+        if (event.target === lightbox) lightbox.close();
+      });
       setInterval(() => {
         secondsRemaining -= 1;
         if (secondsRemaining <= 0) refreshDashboard();
