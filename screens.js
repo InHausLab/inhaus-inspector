@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=255';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=255';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=255';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=255';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=255';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=255';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=256';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=256';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=256';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=256';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=256';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=256';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=255';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=255';
-import { updatePhotoMetadata } from './supabase-photos.js?v=255';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=255';
+} from './findings.js?v=256';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=256';
+import { updatePhotoMetadata } from './supabase-photos.js?v=256';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=256';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=255';
+} from './comment-library.js?v=256';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -658,12 +658,13 @@ async function runDevSmokeTest(btn, statusEl) {
 
     // Step 3: upload photo bytes to Supabase via signed URL
     try {
-      const comma = TINY_JPEG.indexOf(',');
-      const b64 = TINY_JPEG.slice(comma + 1);
-      const binary = atob(b64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      // Generate a valid 1x1 PNG via canvas — avoids atob/base64 encoding issues
+      const canvas = document.createElement('canvas');
+      canvas.width = 1; canvas.height = 1;
+      const ctx2d = canvas.getContext('2d');
+      ctx2d.fillStyle = '#4a90d9';
+      ctx2d.fillRect(0, 0, 1, 1);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
       const r = await fetch(signedUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
