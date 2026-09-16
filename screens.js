@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=251';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=251';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=251';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=251';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=251';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=251';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=252';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=252';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=252';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=252';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=252';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=252';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=251';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=251';
-import { updatePhotoMetadata } from './supabase-photos.js?v=251';
-import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=251';
+} from './findings.js?v=252';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=252';
+import { updatePhotoMetadata } from './supabase-photos.js?v=252';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=252';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=251';
+} from './comment-library.js?v=252';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -2352,6 +2352,71 @@ export function renderStep() {
   const c = ui().el('div', { className: 'screen step-screen' });
   c.appendChild(buildAppHeader(step.name));
   c.appendChild(ui().renderStatusBar(getLastSaveText()));
+
+  // ── Force Sync button ──────────────────────────────────────
+  // Always visible during an active inspection. Sends a checkpoint immediately
+  // with whatever data exists — no room completion required.
+  (function addForceSyncBtn() {
+    const syncBtn = ui().el('button', {
+      id: 'force-sync-btn',
+      style: [
+        'display:block;width:100%;padding:7px 12px;',
+        'font-size:0.78rem;font-weight:600;',
+        'text-align:center;cursor:pointer;touch-action:manipulation;',
+        'border:none;border-bottom:1px solid #e5e7eb;',
+        'background:#fef9c3;color:#713f12;',
+        'transition:background 0.2s;'
+      ].join('')
+    }, '☁ Sync now — tap to back up to cloud');
+    syncBtn.onclick = async function() {
+      const original = syncBtn.textContent;
+      syncBtn.disabled = true;
+      syncBtn.style.background = '#dbeafe';
+      syncBtn.style.color = '#1e40af';
+      syncBtn.textContent = '⏳ Syncing…';
+      try {
+        const ok = await checkpointToCloud(ctx.stepList);
+        if (ok) {
+          syncBtn.style.background = '#dcfce7';
+          syncBtn.style.color = '#166534';
+          syncBtn.textContent = '✓ Backed up to cloud';
+          setTimeout(() => {
+            if (document.body.contains(syncBtn)) {
+              syncBtn.style.background = '';
+              syncBtn.style.color = '';
+              syncBtn.style.display = 'none';
+            }
+          }, 3000);
+        } else {
+          syncBtn.style.background = '#fee2e2';
+          syncBtn.style.color = '#991b1b';
+          syncBtn.textContent = '✗ Sync failed — tap to retry';
+          syncBtn.disabled = false;
+        }
+      } catch(e) {
+        syncBtn.style.background = '#fee2e2';
+        syncBtn.style.color = '#991b1b';
+        syncBtn.textContent = '✗ Error — tap to retry';
+        syncBtn.disabled = false;
+      }
+    };
+    // Show when there's no backup yet, or hide if already synced recently
+    const syncStatus = getSyncStatus ? getSyncStatus() : '';
+    const showAlways = !syncStatus || syncStatus === 'local' || syncStatus === 'failed' || syncStatus === 'offline';
+    syncBtn.style.display = showAlways ? 'block' : 'none';
+    c.appendChild(syncBtn);
+    // Listen for checkpoint success and hide the button
+    window.addEventListener('inhaus-checkpoint-success', function onSuccess() {
+      if (!document.body.contains(syncBtn)) { window.removeEventListener('inhaus-checkpoint-success', onSuccess); return; }
+      syncBtn.style.background = '#dcfce7';
+      syncBtn.style.color = '#166534';
+      syncBtn.textContent = '✓ Backed up to cloud';
+      setTimeout(() => {
+        if (document.body.contains(syncBtn)) syncBtn.style.display = 'none';
+        window.removeEventListener('inhaus-checkpoint-success', onSuccess);
+      }, 3000);
+    }, { once: false });
+  })();
 
   const timersBar = ui().renderTimersBar(ctx.inspection, () => scheduleSave());
   if (timersBar) c.appendChild(timersBar);
