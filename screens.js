@@ -1,10 +1,10 @@
 // InHaus Inspector - Screen Rendering
-import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=250';
-import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=250';
-import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=250';
-import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=250';
-import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=250';
-import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=250';
+import { setInspection, getScreen, setScreen, getLastSaveText, getBestCloudSyncAt, getSyncStatus, clearActivePosition } from './state.js?v=251';
+import { saveNow, scheduleSave, createRestorePoint } from './storage.js?v=251';
+import { buildExportJSON, extractAllPhotosFromExport } from './inspection.js?v=251';
+import { checkpointToCloud, submitInspection, listCloudInspections, loadCloudInspection, ensureStartInspectionShell } from './sync.js?v=251';
+import { STEP_FIELDS, PHASES, REQUIRED_TEST_OPTIONS, buildStepList, getStepData, getStepFields, validateStep, warnStep, ensureRoomRelationships } from './steps.js?v=251';
+import { text, textarea, date, sel, chips, photo, heading, divider, showIf } from './fields.js?v=251';
 import {
   ensureInspectionWorkspace, syncPhotoCommentsToFindings, createFinding, updateFinding,
   approveFinding, excludeFinding, saveFindingToLibrary, useLibraryComment,
@@ -13,14 +13,14 @@ import {
   addTeamMember, removeTeamMember, setStepAssignment, getStepAssignment,
   markStepUpdated, recordTeamActivity, recordAuditEvent,
   setActiveStepPresence, getActivePresence
-} from './findings.js?v=250';
-import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=250';
-import { updatePhotoMetadata } from './supabase-photos.js?v=250';
-import { FIELD_RESUME_TOKEN } from './config.js?v=250';
+} from './findings.js?v=251';
+import { buildPhotoRoutingSuggestions } from './photo-routing.js?v=251';
+import { updatePhotoMetadata } from './supabase-photos.js?v=251';
+import { FIELD_RESUME_TOKEN, PHOTO_WORKER_URL, PHOTO_UPLOAD_SECRET } from './config.js?v=251';
 import {
   refreshCompanyComments, submitCompanyCommentCandidate,
   flushPendingCompanyCommentCandidates
-} from './comment-library.js?v=250';
+} from './comment-library.js?v=251';
 
 // UI globals — accessed lazily via ui() to guarantee window.UI is ready
 function ui() { return window.UI; }
@@ -553,6 +553,181 @@ export function render() {
 
 // ── App Header (reused on all screens) ─────────────────────
 let _devTapCount = 0, _devTapTimer = null;
+
+// ── Dev Pipeline Smoke Test ──────────────────────────────────────────────────
+// One-tap full pipeline check: shell → photo sign → photo upload → save →
+// verify → handoff request. No real inspection created. ~5-10 seconds.
+async function runDevSmokeTest(btn) {
+  const results = [];
+  const start = Date.now();
+  const inspectionId = 'SMOKE-' + Date.now().toString(36).toUpperCase();
+  const photoId = 'p-smoke-' + Math.random().toString(36).slice(2, 9);
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Testing…';
+  const statusEl = btn.nextElementSibling || (() => {
+    const el = ui().el('div', { style: 'font-size:0.8rem;margin-top:8px;padding:8px;border-radius:6px;font-family:monospace;white-space:pre-wrap;' });
+    btn.insertAdjacentElement('afterend', el);
+    return el;
+  })();
+
+  function log(label, ok, detail) {
+    results.push({ label, ok, detail });
+    const lines = results.map(r =>
+      (r.ok ? '✅' : '❌') + ' ' + r.label + (r.detail ? ' — ' + r.detail : '')
+    ).join('\n');
+    statusEl.textContent = lines + '\n⏳ Running…';
+    statusEl.style.background = '#f8f9fa';
+    statusEl.style.border = '1px solid #dee2e6';
+  }
+
+  function done() {
+    const allOk = results.every(r => r.ok);
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const lines = results.map(r =>
+      (r.ok ? '✅' : '❌') + ' ' + r.label + (r.detail ? ' — ' + r.detail : '')
+    ).join('\n');
+    statusEl.textContent = lines + '\n' + (allOk ? '✅ Sync OK' : '❌ Sync Failed') + ' (' + elapsed + 's)';
+    statusEl.style.background = allOk ? '#f0fdf4' : '#fef2f2';
+    statusEl.style.border = '1px solid ' + (allOk ? '#86efac' : '#fca5a5');
+    statusEl.style.color = allOk ? '#166534' : '#991b1b';
+    btn.disabled = false;
+    btn.textContent = allOk ? '✅ Run Smoke Test (last: OK)' : '❌ Run Smoke Test (last: FAILED)';
+  }
+
+  // Minimal 1×1 JPEG as base64 data URL
+  const TINY_JPEG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAABgUEA/8QAIhAAAQMEAgMAAAAAAAAAAAAAAQIDBAAFESExQVH/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8Aq3FtPuV5u0K2W5tK5k54NtJUcAZJOAPQAk1X2m0NWe3R4EdSlIZRtzjJJ6knuSa6qKAP/9k=';
+
+  try {
+    // Step 1: start-inspection-shell
+    try {
+      const r = await fetch(PHOTO_WORKER_URL + '/start-inspection-shell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sharedSecret: PHOTO_UPLOAD_SECRET,
+          action: 'startInspectionShell',
+          requestedBy: 'dev-smoke-test',
+          inspectionId,
+          clientName: 'Smoke Test',
+          propertyAddress: '123 Test St',
+          inspectionDate: new Date().toISOString().slice(0, 10),
+          inspectorName: 'Smoke Test',
+          assessmentType: 'Home Health Assessment',
+          isTestTraining: false,
+          startedAt: new Date().toISOString()
+        })
+      });
+      const d = await r.json();
+      const ok = r.ok && (d.status === 'ready' || d.cached === true) && !!d.assessmentNumber;
+      log('Shell', ok, ok ? '#' + d.assessmentNumber : (d.error || 'HTTP ' + r.status));
+      if (!ok) { done(); return; }
+      var assessmentNumber = d.assessmentNumber;
+      var folderId = d.folderId;
+      var trackerRow = d.trackerRow;
+    } catch(e) {
+      log('Shell', false, e.message || 'network error');
+      done(); return;
+    }
+
+    // Step 2: /sign — get signed upload URL
+    var signedUrl;
+    try {
+      const r = await fetch(PHOTO_WORKER_URL + '/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sharedSecret: PHOTO_UPLOAD_SECRET,
+          inspectionId, photoId,
+          roomName: 'Kitchen', stepName: 'overview', caption: 'smoke test photo'
+        })
+      });
+      const d = await r.json();
+      const ok = r.ok && !!d.signedUrl;
+      log('Sign URL', ok, ok ? 'OK' : (d.error || 'HTTP ' + r.status));
+      if (!ok) { done(); return; }
+      signedUrl = d.signedUrl;
+    } catch(e) {
+      log('Sign URL', false, e.message || 'network error');
+      done(); return;
+    }
+
+    // Step 3: upload photo bytes to Supabase via signed URL
+    try {
+      const comma = TINY_JPEG.indexOf(',');
+      const b64 = TINY_JPEG.slice(comma + 1);
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      const r = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+        body: blob
+      });
+      const ok = r.ok || r.status === 200;
+      log('Photo upload', ok, ok ? 'stored' : 'HTTP ' + r.status);
+      if (!ok) { done(); return; }
+    } catch(e) {
+      log('Photo upload', false, e.message || 'network error');
+      done(); return;
+    }
+
+    // Step 4: /inspections/save — checkpoint with photo manifest
+    try {
+      const r = await fetch(PHOTO_WORKER_URL + '/inspections/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sharedSecret: PHOTO_UPLOAD_SECRET,
+          _checkpoint: true,
+          inspectionId,
+          clientName: 'Smoke Test',
+          propertyAddress: '123 Test St',
+          inspectionDate: new Date().toISOString().slice(0, 10),
+          inspectorName: 'Smoke Test',
+          assessmentType: 'Home Health Assessment',
+          assessmentNumber,
+          folderId,
+          trackerRow,
+          status: 'in-progress',
+          photoManifest: [{ photoId, roomName: 'Kitchen', stepName: 'overview', caption: 'smoke', timestamp: new Date().toISOString() }]
+        })
+      });
+      const d = await r.json();
+      const ok = r.ok && d.status === 'ok' && d.saved === true;
+      log('Checkpoint save', ok, ok ? 'assessment #' + d.assessmentNumber : (d.error || 'HTTP ' + r.status));
+      if (!ok) { done(); return; }
+    } catch(e) {
+      log('Checkpoint save', false, e.message || 'network error');
+      done(); return;
+    }
+
+    // Step 5: /inspection-status — verify photo in storage
+    try {
+      const r = await fetch(PHOTO_WORKER_URL + '/inspection-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sharedSecret: PHOTO_UPLOAD_SECRET,
+          inspectionId,
+          expectedPhotoIds: [photoId]
+        })
+      });
+      const d = await r.json();
+      const ok = r.ok && d.complete === true && d.assessmentExists === true;
+      log('Verify', ok, ok ? d.storedPhotos + '/1 photos confirmed' : (d.error || ('missing: ' + (d.missingPhotoIds || []).join(','))));
+    } catch(e) {
+      log('Verify', false, e.message || 'network error');
+    }
+
+  } catch(e) {
+    log('Smoke test', false, e.message || 'unexpected error');
+  }
+
+  done();
+}
+
 function isDevMode() { return localStorage.getItem('inhausDevMode') === 'true'; }
 function toggleDevMode() {
   const next = !isDevMode();
@@ -755,6 +930,19 @@ export function renderHome() {
     onClick: () => createQuickTestPickup(quickPickupBtn)
   }, 'Create Test Pickup Inspection');
   advancedSection.appendChild(quickPickupBtn);
+
+  // ── Smoke Test button (always visible in Advanced, self-contained) ───────
+  const smokeTestBtn = ui().el('button', {
+    className: 'btn btn-outline btn-full',
+    style: 'margin-top:8px;font-size:0.8rem;color:#7c3aed;border-color:#c4b5fd;',
+    onClick: () => runDevSmokeTest(smokeTestBtn)
+  }, '🔬 Run Smoke Test');
+  const smokeTestStatus = ui().el('div', {
+    style: 'font-size:0.8rem;margin-top:8px;padding:8px;border-radius:6px;font-family:monospace;white-space:pre-wrap;display:none;'
+  });
+  smokeTestBtn.insertAdjacentElement('afterend', smokeTestStatus);
+  advancedSection.appendChild(smokeTestBtn);
+  advancedSection.appendChild(smokeTestStatus);
   c.appendChild(advancedSection);
 
   // ── Jump to Step (dev only) ─────────────────────────────
