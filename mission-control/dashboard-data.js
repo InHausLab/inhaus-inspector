@@ -49,9 +49,10 @@
     for (const ref of photoRefs) {
       if (isPlainObject(ref)) candidates.push(ref.timestamp, ref.createdAt, ref.capturedAt, ref._vaultSavedAt);
     }
-    candidates.push(step._updatedAt, step.updatedAt);
     const dates = candidates.map(validDate).filter(Boolean).sort((a, b) => b - a);
-    return dates.length ? dates[0].toISOString() : '';
+    if (dates.length) return dates[0].toISOString();
+    const fallbackDates = [step._updatedAt, step.updatedAt].map(validDate).filter(Boolean).sort((a, b) => b - a);
+    return fallbackDates.length ? fallbackDates[0].toISOString() : '';
   }
 
   function extractFollowUps(inspection, photos) {

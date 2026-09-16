@@ -80,3 +80,33 @@ test('extractFollowUps includes recorded time and resolves associated follow-up 
     associatedPhotos: [photos[0]]
   }]);
 });
+
+test('extractFollowUps ignores later unrelated room edits when follow-up timestamps exist', () => {
+  const inspection = {
+    stepData: {
+      utility: {
+        roomName: 'Utility Room',
+        followUpNeeded: 'Yes',
+        followUpNote: 'Earlier follow-up',
+        _fieldUpdates: {
+          followUpNote: { updatedAt: '2026-09-16T10:00:00.000Z' }
+        },
+        _updatedAt: '2026-09-16T12:00:00.000Z'
+      },
+      kitchen: {
+        roomName: 'Kitchen',
+        followUpNeeded: 'Yes',
+        followUpNote: 'Later follow-up',
+        _fieldUpdates: {
+          followUpNote: { updatedAt: '2026-09-16T11:00:00.000Z' }
+        },
+        _updatedAt: '2026-09-16T11:00:00.000Z'
+      }
+    }
+  };
+
+  const followUps = extractFollowUps(inspection, []);
+
+  assert.equal(followUps[0].room, 'Kitchen');
+  assert.equal(followUps[1].recordedAt, '2026-09-16T10:00:00.000Z');
+});
