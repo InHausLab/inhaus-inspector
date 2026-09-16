@@ -4,6 +4,23 @@ This file is the authoritative record of every significant change, decision, bug
 
 **Update this file every time something changes.** When handing off to Codex/Claude Code, include this file. When rebuilding, read this first.
 
+## Overnight Validation Run — Sep 15/16 2026
+**Date:** September 15–16, 2026 (21:49–21:57 MDT)
+**Verdict:** GO ✅
+
+### Tests run
+- **v257 deployment verified:** CACHE_NAME=inhaus-v257 ✓, startQuickTestInspection present ✓, QA Test Client pre-fill ✓, ctx.genId() used ✓
+- **100-photo load test (LOAD-TEST-1789530832):** 100/100 photos signed + uploaded in 68s, zero failures, zero rate limits. Supabase storage confirmed 100 objects (lt-001.jpg through lt-100.jpg).
+- **Full E2E inspection (E2E-TEST-1789530926, assessment #039):** shell → 20 photos → checkpoint → final submit → inspection-status complete:true → review portal fieldData present. All steps 200 OK.
+- **Review portal stress:** /get-review for 100-photo inspection returned 200 in 299ms. /get-review for E2E inspection returned 200 in 352ms with fieldData.
+
+### No code changes during overnight run
+All tests passed against v257. No fixes required. Report saved to:
+`/Users/hans/.openclaw/workspace/reports/morning-brief-2026-09-16.md`
+
+---
+
+
 ## v250 / v249 — Sync Bug Fix: assessment_type_locked_after_shell
 **Date:** September 15, 2026
 **Commits:** 85d7d8f (v249), cccf021 (v250), 356d079 (const→let fix)
