@@ -1,4 +1,4 @@
-// InHaus Inspector Service Worker v254
+// InHaus Inspector Service Worker v259
 // Safe iOS Safari implementation - June 28 2026
 //
 // Rules:
@@ -9,29 +9,29 @@
 // - updateViaCache:none set in registration (bypasses GitHub Pages sw.js caching)
 // - no-cache fetch in install (bypasses GitHub Pages max-age=600)
 
-const CACHE_NAME = 'inhaus-v258';
+const CACHE_NAME = 'inhaus-v259';
 
 const APP_SHELL = [
   './',
   './index.html',
   './cache-reset.html',
-  './app.js?v=258',
-  './screens.js?v=258',
-  './sync.js?v=258',
-  './ui.js?v=258',
-  './steps.js?v=258',
-  './config.js?v=258',
-  './storage.js?v=258',
-  './fields.js?v=258',
-  './inspection.js?v=258',
-  './findings.js?v=258',
-  './photo-routing.js?v=258',
-  './comment-library.js?v=258',
-  './feedback.js?v=258',
+  './app.js?v=259',
+  './screens.js?v=259',
+  './sync.js?v=259',
+  './ui.js?v=259',
+  './steps.js?v=259',
+  './config.js?v=259',
+  './storage.js?v=259',
+  './fields.js?v=259',
+  './inspection.js?v=259',
+  './findings.js?v=259',
+  './photo-routing.js?v=259',
+  './comment-library.js?v=259',
+  './feedback.js?v=259',
   './comment-library-admin.html',
-  './comment-library-admin.js?v=258',
-  './db.js?v=258',
-  './state.js?v=258',
+  './comment-library-admin.js?v=259',
+  './db.js?v=259',
+  './state.js?v=259',
   './styles.css',
   './manifest.json',
 ];

@@ -30,7 +30,7 @@ const HANDOFF_RETRY_MAX_DELAY_MS = 60 * 60 * 1000;
 const DIRECT_HANDOFF_LOCK_STALE_MS = 2 * 60 * 1000;
 const ASSESSMENT_NUMBER_SOURCE_SUPABASE = 'supabase_sequence';
 const ASSESSMENT_NUMBER_SOURCE_TRACKER = 'tracker_sequence_fallback';
-const WORKER_VERSION = 'handoff-w42';
+const WORKER_VERSION = 'handoff-w43';
 const REVIEW_MUTATION_MAX_ATTEMPTS = 16;
 const SHEET_CELL_SAFE_CHARS = 45000;
 
@@ -90,8 +90,10 @@ export default {
 
 async function handleSign(request, env) {
   requireEnv(env, ['SUPABASE_URL', 'SUPABASE_BUCKET', 'SUPABASE_SERVICE_KEY', 'UPLOAD_SECRET']);
-  const body = await readJson(request);
-  validateSharedSecret(body, env);
+  const body = await readJson(request).catch(() => null);
+  if (!body || body.sharedSecret !== env.UPLOAD_SECRET) {
+    return json({ error: 'unauthorized' }, 401);
+  }
 
   const inspectionId = cleanId(body.inspectionId, 'inspectionId');
   const photoId = cleanId(body.photoId, 'photoId');
