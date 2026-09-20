@@ -4,6 +4,28 @@ This file is the authoritative record of every significant change, decision, bug
 
 **Update this file every time something changes.** When handing off to Codex/Claude Code, include this file. When rebuilding, read this first.
 
+## v259 / Worker W43 — Pre-Inspection Release Candidate
+**Date:** September 20, 2026
+**Commit:** `bd4716b`
+**Deployment status:** Not deployed; requires the authorized production deploy host and the normal no-active-inspection gate.
+
+### Symptoms and root cause
+- An empty unauthenticated `POST /sign` returned `500 {"error":"invalid_json"}` because the Worker parsed JSON before validating the shared secret.
+- The Inspector release graph mixed v248, v254, and v258 query/cache identifiers, so clients could load incompatible browser modules even though the service-worker cache was named v258.
+
+### Scoped changes
+- Reject missing, malformed, or incorrect `/sign` credentials with `401 {"error":"unauthorized"}` before validating upload fields.
+- Add a regression test that exercises the Worker's real fetch handler with an empty unauthenticated request.
+- Move the complete Inspector entry/import/cache graph to v259 and the Worker receipt version to W43.
+
+### Verification
+- `node --test tests/*.test.mjs`: **111/111 passed**.
+- Production API smoke `E2E-TEST-CODEX-20260920233713`: shell saved, four photos uploaded and confirmed in the photo inventory, checkpoint saved, final status `complete:true`, and `/get-review` returned field data.
+- Review Portal human-workflow check displayed **4/4 photos confirmed** for the test inspection.
+- Drive mirror remained `0/4`; the originals are confirmed in Supabase and mirror repair is intentionally deferred for this release.
+
+---
+
 ## Overnight Validation Run — Sep 15/16 2026
 **Date:** September 15–16, 2026 (21:49–21:57 MDT)
 **Verdict:** GO ✅
