@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Home Health Assessment Results — 521 Park Circle, Basalt CO</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --green:   #1B4332;
+    --green-lt:#2D6A4F;
+    --green-bg:#F0F7F4;
+    --amber:   #B45309;
+    --amber-bg:#FFFBEB;
+    --amber-bd:#FCD34D;
+    --text:    #111827;
+    --muted:   #6B7280;
+    --border:  #E5E7EB;
+    --row-alt: #F9FAFB;
+    --ok:      #15803D;
+    --warn:    #B45309;
+    --radius:  6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    background: #fff;
+  }
+
+  /* ── Layout ── */
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* ── Header ── */
+  .report-header {
+    border-top: 4px solid var(--green);
+    padding-top: 28px;
+    margin-bottom: 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .report-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: -0.3px;
+    line-height: 1.3;
+  }
+  .report-meta {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.8;
+  }
+  .report-meta strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .byline {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+    padding-top: 4px;
+  }
+  .byline span {
+    display: block;
+    font-weight: 600;
+    color: var(--green);
+    font-size: 13px;
+  }
+
+  /* ── Overview band ── */
+  .overview {
+    background: var(--green-bg);
+    border-left: 4px solid var(--green);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 40px;
+    color: #1F2937;
+    font-size: 14.5px;
+  }
+
+  /* ── Section blocks ── */
+  .section {
+    margin-bottom: 44px;
+  }
+  .section-header {
+    border-bottom: 2px solid var(--green);
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .section-header h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: -0.2px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* subsection headings */
+  .subsection-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 24px 0 10px;
+  }
+
+  p, .body-text {
+    font-size: 14.5px;
+    color: #374151;
+    margin-bottom: 14px;
+  }
+
+  /* ── Score pill ── */
+  .score-pill {
+    display: inline-block;
+    background: var(--green);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Tables ── */
+  .tbl-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead th {
+    background: var(--green);
+    color: #fff;
+    font-weight: 600;
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr:nth-child(odd)  { background: #fff; }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* status cells */
+  .ok   { color: var(--ok);   font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .det  { color: var(--muted); font-weight: 500; }
+  .rec  { color: var(--muted); }
+
+  /* ── Items to Watch ── */
+  .watch-section {
+    background: var(--amber-bg);
+    border-left: 4px solid var(--amber-bd);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 44px;
+  }
+  .watch-section .section-header {
+    border-bottom-color: var(--amber-bd);
+    margin-bottom: 20px;
+  }
+  .watch-section .section-header h2 {
+    color: var(--amber);
+  }
+  .watch-item {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--amber-bd);
+  }
+  .watch-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  .watch-item h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--amber);
+    margin-bottom: 8px;
+  }
+  .watch-item p {
+    font-size: 14px;
+    color: #374151;
+    margin-bottom: 0;
+  }
+
+  /* ── Footer note ── */
+  .report-footer {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { font-size: 13px; }
+    .page { padding: 20px 16px; max-width: 100%; }
+    .report-header { padding-top: 16px; }
+    .section { page-break-inside: avoid; }
+    .watch-section { page-break-inside: avoid; }
+    thead th { background: var(--green) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody tr:nth-child(even) { background: #F9FAFB !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    body { font-size: 14px; }
+    .page { padding: 28px 16px 60px; }
+    .report-header { flex-direction: column; }
+    .byline { text-align: left; }
+    .report-header h1 { font-size: 19px; }
+    table { font-size: 12.5px; }
+    thead th { padding: 8px 10px; }
+    tbody td { padding: 7px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ HEADER ══ -->
+  <header class="report-header">
+    <div>
+      <h1>Home Health Assessment Results</h1>
+      <div class="report-meta">
+        <strong>Property:</strong> 521 Park Circle, Basalt, CO 81621<br>
+        <strong>Inspection Date:</strong> August 12, 2026<br>
+        <strong>Report Date:</strong> September 23, 2026
+      </div>
+    </div>
+    <div class="byline">
+      Prepared by<br><span>InHaus Lab</span>
+    </div>
+  </header>
+
+  <!-- ══ OVERVIEW ══ -->
+  <div class="overview">
+    Over 190 individual parameters and measurements were taken at your home on August 12, 2026, covering indoor air quality, mold, radon, water chemistry, PFAS (forever chemicals), and microplastics. Results across most categories are clean. Three items are flagged for your awareness and noted at the bottom of this document.
+  </div>
+
+  <!-- ══ SECTION 1 — Indoor Air Quality ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Indoor Air Quality — Mold &amp; Allergens</h2>
+      <span class="section-label">Air</span>
+    </div>
+
+    <p>Air was sampled using DNA-based genomic sequencing, which identifies every mold species present by its genetic material — a more precise method than traditional microscopy. Testing covered 15 mold species and 39 pollen types (24 tree species, 14 weed species, and grasses).</p>
+
+    <div class="score-pill">Overall Air Quality Score: 30 / 100 (Low) — 82% of homes score at this level or lower</div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>What Was Tested</th><th>Result</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cladosporium</td><td>376 spores/m³ — Very High</td><td class="warn">⚠️ Elevated</td></tr>
+          <tr><td>Aureobasidium</td><td>28 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Aspergillus</td><td>25 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Fusarium</td><td>16 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Phoma</td><td>13 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Alternaria</td><td>10 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Penicillium</td><td>6 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Didymella</td><td>5 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Chaetomium</td><td>3 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Epicoccum</td><td>3 spores/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Acremonium</td><td>1 spore/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Wallemia</td><td>1 spore/m³</td><td class="det">Detected</td></tr>
+          <tr><td>Bipolaris</td><td>Not detected</td><td class="ok">✅ Clear</td></tr>
+          <tr><td>Stachybotrys (toxic black mold)</td><td>Not detected</td><td class="ok">✅ Clear</td></tr>
+          <tr><td>Ulocladium</td><td>Not detected</td><td class="ok">✅ Clear</td></tr>
+          <tr><td>Tree pollen (24 species: maple, oak, birch, ash, walnut, cottonwood, pine, and 17 others)</td><td>Not detected</td><td class="ok">✅ Clear</td></tr>
+          <tr><td>Weed pollen (14 species: ragweed, mugwort, pigweed, sorrel, and 10 others)</td><td>Not detected</td><td class="ok">✅ Clear</td></tr>
+          <tr><td>Grass pollen</td><td>Not detected</td><td class="ok">✅ Clear</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ SECTION 2 — Mold ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Mold — Air &amp; Surface Sampling</h2>
+      <span class="section-label">Mold</span>
+    </div>
+
+    <p>A separate microscopy-based air sample was collected in the primary bathroom, and surface swabs were taken in both the utility room and kitchen. Samples were analyzed at an accredited laboratory.</p>
+
+    <p class="subsection-title">Primary Bathroom — Air Sample</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>What Was Tested</th><th>Result</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Total spore count</td><td>470 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Cladosporium</td><td>208 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Smut/Myxomycetes</td><td>87 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Basidiospores</td><td>74 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Ascospores</td><td>40 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Penicillium/Aspergillus</td><td>40 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Alternaria</td><td>13 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td>Curvularia</td><td>7 spores/m³</td><td class="ok">✅ Normal</td></tr>
+          <tr><td><strong>Lab determination</strong></td><td><strong>NORMAL — no exposure concern</strong></td><td class="ok">✅ Pass</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="subsection-title">Surface Swabs (same 8 mold types tested at each location)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Location</th><th>Result</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Utility Room</td><td>No growth detected</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Kitchen</td><td>No growth detected</td><td class="ok">✅ Pass</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ SECTION 3 — Radon ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Radon</h2>
+      <span class="section-label">Radon</span>
+    </div>
+
+    <p>Radon is a naturally occurring radioactive gas that rises from soil and rock. It is the second leading cause of lung cancer in non-smokers. A continuous electronic monitor ran in the basement for 48 hours, recording conditions every hour.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>What Was Tested</th><th>Result</th><th>EPA Action Level</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Radon (48-hour average)</td><td>0.3 pCi/L</td><td>4.0 pCi/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Peak radon reading</td><td>1.3 pCi/L</td><td>—</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Basement temperature (average)</td><td>71.3°F</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Basement humidity (average)</td><td>50.3%</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Atmospheric pressure (average)</td><td>23.64 inHg</td><td>—</td><td class="rec">Recorded</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>National average indoor radon is 1.3 pCi/L. Your home tested at 0.3 pCi/L — well below both the national average and the EPA action level.</p>
+  </div>
+
+  <!-- ══ SECTION 4 — Water Quality ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Water Quality</h2>
+      <span class="section-label">Water</span>
+    </div>
+
+    <p>A water sample from the kitchen sink was analyzed by an EPA-certified laboratory. Results cover 48 parameters across metals, minerals, inorganics, and physical properties.</p>
+
+    <p class="subsection-title">Metals (31 tested)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>What Was Tested</th><th>Result</th><th>EPA Limit</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lead</td><td>Not detected</td><td>0.010 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Arsenic</td><td>Not detected</td><td>0.010 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Mercury</td><td>Not detected</td><td>0.002 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Cadmium</td><td>Not detected</td><td>0.005 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Chromium</td><td>Not detected</td><td>0.100 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Hexavalent Chromium (Cr-6)</td><td>Not detected</td><td>—</td><td class="ok">✅ Clear</td></tr>
+          <tr><td>Antimony</td><td>Not detected</td><td>0.006 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Barium</td><td>0.044 mg/L</td><td>2.0 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Beryllium</td><td>Not detected</td><td>0.004 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Selenium</td><td>Not detected</td><td>0.050 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Thallium</td><td>Not detected</td><td>0.002 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Aluminum</td><td>Not detected</td><td>0.200 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Iron</td><td>Not detected</td><td>0.300 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Manganese</td><td>Not detected</td><td>0.050 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Copper</td><td>0.120 mg/L</td><td>1.0 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Zinc</td><td>Not detected</td><td>5.0 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Silver</td><td>Not detected</td><td>0.100 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Calcium</td><td>43.7 mg/L</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Magnesium</td><td>8.65 mg/L</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Sodium</td><td>4.21 mg/L</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Strontium</td><td>0.246 mg/L</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Silica</td><td>20.7 mg/L</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Silicon</td><td>9.64 mg/L</td><td>—</td><td class="rec">Recorded</td></tr>
+          <tr><td>Cobalt, Boron, Lithium, Molybdenum, Nickel, Phosphorus, Potassium, Tin, Vanadium</td><td>Not detected</td><td>—</td><td class="ok">✅ Clear</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="subsection-title">Inorganics (5 tested)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>What Was Tested</th><th>Result</th><th>EPA Limit</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Nitrate/Nitrite (as Nitrogen)</td><td>0.500 mg/L</td><td>10 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Fluoride</td><td>0.164 mg/L</td><td>2.0 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Sulfate</td><td>52.1 mg/L</td><td>250 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Chloride</td><td>3.76 mg/L</td><td>250 mg/L</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Bromide</td><td>Not detected</td><td>—</td><td class="ok">✅ Clear</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="subsection-title">Physical Properties (12 tested)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>What Was Tested</th><th>Result</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>pH</td><td>7.95 (range 6.5–8.5)</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Total Dissolved Solids (TDS)</td><td>228 mg/L (limit 500)</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Hardness</td><td>145 mg/L (moderately hard)</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Alkalinity</td><td>110 mg/L</td><td class="rec">Recorded</td></tr>
+          <tr><td>Bicarbonate</td><td>110 mg/L</td><td class="rec">Recorded</td></tr>
+          <tr><td>Carbonate</td><td>Not detected</td><td class="rec">Recorded</td></tr>
+          <tr><td>Conductivity</td><td>346 µmhos/cm</td><td class="rec">Recorded</td></tr>
+          <tr><td>Turbidity</td><td>Not detected</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>Tannin/Lignin</td><td>Not detected</td><td class="rec">Recorded</td></tr>
+          <tr><td>Langelier Index</td><td>0.2</td><td class="rec">Recorded</td></tr>
+          <tr><td>Ryznar Index</td><td>7.5</td><td class="rec">Recorded</td></tr>
+          <tr><td>Aggressive Index</td><td>11.6</td><td class="warn">⚠️ See note below</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ SECTION 5 — PFAS ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>PFAS — Forever Chemicals</h2>
+      <span class="section-label">PFAS</span>
+    </div>
+
+    <p>PFAS (per- and polyfluoroalkyl substances) are man-made chemicals used in nonstick cookware, water-resistant fabrics, firefighting foam, and industrial manufacturing. They are called "forever chemicals" because they don't break down in the body or the environment. The EPA established enforceable limits for six PFAS compounds in 2024.</p>
+
+    <p>55 individual PFAS compounds were screened.</p>
+
+    <p class="subsection-title">The 6 EPA-regulated compounds (PFAS6)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Compound</th><th>Result</th><th>EPA Limit (2024)</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>PFOA (Perfluorooctanoic acid — Teflon)</td><td>Below detection (&lt;1.0 ppt)</td><td>4 ppt</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>PFOS (Perfluorooctane sulfonic acid — Scotchgard)</td><td>Below detection (&lt;1.0 ppt)</td><td>4 ppt</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>PFHxS (Perfluorohexane sulfonic acid)</td><td>Below detection (&lt;1.0 ppt)</td><td>10 ppt combined</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>PFNA (Perfluorononanoic acid)</td><td>Below detection (&lt;1.0 ppt)</td><td>10 ppt combined</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>HFPO-DA / GenX (next-gen PFAS replacement)</td><td>Below detection (&lt;1.0 ppt)</td><td>10 ppt combined</td><td class="ok">✅ Pass</td></tr>
+          <tr><td>PFBS (Perfluorobutane sulfonic acid)</td><td>Below detection (&lt;1.0 ppt)</td><td>10 ppt combined</td><td class="ok">✅ Pass</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="subsection-title">49 additional (unregulated) PFAS compounds screened</p>
+    <p style="font-size:13px; color:#4B5563; line-height:1.7;">PFBA, PFPeA, PFHxA, PFHpA, PFDA, PFUnA, PFDoA, PFTrDA, PFTeA, PFPrS, PFPeS, PFHpS, PFNS, PFDS, PFDoS, 4:2 FTS, 6:2 FTS, 8:2 FTS, 10:2 FTS, FBSA, MeFBSA, FHxSA, PFOSA, FDSA, NEtFOSA, NMeFOSA, FOSAA, NEtFOSAA, NMeFOSAA, NMeFOSE, NEtFOSE, HFPO-DA, ADONA, PFMPA, PFMBA, NFDHA, 9Cl-PF3ONS, 11CL-PF3OUdS, PFEESA, PFECHS, 8Cl-PFOS, 3:3FTCA, 5:3FTCA, 7:3FTCA, FDUEA, FOUEA, 6:6PFPi, 6:8PFPi, 8:8PFPi, N-AP-FHxSA</p>
+
+    <div style="background:#F0F7F4; border-left:3px solid var(--green); border-radius:4px; padding:12px 16px; margin-top:12px; font-size:14px; color:#1F2937;">
+      <strong>Result:</strong> 1 compound detected at 1.2 ppt — below all EPA limits. 54 of 55 compounds not detected.
+    </div>
+  </div>
+
+  <!-- ══ SECTION 6 — Microplastics ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Microplastics</h2>
+      <span class="section-label">Microplastics</span>
+    </div>
+
+    <p>Microplastics are plastic particles smaller than 5mm that have been found in water supplies worldwide. There is currently no regulatory limit. Three separate testing methods were used.</p>
+
+    <p class="subsection-title">Test 1 — Fluorescence Microscopy (6 size fractions)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Size Range</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Less than 10 µm</td><td class="ok">Not detected</td></tr>
+          <tr><td>10–50 µm</td><td class="ok">Not detected</td></tr>
+          <tr><td>50–100 µm</td><td class="ok">Not detected</td></tr>
+          <tr><td>100–500 µm</td><td class="ok">Not detected</td></tr>
+          <tr><td>500–1,000 µm</td><td class="ok">Not detected</td></tr>
+          <tr><td>1,000–5,000 µm</td><td class="ok">Not detected</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="subsection-title">Test 2 — Raman Spectrometry (6 plastic types × 6 size ranges = 36 measurements)</p>
+    <p style="font-size:13.5px; color:#374151; margin-bottom:8px;">Plastics tested: PET (#1), HDPE (#2), LDPE (#4), Polypropylene (#5), Polystyrene (#6), Other (#7)</p>
+    <div style="background:#F0F7F4; border-left:3px solid var(--green); border-radius:4px; padding:12px 16px; margin-bottom:20px; font-size:14px; color:#1F2937;">
+      All 36 measurements: <strong>Not detected</strong>
+    </div>
+
+    <p class="subsection-title">Test 3 — Laser Direct Infrared Spectrometry / LDIR (28 polymer types, 15–500 µm)</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Plastic Type</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Rubber</td><td>189 particles/liter</td></tr>
+          <tr><td>Polypropylene</td><td>75 particles/liter</td></tr>
+          <tr><td>Polyethylene</td><td>51 particles/liter</td></tr>
+          <tr><td>Polystyrene</td><td>4 particles/liter</td></tr>
+          <tr><td>Polyamide (Nylon)</td><td>2 particles/liter</td></tr>
+          <tr><td>Alkyd Varnish</td><td>2 particles/liter</td></tr>
+          <tr><td>Acrylates, ABS, EVA, PLA, Polybutadiene, Polycaprolactone, Polycarbonate, Polyether, Chlorinated Polyethylene, PET, PHB, Polyimide, PMMA, POM, Polysulfone, PTFE, Polyurethane, PVA, PVC, Silicone (21 types)</td><td class="ok">Not detected</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>323 particles/liter</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The first two tests detected nothing. The third test — using a more sensitive laser-based method — detected 323 particles per liter, primarily rubber and polypropylene, which are consistent with plumbing system components. Published research puts typical tap water in the range of 1–100 particles per liter; 323 is above that range. No regulatory limit exists. A certified point-of-use filter (reverse osmosis or NSF-certified microplastics filter) could reduce exposure.</p>
+  </div>
+
+  <!-- ══ SECTION 7 — Home Systems ══ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Home Systems Documented</h2>
+      <span class="section-label">Systems</span>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>System</th><th>Condition Found</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Heating</td><td>Boiler</td></tr>
+          <tr><td>Cooling</td><td>Window AC units</td></tr>
+          <tr><td>Forced air HVAC</td><td>Not present</td></tr>
+          <tr><td>Mechanical ventilation</td><td>Not present</td></tr>
+          <tr><td>Water source</td><td>Municipal</td></tr>
+          <tr><td>Radon mitigation system</td><td>Not present</td></tr>
+          <tr><td>Air filtration system</td><td>Not present</td></tr>
+          <tr><td>Water filtration system</td><td>Not present</td></tr>
+          <tr><td>Water softening</td><td>Not present</td></tr>
+          <tr><td>UV water treatment</td><td>Not present</td></tr>
+          <tr><td>Exterior siding</td><td>Wood and metal</td></tr>
+          <tr><td>Appliance condition</td><td>Good (3–10 years old)</td></tr>
+          <tr><td>Rooms with visible dampness</td><td>0</td></tr>
+          <tr><td>Rooms with musty odor</td><td>0</td></tr>
+          <tr><td>Occupancy during inspection</td><td>Unoccupied</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ ITEMS TO WATCH ══ -->
+  <div class="watch-section">
+    <div class="section-header">
+      <h2>Three Items to Watch</h2>
+      <span class="section-label" style="color:#92400E;">Flagged</span>
+    </div>
+
+    <div class="watch-item">
+      <h3>1. Cladosporium — Kitchen Air (Very High)</h3>
+      <p>Cladosporium was detected at very high levels in the kitchen air sample. It is a common outdoor mold — not toxic — but indoor concentrations this high, especially dominating over all other species, can indicate a nearby moisture source: a slow plumbing leak, condensation around a window or HVAC intake, or water intrusion. The overall air quality score is still in the Low range (82% of homes tested are at this level or lower), so this is not an emergency finding. Worth having someone check under the kitchen sink, around window seals, and at any HVAC returns in the kitchen area.</p>
+    </div>
+
+    <div class="watch-item">
+      <h3>2. Aggressive Water Index (11.6)</h3>
+      <p>This measures the water's mild tendency to be slightly corrosive to metal plumbing. It is not a drinking water health concern — all health-relevant metals tested clean. Homes with older copper or galvanized pipes may see slightly accelerated wear over time. Consistent with the other water chemistry readings, which show the water is near-balanced.</p>
+    </div>
+
+    <div class="watch-item">
+      <h3>3. Microplastics — Laser Test (323 particles/liter)</h3>
+      <p>The most sensitive of the three microplastics tests detected 323 plastic particles per liter, above what most published studies find in municipal tap water. No regulatory limit exists. The other two tests detected nothing, reflecting different method sensitivities. The types detected (rubber, polypropylene, polyethylene) point to plumbing infrastructure rather than consumer contamination. If microplastics are a concern, a point-of-use reverse osmosis filter is the most effective reduction option.</p>
+    </div>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="report-footer">
+    <strong>Total parameters and measurements: 190+</strong><br>
+    Testing covered indoor air quality, mold (air sampling and surface swabs), radon, water chemistry (48 parameters), PFAS (55 compounds), and microplastics (3 separate testing methods).
+  </div>
+
+</div>
+</body>
+</html>
